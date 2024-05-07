@@ -1,0 +1,52 @@
+name: bowtie
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1
+  - _openmp_mutex=4.5
+  - bowtie2=2.5.3
+  - bzip2=1.0.8
+  - c-ares=1.26.0
+  - ca-certificates=2024.2.2
+  - htslib=1.19.1
+  - icu=73.2
+  - keyutils=1.6.1
+  - krb5=1.21.2
+  - ld_impl_linux-64=2.40
+  - libcurl=8.5.0
+  - libdeflate=1.18
+  - libedit=3.1.20191231
+  - libev=4.33
+  - libffi=3.4.2
+  - libgcc-ng=13.2.0
+  - libgomp=13.2.0
+  - libhwloc=2.9.3
+  - libiconv=1.17
+  - libnghttp2=1.58.0
+  - libnsl=2.0.1
+  - libsqlite=3.45.1
+  - libssh2=1.11.0
+  - libstdcxx-ng=13.2.0
+  - libuuid=2.38.1
+  - libxcrypt=4.4.36
+  - libxml2=2.12.5
+  - libzlib=1.2.13
+  - ncurses=6.4
+  - openssl=3.2.1
+  - perl=5.32.1
+  - pip=24.0
+  - python=3.10.13
+  - python_abi=3.10
+  - readline=8.2
+  - samtools=1.19.2
+  - setuptools=69.0.3
+  - tbb=2021.11.0
+  - tk=8.6.13
+  - tzdata=2024a
+  - wheel=0.42.0
+  - xz=5.2.6
+  - zlib=1.2.13
+  - zstd=1.5.5
+ 
