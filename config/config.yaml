@@ -3,14 +3,15 @@ links:
  card_link: https://card.mcmaster.ca/download/0/broadstreet-v3.2.9.tar.bz2
  checkv_link: https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz
 directories:
-  out_dir: /media/data/antonielli_dir/BacTest/output_dir
-  fastq_dir: /home/antoniellil/Downloads/reads_dir
-  blast_db: /data/x1hbrnas4/big_db/NCBI_nt_2024.04.10
-  eggnog_db: /data/x1hbrnas4/big_db/eggnog
-  gtdbtk_db: /data/x1hbrnas4/big_db/GTDB_R214/release214
-  bakta_db: /data/x1hbrnas4/big_db/bakta/db
-  platon_db: /data/x1hbrnas4/big_db/platon/db
+  out_dir: /path/to/output_dir
+  fastq_dir: /path/to/fastq_dir
+  blast_db: /path/to/NCBI_nt
+  eggnog_db: /path/to/eggnog
+  gtdbtk_db: /path/to/GTDB_R214/release214
+  bakta_db: /path/to/bakta/db
+  platon_db: /path/to/platon/db
 resources:
   threads: 25
   ram_gb: 256
 parameters:
+  genus:
