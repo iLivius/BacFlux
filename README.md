@@ -2,6 +2,7 @@
 A workflow for bacterial short reads assembly, QC, annotation, and more.
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥8.4.7-brightgreen.svg)](https://snakemake.readthedocs.io/en/stable/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11143917.svg)](https://doi.org/10.5281/zenodo.11143917)
 
 ```bash
 ________             _______________              
@@ -48,9 +49,11 @@ The pipeline accepts paired-end reads as input and subjects them to a series of 
 ## Quick Start
 This guide gets you started with `BacFlux`. Here's a quick guide:
 
-- Download the latest release: Head over to the Releases section and download the archive containing the workflow.
-
-- Unpack the archive: Extract the downloaded archive into your desired location.
+- Download the latest release:
+  ```bash
+  #git command
+  git clone https://github.com/iLivius/BacFlux.git
+  ```
 
 - Configure the `config.yaml`: Specify the input directory containing the raw sequencing data (i.e. paired-end FASTQ files: *strain-1_R1.fq.gz*, *strain-1_R2.fq.gz*) and the desired location for the analysis outputs, respectively. `BacFlux` relies on external databases for some analyses. Some of them are not automatically installed and the `config.yaml` must be edited with the path to the following downloaded databases:
 
@@ -141,12 +144,14 @@ BacFlux downloads automatically all dependencies and several databases.  However
 
     Head over to the Releases section of the repository.
     Download the latest archive file (typically in .zip or .tar.gz format). This archive contains the `BacFlux` Snakefile script, the `config.yaml` configuration file, and an `envs` environment directory.
-
-2. **Unpack the Archive:**
-
     Extract the downloaded archive into your desired location. This will create a directory structure with the necessary files and directories.
+    Alternatively, download via command line as:
+    ```bash
+    #git command
+    git clone https://github.com/iLivius/BacFlux.git
+    ```
 
-3. **Install Snakemake:**
+2. **Install Snakemake:**
 
     `BacFlux` relies on [Snakemake](https://snakemake.readthedocs.io/en/stable/index.html) to manage the workflow execution. Find the official and complete set of instructions [here](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html). Alternatively, to install Snakemake as a Conda environment:
     ```bash
@@ -154,7 +159,7 @@ BacFlux downloads automatically all dependencies and several databases.  However
     conda create -c conda-forge -c bioconda -n snakemake snakemake
     ```
 
-4. **Databases:**
+3. **Databases:**
 
     While `BacFlux` automates the installation of all software dependencies, some external databases need to be downloaded manually. Unless you have installed them already. In that case, skip this paragraph and jump to the [configuration](#configuration) section. 
 
