@@ -16,7 +16,7 @@ BacFlux v1.1.6
 May 2024
 ```
 
-![BacFlux DAG](miscellaneous/BacFlux_1.1.x_DAG.png)
+![BacFlux DAG](miscellaneous/BacFlux_v1.1.x_DAG.png)
 
 ## Authors and Contributors
 [AIT Austrian Institute of Technology, Center for Health & Bioresources](https://www.ait.ac.at/en/research-topics/bioresources)
