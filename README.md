@@ -11,12 +11,12 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.1
+BacFlux v1.1.6
 
-April 2024
+May 2024
 ```
 
-![BacFlux DAG](miscellaneous/BacFlux_DAG.png)
+![BacFlux DAG](miscellaneous/BacFlux_1.1.x_DAG.png)
 
 ## Authors and Contributors
 [AIT Austrian Institute of Technology, Center for Health & Bioresources](https://www.ait.ac.at/en/research-topics/bioresources)
@@ -331,9 +331,9 @@ The workflow output reflects the steps described in the [description](#descripti
 
 - `05.annotation`: Contains the following sub-directories:
     - **prokka**: Legacy annotation performed by [Prokka](https://github.com/vdejager/prokka) (v1.14.6).
-    - **bakta**: Accurate annotation outputted by [Bakta](https://github.com/oschwengers/bakta) (v1.9.1).
+    - **bakta**: Accurate annotation outputted by [Bakta](https://github.com/oschwengers/bakta) (v1.9.3).
     - **eggnog**: Functional annotation produced by [EggNOG](https://github.com/eggnogdb) mapper (v2.1.12).
-    - **antismash**: Secondary metabolites inferred by [antiSMASH](https://github.com/antismash/antismash) (v6.1.1).
+    - **antismash**: Secondary metabolites inferred by [antiSMASH](https://github.com/antismash/antismash) (v7.1.0).
 
 - `06.AMR`: Antimicrobial resistance features are investigated with two complementary approaches:
     - **AMR_mapping**: reads filtered by [fastp](https://github.com/OpenGene/fastp) (v0.23.4) are mapped to the CARD database (v3.2.9.) using [BBMap](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/) (v39.06) with minimum identiy = 0.99. Mapping results are parsed and features with a covered length of at least 70% are reported in the `AMR legend` file.
@@ -350,7 +350,7 @@ The workflow output reflects the steps described in the [description](#descripti
     2. [QualiMap](http://qualimap.conesalab.org/) (v2.3)
     3. [Quast](https://github.com/ablab/quast) (v5.2.0)
     4. [Prokka](https://github.com/vdejager/prokka) (v1.14.6)
-    5. [Bakta](https://github.com/oschwengers/bakta) (v1.9.1)
+    5. [Bakta](https://github.com/oschwengers/bakta) (v1.9.3)
 
 ## Acknowledgements
 This work was supported by the [Austrian Science Fund (FWF)](https://www.fwf.ac.at/en/) [Project I6030-B].
@@ -363,7 +363,7 @@ Antonielli, L., Großkinsky, D., Koch, H., Trognitz, F., Sanchez Mejia, A., & Na
 
 2. Bankevich, A., Nurk, S., Antipov, D., Gurevich, A. A., Dvorkin, M., Kulikov, A. S., Lesin, V. M., Nikolenko, S. I., Pham, S., Prjibelski, A. D., Pyshkin, A. V., Sirotkin, A. V., Vyahhi, N., Tesler, G., Alekseyev, M. A., & Pevzner, P. A. (2012). SPAdes: A New Genome Assembly Algorithm and Its Applications to Single-Cell Sequencing. Journal of Computational Biology, 19(5), 455–477. https://doi.org/10.1089/cmb.2012.0021
 
-3. Blin, K., Shaw, S., Kloosterman, A. M., Charlop-Powers, Z., van Wezel, G. P., Medema, M. H., & Weber, T. (2021). antiSMASH 6.0: Improving cluster detection and comparison capabilities. Nucleic Acids Research, 49(W1), W29–W35. https://doi.org/10.1093/nar/gkab335
+3. Blin, K., Shaw, S., Augustijn, H. E., Reitz, Z. L., Biermann, F., Alanjary, M., Fetter, A., Terlouw, B. R., Metcalf, W. W., Helfrich, E. J. N., van Wezel, G. P., Medema, M. H., & Weber, T. (2023). antiSMASH 7.0: New and improved predictions for detection, regulation, chemical structures and visualisation. Nucleic Acids Research, 51(W1), W46–W50. https://doi.org/10.1093/nar/gkad344
 
 4. Bushnell, B. (2014). BBMap: A Fast, Accurate, Splice-Aware Aligner. https://escholarship.org/uc/item/1h3515gn
 Camacho, C., Coulouris, G., Avagyan, V., Ma, N., Papadopoulos, J., Bealer, K., & Madden, T. L. (2009). BLAST+: Architecture and applications. BMC Bioinformatics, 10, 421. https://doi.org/10.1186/1471-2105-10-421
