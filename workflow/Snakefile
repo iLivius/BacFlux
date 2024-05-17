@@ -5,10 +5,10 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.1
+BacFlux v1.1.6
 
 
-Livio Antonielli, April 2024 
+Livio Antonielli, May 2024 
 ''')
 
 # Modules:
@@ -16,7 +16,7 @@ import os
 import sys
 from urllib.parse import urlparse
 
-# Configuration file (same directory as snakefile script):
+# Configuration file:
 configfile: 'config/config.yaml'
 
 # Path to DBs and input/output directories in config file:
@@ -575,7 +575,7 @@ rule accurate_annotation:
 
 rule functional_annotation:
   input:
-    prokka_dir = "05.annotation/prokka/{sample}"
+    bakta_dir = "05.annotation/bakta/{sample}"
   output:
     temp_dir = temp(directory("05.annotation/eggnog/{sample}/eggnog_tmp")),
     eggnog_dir = directory("05.annotation/eggnog/{sample}")
@@ -593,13 +593,30 @@ rule functional_annotation:
   shell:
     """
     mkdir -p {output.temp_dir} {output.eggnog_dir}
-    emapper.py -i {input.prokka_dir}/{wildcards.sample}.faa --output_dir {output.eggnog_dir} \
+
+    emapper.py -i {input.bakta_dir}/{wildcards.sample}.faa --output_dir {output.eggnog_dir} \
     --cpu {resources.cpus} -m diamond --data_dir {params.dmnd_db} \
     --output {wildcards.sample} --temp_dir {output.temp_dir} --override > {log} 2>&1
     """
 
-rule secondary_metabolites:
+rule secondary_metabolites_db:
+  output:
+    antismash_db = temp(directory("05.annotation/antismash/databases"))
+  conda:
+    "envs/antismash.yaml"
+  message:
+    "--- antiSMASH: database download. ---"
+  log:
+    "logs/secondary_metabolites_database.log"
+  priority: 4
+  shell:
+    """
+    download-antismash-databases --database-dir {output.antismash_db} > {log} 2>&1
+    """    
+
+rule secondary_metabolites_analysis:
   input:
+    antismash_db = "05.annotation/antismash/databases",
     bakta_dir = "05.annotation/bakta/{sample}"
   output:
     antismash_dir = directory("05.annotation/antismash/{sample}")
@@ -615,9 +632,9 @@ rule secondary_metabolites:
   priority: 4
   shell:
     """
-    download-antismash-databases > {log} 2>&1
-    antismash --taxon {params.taxon} --output-dir {output.antismash_dir} --output-basename {wildcards.sample} \
-    --genefinding-tool {params.genefinding_tool} --genefinding-gff3 {input.bakta_dir}/{wildcards.sample}.gff3 {input.bakta_dir}/{wildcards.sample}.gbff >> {log} 2>&1
+    antismash --output-dir {output.antismash_dir} --output-basename {wildcards.sample} \
+    --databases {input.antismash_db} --taxon {params.taxon} --genefinding-tool {params.genefinding_tool} \
+    {input.bakta_dir}/{wildcards.sample}.gbff > {log} 2>&1
     """    
 
 for sample in SAMPLES:
@@ -745,13 +762,13 @@ rule plasmid_search:
     if [[ -s {output.plasmid_dir}/contigs_sel.plasmid.fasta ]] && grep -q ">" {output.plasmid_dir}/contigs_sel.plasmid.fasta; then
         while IFS= read -r i; do
             if grep -m 1 "$i" {input.blast} | grep -q "plasmid"; then
-                echo "$i" >> {output.plasmids}
+                echo "{wildcards.sample}: $i is a plasmid." >> {output.plasmids}
             else
-                echo "Platon's hints for {wildcards.sample} sample were not verified by BLAST search." >> {output.plasmids}
+               echo "{wildcards.sample}: $i was not verified by BLAST search." >> {output.plasmids}
             fi
         done < <(grep ">" {output.plasmid_dir}/contigs_sel.plasmid.fasta | sed 's/^>//g')
     else
-        echo "Platon found no plasmid in {wildcards.sample} sample." > {output.plasmids}
+        echo "Platon found no plasmid in sample {wildcards.sample}." > {output.plasmids}
     fi
     """
 
