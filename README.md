@@ -213,8 +213,9 @@ BacFlux downloads automatically all dependencies and several databases.  However
     * `GTDB` database:
         ```bash
         #move first inside the directory where you want to place the database, then download and decompress the file
-        wget -c https://data.gtdb.ecogenomic.org/releases/latest/auxillary_files/gtdbtk_data.tar.gz
-        tar xvzf gtdbtk_data.tar.gz 
+        wget -c https://data.gtdb.ecogenomic.org/releases/release214/214.0/auxillary_files/gtdbtk_r214_data.tar.gz
+        tar -xzvf gtdbtk_r214_data.tar.gz
+        rm gtdbtk_r214_data.tar.gz
         ```
         *NOTE: the data needed to run GTDB-Tk will occupy around 85 GB of space.*
 
