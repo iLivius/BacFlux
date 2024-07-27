@@ -120,7 +120,7 @@ Here's a breakdown of the `BacFlux` workflow:
     * Performs accurate taxonomic placement with [GTDB-Tk](https://github.com/Ecogenomics/GTDBTk) using a curated reference [database](https://gtdb.ecogenomic.org/).
 
 05. **Annotation:**
-    * Annotates contigs using [Prokka](https://github.com/vdejager/prokka) and [Bakta](https://github.com/oschwengers/bakta) for functional prediction.
+    * Annotates contigs using [Prokka](https://github.com/tseemann/prokka) and [Bakta](https://github.com/oschwengers/bakta) for functional prediction.
     * Provides further functional annotation with [EggNOG](https://github.com/eggnogdb).
     * Infers secondary metabolites with [antiSMASH](https://github.com/antismash/antismash).
 
@@ -331,7 +331,7 @@ The workflow output reflects the steps described in the [description](#descripti
 - `04.taxonomy`: Taxonomic placement of raw, filtered and selected contigs, performed by [GTDB-Tk](https://github.com/Ecogenomics/GTDBTk) (v2.3.2).
 
 - `05.annotation`: Contains the following sub-directories:
-    - **prokka**: Legacy annotation performed by [Prokka](https://github.com/vdejager/prokka) (v1.14.6).
+    - **prokka**: Legacy annotation performed by [Prokka](https://github.com/tseemann/prokka) (v1.14.5).
     - **bakta**: Accurate annotation outputted by [Bakta](https://github.com/oschwengers/bakta) (v1.9.3).
     - **eggnog**: Functional annotation produced by [EggNOG](https://github.com/eggnogdb) mapper (v2.1.12).
     - **antismash**: Secondary metabolites inferred by [antiSMASH](https://github.com/antismash/antismash) (v7.1.0).
@@ -350,7 +350,7 @@ The workflow output reflects the steps described in the [description](#descripti
     1. [fastp](https://github.com/OpenGene/fastp) (v0.23.4)
     2. [QualiMap](http://qualimap.conesalab.org/) (v2.3)
     3. [Quast](https://github.com/ablab/quast) (v5.2.0)
-    4. [Prokka](https://github.com/vdejager/prokka) (v1.14.6)
+    4. [Prokka](https://github.com/tseemann/prokka) (v1.14.5)
     5. [Bakta](https://github.com/oschwengers/bakta) (v1.9.3)
 
 ## Acknowledgements
