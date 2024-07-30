@@ -5,10 +5,10 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.1.7
+BacFlux v1.1.8
 
 
-Livio Antonielli, May 2024 
+Livio Antonielli, July 2024 
 ''')
 
 # Modules:
@@ -34,6 +34,9 @@ DATABASES = ["argannot", "card", "ecoh", "ecoli_vf", "megares", "ncbi", "resfind
 # Hardware resources in config file:
 CPUS = config['resources']['threads']
 RAM = config['resources']['ram_gb']
+
+# Define not allowed characters
+not_allowed_chars = set("_*#@%^/! ?&:;|<>")
 
 # Sanity check of genus parameter:
 if config['parameters'] is not None and "genus" in config['parameters']:
@@ -69,6 +72,9 @@ if len(SAMPLES) == 0:
     sys.exit(0)
 else:
     for sample in sorted(SAMPLES):
+        if any(char in sample for char in not_allowed_chars):
+            sys.stderr.write(f"Sample name '{sample}' contains not allowed characters.\n")
+            sys.exit(0)
         print(f"Sample {sample} in process...")
 
 # Check if files have nonunique extension:
@@ -322,7 +328,7 @@ rule blast_contigs:
     blast = "03.post-processing/contaminants/{sample}/blastout"
   params:
     dir = BLASTDB,
-    db = os.path.join(BLASTDB, "nt")
+    db = os.path.join(BLASTDB, config['parameters']['nt_version'])
   resources:
     cpus = CPUS
   conda:
@@ -516,7 +522,7 @@ rule taxonomic_assignment:
   shell:
     """
     GTDBTK_DATA_PATH={params.gtdbtk_db:q} \
-    gtdbtk classify_wf -x fasta --genome_dir {input.checkm_dir} --cpus {resources.cpus} --pplacer_cpus {resources.cpus_p} --mash_db {params.gtdbtk_db:q}/mash/gtdb-tk_r214.msh \
+    gtdbtk classify_wf -x fasta --genome_dir {input.checkm_dir} --cpus {resources.cpus} --pplacer_cpus {resources.cpus_p} --mash_db {params.gtdbtk_db:q}/mash/gtdb-tk_r220.msh \
     --out_dir {output.gtdbtk_dir} > {log} 2>&1
     rm -rf {input.checkm_dir}/contigs*.fasta
     """
