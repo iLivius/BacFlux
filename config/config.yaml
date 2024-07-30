@@ -7,11 +7,12 @@ directories:
   fastq_dir: /path/to/fastq_dir
   blast_db: /path/to/NCBI_nt
   eggnog_db: /path/to/eggnog
-  gtdbtk_db: /path/to/GTDB_R214/release214
+  gtdbtk_db: /path/to/GTDB_R220/release220
   bakta_db: /path/to/bakta/db
   platon_db: /path/to/platon/db
 resources:
-  threads: 25
+  threads: 56
   ram_gb: 256
 parameters:
+  nt_version: "core_nt"
   genus:
