@@ -5,7 +5,7 @@ links:
 directories:
   out_dir: /path/to/output_dir
   fastq_dir: /path/to/fastq_dir
-  blast_db: /path/to/NCBI_nt
+  blast_db: /path/to/NCBI_core_nt
   eggnog_db: /path/to/eggnog
   gtdbtk_db: /path/to/GTDB_R220/release220
   bakta_db: /path/to/bakta/db
