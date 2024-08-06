@@ -14,5 +14,5 @@ resources:
   threads: 56
   ram_gb: 256
 parameters:
-  nt_version: "core_nt"
+  nt_version: core_nt
   genus:
