@@ -240,6 +240,9 @@ BacFlux downloads automatically all dependencies and several databases.  However
         wget https://zenodo.org/record/10522951/files/db-light.tar.gz
         tar -xzf db-light.tar.gz
         rm db-light.tar.gz
+
+        #if the AMRFinderPlus db gives an error, update it by activating the Bakta Conda env and running the following command by targeting the Bakta db directory:
+        amrfinder_update --force_update --database db/amrfinderplus-db/
         ```
         *NOTE: according to the [source](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) the light version should take 1.4 GB compressed and 3.4 GB decompressed, whereas the full database should get 37 GB zipped and 71 GB unzipped.*
 
