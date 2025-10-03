@@ -1,6 +1,7 @@
-name: bbmap
+name: filtlong
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bbmap=39.33
+  - filtlong=0.2.1
+

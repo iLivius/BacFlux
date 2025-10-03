@@ -5,10 +5,10 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.1.8
+BacFlux v1.1.9
 
 
-Livio Antonielli, July 2024 
+Livio Antonielli, August 2025
 ''')
 
 # Modules:
@@ -26,6 +26,7 @@ BLASTDB = config['directories']['blast_db']
 DMNDDB = config['directories']['eggnog_db']
 GTDBTKDB = config['directories']['gtdbtk_db']
 BAKTADB = config['directories']['bakta_db']
+DBCANDB = config['directories']['dbcan_db']
 PLATONDB = config['directories']['platon_db']
 
 # AMR DBs (ABRicate):
@@ -102,10 +103,10 @@ rule all:
     checkm_stats = expand("03.post-processing/completeness_evaluation/{sample}/checkm_stats.tsv", sample = SAMPLES),
     checkm_lineage = expand("03.post-processing/completeness_evaluation/{sample}/lineage.ms", sample = SAMPLES),
     gtdbtk_dir = expand("04.taxonomy/{sample}", sample = SAMPLES),
-    prokka_dir = expand("05.annotation/prokka/{sample}", sample = SAMPLES),
     bakta_dir = expand("05.annotation/bakta/{sample}", sample = SAMPLES),
     eggnog_dir = expand("05.annotation/eggnog/{sample}", sample = SAMPLES),
     antismash_dir = expand("05.annotation/antismash/{sample}", sample = SAMPLES),
+    dbcan_dir = expand("05.annotation/dbcan/{sample}", sample = SAMPLES),
     amr_tab = expand("06.AMR/ABRicate/{sample}/{db}.tsv", sample = SAMPLES, db = DATABASES),
     amr_summary = expand("06.AMR/ABRicate/{sample}/AMR_summary.txt", sample = SAMPLES),
     covstats = expand("06.AMR/AMR_mapping/{sample}/{sample}_covstats.tsv", sample = SAMPLES),
@@ -527,31 +528,6 @@ rule taxonomic_assignment:
     rm -rf {input.checkm_dir}/contigs*.fasta
     """
 
-rule legacy_annotation:
-  input:
-    contigs = "02.assembly/{sample}/contigs_sel.fasta",
-    abund = "03.post-processing/contaminants/{sample}/{sample}_composition.txt"
-  output:
-    prokka_dir = directory("05.annotation/prokka/{sample}")
-  resources:
-    cpus = CPUS
-  conda:
-    "envs/prokka.yaml"
-  message:
-    "--- PROKKA: Genome annotation. ---"
-  log:
-    "logs/legacy_annotation_{sample}.log"
-  priority: 5
-  shell:
-    """
-    for i in $(cat {input.abund} | sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p'); do \
-    prokka --kingdom Bacteria --genus $i --species sp. --strain {wildcards.sample} \
-    --usegenus --gcode 11 --rfam --compliant --addgenes --mincontiglen 500 \
-    --centre AIT --locustag {wildcards.sample} --prefix {wildcards.sample} \
-    --outdir {output.prokka_dir} --cpus {resources.cpus} --force {input.contigs}; \
-    done > {log} 2>&1
-    """
-
 rule accurate_annotation:
   input:
     contigs = "02.assembly/{sample}/contigs_sel.fasta",
@@ -643,6 +619,42 @@ rule secondary_metabolites_analysis:
     {input.bakta_dir}/{wildcards.sample}.gbff > {log} 2>&1
     """    
 
+rule cazyme_gene_cluster:
+  input:
+    bakta_dir = "05.annotation/bakta/{sample}",
+  output:
+    dbcan_dir = directory("05.annotation/dbcan/{sample}")
+  params:
+    dbcan_db = DBCANDB
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/dbcan.yaml"
+  message:
+    "--- dbCAN: Finding CAZyme gene clusters. ---"
+  log:
+    "logs/cazyme_{sample}.log"
+  priority: 4
+  shell:
+    """
+    # CAZyme annotation of protein sequences
+    run_dbcan CAZyme_annotation --input_raw_data {input.bakta_dir}/{wildcards.sample}.faa --output_dir {output.dbcan_dir} \
+      --db_dir {params.dbcan_db} --mode protein --threads {resources.cpus} --methods hmm --methods diamond --methods dbCANsub > {log} 2>&1
+
+    # CAZyme Gene Cluster (CGC) Annotation
+    run_dbcan gff_process --input_gff {input.bakta_dir}/{wildcards.sample}.gff3 --output_dir {output.dbcan_dir} \
+      --db_dir {params.dbcan_db} --gff_type prodigal --threads {resources.cpus} >> {log} 2>&1
+
+    # CAZyme Gene Cluster (CGC) Identification
+    run_dbcan cgc_finder --output_dir {output.dbcan_dir} >> {log} 2>&1 
+
+    # CGC Substrate Prediction
+    run_dbcan substrate_prediction --output_dir {output.dbcan_dir} --db_dir {params.dbcan_db} >> {log} 2>&1
+
+    # CAZyme Gene Cluster Visualization (this will throw an error which I still need to figure out how to handle)
+    #run_dbcan cgc_circle_plot --output_dir {output.dbcan_dir} >> {log} 2>&1
+    """    
+
 for sample in SAMPLES:
   for db in DATABASES:
     rule:
@@ -651,7 +663,9 @@ for sample in SAMPLES:
       output:
         amr_tab = expand("06.AMR/ABRicate/{sample}/{db}.tsv", sample = sample, db = db)
       params:
-        db = db
+        db = db,
+        minid = 80,
+        mincov = 70
       conda:
         "envs/abricate.yaml"
       message:
@@ -661,7 +675,7 @@ for sample in SAMPLES:
       priority: 4
       shell:
         """
-        abricate --db {params.db} {input.contigs} --nopath --quiet > {output.amr_tab} 2> {log}
+        abricate --db {params.db} {input.contigs} --minid {params.minid} --mincov {params.mincov} --nopath --quiet > {output.amr_tab} 2> {log}
         """
 
 rule AMR_summary:
@@ -855,7 +869,6 @@ rule multiqc:
     fastp_json = expand("01.pre-processing/{sample}_fastp.json", sample = SAMPLES),
     qualimap_dir = expand("03.post-processing/mapping_evaluation/{sample}", sample = SAMPLES),
     quast_dir = expand("03.post-processing/assembly_evaluation/{sample}", sample = SAMPLES),
-    prokka_dir = expand("05.annotation/prokka/{sample}", sample = SAMPLES),
     bakta_dir = expand("05.annotation/bakta/{sample}", sample = SAMPLES)
   output:
     multiqc_dir = directory("09.report"),
@@ -869,6 +882,6 @@ rule multiqc:
   shell:
     """
     printf "%s\n" "show_analysis_paths: False" "show_analysis_time: False" > {output.multiqc_yaml}
-    multiqc --config {output.multiqc_yaml} -d -dd 1 {input.fastp_json} {input.qualimap_dir} {input.quast_dir} {input.prokka_dir} {input.bakta_dir} \
+    multiqc --config {output.multiqc_yaml} -d -dd 1 {input.fastp_json} {input.qualimap_dir} {input.quast_dir} {input.bakta_dir} \
     --outdir {output.multiqc_dir} > {log} 2>&1
     """

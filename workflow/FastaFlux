@@ -1,0 +1,676 @@
+print(r'''
+__________             _____       _______________              
+___  ____/_____ _________  /______ ___  ____/__  /___  _____  __
+__  /_   _  __ `/_  ___/  __/  __ `/_  /_   __  /_  / / /_  |/_/
+_  __/   / /_/ /_(__  )/ /_ / /_/ /_  __/   _  / / /_/ /__>  <  
+/_/      \__,_/ /____/ \__/ \__,_/ /_/      /_/  \__,_/ /_/|_|  
+                                                                
+                                                  
+FastaFlux 1.0.1
+
+
+Livio Antonielli, August 2025 
+''')
+
+# Modules:
+import os
+import sys
+from urllib.parse import urlparse
+
+# Configuration file:
+configfile: 'config/config.yaml'
+
+# Path to DBs and input/output directories in config file:
+workdir: config['directories']['out_dir']
+FASTADIR = config['directories']['fasta_dir']
+BLASTDB = config['directories']['blast_db']
+DMNDDB = config['directories']['eggnog_db']
+GTDBTKDB = config['directories']['gtdbtk_db']
+BAKTADB = config['directories']['bakta_db']
+DBCANDB = config['directories']['dbcan_db']
+PLATONDB = config['directories']['platon_db']
+
+# AMR DBs (ABRicate):
+DATABASES = ["argannot", "card", "ecoh", "ecoli_vf", "megares", "ncbi", "resfinder", "vfdb"]
+
+# Hardware resources in config file:
+CPUS = config['resources']['threads']
+
+# Define not allowed characters
+not_allowed_chars = set("_*#@%^/! ?&:;|<>")
+
+# Sanity check of genus parameter:
+if config['parameters'] is not None and "genus" in config['parameters']:
+    genus = config['parameters']["genus"]
+    if genus is not None and len(genus) > 0:
+        print(f"The 'genus' parameter is specified in the config file with value: '{genus}'.")
+    else:
+        print("The 'genus' parameter value is not specified in the config file and will be inferred automatically.")
+else:
+    print("The 'genus' parameter is not present in the config file and contigs won't be filtered accordingly.")
+
+# Sanity check of checkv db link parameter:
+global id
+id = None
+
+if config['links'] is not None and "checkv_link" in config['links']:
+    link = config['links']["checkv_link"]
+    if link is not None and len(link) > 0:
+        path = urlparse(link).path
+        db = os.path.basename(path)
+        id = os.path.splitext(os.path.splitext(db)[0])[0]
+    else:
+        print("The link to CheckV database is not specified and the latest version will be automatically downloaded.")
+else:
+    sys.stderr.write(f"The checkv_link parameter is not present. Please, check the config file.\n")
+    sys.exit(0)
+
+# Import FASTQ files from input dir:
+SAMPLES, EXTENSIONS = glob_wildcards(os.path.join(FASTADIR, '{sample}.{extn}'))
+
+if len(SAMPLES) == 0:
+    sys.stderr.write(f"No files in {FASTADIR}. Please, check directory.\n")
+    sys.exit(0)
+else:
+    for sample in sorted(SAMPLES):
+        if any(char in sample for char in not_allowed_chars):
+            sys.stderr.write(f"Sample name '{sample}' contains not allowed characters.\n")
+            sys.exit(0)
+        print(f"Sample {sample} in process...")
+
+# Check if files have nonunique extension:
+for extension in EXTENSIONS:
+  if extension.endswith(("fasta", "fa", "fna")):
+    if len(set(EXTENSIONS)) != 1:
+      sys.stderr.write("More than one type of file extension detected\n\t")
+      sys.stderr.write("\n\t".join(set(EXTENSIONS)))
+      sys.exit(0)
+  else:
+    sys.stderr.write("\nFile format not recognized.\n")
+    sys.exit(0)
+
+# Create sample objects:
+EXTN = EXTENSIONS[0]
+CONTIGS = '{sample}.' + EXTN
+
+rule all:
+  input:
+    contigs_filt = expand("01.pre-processing/{sample}/contigs_filt.fasta", sample = SAMPLES),
+    contigs_sel = expand("02.post-processing/contaminants/{sample}/contigs_sel.fasta", sample = SAMPLES),
+    quast_dir = expand("02.post-processing/assembly_evaluation/{sample}", sample = SAMPLES),
+    checkm_dir = expand("02.post-processing/completeness_evaluation/{sample}", sample = SAMPLES),
+    checkm_stats = expand("02.post-processing/completeness_evaluation/{sample}/checkm_stats.tsv", sample = SAMPLES),
+    checkm_lineage = expand("02.post-processing/completeness_evaluation/{sample}/lineage.ms", sample = SAMPLES),
+    gtdbtk_dir = expand("03.taxonomy/{sample}", sample = SAMPLES),
+    bakta_dir = expand("04.annotation/bakta/{sample}", sample = SAMPLES),
+    eggnog_dir = expand("04.annotation/eggnog/{sample}", sample = SAMPLES),
+    antismash_dir = expand("04.annotation/antismash/{sample}", sample = SAMPLES),
+    dbcan_dir = expand("04.annotation/dbcan/{sample}", sample = SAMPLES),
+    amr_tab = expand("05.AMR/ABRicate/{sample}/{db}.tsv", sample = SAMPLES, db = DATABASES),
+    amr_summary = expand("05.AMR/ABRicate/{sample}/AMR_summary.txt", sample = SAMPLES),
+    plasmid_dir = expand("06.plasmids/{sample}", sample = SAMPLES),
+    plasmids = expand("06.plasmids/{sample}/verified_plasmids.txt", sample = SAMPLES),
+    vs2_dir = expand("07.phages/virsorter/{sample}", sample = SAMPLES),
+    checkv_dir = expand("07.phages/checkv/{sample}", sample = SAMPLES),
+    multiqc_dir = "08.report"
+
+rule filter_contigs:
+  input:
+    contigs = os.path.join(FASTADIR, CONTIGS)
+  output:
+    contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta"
+  message:
+    "Contig filtering."
+  priority: 9
+  shell:
+    """
+    # Check the format of the FASTA header
+    header_format=$(head -n 1 {input.contigs} | grep -E 'length_[0-9]+|cov_[0-9.]+' || true)
+
+    if [ -n "$header_format" ]; then
+        echo "SPAdes format detected: removing short contigs <500 bp and low coverage <2x."
+        # SPAdes format: Headers contain 'length_' and 'cov_'
+        awk '{{
+          if(NR==1) {{
+            printf "%s\\n", $0
+          }} else {{
+            if(/^>/) {{
+              printf "\\n%s\\n", $0
+            }} else {{
+              printf $0
+            }}
+          }}
+        }}' {input.contigs} | \
+        awk -F"_" '{{
+          if(/^>/ && $6 >= 2.0 && $4 >= 500) {{
+            printf "%s\\n", $0
+            getline
+            print
+          }}
+        }}' > {output.contigs_filt}
+    else
+        echo "Fixing FASTA headers."
+        # NCBI format: Simplify headers and no filtering based on length/coverage
+        awk '/^>/ {{print $1; next}} {{print}}' {input.contigs} > {output.contigs_filt}
+    fi
+    """
+
+rule map_contigs:
+  input:
+    contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta"
+  output:
+    bam = temp("02.post-processing/contaminants/{sample}_map.bam"),
+    bai = temp("02.post-processing/contaminants/{sample}_map.bam.bai")
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/minimap.yaml"
+  message:
+    "--- Minimap2: Map reads against contigs. ---"
+  log:
+    "logs/map_contigs_{sample}.log"
+  priority: 0
+  shell:
+    """
+    minimap2 -a {input.contigs_filt} {input.contigs_filt} 2> {log} | \
+    samtools view -S -b -u -@ {resources.cpus} | \
+    samtools sort -o {output.bam} -@ {resources.cpus} 2>> {log}
+    
+    samtools index {output.bam} -@ {resources.cpus} 2>> {log}
+    """
+
+rule blast_contigs:
+  input:
+    contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta"
+  output:
+    blast = "02.post-processing/contaminants/{sample}/blastout"
+  params:
+    dir = BLASTDB,
+    db = os.path.join(BLASTDB, config['parameters']['nt_version'])
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/blast.yaml"
+  message:
+    "--- BLAST: Align contigs against NCBI nt db. ---"
+  log:
+    "logs/blast_contigs_{sample}.log"
+  priority: 0
+  shell:
+    """
+    BLASTDB={params.dir} blastn -task megablast -query {input.contigs_filt} -db {params.db} -outfmt \
+    '6 qseqid staxids bitscore pident evalue length qlen slen qcovs qcovhsp sskingdoms scomnames sscinames sblastnames stitle' \
+    -num_threads {resources.cpus} -evalue 1e-5 -max_target_seqs 100 -max_hsps 10 \
+    -out {output.blast} > {log} 2>&1
+    """
+
+rule blob_json:
+  input:
+    contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta",
+    bam = "02.post-processing/contaminants/{sample}_map.bam",
+    bai = "02.post-processing/contaminants/{sample}_map.bam.bai",
+    blast = "02.post-processing/contaminants/{sample}/blastout",
+    nodes = os.path.join(BLASTDB, "nodes.dmp"),
+    names = os.path.join(BLASTDB, "names.dmp")
+  output:
+    json = temp("02.post-processing/contaminants/{sample}/blob.blobDB.json"),
+    cov = temp("02.post-processing/contaminants/{sample}/blob.{sample}_map.bam.cov")
+  params:
+    basename = "02.post-processing/contaminants/{sample}/blob"
+  conda:
+    "envs/blobtools.yaml"
+  message:
+    "--- BlobTools: Screen BLAST hits for contaminants. ---"
+  log:
+    "logs/blob_json_{sample}.log"
+  priority: 0
+  shell:
+    """
+    blobtools create -i {input.contigs_filt} -b {input.bam} -t {input.blast} --nodes {input.nodes} --names {input.names} \
+    -o {params.basename} > {log} 2>&1
+    """
+
+rule blob_table:
+  input:
+    json = "02.post-processing/contaminants/{sample}/blob.blobDB.json"
+  output:
+    bestscore = "02.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt"
+  params:
+    basename = "02.post-processing/contaminants/{sample}/bestscore"
+  conda:
+    "envs/blobtools.yaml"
+  message:
+    "--- BlobTools: Collapse taxonomic assignment of BLAST hits according to sum of best scores. ---"
+  log:
+    "logs/blob_table_{sample}.log"
+  priority: 0
+  shell:
+    """
+    blobtools view --input {input.json} --out {params.basename} --taxrule bestsum --rank all --hits > {log} 2>&1
+    """
+
+FASTA_LIN_CMD = r"""{if(NR==1) {printf "%s\n", $0} else {if(/^>/) {printf "\n%s\n", $0} else {printf $0}}}"""
+
+# Execute either one rule or another according to presence/absence of 'genus' parameter
+if "genus" in config['parameters'] and config['parameters']['genus'] is not None and len(config['parameters']['genus']) > 0:
+  rule:
+    input:
+      contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta",
+      bestscore = "02.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt"
+    output:
+      contigs_filt_lin = "01.pre-processing/{sample}/contigs_filt_lin.fasta",
+      abund = "02.post-processing/contaminants/{sample}/{sample}_composition.txt",
+      list = "02.post-processing/contaminants/{sample}/contigs.list",
+      contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta"
+    params:
+      genus = config['parameters']['genus']    
+    priority: 0
+    shell:
+      """
+      cat {input.contigs_filt} | awk {FASTA_LIN_CMD:q} > {output.contigs_filt_lin}
+
+      for i in $(cat {input.bestscore} | sed '1,11d' | cut -f 22 | sort -u); do \
+          cat {input.bestscore} | sed '1,11d' | awk -v var=$i 'BEGIN {{printf "%s%s", var, ": "}} $22 == var {{count++}} END {{printf "%.2f\\n", count/NR}}'; \
+      done > {output.abund}
+
+      echo "Sample {wildcards.sample} composition:"
+      cat {output.abund}
+      awk -v var="{params.genus}" 'tolower($22) ~ tolower("[:alpha:]*"var) {{print $1}}' {input.bestscore} > {output.list}
+      grep -A1 -f {output.list} {output.contigs_filt_lin} | sed '/--/d' > {output.contigs_sel}
+      """
+else:
+  rule:
+    input:
+      contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta",
+      bestscore = "02.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt"
+    output:
+      contigs_filt_lin = "01.pre-processing/{sample}/contigs_filt_lin.fasta",
+      abund = "02.post-processing/contaminants/{sample}/{sample}_composition.txt",
+      list = "02.post-processing/contaminants/{sample}/contigs.list",
+      contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta"
+    priority: 0
+    shell:
+      """
+      cat {input.contigs_filt} | awk {FASTA_LIN_CMD:q} > {output.contigs_filt_lin}
+
+      for i in $(cat {input.bestscore} | sed '1,11d' | cut -f 22 | sort -u); do \
+          cat {input.bestscore} | sed '1,11d' | awk -v var=$i 'BEGIN {{printf "%s%s", var, ": "}} $22 == var {{count++}} END {{printf "%.2f\\n", count/NR}}'; \
+      done > {output.abund}
+
+      echo "Sample {wildcards.sample} composition:"
+      cat {output.abund}
+
+      for i in $(cat {output.abund} | sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p' | sed -e 's/Para//;s/Pseudo//;s/Paen//' | tr '[:upper:]' '[:lower:]'); do \
+          awk -v var="$i" 'tolower($22) ~ tolower("[:alpha:]*"var) {{print $1}}' {input.bestscore}; \
+      done > {output.list}
+
+      grep -A1 -f {output.list} {output.contigs_filt_lin} | sed '/--/d' > {output.contigs_sel}
+      """
+
+rule genome_assembly_evaluation:
+  input:
+    contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta"
+  output:
+    quast_dir = directory("02.post-processing/assembly_evaluation/{sample}")
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/quast.yaml"
+  message:
+    "--- QUAST: Genome assembly evaluation. ---"
+  log:
+    "logs/assembly_evaluation_{sample}.log"
+  shell:
+    """
+    quast {input.contigs_sel} -o {output.quast_dir} --no-icarus -t {resources.cpus} > {log} 2>&1 
+    """
+
+rule completeness_and_contamination:
+  input:
+    contigs = os.path.join(FASTADIR, CONTIGS),
+    contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta",
+    contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta"
+  output:
+    checkm_dir = directory("02.post-processing/completeness_evaluation/{sample}"),
+    checkm_stats = "02.post-processing/completeness_evaluation/{sample}/checkm_stats.tsv",
+    checkm_lineage = "02.post-processing/completeness_evaluation/{sample}/lineage.ms"
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/checkm.yaml"
+  message:
+    "--- CheckM: Assessment of genome completenness and contamination. ---"
+  log:
+    "logs/completenness_and_contamination_{sample}.log"
+  priority: 5
+  shell:
+    """
+    cp {input.contigs} {input.contigs_filt} {input.contigs_sel} {output.checkm_dir}
+    checkm lineage_wf -t {resources.cpus} -x fasta {output.checkm_dir} {output.checkm_dir} > {log} 2>&1
+    checkm qa -o 2 -t {resources.cpus} --tab_table -f {output.checkm_stats} {output.checkm_lineage} {output.checkm_dir} >> {log} 2>&1
+    """
+
+rule taxonomic_assignment:
+  input:
+    checkm_dir = "02.post-processing/completeness_evaluation/{sample}",
+  output:
+    gtdbtk_dir = directory("03.taxonomy/{sample}")
+  params:
+    gtdbtk_db = GTDBTKDB
+  resources:
+    cpus = CPUS,
+    cpus_p = min(CPUS, 64)
+  conda:
+    "envs/gtdbtk.yaml"
+  message:
+    "--- GTDB-Tk: Taxonomic assignment. ---"
+  log:
+    "logs/taxonomic_assignment_{sample}.log"
+  priority: 4
+  shell:
+    """
+    GTDBTK_DATA_PATH={params.gtdbtk_db:q} \
+    gtdbtk classify_wf -x fasta --genome_dir {input.checkm_dir} --cpus {resources.cpus} --pplacer_cpus {resources.cpus_p} --mash_db {params.gtdbtk_db:q}/mash/gtdb-tk_r220.msh \
+    --out_dir {output.gtdbtk_dir} > {log} 2>&1
+    rm -rf {input.checkm_dir}/contigs*.fasta
+    """
+
+rule accurate_annotation:
+  input:
+    contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta",
+    abund = "02.post-processing/contaminants/{sample}/{sample}_composition.txt"
+  output:
+    bakta_dir = directory("04.annotation/bakta/{sample}")
+  params:
+    bakta_db = BAKTADB
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/bakta.yaml"
+  message:
+    "--- Bakta: Genome annotation. ---"
+  log:
+    "logs/accurate_annotation_{sample}.log"
+  priority: 5
+  shell:
+    """
+    for i in $(cat {input.abund} | sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p'); do \
+    bakta --db {params.bakta_db} --verbose --genus $i --species sp. --strain {wildcards.sample} \
+    --translation-table 11 --min-contig-length 500 \
+    --locus-tag {wildcards.sample} --prefix {wildcards.sample} \
+    --output {output.bakta_dir} --threads {resources.cpus} --force {input.contigs_sel}; \
+    done > {log} 2>&1
+    """    
+
+rule functional_annotation:
+  input:
+    bakta_dir = "04.annotation/bakta/{sample}"
+  output:
+    temp_dir = temp(directory("04.annotation/eggnog/{sample}/eggnog_tmp")),
+    eggnog_dir = directory("04.annotation/eggnog/{sample}")
+  params:
+    dmnd_db = DMNDDB
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/eggnog-mapper.yaml"
+  message:
+    "--- EggNOG: Functional annotation. ---"
+  log:
+    "logs/functional_annotation_{sample}.log"
+  priority: 4
+  shell:
+    """
+    mkdir -p {output.temp_dir} {output.eggnog_dir}
+
+    emapper.py -i {input.bakta_dir}/{wildcards.sample}.faa --output_dir {output.eggnog_dir} \
+    --cpu {resources.cpus} -m diamond --data_dir {params.dmnd_db} \
+    --output {wildcards.sample} --temp_dir {output.temp_dir} --override > {log} 2>&1
+    """
+
+rule secondary_metabolites_db:
+  output:
+    antismash_db = temp(directory("04.annotation/antismash/databases"))
+  conda:
+    "envs/antismash.yaml"
+  message:
+    "--- antiSMASH: database download. ---"
+  log:
+    "logs/secondary_metabolites_database.log"
+  priority: 4
+  shell:
+    """
+    download-antismash-databases --database-dir {output.antismash_db} > {log} 2>&1
+    """    
+
+rule secondary_metabolites_analysis:
+  input:
+    antismash_db = "04.annotation/antismash/databases",
+    bakta_dir = "04.annotation/bakta/{sample}"
+  output:
+    antismash_dir = directory("04.annotation/antismash/{sample}")
+  params:
+    taxon = 'bacteria',
+    genefinding_tool = 'none'
+  conda:
+    "envs/antismash.yaml"
+  message:
+    "--- antiSMASH: secondary metabolite annotation. ---"
+  log:
+    "logs/secondary_metabolites_{sample}.log"
+  priority: 4
+  shell:
+    """
+    antismash --output-dir {output.antismash_dir} --output-basename {wildcards.sample} \
+    --databases {input.antismash_db} --taxon {params.taxon} --genefinding-tool {params.genefinding_tool} \
+    {input.bakta_dir}/{wildcards.sample}.gbff > {log} 2>&1
+    """
+
+rule cazyme_gene_cluster:
+  input:
+    bakta_dir = "04.annotation/bakta/{sample}",
+  output:
+    dbcan_dir = directory("04.annotation/dbcan/{sample}")
+  params:
+    dbcan_db = DBCANDB
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/dbcan.yaml"
+  message:
+    "--- dbCAN: CAZyme gene cluster annotation. ---"
+  log:
+    "logs/cazyme_{sample}.log"
+  priority: 4
+  shell:
+    """
+    # CAZyme annotation of protein sequences
+    run_dbcan CAZyme_annotation --input_raw_data {input.bakta_dir}/{wildcards.sample}.faa --output_dir {output.dbcan_dir} \
+      --db_dir {params.dbcan_db} --mode protein --threads {resources.cpus} --methods hmm --methods diamond --methods dbCANsub > {log} 2>&1
+
+    # CAZyme Gene Cluster (CGC) Annotation
+    run_dbcan gff_process --input_gff {input.bakta_dir}/{wildcards.sample}.gff3 --output_dir {output.dbcan_dir} \
+      --db_dir {params.dbcan_db} --gff_type prodigal --threads {resources.cpus} >> {log} 2>&1
+
+    # CAZyme Gene Cluster (CGC) Identification
+    run_dbcan cgc_finder --output_dir {output.dbcan_dir} >> {log} 2>&1 
+
+    # CGC Substrate Prediction
+    run_dbcan substrate_prediction --output_dir {output.dbcan_dir} --db_dir {params.dbcan_db} >> {log} 2>&1
+
+    # CAZyme Gene Cluster Visualization (this will throw an error which I still need to figure out how to handle)
+    #run_dbcan cgc_circle_plot --output_dir {output.dbcan_dir} >> {log} 2>&1
+    """    
+
+for sample in SAMPLES:
+  for db in DATABASES:
+    rule:
+      input:
+        contigs_sel = expand("02.post-processing/contaminants/{sample}/contigs_sel.fasta", sample = sample)
+      output:
+        amr_tab = expand("05.AMR/ABRicate/{sample}/{db}.tsv", sample = sample, db = db)
+      params:
+        db = db,
+        minid = 80,
+        mincov = 70  
+      conda:
+        "envs/abricate.yaml"
+      message:
+        "--- ABRicate: AMR detection. ---"
+      log:
+        expand("logs/amr_{db}_in_{sample}_contigs.log", sample = sample, db = db)
+      priority: 4
+      shell:
+        """
+        abricate --db {params.db} {input.contigs_sel} --minid {params.minid} --mincov {params.mincov} --nopath --quiet > {output.amr_tab} 2> {log}
+        """
+
+rule AMR_summary:
+  input:
+    argannot = "05.AMR/ABRicate/{sample}/argannot.tsv",
+    card = "05.AMR/ABRicate/{sample}/card.tsv",
+    ecoh = "05.AMR/ABRicate/{sample}/ecoh.tsv",
+    ecoli_vf = "05.AMR/ABRicate/{sample}/ecoli_vf.tsv",
+    megares = "05.AMR/ABRicate/{sample}/megares.tsv",
+    ncbi = "05.AMR/ABRicate/{sample}/ncbi.tsv",
+    resfinder = "05.AMR/ABRicate/{sample}/resfinder.tsv",
+    vfdb = "05.AMR/ABRicate/{sample}/vfdb.tsv"
+  output:
+    amr_summary = "05.AMR/ABRicate/{sample}/AMR_summary.txt"
+  conda:
+    "envs/abricate.yaml"
+  priority: 3
+  shell:
+    """
+    abricate --summary \
+    {input.argannot} {input.card} {input.ecoh} \
+    {input.ecoli_vf} {input.megares} {input.ncbi} \
+    {input.resfinder} {input.vfdb} > {output.amr_summary}
+    """
+
+rule plasmid_search:
+  input:
+    contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta",
+    blast = "02.post-processing/contaminants/{sample}/blastout"
+  output:
+    plasmid_dir = directory("06.plasmids/{sample}"),
+    plasmids = "06.plasmids/{sample}/verified_plasmids.txt"
+  params:
+    platon_db = PLATONDB
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/platon.yaml"
+  message:
+    "--- Platon: Plasmid identification. ---"
+  log:
+    "logs/plasmid_search_{sample}.log"
+  priority: 4
+  shell:
+    """
+   platon --db {params.platon_db} --output {output.plasmid_dir} --verbose --threads {resources.cpus} {input.contigs_sel} > {log} 2>&1
+    
+    if [[ -s {output.plasmid_dir}/contigs_sel.plasmid.fasta ]] && grep -q ">" {output.plasmid_dir}/contigs_sel.plasmid.fasta; then
+        while IFS= read -r i; do
+            if grep -m 1 "$i" {input.blast} | grep -q "plasmid"; then
+                echo "{wildcards.sample}: $i is a plasmid." >> {output.plasmids}
+            else
+               echo "{wildcards.sample}: $i was not verified by BLAST search." >> {output.plasmids}
+            fi
+        done < <(grep ">" {output.plasmid_dir}/contigs_sel.plasmid.fasta | sed 's/^>//g')
+    else
+        echo "Platon found no plasmid in sample {wildcards.sample}." > {output.plasmids}
+    fi
+    """
+
+rule viral_db:
+  output:
+    vs2_db = temp(directory("07.phages/vs2_db")),
+    checkv_db = temp(directory("07.phages/checkv_db"))
+  resources:
+    cpus = 4
+  conda:
+    "envs/virsorter.yaml"
+  params:
+    checkv_link = config['links']['checkv_link'] if 'checkv_link' in config['links'] else None,
+    tries = 5,
+    db_id = id
+  message:
+    """
+    --- Download VirSort2 database ---
+    --- Download CheckV database ---
+    """
+  log:
+    "logs/viral_databases.log"
+  priority: 9
+  shell:
+    """
+    virsorter setup -d {output.vs2_db} -j {resources.cpus} > {log} 2>&1
+    if [ -z "{params.checkv_link}" ]; then
+        checkv download_database {output.checkv_db} >> {log} 2>&1
+    else
+        wget --tries={params.tries} -c {params.checkv_link} -P {output.checkv_db} >> {log} 2>&1
+        tar -xzvf {output.checkv_db}/{params.db_id}.tar.gz -C {output.checkv_db} >> {log} 2>&1
+        diamond makedb --in {output.checkv_db}/{params.db_id}/genome_db/checkv_reps.faa \
+        --db {output.checkv_db}/{params.db_id}/genome_db/checkv_reps >> {log} 2>&1
+    fi
+    """
+
+rule viral_identification:
+  input:
+    contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta",
+    vs2_db = "07.phages/vs2_db",
+    checkv_db = "07.phages/checkv_db"
+  output:
+    vs2_dir = directory("07.phages/virsorter/{sample}"),
+    checkv_dir = directory("07.phages/checkv/{sample}")
+  params:
+    viral_groups = "dsDNAphage,NCLDV,RNA,ssDNA,lavidaviridae",
+    min_score = 0.5,
+    checkv_link = config['links']['checkv_link'] if 'checkv_link' in config['links'] else None,
+    db_id = id
+  resources:
+    cpus = CPUS
+  conda:
+    "envs/virsorter.yaml"
+  message:
+    """
+    --- VirSorter2: Identification of phages and prophages. ---
+    --- CheckV: Quality assessment of viral genomes. ---
+    """
+  log:
+    "logs/viral_identification_{sample}.log"
+  priority: 8
+  shell:
+    """
+    virsorter run  -i {input.contigs_sel} -w {output.vs2_dir} -d {input.vs2_db} \
+    --keep-original-seq --include-groups {params.viral_groups} --min-score {params.min_score} -j {resources.cpus} all > {log} 2>&1
+
+    if [ -z "{params.checkv_link}" ]; then
+        checkv end_to_end {output.vs2_dir}/final-viral-combined.fa {output.checkv_dir} \
+      -t {resources.cpus} -d {input.checkv_db}/{params.db_id} >> {log} 2>&1 
+    else
+        checkv end_to_end {output.vs2_dir}/final-viral-combined.fa {output.checkv_dir} \
+      -t {resources.cpus} -d {input.checkv_db}/checkv-db-v1.5 >> {log} 2>&1    
+    fi
+    """
+
+rule multiqc:
+  input:
+    quast_dir = expand("02.post-processing/assembly_evaluation/{sample}", sample = SAMPLES),
+    bakta_dir = expand("04.annotation/bakta/{sample}", sample = SAMPLES)
+  output:
+    multiqc_dir = directory("08.report"),
+    multiqc_yaml = temp("08.report/multiqc_config.yaml")
+  conda:
+    "envs/multiqc.yaml"
+  message:
+    "--- MultiQC: Aggregate results. ---"
+  log:
+    "logs/multiqc.log"
+  shell:
+    """
+    printf "%s\n" "show_analysis_paths: False" "show_analysis_time: False" > {output.multiqc_yaml}
+    multiqc --config {output.multiqc_yaml} -d -dd 1 {input.quast_dir} {input.bakta_dir} \
+    --outdir {output.multiqc_dir} > {log} 2>&1
+    """

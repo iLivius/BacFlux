@@ -1,6 +1,6 @@
-name: bbmap
+name: snippy
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bbmap=39.33
+  - snippy=4.6.0

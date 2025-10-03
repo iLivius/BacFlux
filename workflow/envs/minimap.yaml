@@ -1,6 +1,7 @@
-name: bbmap
+name: minimap
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bbmap=39.33
+  - minimap2=2.30
+  - samtools=1.21

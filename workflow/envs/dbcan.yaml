@@ -1,6 +1,6 @@
-name: bbmap
+name: dbcan
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bbmap=39.33
+  - dbcan=5.1.2

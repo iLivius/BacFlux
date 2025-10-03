@@ -1,7 +1,7 @@
 # BacFlux
-A workflow for bacterial short reads assembly, QC, annotation, and more.
+A workflow for bacterial short-read assembly, QC, annotation, and more, with support for pre-assembled contigs
 
-[![Snakemake](https://img.shields.io/badge/snakemake-≥8.4.7-brightgreen.svg)](https://snakemake.readthedocs.io/en/stable/)
+[![Snakemake](https://img.shields.io/badge/snakemake-≥9.10.1-brightgreen.svg)](https://snakemake.readthedocs.io/en/stable/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11143917.svg)](https://doi.org/10.5281/zenodo.11143917)
 
 ```bash
@@ -11,9 +11,9 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.1.8
+BacFlux v1.1.9
 
-July 2024
+August 2025
 ```
 
 ![BacFlux DAG](miscellaneous/BacFlux_v1.1.x_DAG.png)
@@ -31,8 +31,11 @@ July 2024
 - Alexa Sanchez Mejia
 
 ## Synopsis
-`BacFlux` is a comprehensive and automated bioinformatics workflow designed specifically for the processing and analysis of bacterial genomic data sequenced with Illumina technology. It integrates several powerful tools, each performing a specific task, into a seamless workflow managed by a Snakemake script.
-The pipeline accepts paired-end reads as input and subjects them to a series of analyses including steps for quality control, assessment of genome completeness and contamination, taxonomic placement, annotation, inference of secondary metabolites, screening for antimicrobial resistance and virulence genes, and investigation of plasmid presence.
+`BacFlux` is a comprehensive and automated bioinformatics workflow designed specifically for the processing and analysis of bacterial genomic data sequenced using Illumina technology. It integrates several powerful tools, each performing a specific task, into a seamless workflow managed by a Snakemake script.  
+
+The pipeline accepts paired-end reads as input and subjects them to a series of analyses including steps for quality control, assessment of genome completeness and contamination, taxonomic placement, annotation, inference of secondary metabolites, screening for antimicrobial resistance and virulence genes, and investigation of plasmid presence.  
+
+Alternatively, previously assembled contigs can be provided in FASTA format and processed using the `FastaFlux` module, which applies the downstream analysis steps starting from assembled genomes.
 
 ## Table of Contents
 - [Quick Start](#quick-start)
@@ -47,7 +50,7 @@ The pipeline accepts paired-end reads as input and subjects them to a series of 
 - [References](#references)
 
 ## Quick Start
-This guide gets you started with `BacFlux`. Here's a quick guide:
+This guide gets you started with `BacFlux`. Quick guide:
 
 - Download the latest release:
   ```bash
@@ -57,10 +60,11 @@ This guide gets you started with `BacFlux`. Here's a quick guide:
 
 - Configure the `config.yaml`: Specify the input directory containing the raw sequencing data (i.e. paired-end FASTQ files: *strain-1_R1.fq.gz*, *strain-1_R2.fq.gz*) and the desired location for the analysis outputs, respectively. `BacFlux` relies on external databases for some analyses. Some of them are not automatically installed and the `config.yaml` must be edited with the path to the following downloaded databases:
 
+    * bakta_db: path to the [Bakta](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) database directory
     * blast_db: path to the [NCBI core nt](https://ftp.ncbi.nlm.nih.gov/blast/db/) database directory
+    * dbcan_db: path to the [run_dbCAN](https://github.com/bcb-unl/run_dbcan) database directory
     * eggnog_db: path to the [eggNOG](https://github.com/eggnogdb/eggnog-mapper/wiki/eggNOG-mapper-v2.1.5-to-v2.1.12#user-content-Installation) diamond database directory
     * gtdbtk_db: path to the [GTDB](https://ecogenomics.github.io/GTDBTk/installing/index.html) database directory
-    * bakta_db: path to the [Bakta](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) database directory
     * platon_db: path to the [Platon](https://github.com/oschwengers/platon?tab=readme-ov-file#database) database directory
 
 - Install [Snakemake](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html) (if not installed already) and activate the environment:
@@ -92,7 +96,7 @@ Now you're all set to run `BacFlux`! Refer to the [installation](#installation),
 ## Rationale
 The analysis of bacterial WGS data often involves a complex series of steps using various bioinformatic tools. Manual execution of this process can be time-consuming, error-prone, and difficult to reproduce. `BacFlux` addresses these challenges by providing a comprehensive and automated Snakemake workflow that streamlines bacterial genomic data analysis.
 
-`BacFlux` integrates several best-in-class bioinformatic tools into a cohesive pipeline, automating tasks from quality control and assembly to annotation, taxonomic classification, identification of resistance genes and viral sequences.
+`BacFlux` integrates several best-in-class bioinformatic tools into a cohesive pipeline, automating tasks from quality control and assembly to annotation, taxonomic classification, identification of antimicrobial resistance genes and viral sequences.
 
 By providing a user-friendly and automated solution, `BacFlux` empowers researchers to focus on interpreting the biological meaning of their data.
 
@@ -120,8 +124,9 @@ Here's a breakdown of the `BacFlux` workflow:
     * Performs accurate taxonomic placement with [GTDB-Tk](https://github.com/Ecogenomics/GTDBTk) using a curated reference [database](https://gtdb.ecogenomic.org/).
 
 05. **Annotation:**
-    * Annotates contigs using [Prokka](https://github.com/tseemann/prokka) and [Bakta](https://github.com/oschwengers/bakta) for functional prediction.
+    * Annotates contigs using [Bakta](https://github.com/oschwengers/bakta) for functional prediction.
     * Provides further functional annotation with [EggNOG](https://github.com/eggnogdb).
+    * Annotates Carbohydrate-Active enZYmes (CAZymes) using the standalone version [run_dbCAN](https://github.com/bcb-unl/run_dbcan) of the [dbCAN3](https://bcb.unl.edu/dbCAN2/) annotation tool.
     * Infers secondary metabolites with [antiSMASH](https://github.com/antismash/antismash).
 
 06. **Antimicrobial Resistance (AMR):**
@@ -161,11 +166,28 @@ BacFlux downloads automatically all dependencies and several databases.  However
 
 3. **Databases:**
 
-    While `BacFlux` automates the installation of all software dependencies, some external databases need to be downloaded manually. Unless you have installed them already. In that case, skip this paragraph and jump to the [configuration](#configuration) section. 
+    While `BacFlux` automates the installation of all software dependencies, some external databases need to be downloaded manually. If you have already installed them, skip this section and go directly to [configuration](#configuration) section. 
 
     Here are the required databases and instructions for obtaining them.
 
-    * `NCBI core nt` database, adapted from [here](https://gist.github.com/ppflrs/336e49f8ae3843dc06cc3925940f3024):
+    * `Bakta` database:
+        ```bash
+        #Bakta database comes in two flavours. To download the full database, use the following link (recommended):
+        wget -c https://zenodo.org/records/10522951/files/db.tar.gz
+        tar -xzf db.tar.gz
+        rm db.tar.gz
+
+        #alternatively, download a lighter version
+        wget https://zenodo.org/record/10522951/files/db-light.tar.gz
+        tar -xzf db-light.tar.gz
+        rm db-light.tar.gz
+
+        #if the AMRFinderPlus db gives an error, update it by activating the Bakta Conda env and running the following command by targeting the Bakta db directory:
+        amrfinder_update --force_update --database db/amrfinderplus-db/
+        ```
+        *NOTE: according to the [source](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) the light version should take 1.3 GB compressed and 3.9 GB decompressed, whereas the full database should get 30 GB zipped and 84 GB unzipped.*
+
+    * `BLAST core nt` database, adapted from [here](https://gist.github.com/ppflrs/336e49f8ae3843dc06cc3925940f3024):
         ```bash
         #create a list of all core nt links in the directory designated to host the database (recommended)
         rsync --list-only rsync://ftp.ncbi.nlm.nih.gov/blast/db/core_nt.*.gz | grep '.tar.gz' | awk '{print "ftp.ncbi.nlm.nih.gov/blast/db/" $NF}' > nt_links.list
@@ -191,22 +213,39 @@ BacFlux downloads automatically all dependencies and several databases.  However
         wget -c 'ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz'
         gunzip nucl_gb.accession2taxid.gz
         ```
-        *NOTE: the complete NCBI core nt database and taxonomy-related files should take around 223 GB of hard drive space.*
+        *NOTE: the complete NCBI core nt database and taxonomy-related files should take around 300 GB of hard drive space (September 2025).*
+
+    * `dbCAN` database:
+        ```bash
+        #one-time installation of a Conda environment with run_dbCAN
+        conda create -n run_dbCAN dbcan=5.1.2
+
+        #activate the environment
+        conda activate run_dbCAN
+
+        #create a directory for the required databases
+        mkdir /data/dbcan_db
+        #replace /data/dbcan_db with your desired path
+
+        #download all required databases using the built-in command
+        run_dbcan database --db_dir /data/dbcan_db
+        ```
+        *NOTE: the dbCAN database requires ~5 GB of space.*
 
     * `eggNOG diamond` database:
         ```bash
-       #the easiest way is to install a Conda environment with eggnog-mapper, first
-       conda create -n eggnog-mapper eggnog-mapper=2.1.12
+        #the easiest way is to install a Conda environment with eggnog-mapper, first
+        conda create -n eggnog-mapper eggnog-mapper=2.1.13
 
-       #activate the environment
-       conda activate eggnog-mapper
+        #activate the environment
+        conda activate eggnog-mapper
 
-       #then, create a directory where you want to install the diamond database for eggnog-mapper 
-       mkdir /data/eggnog_db
-       #change /data/eggnog_db with your actual PATH
+        #then, create a directory where you want to install the diamond database for eggnog-mapper 
+        mkdir /data/eggnog_db
+        #replace /data/eggnog_db with your actual PATH
 
-       #finally, download the diamond db in the newly created directory 
-       download_eggnog_data.py --data_dir /data/eggnog_db -y
+        #finally, download the diamond db in the newly created directory 
+        download_eggnog_data.py --data_dir /data/eggnog_db -y
         ```
         *NOTE: the eggNOG database requires ~50 GB of space.*
 
@@ -215,36 +254,17 @@ BacFlux downloads automatically all dependencies and several databases.  However
         #move first inside the directory where you want to place the database, then download and decompress either the full package or the split package version
 
         # full package
-        wget -c https://data.gtdb.ecogenomic.org/releases/release220/220.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r220_data.tar.gz
-        tar xzvf gtdbtk_r220_data.tar.gz
-        rm gtdbtk_r220_data.tar.gz
+        wget -c https://data.gtdb.ecogenomic.org/releases/release226/226.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r226_data.tar.gz
 
         # split package (alternative)
-        base_url="https://data.gtdb.ecogenomic.org/releases/release220/220.0/auxillary_files/gtdbtk_package/split_package/gtdbtk_r220_data.tar.gz.part_"
-        suffixes=(aa ab ac ad ae af ag ah ai aj ak)
-        printf "%s\n" "${suffixes[@]}" | xargs -n 1 -P 11 -I {} wget "${base_url}{}"
-        cat gtdbtk_r220_data.tar.gz.part_* > gtdbtk_r220_data.tar.gz
-        tar xzvf gtdbtk_r220_data.tar.gz
-        rm gtdbtk_r220_data.tar.gz
+        base_url="https://data.gtdb.ecogenomic.org/releases/release226/226.0/auxillary_files/gtdbtk_package/split_package/gtdbtk_r226_data.tar.gz.part_"
+        suffixes=(aa ab ac ad ae af ag ah ai aj ak al am an)
+        printf "%s\n" "${suffixes[@]}" | xargs -n 1 -P 14 -I {} wget "${base_url}{}"
+        cat gtdbtk_r226_data.tar.gz.part_* > gtdbtk_r226_data.tar.gz
+        tar xzvf gtdbtk_r226_data.tar.gz
+        rm gtdbtk_r226_data.tar.gz
         ```
-        *NOTE: compressed archive size ~102 GB, decompressed archive size ~108 GB.*
-
-    * `Bakta` database:
-        ```bash
-        #Bakta database comes in two flavours. To download the full database, use the following link (recommended):
-        wget -c https://zenodo.org/records/10522951/files/db.tar.gz
-        tar -xzf db.tar.gz
-        rm db.tar.gz
-
-        #alternatively, download a lighter version
-        wget https://zenodo.org/record/10522951/files/db-light.tar.gz
-        tar -xzf db-light.tar.gz
-        rm db-light.tar.gz
-
-        #if the AMRFinderPlus db gives an error, update it by activating the Bakta Conda env and running the following command by targeting the Bakta db directory:
-        amrfinder_update --force_update --database db/amrfinderplus-db/
-        ```
-        *NOTE: according to the [source](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) the light version should take 1.4 GB compressed and 3.4 GB decompressed, whereas the full database should get 37 GB zipped and 71 GB unzipped.*
+        *NOTE: compressed archive size ~132 GB, decompressed archive size ~146 GB.*
 
     * `Platon` database:
         ```bash
@@ -262,17 +282,24 @@ Before running `BacFlux`, you must edit the `config.yaml` file with a text edito
 
     This section should work fine as it is, therefore it is recommandable to change the `links` only if not working or to update the database versions:
 
-    - [phix_link](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015): Path to the PhiX genome reference used by Illumina for sequencing control.
-    - [card_link](https://card.mcmaster.ca/download/0/broadstreet-v3.2.9.tar.bz2): Path to the Comprehensive Antibiotic Resistance Database (`CARD`)
+    - [card_link](https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2): Path to the Comprehensive Antibiotic Resistance Database (`CARD`)
     - [checkv_link](https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz): Path to the `CheckV` database for viral genome quality assessment
+    - [phix_link](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015): Path to the PhiX genome reference used by Illumina for sequencing control.
 
 - `directories`
 
-    Update paths based on your file system: 
+    Update paths based on your file system:
+
+    - **out_dir**: This directory will store all output files generated by `BacFlux`. Additionally, by default, `BacFlux` will install required software and databases here, within Conda environments. Reusing this output directory for subsequent runs avoids reinstalling everything from scratch.
+
+    - **fasta_dir**: directory containing previously assembled contigs in FASTA format. You can provide multiple files under the following conditions:
+        1. Files can only have the following extensions: `fasta`, `fa`, or `fna`.
+        2. You can provide multiple samples but the extension should be the same for all files. So, don't mix files with different extensions.
+        3. File names should uniquely identify the strain, and must not contain underscores.
 
     - **fastq_dir**: directory containing the paired-end reads of your sequenced strains, in FASTQ format. You can provide as many as you like but at the following conditions:
         1. Files can only have the following extensions: either `fastq`, `fq`, `fastq.gz` or `fq.gz`.
-        2. You can provide multiple samples but the extension should be the same for all files. So, don't mix files with different extensions.
+        2. You can provide multiple samples but the extension should be the same for all files.
         3. Sample names should be formatted as follows: mystrain_R1.fq and mystrain_R2.fq, strain-1_R1.fq and strain-1_R2.fq, strain2_R1.fq, strain2_R2.fq. In this example, `BacFlux` will interpret the name of each strain as: "mystrain", "strain-1", and "strain2", respectively. Strain names cannot contain underscores. See another example, below:
             ```bash
             #the input dir contains the PE reads of two strains, PE212-1 and PE253-B, respectively
@@ -284,15 +311,15 @@ Before running `BacFlux`, you must edit the `config.yaml` file with a text edito
             -rw-rw-r-- 1 ahab ahab 433M Apr  8 16:48 PE253-B_R2.fastq.gz
             ```
              
-    - **out_dir**: This directory will store all output files generated by `BacFlux`. Additionally, by default, `BacFlux` will install required software and databases here, within Conda environments. Reusing this output directory for subsequent runs avoids reinstalling everything from scratch.
+    - **bakta_db**: path to either the light or full (recommended) database of `Bakta`.
 
-    - **blast_db**: path to the whole `NCBI core nt` (recommended) or prokaryotic database only, and related taxonomic dependencies, see [installation](#installation).
+    - **blast_db**: path to the whole `NCBI BLAST core nt` (recommended) or prokaryotic database only, and related taxonomic dependencies, see [installation](#installation).
+
+    - **dbcan_db**: path to the database directory `dbCAN`.
 
     - **eggnog_db**: path to the diamond database for `eggNOG`.
 
-    - **gtdbtk_db**: path to the R220 release of `GTDB`.
-
-    - **bakta_db**: path to either the light or full (recommended) database of `Bakta`.
+    - **gtdbtk_db**: path to the R226 release of `GTDB`.
 
     - **platon_db**: path to the `Platon` database.
 
@@ -322,34 +349,38 @@ conda activate snakemake
 # navigate inside the directory where the BacFlux archive was downloaded and decompressed
 
 # launch the workflow
-snakemake --sdm conda --cores 50
+snakemake --sdm conda --jobs 4 --cores 20
 ```
 *NOTE:  Starting from Snakemake version 8.4.7, the --use-conda option has been deprecated. Instead, you should now use --software-deployment-method conda or --sdm conda.*
+
+**IMPORTANT:** To run `FastaFlux` on FASTA files of previously assembled bacterial genome contigs (specified in the `fasta_dir` option of the config file), use:
+```bash
+snakemake --sdm conda --snakefile workflow/FastaFlux --jobs 2 --cores 12
+```
 
 ## Output
 The workflow output reflects the steps described in the [description](#description) section. Here's a breakdown of the subdirectories created within the main output folder, along with explanations of their contents:
 
-- `01.pre-processing`: QC and statistics of raw reads and trimmed reads, produced by [fastp](https://github.com/OpenGene/fastp) (v0.23.4).
+- `01.pre-processing`: QC and statistics of raw reads and trimmed reads, produced by [fastp](https://github.com/OpenGene/fastp) (v1.0.1).
 
-- `02.assembly`: Content output by [SPAdes](https://github.com/ablab/spades) (v4.0.0). In addiction to the raw contigs, you will find also the filtered contigs (>500bp and at least 2x) and the selected contigs, which are the contigs selected after BLAST search and decontamination (see `parameters` in the [configuration](#configuration) section above). The follow-up applications used during the worflow will either use selected contigs (i.e. for annotation purposes) or raw, filtered and selected contigs (i.e. to evaluate the genome completenness and contamination).
+- `02.assembly`: Content output by [SPAdes](https://github.com/ablab/spades) (v4.2.0). In addition to the raw contigs, you will find also the filtered contigs (>500bp and at least 2x) and the selected contigs, which are the contigs selected after BLAST search and decontamination (see `parameters` in the [configuration](#configuration) section above). The follow-up applications used during the workflow will either use selected contigs (i.e. for annotation purposes) or raw, filtered and selected contigs (i.e. to evaluate the genome completeness and contamination).
 
 - `03.post-processing`: Contains the following sub-directories:
     - **mapping_evaluation**: [QualiMap](http://qualimap.conesalab.org/) (v2.3) output based on filtered contigs.
-    - **contaminants**: Contig selection based on [BLAST+](https://blast.ncbi.nlm.nih.gov/doc/blast-help/) (v2.15.0) search and [BlobTools](https://github.com/DRL/blobtools) (1.1.1) analysis. Check the `composition` text file for a quick overview of the relative composition of your assembly.
-    - **assembly_evaluation**: [Quast](https://github.com/ablab/quast) (v5.2.0) output based on selected contigs.
-    - **completenness_evaluation**: [CheckM](https://github.com/Ecogenomics/CheckM) (1.2.3) output based on raw, filtered and selected contigs.
+    - **contaminants**: Contig selection based on [BLAST+](https://blast.ncbi.nlm.nih.gov/doc/blast-help/) (v2.16.0) search and [BlobTools](https://github.com/DRL/blobtools) (1.1.1) analysis. Check the `composition` text file for a quick overview of the relative composition of your assembly.
+    - **assembly_evaluation**: [Quast](https://github.com/ablab/quast) (v5.3.0) output based on selected contigs.
+    - **completeness_evaluation**: [CheckM](https://github.com/Ecogenomics/CheckM) (1.2.4) output based on raw, filtered and selected contigs.
 
-- `04.taxonomy`: Taxonomic placement of raw, filtered and selected contigs, performed by [GTDB-Tk](https://github.com/Ecogenomics/GTDBTk) (v2.4.0).
+- `04.taxonomy`: Taxonomic placement of raw, filtered and selected contigs, performed by [GTDB-Tk](https://github.com/Ecogenomics/GTDBTk) (v2.4.1).
 
 - `05.annotation`: Contains the following sub-directories:
-    - **prokka**: Legacy annotation performed by [Prokka](https://github.com/tseemann/prokka) (v1.14.6).
-    - **bakta**: Accurate annotation outputted by [Bakta](https://github.com/oschwengers/bakta) (v1.9.4).
+    - **bakta**: Accurate annotation outputted by [Bakta](https://github.com/oschwengers/bakta) (v1.11.3).
     - **eggnog**: Functional annotation produced by [EggNOG](https://github.com/eggnogdb) mapper (v2.1.12).
-    - **antismash**: Secondary metabolites inferred by [antiSMASH](https://github.com/antismash/antismash) (v7.1.0).
+    - **antismash**: Secondary metabolites inferred by [antiSMASH](https://github.com/antismash/antismash) (v8.0.2).
 
 - `06.AMR`: Antimicrobial resistance features are investigated with two complementary approaches:
-    - **AMR_mapping**: reads filtered by [fastp](https://github.com/OpenGene/fastp) (v0.23.4) are mapped to the CARD database (v3.2.9.) using [BBMap](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/) (v39.06) with minimum identiy = 0.99. Mapping results are parsed and features with a covered length of at least 70% are reported in the `AMR legend` file.
-    - **ABRicate**: selected contigs are screened for the presence of AMR elements and virulence factors, using [ABRicate](https://github.com/tseemann/abricate) (v1.0.1).
+    - **AMR_mapping**: reads filtered by [fastp](https://github.com/OpenGene/fastp) (v1.0.1) are mapped to the CARD database (v4.0.1) using [BBMap](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/) (v39.33) with minimum identity = 0.99. Mapping results are parsed and features with a covered length of at least 70% are reported in the `AMR legend` file.
+    - **ABRicate**: selected contigs are screened for the presence of AMR elements and virulence factors, using [ABRicate](https://github.com/tseemann/abricate) (v1.0.1). [EFSA thresholds](https://efsa.onlinelibrary.wiley.com/doi/full/10.2903/j.efsa.2023.8323) are applied: hits must show **≥80% identity and ≥70% gene-length coverage** to be considered.
 
 - `07.plasmids`: Selected contigs are screened for the presence of plasmid replicons with [Platon](https://github.com/oschwengers/platon) (v1.7) and results verified by BLAST search to avoid false positive. Contigs ascertained as plasmids are reported in the `verified plasmids` file.
 
@@ -358,14 +389,13 @@ The workflow output reflects the steps described in the [description](#descripti
     - **checkv**: This second step serves to quality control the results of the previous step to avoid the presence of non-viral sequences (false positive) and to trim potential host regions left at the ends of proviruses.
 
 - `09.report`: [MultiQC](https://github.com/MultiQC/MultiQC) (v1.23) is used to parse and aggregate the results of the following tools:
-    1. [fastp](https://github.com/OpenGene/fastp) (v0.23.4)
+    1. [fastp](https://github.com/OpenGene/fastp) (v1.0.1)
     2. [QualiMap](http://qualimap.conesalab.org/) (v2.3)
-    3. [Quast](https://github.com/ablab/quast) (v5.2.0)
-    4. [Prokka](https://github.com/tseemann/prokka) (v1.14.6)
-    5. [Bakta](https://github.com/oschwengers/bakta) (v1.9.4)
+    3. [Quast](https://github.com/ablab/quast) (v5.3.0)
+    5. [Bakta](https://github.com/oschwengers/bakta) (v1.11.3)
 
 ## Acknowledgements
-This work was supported by the [Austrian Science Fund (FWF)](https://www.fwf.ac.at/en/) [Project I6030-B].
+This work was originally supported by the [Austrian Science Fund (FWF)](https://www.fwf.ac.at/en/) under Project I6030-B.
 
 ## Citation
 Antonielli, L., Großkinsky, D. K., Koch, H., Trognitz, F., Sanchez Mejia, A., & Nagel, M. (2024). BacFlux: A workflow for bacterial short reads assembly, QC, annotation, and more. Zenodo. https://doi.org/10.5281/zenodo.11143917

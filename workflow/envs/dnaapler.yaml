@@ -1,6 +1,6 @@
-name: bbmap
+name: dnaapler
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bbmap=39.33
+  - dnaapler=1.3.0

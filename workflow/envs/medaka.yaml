@@ -1,6 +1,6 @@
-name: bbmap
+name: medaka
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bbmap=39.33
+  - medaka=2.1.0

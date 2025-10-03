@@ -1,18 +1,20 @@
 links:
- phix_link: ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
- card_link: https://card.mcmaster.ca/download/0/broadstreet-v3.2.9.tar.bz2
+ card_link: https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2
  checkv_link: https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz
+ phix_link: ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
 directories:
   out_dir: /path/to/output_dir
-  fastq_dir: /path/to/fastq_dir
-  blast_db: /path/to/NCBI_core_nt
-  eggnog_db: /path/to/eggnog
-  gtdbtk_db: /path/to/GTDB_R220/release220
+  fasta_dir: /path/to/fasta_dir #Only for FastaFlux
+  fastq_dir: /path/to/fastq_dir #Only for BacFlux, BacFluxL, and BacFluxL+
   bakta_db: /path/to/bakta/db
+  blast_db: /path/to/NCBI_core_nt
+  dbcan_db: /path/to/dbcan
+  eggnog_db: /path/to/eggnog
+  gtdbtk_db: /path/to/GTDB_R226/release226
   platon_db: /path/to/platon/db
 resources:
-  threads: 56
   ram_gb: 256
+  threads: 56
 parameters:
-  nt_version: core_nt
+  nt_version: "core_nt" #Options: core_nt, nt_prok
   genus:
