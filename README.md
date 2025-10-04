@@ -1,5 +1,5 @@
 # BacFlux
-A workflow for bacterial short-read assembly, QC, annotation, and more, with support for pre-assembled contigs
+A workflow for bacterial short-read assembly, QC, annotation, and more, with support for pre-assembled contigs.
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥9.10.1-brightgreen.svg)](https://snakemake.readthedocs.io/en/stable/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11143917.svg)](https://doi.org/10.5281/zenodo.11143917)
