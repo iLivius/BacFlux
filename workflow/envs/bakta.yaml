@@ -1,6 +1,6 @@
-name: bakta
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bakta=1.11.3
+  - bakta=1.11.4
+  - pyhmmer<0.12
