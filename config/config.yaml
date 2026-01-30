@@ -3,9 +3,8 @@ links:
  checkv_link: https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz
  phix_link: ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
 directories:
-  out_dir: /path/to/output_dir
-  fasta_dir: /path/to/fasta_dir #Only for FastaFlux
-  fastq_dir: /path/to/fastq_dir #Only for BacFlux, BacFluxL, and BacFluxL+
+  output_dir: /path/to/output_dir
+  input_dir: /path/to/input_dir
   bakta_db: /path/to/bakta/db
   blast_db: /path/to/NCBI_core_nt
   dbcan_db: /path/to/dbcan
@@ -14,7 +13,7 @@ directories:
   platon_db: /path/to/platon/db
 resources:
   ram_gb: 256
-  threads: 56
+  threads: 24
 parameters:
   nt_version: "core_nt" #Options: core_nt, nt_prok
   genus:

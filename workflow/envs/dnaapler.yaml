@@ -1,6 +1,0 @@
-name: dnaapler
-channels:
-  - conda-forge
-  - bioconda
-dependencies:
-  - dnaapler=1.3.0
