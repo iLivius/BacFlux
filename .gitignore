@@ -1,0 +1,3 @@
+.snakemake/
+
+config/config_custom.yaml

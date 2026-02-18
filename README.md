@@ -11,9 +11,9 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.1.10
+BacFlux v1.2.0
 
-January 2026
+February 2026
 ```
 ---
 ![BacFlux DAG](miscellaneous/BacFlux_v1.1.x_DAG.png)
@@ -54,7 +54,7 @@ This guide gets you started with `BacFlux`. Quick guide:
 
 - Download the latest release:
   ```bash
-  #git command
+  # git command
   git clone https://github.com/iLivius/BacFlux.git
   ```
 
@@ -62,16 +62,15 @@ This guide gets you started with `BacFlux`. Quick guide:
 
     * bakta_db: path to the [Bakta](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) database directory
     * blast_db: path to the [NCBI core nt](https://ftp.ncbi.nlm.nih.gov/blast/db/) database directory
-    * dbcan_db: path to the [run_dbCAN](https://github.com/bcb-unl/run_dbcan) database directory
     * eggnog_db: path to the [eggNOG](https://github.com/eggnogdb/eggnog-mapper/wiki/eggNOG-mapper-v2.1.5-to-v2.1.13#user-content-Installation) diamond database directory
     * gtdbtk_db: path to the [GTDB](https://ecogenomics.github.io/GTDBTk/installing/index.html) database directory
     * platon_db: path to the [Platon](https://github.com/oschwengers/platon?tab=readme-ov-file#database) database directory
 
 - Install [Snakemake](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html) (if not installed already) and activate the environment:
   ```bash
-  #optional, if not installed already
+  # optional, if not installed already
   conda create -c conda-forge -c bioconda -n snakemake snakemake
-  #activate Snakemake environment
+  # activate Snakemake environment
   conda activate snakemake
   ```
 Refer to the [installation](#installation), [configuration](#configuration) and [running BacFlux](#running-bacflux) sections for detailed instructions.
@@ -83,15 +82,15 @@ Refer to the [installation](#installation), [configuration](#configuration) and 
 
   This  command uses the following options:
 
-    --sdm: uses conda for dependency management
+    - --sdm: uses conda for dependency management
 
-    --keep-going: continues execution even if errors occur in some steps
+    - --keep-going: continues execution even if errors occur in some steps
 
-    --ignore-incomplete: ignores rules with missing outputs
+    - --ignore-incomplete: ignores rules with missing outputs
 
-    --keep-incomplete: keeps incomplete intermediate files
+    - --keep-incomplete: keeps incomplete intermediate files
 
-    --cores 50: cap the amount of local CPUs at this value (adjust as needed).
+    - --cores 50: cap the amount of local CPUs at this value (adjust as needed).
 
 [⬆ Back to Table of Contents](#table-of-contents)
 
@@ -158,7 +157,7 @@ BacFlux downloads automatically all dependencies and several databases.  However
     Extract the downloaded archive into your desired location. This will create a directory structure with the necessary files and directories.
     Alternatively, download via command line as:
     ```bash
-    #git command
+    # git command
     git clone https://github.com/iLivius/BacFlux.git
     ```
 
@@ -166,7 +165,7 @@ BacFlux downloads automatically all dependencies and several databases.  However
 
     `BacFlux` relies on [Snakemake](https://snakemake.readthedocs.io/en/stable/index.html) to manage the workflow execution. Find the official and complete set of instructions [here](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html). To install Snakemake as a Conda environment:
     ```bash
-    #install Snakemake in a new Conda environment (alternatively, use mamba)
+    # install Snakemake in a new Conda environment (alternatively, use mamba)
     conda create -c conda-forge -c bioconda -n snakemake snakemake
     ```
 
@@ -178,78 +177,62 @@ BacFlux downloads automatically all dependencies and several databases.  However
 
     * `Bakta` database:
         ```bash
-        #Bakta database comes in two flavours. To download the full database, use the following link (recommended):
+        # Bakta database comes in two flavours. To download the full database, use the following link (recommended):
         wget -c https://zenodo.org/records/10522951/files/db.tar.gz
         tar -xzf db.tar.gz
         rm db.tar.gz
 
-        #alternatively, download a lighter version
+        # alternatively, download a lighter version
         wget https://zenodo.org/record/10522951/files/db-light.tar.gz
         tar -xzf db-light.tar.gz
         rm db-light.tar.gz
 
-        #if the AMRFinderPlus db gives an error, update it by activating the Bakta Conda env and running the following command by targeting the Bakta db directory:
+        # if the AMRFinderPlus db gives an error, update it by activating the Bakta Conda env and running the following command by targeting the Bakta db directory:
         amrfinder_update --force_update --database db/amrfinderplus-db/
         ```
         *NOTE: according to the [source](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) the light version should take 1.3 GB compressed and 3.9 GB decompressed, whereas the full database should get 30 GB zipped and 84 GB unzipped.*
 
     * `NCBI core nt` database, adapted from [here](https://gist.github.com/ppflrs/336e49f8ae3843dc06cc3925940f3024):
         ```bash
-        #create a list of all core nt links in the directory designated to host the database (recommended)
+        # create a list of all core nt links in the directory designated to host the database (recommended)
         rsync --list-only rsync://ftp.ncbi.nlm.nih.gov/blast/db/core_nt.*.gz | grep '.tar.gz' | awk '{print "ftp.ncbi.nlm.nih.gov/blast/db/" $NF}' > nt_links.list
         
-        #alternatively, create a list of nt links for bacteria only 
+        # alternatively, create a list of nt links for bacteria only 
         rsync --list-only rsync://ftp.ncbi.nlm.nih.gov/blast/db/nt_prok.*.gz | grep '.tar.gz' | awk '{print "ftp.ncbi.nlm.nih.gov/blast/db/" $NF}' > nt_prok_links.list
        
-        #download in parallel, without overdoing it
+        # download in parallel, without overdoing it
         cat nt*.list | parallel -j4 'rsync -h --progress rsync://{} .'
 
-        #decompress with multiple CPUs
+        # decompress with multiple CPUs
         find . -name '*.gz' | parallel -j4 'echo {}; tar -zxf {}'
 
-        #get NCBI taxdump
+        # get NCBI taxdump
         wget -c 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
         tar -zxvf taxdump.tar.gz
 
-        #get NCBI BLAST taxonomy
+        # get NCBI BLAST taxonomy
         wget 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/taxdb.tar.gz'
         tar -zxvf taxdb.tar.gz
 
-        #get NCBI accession2taxid file
+        # get NCBI accession2taxid file
         wget -c 'ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz'
         gunzip nucl_gb.accession2taxid.gz
         ```
         *NOTE: the complete NCBI core nt database and taxonomy-related files should take around 300 GB of hard drive space (September 2025).*
 
-    * `dbCAN` database:
-        ```bash
-        #one-time installation of a Conda environment with run_dbCAN
-        conda create -n run_dbCAN dbcan=5.1.2
-
-        #activate the environment
-        conda activate run_dbCAN
-
-        #create a directory for the required databases (example)
-        mkdir /data/dbcan_db
-
-        #download all required databases using the built-in command
-        run_dbcan database --db_dir /data/dbcan_db --aws_s3
-        ```
-        *NOTE: the dbCAN database requires ~5 GB of space.*
-
     * `eggNOG diamond` database:
         ```bash
-        #the easiest way is to install a Conda environment with eggnog-mapper, first
+        # the easiest way is to install a Conda environment with eggnog-mapper, first
         conda create -n eggnog-mapper eggnog-mapper=2.1.13
 
-        #activate the environment
+        # activate the environment
         conda activate eggnog-mapper
 
-        #then, create a directory where you want to install the diamond database for eggnog-mapper 
+        # then, create a directory where you want to install the diamond database for eggnog-mapper 
         mkdir /data/eggnog_db
         #replace /data/eggnog_db with your actual PATH
 
-        #finally, download the diamond db in the newly created directory 
+        # finally, download the diamond db in the newly created directory 
         download_eggnog_data.py --data_dir /data/eggnog_db -y
         ```
         *NOTE: the eggNOG database requires ~50 GB of space.*
@@ -273,7 +256,7 @@ BacFlux downloads automatically all dependencies and several databases.  However
 
     * `Platon` database:
         ```bash
-        #download the database in a directory of your choice 
+        # download the database in a directory of your choice 
         wget https://zenodo.org/record/4066768/files/db.tar.gz
         tar -xzf db.tar.gz
         rm db.tar.gz
@@ -291,20 +274,23 @@ Before running `BacFlux`, you must edit the `config.yaml` file with a text edito
 
     - [card_link](https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2): Path to the Comprehensive Antibiotic Resistance Database (`CARD`)
     - [checkv_link](https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz): Path to the `CheckV` database for viral genome quality assessment
+    - [dbcan_link](https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz): Path to the `dbCAN` database of `run_dbcan` v5.1.2.
     - [phix_link](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015): Path to the PhiX genome reference used by Illumina for sequencing control.
 
 - `directories`
 
     Update paths based on your file system:
 
-    - **output_dir**: This directory will store all output files generated by `BacFlux`. Additionally, by default, `BacFlux` will install required software and databases here, within Conda environments. Reusing this output directory for subsequent runs avoids reinstalling everything from scratch.
+    - **output_dir**: This directory will store all output files generated by `BacFlux`. Additionally, `BacFlux` will install required software and databases here, within Conda environments. Reusing this output directory for subsequent runs avoids reinstalling everything from scratch.
 
     - **input_dir**: directory containing the paired-end reads of your sequenced strains, in **FASTQ** format. You can provide as many as you like but at the following conditions:
         1. Files can only have the following extensions: either `fastq`, `fq`, `fastq.gz` or `fq.gz`.
         2. You can provide multiple samples but the extension should be the same for all files.
-        3. Sample names should be formatted as follows: mystrain_R1.fq and mystrain_R2.fq, strain-1_R1.fq and strain-1_R2.fq, strain2_R1.fq, strain2_R2.fq. In this example, `BacFlux` will interpret the name of each strain as: "mystrain", "strain-1", and "strain2", respectively. Strain names cannot contain underscores. See another example, below:
+        3. Sample names should be formatted as follows: mystrain_R1.fq and mystrain_R2.fq, strain-1_R1.fq and strain-1_R2.fq, strain2_R1.fq, strain2_R2.fq. In this example, `BacFlux` will interpret the name of each strain as: "mystrain", "strain-1", and "strain2", respectively. Strain names cannot contain underscores. 
+        See another example, below:
+
             ```bash
-            #the input dir contains the PE reads of two strains, PE212-1 and PE253-B, respectively
+            # the input dir contains the PE reads of two strains, PE212-1 and PE253-B, respectively
             ahab@pequod:~/data$ ls -lh
             total 1,6G
             -rw-rw-r-- 1 ahab ahab 379M Apr  8 16:48 PE212-1_R1.fastq.gz
@@ -318,15 +304,9 @@ Before running `BacFlux`, you must edit the `config.yaml` file with a text edito
         3. File names should uniquely identify the strain, and must not contain underscores.
 
     - **bakta_db**: path to either the light or full (recommended) database of `Bakta`.
-
     - **blast_db**: path to the `NCBI core nt` (recommended) or prokaryotic database only, and related taxonomic dependencies, see [installation](#installation).
-
-    - **dbcan_db**: path to the database directory `dbCAN`.
-
     - **eggnog_db**: path to the diamond database for `eggNOG`.
-
     - **gtdbtk_db**: path to the R226 release of `GTDB`.
-
     - **platon_db**: path to the `Platon` database.
 
 - `resources`
@@ -350,6 +330,7 @@ Before running `BacFlux`, you must edit the `config.yaml` file with a text edito
 
 ## Running BacFlux
 `BacFlux` can be executed as simply as a Snakefile. Please refer to the official [Snakemake documentation](https://snakemake.readthedocs.io/en/stable/index.html) for more details.
+
 ```bash
 # first, activate the Snakemake Conda environment
 conda activate snakemake
@@ -362,6 +343,7 @@ snakemake --sdm conda --jobs 4 --cores 20
 *NOTE:  Starting from Snakemake version 8.4.7, the --use-conda option has been deprecated. Instead, you should now use --software-deployment-method conda or --sdm conda.*
 
 **IMPORTANT:** To run `FastaFlux` on FASTA files of previously assembled bacterial genome contigs, use:
+
 ```bash
 snakemake --sdm conda --snakefile workflow/FastaFlux --jobs 2 --cores 12
 ```
@@ -384,7 +366,7 @@ The workflow output reflects the steps described in the [description](#descripti
 - `04.taxonomy`: Taxonomic placement of raw, filtered and selected contigs, performed by [GTDB-Tk](https://github.com/Ecogenomics/GTDBTk) (v2.6.1).
 
 - `05.annotation`: Contains the following sub-directories:
-    - **bakta**: Accurate annotation outputted by [Bakta](https://github.com/oschwengers/bakta) (v1.11.4).
+    - **bakta**: Accurate annotation outputted by [Bakta](https://github.com/oschwengers/bakta) (v1.12.0).
     - **eggnog**: Functional annotation produced by [EggNOG](https://github.com/eggnogdb) mapper (v2.1.13).
     - **antismash**: Secondary metabolites inferred by [antiSMASH](https://github.com/antismash/antismash) (v8.0.4).
     - **dbcan**: Carbohydrate-active enzyme and substrate annotation by [dbCAN3](https://github.com/bcb-unl/run_dbcan) (v5.1.2)
@@ -403,7 +385,9 @@ The workflow output reflects the steps described in the [description](#descripti
     1. [fastp](https://github.com/OpenGene/fastp) (v1.0.1)
     2. [QualiMap](http://qualimap.conesalab.org/) (v2.3)
     3. [Quast](https://github.com/ablab/quast) (v5.3.0)
-    4. [Bakta](https://github.com/oschwengers/bakta) (v1.11.4)
+    4. [CheckM](https://github.com/Ecogenomics/CheckM) (1.2.4) 
+    5. [GTDB-Tk](https://github.com/Ecogenomics/GTDBTk) (v2.6.1)
+    6. [Bakta](https://github.com/oschwengers/bakta) (v1.12.0)
 
 [⬆ Back to Table of Contents](#table-of-contents)
 
