@@ -5,10 +5,10 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.1.10
+BacFlux v1.2.0 — Genomic Analysis of Bacterial Illumina Reads 
 
 
-Livio Antonielli, January 2026
+Livio Antonielli, February 2026
 ''')
 
 # Modules:
@@ -22,11 +22,10 @@ configfile: 'config/config.yaml'
 # Path to DBs and input/output directories in config file:
 workdir: config['directories']['output_dir']
 INPUTDIR = config['directories']['input_dir']
+BAKTADB = config['directories']['bakta_db']
 BLASTDB = config['directories']['blast_db']
 DMNDDB = config['directories']['eggnog_db']
 GTDBTKDB = config['directories']['gtdbtk_db']
-BAKTADB = config['directories']['bakta_db']
-DBCANDB = config['directories']['dbcan_db']
 PLATONDB = config['directories']['platon_db']
 
 # AMR DBs (ABRicate):
@@ -117,6 +116,7 @@ rule all:
     bakta_dir = expand("05.annotation/bakta/{sample}", sample = SAMPLES),
     eggnog_dir = expand("05.annotation/eggnog/{sample}", sample = SAMPLES),
     antismash_dir = expand("05.annotation/antismash/{sample}", sample = SAMPLES),
+    dbcan_db = "05.annotation/dbcan/dbcan_db_v5.1.2",
     dbcan_dir = expand("05.annotation/dbcan/{sample}", sample = SAMPLES),
     amr_tab = expand("06.AMR/ABRicate/{sample}/{db}.tsv", sample = SAMPLES, db = DATABASES),
     amr_summary = expand("06.AMR/ABRicate/{sample}/AMR_summary.txt", sample = SAMPLES),
@@ -559,8 +559,6 @@ rule genome_assembly_evaluation:
 
 rule completeness_and_contamination:
   input:
-    contigs = "02.assembly/{sample}/contigs.fasta",
-    contigs_filt = "02.assembly/{sample}/contigs_filt.fasta",
     contigs_sel = "02.assembly/{sample}/contigs_sel.fasta"
   output:
     checkm_dir = directory("03.post-processing/completeness_evaluation/{sample}"),
@@ -577,7 +575,7 @@ rule completeness_and_contamination:
   priority: 5
   shell:
     """
-    cp {input.contigs} {input.contigs_filt} {input.contigs_sel} {output.checkm_dir}
+    cp {input.contigs_sel} {output.checkm_dir}/{wildcards.sample}.fasta
     
     checkm lineage_wf \
       -t {resources.cpus} \
@@ -588,8 +586,7 @@ rule completeness_and_contamination:
       -o 2 \
       -t {resources.cpus} \
       --tab_table \
-      -f {output.checkm_stats} {output.checkm_lineage} \
-      {output.checkm_dir} >> {log} 2>&1
+      -f {output.checkm_stats} {output.checkm_lineage} {output.checkm_dir} >> {log} 2>&1
     """
 
 rule taxonomic_assignment:
@@ -622,10 +619,10 @@ rule taxonomic_assignment:
       --cpus {resources.cpus} \
       --pplacer_cpus {resources.cpus_p} > {log} 2>&1
 
-    rm -rf {input.checkm_dir}/contigs*.fasta
+    rm -rf {input.checkm_dir}/*.fasta
     """
 
-rule accurate_annotation:
+rule annotation:
   input:
     contigs = "02.assembly/{sample}/contigs_sel.fasta",
     abund = "03.post-processing/contaminants/{sample}/{sample}_composition.txt"
@@ -640,7 +637,7 @@ rule accurate_annotation:
   message:
     "--- Bakta: Genome annotation. ---"
   log:
-    "logs/accurate_annotation_{sample}.log"
+    "logs/annotation_{sample}.log"
   priority: 5
   shell:
     """
@@ -655,6 +652,7 @@ rule accurate_annotation:
       --min-contig-length 500 \
       --locus-tag {wildcards.sample} \
       --prefix {wildcards.sample} \
+      --keep-contig-headers \
       --output {output.bakta_dir} \
       --threads {resources.cpus} \
       --force {input.contigs}; \
@@ -739,13 +737,52 @@ rule secondary_metabolites_analysis:
       {input.bakta_dir}/{wildcards.sample}.gbff > {log} 2>&1
     """    
 
+# Specify directory where to place the dbCAN database
+DBCAN_DB_DIR = "05.annotation/dbcan/dbcan_db_v5.1.2"
+
+# Sentinel file for triggering the cazyme annotation rule afterwards
+DBCAN_SENTINEL = DBCAN_DB_DIR + "/.verified.sha256"
+
+rule cazyme_db_download:
+  output:
+    dbcan_db = directory(DBCAN_DB_DIR),
+    dbcan_verified = DBCAN_SENTINEL
+  params:
+    dbcan_db_url = config["links"]["dbcan_link"],
+    sha_url = lambda wc: config["links"]["dbcan_link"].replace(".tar.gz", ".sha256")
+  log:
+    "logs/cazyme_db_download.log"
+  priority: 4
+  shell:
+    """
+    mkdir -p "{output.dbcan_db}"
+
+    TAR="{output.dbcan_db}/$(basename "{params.dbcan_db_url}")"
+    SHA="{output.dbcan_db}/$(basename "{params.sha_url}")"
+
+    wget -O "$TAR" "{params.dbcan_db_url}" > "{log}" 2>&1
+    wget -O "$SHA" "{params.sha_url}" >> "{log}" 2>&1
+
+    # verify checksum
+    expected="$(awk 'NR==1{{print $1}}' "$SHA")"
+    actual="$(sha256sum "$TAR" | awk '{{print $1}}')"
+    test "$expected" = "$actual"
+
+    # extract (flatten top-level directory)
+    tar -xzf "$TAR" -C "{output.dbcan_db}" --strip-components=1 >> "{log}" 2>&1
+
+    # create sentinel containing verified checksum
+    echo "$actual" > "{output.dbcan_verified}"
+    """
+
 rule cazyme_gene_cluster:
   input:
     bakta_dir = "05.annotation/bakta/{sample}",
+    dbcan_verified = DBCAN_SENTINEL
   output:
     dbcan_dir = directory("05.annotation/dbcan/{sample}")
   params:
-    dbcan_db = DBCANDB
+    dbcan_db = DBCAN_DB_DIR
   resources:
     cpus = min(CPUS, 24)
   conda:
@@ -778,7 +815,7 @@ rule cazyme_gene_cluster:
 
     # CAZyme Gene Cluster (CGC) Identification
     run_dbcan cgc_finder \
-      --output_dir {output.dbcan_dir} >> {log} 2>&1
+      --output_dir {output.dbcan_dir} >> {log} 2>&1 
 
     # CGC Substrate Prediction
     run_dbcan substrate_prediction \
@@ -891,7 +928,7 @@ rule map_amr_db:
       path={output.bbmap_temp} \
       idfilter={params.min_id} \
       idtag \
-      -Xmx64g \
+      -Xmx32g \
       threads={resources.cpus} \
       ambiguous=best \
       secondary=f \
@@ -1042,10 +1079,13 @@ rule multiqc:
     fastp_json = expand("01.pre-processing/{sample}_fastp.json", sample = SAMPLES),
     qualimap_dir = expand("03.post-processing/mapping_evaluation/{sample}", sample = SAMPLES),
     quast_dir = expand("03.post-processing/assembly_evaluation/{sample}", sample = SAMPLES),
+    checkm_dir = expand("03.post-processing/completeness_evaluation/{sample}", sample = SAMPLES),
+    gtdbtk_dir = expand("04.taxonomy/{sample}", sample = SAMPLES),
     bakta_dir = expand("05.annotation/bakta/{sample}", sample = SAMPLES)
   output:
+    report_html = "09.report/multiqc_report.html",
     multiqc_dir = directory("09.report"),
-    multiqc_yaml = temp("09.report/multiqc_config.yaml")
+    multiqc_yaml = "09.report/multiqc_config.yaml"
   conda:
     "envs/multiqc.yaml"
   message:
@@ -1053,16 +1093,42 @@ rule multiqc:
   log:
     "logs/multiqc.log"
   shell:
-    """
+    r"""
+    set -euo pipefail
+
+    mkdir -p {output.multiqc_dir}
+
     printf "%s\n" "show_analysis_paths: False" "show_analysis_time: False" > {output.multiqc_yaml}
-    
+
+  
+    cat >> "{output.multiqc_yaml}" << 'EOF'
+sample_names_replace_regex: true
+sample_names_replace_exact: true
+
+sample_names_replace:
+  # read QC (fastp)
+  '^01\.pre-processing \| ([^|]+)$': 'read QC | \1'
+
+  # mapping QC (QualiMap)
+  '^03\.post-processing \| mapping_evaluation \| ([^|]+) \| \1_map$': 'map QC pt.1 | \1'
+  '^03\.post-processing \| mapping_evaluation \| ([^|]+) \| raw_data$': 'map QC pt.2 | \1'
+
+  # assembly QC (Quast)
+  '^03\.post-processing \| assembly_evaluation \| ([^|]+) \| contigs_sel$':  'assembly QC | \1'
+
+  # annotation (Bakta)
+  '^05\.annotation \| bakta \| ([^|]+) \| \1$': 'annotation | \1'
+EOF
+
     multiqc \
-      --config {output.multiqc_yaml} \
+      --config "{output.multiqc_yaml}" \
       -d \
-      -dd 1 \
       {input.fastp_json} \
       {input.qualimap_dir} \
       {input.quast_dir} \
+      {input.checkm_dir} \
+      {input.gtdbtk_dir} \
       {input.bakta_dir} \
-      --outdir {output.multiqc_dir} > {log} 2>&1
+      --outdir "{output.multiqc_dir}" \
+      --filename "multiqc_report.html" > "{log}" 2>&1
     """
