@@ -31,7 +31,7 @@ February 2026
 - Alexa Sanchez Mejia
 
 ## Synopsis
-`BacFlux` is a comprehensive and automated bioinformatics workflow designed specifically for the processing and analysis of bacterial genomic data sequenced using Illumina technology. It integrates several powerful tools, each performing a specific task, into a seamless workflow managed by a Snakemake script.  
+`BacFlux` is a comprehensive and automated bioinformatics workflow designed specifically for the processing and analysis of bacterial genomic data sequenced using Illumina technology. It integrates several tools into a seamless workflow managed by a Snakemake script.  
 
 The pipeline accepts paired-end reads as input and subjects them to a series of analyses including steps for quality control, assessment of genome completeness and contamination, taxonomic placement, annotation, inference of secondary metabolites, screening for antimicrobial resistance and virulence genes, and investigation of plasmid presence.  
 
