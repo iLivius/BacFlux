@@ -11,9 +11,9 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.2.0
+BacFlux v1.2.2
 
-February 2026
+April 2026
 ```
 ---
 ![BacFlux DAG](miscellaneous/BacFlux_v1.1.x_DAG.png)

@@ -3,6 +3,7 @@
 #
 # Purpose:
 #   Remove bulky temporary folders and downloaded databases that are not required to keep the final results of the workflow.
+#   Supports both BacFlux and FastaFlux output directories.
 #
 # Usage:
 #   ./clean_workdir.sh            # dry-run (prints what would be removed)
@@ -21,42 +22,67 @@ elif [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-need_dir() {
-  local d="$1"
-  [[ -d "$d" ]] || { echo "ERROR: expected directory not found: $d" >&2; exit 1; }
+detect_workflow() {
+  if [[ -d "02.assembly" && -d "03.post-processing" && -d "04.taxonomy" ]]; then
+    echo "BacFlux"
+  elif [[ -d "01.pre-processing" && -d "02.post-processing" && -d "03.taxonomy" ]]; then
+    echo "FastaFlux"
+  else
+    echo "ERROR: current directory does not look like a BacFlux or FastaFlux output directory." >&2
+    exit 1
+  fi
 }
 
-# ensure we are in the right place (security check)
-need_dir "02.assembly"
+WORKFLOW="$(detect_workflow)"
 
-# All targets
-TARGETS=(
-  # 02.assembly: SPAdes intermediates and temporary folders
-  "02.assembly/*/K*"
-  "02.assembly/*/misc"
-  "02.assembly/*/pipeline_state"
-  "02.assembly/*/tmp"
+POSTPROC_DIR=""
+TAXONOMY_DIR=""
+ANNOTATION_DIR=""
+PHAGES_DIR=""
+TARGETS=()
 
-  # 03.post-processing: completeness evaluation intermediates
-  "03.post-processing/completeness_evaluation/*/bins"
-  "03.post-processing/completeness_evaluation/*/storage"
-  "03.post-processing/completeness_evaluation/*/lineage.ms"
+if [[ "$WORKFLOW" == "BacFlux" ]]; then
+  POSTPROC_DIR="03.post-processing"
+  TAXONOMY_DIR="04.taxonomy"
+  ANNOTATION_DIR="05.annotation"
+  PHAGES_DIR="08.phages"
 
-  # 04.taxonomy: GTDB-Tk subfolders
-  "04.taxonomy/*/align"
-  "04.taxonomy/*/identify"
+  TARGETS+=(
+    # 02.assembly: SPAdes intermediates and temporary folders
+    "02.assembly/*/K*"
+    "02.assembly/*/misc"
+    "02.assembly/*/pipeline_state"
+    "02.assembly/*/tmp"
+  )
+else
+  POSTPROC_DIR="02.post-processing"
+  TAXONOMY_DIR="03.taxonomy"
+  ANNOTATION_DIR="04.annotation"
+  PHAGES_DIR="07.phages"
+fi
 
-  # 05.annotation: downloaded databases
-  "05.annotation/dbcan/dbcan_db_v5.1.2"
-  "05.annotation/antismash/databases"
+TARGETS+=(
+  # Completeness evaluation intermediates
+  "${POSTPROC_DIR}/completeness_evaluation/*/bins"
+  "${POSTPROC_DIR}/completeness_evaluation/*/storage"
+  "${POSTPROC_DIR}/completeness_evaluation/*/lineage.ms"
 
-  # 08.phages: databases and temporary folders
-  "08.phages/*_db"
-  "08.phages/checkv/*/tmp"
-  "08.phages/virsorter/*/iter-*"
+  # GTDB-Tk subfolders
+  "${TAXONOMY_DIR}/*/align"
+  "${TAXONOMY_DIR}/*/identify"
+
+  # Downloaded databases
+  "${ANNOTATION_DIR}/dbcan/dbcan_db_v5.1.2"
+  "${ANNOTATION_DIR}/antismash/databases"
+
+  # Phage databases and temporary folders
+  "${PHAGES_DIR}/*_db"
+  "${PHAGES_DIR}/checkv/*/tmp"
+  "${PHAGES_DIR}/virsorter/*/iter-*"
 )
 
 echo "== Cleanup utility =="
+echo "Workflow: $WORKFLOW"
 if [[ "$DO_RUN" -eq 1 ]]; then
   echo "Mode: RUN (will delete)"
 else
