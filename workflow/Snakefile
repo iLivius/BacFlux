@@ -5,10 +5,10 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.2.0 — Genomic Analysis of Bacterial Illumina Reads 
+BacFlux v1.2.2 — Genomic Analysis of Bacterial Illumina Reads
 
 
-Livio Antonielli, February 2026
+Livio Antonielli, April 2026
 ''')
 
 # Modules:
@@ -38,6 +38,13 @@ RAM = config['resources']['ram_gb']
 # Define not allowed characters
 not_allowed_chars = set("_*#@%^/! ?&:;|<>")
 
+def bakta_locus_tag(sample):
+    tag = "".join(char if char.isalnum() or char in "_.-" else "_" for char in str(sample))
+    tag = tag[:24]
+    if not tag:
+        raise ValueError(f"Unable to derive a valid Bakta locus tag from sample name '{sample}'.")
+    return tag
+
 # Sanity check of genus parameter:
 if config['parameters'] is not None and "genus" in config['parameters']:
     genus = config['parameters']["genus"]
@@ -50,7 +57,7 @@ else:
 
 # Sanity check of checkv db link parameter:
 global id
-id = None
+id = "checkv-db-v1.5"
 
 links = config.get("links") or {}
 
@@ -58,9 +65,8 @@ if "checkv_link" not in links or links["checkv_link"] is None or str(links["chec
     # Optional parameter: fall back to automatic download
     print(
         "The link to the CheckV database is not specified (or empty). "
-        "The latest version will be downloaded automatically."
+        "CheckV will download the database automatically."
     )
-    id = None
 else:
     link = str(links["checkv_link"]).strip()
     path = urlparse(link).path
@@ -569,9 +575,9 @@ rule completeness_and_contamination:
   conda:
     "envs/checkm.yaml"
   message:
-    "--- CheckM: Assessment of genome completenness and contamination. ---"
+    "--- CheckM: Assessment of genome completeness and contamination. ---"
   log:
-    "logs/completenness_and_contamination_{sample}.log"
+    "logs/completeness_and_contamination_{sample}.log"
   priority: 5
   shell:
     """
@@ -629,7 +635,8 @@ rule annotation:
   output:
     bakta_dir = directory("05.annotation/bakta/{sample}")
   params:
-    bakta_db = BAKTADB
+    bakta_db = BAKTADB,
+    locus_tag = lambda wc: bakta_locus_tag(wc.sample)
   resources:
     cpus = min(CPUS, 24)
   conda:
@@ -650,7 +657,7 @@ rule annotation:
       --strain {wildcards.sample} \
       --translation-table 11 \
       --min-contig-length 500 \
-      --locus-tag {wildcards.sample} \
+      --locus-tag {params.locus_tag} \
       --prefix {wildcards.sample} \
       --keep-contig-headers \
       --output {output.bakta_dir} \
@@ -1032,9 +1039,7 @@ rule viral_identification:
     checkv_dir = directory("08.phages/checkv/{sample}")
   params:
     viral_groups = "dsDNAphage,NCLDV,RNA,ssDNA,lavidaviridae",
-    min_score = 0.5,
-    checkv_link = config['links']['checkv_link'] if 'checkv_link' in config['links'] else None,
-    db_id = id
+    min_score = 0.5
   resources:
     cpus = min(CPUS, 24)
   conda:
@@ -1050,7 +1055,7 @@ rule viral_identification:
   shell:
     """
     virsorter run  \
-      -i {input.contigs} \-w {output.vs2_dir} -d {input.vs2_db} \
+      -i {input.contigs} \
       -w {output.vs2_dir} \
       -d {input.vs2_db} \
       --keep-original-seq \
@@ -1059,19 +1064,20 @@ rule viral_identification:
       -j {resources.cpus} \
       all > {log} 2>&1
 
-    if [ -z "{params.checkv_link}" ]; then
-        checkv end_to_end \
-          {output.vs2_dir}/final-viral-combined.fa \
-          {output.checkv_dir} \
-          -t {resources.cpus} \
-          -d {input.checkv_db}/{params.db_id} >> {log} 2>&1 
-    else
-        checkv end_to_end \
-          {output.vs2_dir}/final-viral-combined.fa \
-          {output.checkv_dir} \
-          -t {resources.cpus} \
-          -d {input.checkv_db}/checkv-db-v1.5 >> {log} 2>&1
+    checkv_rep_files=$(find {input.checkv_db} -type f -path "*/genome_db/checkv_reps.faa" | sort)
+    checkv_rep_file=$(printf "%s\n" "$checkv_rep_files" | head -n 1)
+    checkv_rep_count=$(printf "%s\n" "$checkv_rep_files" | sed '/^$/d' | wc -l)
+    if [ "$checkv_rep_count" -ne 1 ]; then
+        echo "Expected exactly one CheckV database in {input.checkv_db}, found $checkv_rep_count candidate(s)." >> {log}
+        exit 1
     fi
+    checkv_db_dir=$(dirname "$(dirname "$checkv_rep_file")")
+
+    checkv end_to_end \
+      {output.vs2_dir}/final-viral-combined.fa \
+      {output.checkv_dir} \
+      -t {resources.cpus} \
+      -d "$checkv_db_dir" >> {log} 2>&1
     """
 
 rule multiqc:

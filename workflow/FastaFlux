@@ -5,10 +5,10 @@ __  /_   _  __ `/_  ___/  __/  __ `/_  /_   __  /_  / / /_  |/_/
 _  __/   / /_/ /_(__  )/ /_ / /_/ /_  __/   _  / / /_/ /__>  <  
 /_/      \__,_/ /____/ \__/ \__,_/ /_/      /_/  \__,_/ /_/|_|  
                                                                                                             
-FastaFlux v1.2.0 – Downstream Analysis of Bacterial Whole-Genome Assemblies
+FastaFlux v1.2.2 – Downstream Analysis of Bacterial Whole-Genome Assemblies
 
 
-Livio Antonielli, February 2026 
+Livio Antonielli, April 2026
 ''')
 
 # Modules:
@@ -37,6 +37,13 @@ CPUS = config['resources']['threads']
 # Define not allowed characters
 not_allowed_chars = set("_*#@%^/! ?&:;|<>")
 
+def bakta_locus_tag(sample):
+    tag = "".join(char if char.isalnum() or char in "_.-" else "_" for char in str(sample))
+    tag = tag[:24]
+    if not tag:
+        raise ValueError(f"Unable to derive a valid Bakta locus tag from sample name '{sample}'.")
+    return tag
+
 # Sanity check of genus parameter:
 if config['parameters'] is not None and "genus" in config['parameters']:
     genus = config['parameters']["genus"]
@@ -47,22 +54,20 @@ if config['parameters'] is not None and "genus" in config['parameters']:
 else:
     print("The 'genus' parameter is not present in the config file and contigs won't be filtered accordingly.")
 
-# Sanity check of checkv db link parameter:
-global id
-id = None
-
+# Sanity check of checkv and dbCAN link parameters:
 links = config.get("links") or {}
+CHECKV_LINK = str(links.get("checkv_link") or "").strip()
+DBCAN_LINK = str(links.get("dbcan_link") or "").strip()
+CHECKV_DB_ID = None
 
-if "checkv_link" not in links or links["checkv_link"] is None or str(links["checkv_link"]).strip() == "":
+if not CHECKV_LINK:
     # Optional parameter: fall back to automatic download
     print(
         "The link to the CheckV database is not specified (or empty). "
         "The latest version will be downloaded automatically."
     )
-    id = None
 else:
-    link = str(links["checkv_link"]).strip()
-    path = urlparse(link).path
+    path = urlparse(CHECKV_LINK).path
     db = os.path.basename(path)
 
     # Hard failure only for truly invalid input
@@ -71,8 +76,17 @@ else:
             f"Invalid checkv_link: expected a .tar.gz archive, got '{db}'."
         )
 
-    id = os.path.splitext(os.path.splitext(db)[0])[0]
-    print(f"Using CheckV database from link: '{link}' (db_id='{id}').")
+    CHECKV_DB_ID = os.path.splitext(os.path.splitext(db)[0])[0]
+    print(f"Using CheckV database from link: '{CHECKV_LINK}' (db_id='{CHECKV_DB_ID}').")
+
+if not DBCAN_LINK:
+    raise ValueError("Missing required 'links.dbcan_link' value in the config file.")
+if not DBCAN_LINK.endswith(".tar.gz"):
+    raise ValueError(
+        f"Invalid dbcan_link: expected a .tar.gz archive, got '{os.path.basename(DBCAN_LINK)}'."
+    )
+
+DBCAN_SHA_URL = DBCAN_LINK.replace(".tar.gz", ".sha256")
 
 # Import FASTQ files from input dir:
 SAMPLES, EXTENSIONS = glob_wildcards(os.path.join(INPUTDIR, '{sample}.{extn}'))
@@ -289,7 +303,7 @@ rule blob_table:
 FASTA_LIN_CMD = r"""{if(NR==1) {printf "%s\n", $0} else {if(/^>/) {printf "\n%s\n", $0} else {printf $0}}}"""
 
 # Execute either one rule or another according to presence/absence of 'genus' parameter
-if "genus" in config['parameters'] and config['parameters']['genus'] is not None and len(config['parameters']['genus']) > 0:
+if config.get('parameters') is not None and "genus" in config['parameters'] and config['parameters']['genus'] is not None and len(config['parameters']['genus']) > 0:
   rule:
     input:
       contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta",
@@ -443,7 +457,8 @@ rule accurate_annotation:
   output:
     bakta_dir = directory("04.annotation/bakta/{sample}")
   params:
-    bakta_db = BAKTADB
+    bakta_db = BAKTADB,
+    locus_tag = lambda wc: bakta_locus_tag(wc.sample)
   resources:
     cpus = min(CPUS, 24)
   conda:
@@ -464,7 +479,7 @@ rule accurate_annotation:
         --strain {wildcards.sample} \
         --translation-table 11 \
         --min-contig-length 500 \
-        --locus-tag {wildcards.sample} \
+        --locus-tag {params.locus_tag} \
         --prefix {wildcards.sample} \
         --keep-contig-headers \
         --output {output.bakta_dir} \
@@ -562,8 +577,8 @@ rule cazyme_db_download:
     dbcan_db = directory(DBCAN_DB_DIR),
     dbcan_verified = DBCAN_SENTINEL
   params:
-    dbcan_db_url = config["links"]["dbcan_link"],
-    sha_url = lambda wc: config["links"]["dbcan_link"].replace(".tar.gz", ".sha256")
+    dbcan_db_url = DBCAN_LINK,
+    sha_url = DBCAN_SHA_URL
   log:
     "logs/cazyme_db_download.log"
   priority: 4
@@ -592,6 +607,7 @@ rule cazyme_db_download:
 rule cazyme_gene_cluster:
   input:
     bakta_dir = "04.annotation/bakta/{sample}",
+    dbcan_verified = DBCAN_SENTINEL
   output:
     dbcan_dir = directory("04.annotation/dbcan/{sample}")
   params:
@@ -742,9 +758,9 @@ rule viral_db:
   conda:
     "envs/virsorter.yaml"
   params:
-    checkv_link = config['links']['checkv_link'] if 'checkv_link' in config['links'] else None,
+    checkv_link = CHECKV_LINK,
     tries = 5,
-    db_id = id
+    db_id = CHECKV_DB_ID
   message:
     """
     --- Download VirSort2 database ---
@@ -781,9 +797,7 @@ rule viral_identification:
     checkv_dir = directory("07.phages/checkv/{sample}")
   params:
     viral_groups = "dsDNAphage,NCLDV,RNA,ssDNA,lavidaviridae",
-    min_score = 0.5,
-    checkv_link = config['links']['checkv_link'] if 'checkv_link' in config['links'] else None,
-    db_id = id
+    min_score = 0.5
   resources:
     cpus = min(CPUS, 24)
   conda:
@@ -808,19 +822,20 @@ rule viral_identification:
       -j {resources.cpus} \
       all > {log} 2>&1
 
-    if [ -z "{params.checkv_link}" ]; then
-        checkv end_to_end \
-          {output.vs2_dir}/final-viral-combined.fa \
-          {output.checkv_dir} \
-          -t {resources.cpus} \
-          -d {input.checkv_db}/{params.db_id} >> {log} 2>&1 
-    else
-        checkv end_to_end \
-          {output.vs2_dir}/final-viral-combined.fa \
-          {output.checkv_dir} \
-          -t {resources.cpus} \
-          -d {input.checkv_db}/checkv-db-v1.5 >> {log} 2>&1
+    checkv_rep_files=$(find {input.checkv_db} -type f -path "*/genome_db/checkv_reps.faa" | sort)
+    checkv_rep_file=$(printf "%s\n" "$checkv_rep_files" | head -n 1)
+    checkv_rep_count=$(printf "%s\n" "$checkv_rep_files" | sed '/^$/d' | wc -l)
+    if [ "$checkv_rep_count" -ne 1 ]; then
+        echo "Expected exactly one CheckV database in {input.checkv_db}, found $checkv_rep_count candidate(s)." >> {log}
+        exit 1
     fi
+    checkv_db_dir=$(dirname "$(dirname "$checkv_rep_file")")
+
+    checkv end_to_end \
+      {output.vs2_dir}/final-viral-combined.fa \
+      {output.checkv_dir} \
+      -t {resources.cpus} \
+      -d "$checkv_db_dir" >> {log} 2>&1
     """
 
 rule multiqc:
