@@ -5,10 +5,10 @@ __  /_   _  __ `/_  ___/  __/  __ `/_  /_   __  /_  / / /_  |/_/
 _  __/   / /_/ /_(__  )/ /_ / /_/ /_  __/   _  / / /_/ /__>  <  
 /_/      \__,_/ /____/ \__/ \__,_/ /_/      /_/  \__,_/ /_/|_|  
                                                                                                             
-FastaFlux v1.2.2 – Downstream Analysis of Bacterial Whole-Genome Assemblies
+FastaFlux v1.3.0
+Downstream Analysis of Bacterial Whole-Genome Assemblies
 
-
-Livio Antonielli, April 2026
+Livio Antonielli, June 2026
 ''')
 
 # Modules:
@@ -33,6 +33,9 @@ DATABASES = ["argannot", "card", "ecoh", "ecoli_vf", "megares", "ncbi", "resfind
 
 # Hardware resources in config file:
 CPUS = config['resources']['threads']
+WORKFLOW_DIR = workflow.basedir
+PARAMETERS = config.get('parameters', {}) or {}
+SELECT_TAXONOMY_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "select_contigs_by_taxonomy.py")
 
 # Define not allowed characters
 not_allowed_chars = set("_*#@%^/! ?&:;|<>")
@@ -44,15 +47,57 @@ def bakta_locus_tag(sample):
         raise ValueError(f"Unable to derive a valid Bakta locus tag from sample name '{sample}'.")
     return tag
 
-# Sanity check of genus parameter:
-if config['parameters'] is not None and "genus" in config['parameters']:
-    genus = config['parameters']["genus"]
-    if genus is not None and len(genus) > 0:
-        print(f"The 'genus' parameter is specified in the config file with value: '{genus}'.")
-    else:
-        print("The 'genus' parameter value is not specified in the config file and will be inferred automatically.")
-else:
-    print("The 'genus' parameter is not present in the config file and contigs won't be filtered accordingly.")
+def _as_decontam_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple, set)):
+        return ";".join(str(item).strip() for item in value if str(item).strip())
+    return str(value).strip()
+
+
+def _config_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"true", "1", "yes", "on"}:
+        return True
+    if text in {"false", "0", "no", "off"}:
+        return False
+    raise ValueError(f"Invalid boolean config value: {value!r}")
+
+
+def _decontam_settings(default_mode):
+    params = config.get("parameters", {}) or {}
+    settings = dict(params.get("decontamination") or {})
+    if not settings:
+        legacy_genus = params.get("genus", None)
+        if legacy_genus is not None and str(legacy_genus).strip():
+            settings = {"mode": "include", "include_genera": legacy_genus}
+        elif "genus" in params:
+            settings = {"mode": "auto"}
+        else:
+            settings = {"mode": default_mode}
+
+    mode = str(settings.get("mode", default_mode) or default_mode).strip().lower()
+    if mode not in {"auto", "include", "exclude", "off"}:
+        raise ValueError("Invalid decontamination.mode. Expected one of: auto, include, exclude, off.")
+    settings["mode"] = mode
+    settings["include_genera"] = _as_decontam_text(settings.get("include_genera", ""))
+    settings["include_genera_by_sample"] = _as_decontam_text(settings.get("include_genera_by_sample", ""))
+    settings["exclude_genera"] = _as_decontam_text(settings.get("exclude_genera", ""))
+    settings["exclude_genera_file"] = _as_decontam_text(settings.get("exclude_genera_file", ""))
+    settings["sample_overrides"] = _as_decontam_text(settings.get("sample_overrides", ""))
+    settings["discard_no_hit"] = str(_config_bool(settings.get("discard_no_hit"), False)).lower()
+    return settings
+
+
+DECONTAMINATION = _decontam_settings("auto")
+print(
+    "Decontamination mode: "
+    f"{DECONTAMINATION['mode']} (discard_no_hit={DECONTAMINATION['discard_no_hit']})."
+)
 
 # Sanity check of checkv and dbCAN link parameters:
 links = config.get("links") or {}
@@ -302,63 +347,46 @@ rule blob_table:
 
 FASTA_LIN_CMD = r"""{if(NR==1) {printf "%s\n", $0} else {if(/^>/) {printf "\n%s\n", $0} else {printf $0}}}"""
 
-# Execute either one rule or another according to presence/absence of 'genus' parameter
-if config.get('parameters') is not None and "genus" in config['parameters'] and config['parameters']['genus'] is not None and len(config['parameters']['genus']) > 0:
-  rule:
-    input:
-      contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta",
-      bestscore = "02.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt"
-    output:
-      contigs_filt_lin = "01.pre-processing/{sample}/contigs_filt_lin.fasta",
-      abund = "02.post-processing/contaminants/{sample}/{sample}_composition.txt",
-      list = "02.post-processing/contaminants/{sample}/contigs.list",
-      contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta"
-    params:
-      genus = config['parameters']['genus']    
-    priority: 0
-    shell:
-      """
-      cat {input.contigs_filt} | awk {FASTA_LIN_CMD:q} > {output.contigs_filt_lin}
+rule select_contigs:
+  input:
+    contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta",
+    bestscore = "02.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt"
+  output:
+    contigs_filt_lin = "01.pre-processing/{sample}/contigs_filt_lin.fasta",
+    abund = "02.post-processing/contaminants/{sample}/{sample}_composition.txt",
+    list = "02.post-processing/contaminants/{sample}/contigs.list",
+    decisions = "02.post-processing/contaminants/{sample}/contig_taxonomy_decisions.tsv",
+    contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta"
+  params:
+    selector = SELECT_TAXONOMY_SCRIPT,
+    mode = DECONTAMINATION["mode"],
+    include_genera = DECONTAMINATION["include_genera"],
+    include_genera_by_sample = DECONTAMINATION["include_genera_by_sample"],
+    exclude_genera = DECONTAMINATION["exclude_genera"],
+    exclude_genera_file = DECONTAMINATION["exclude_genera_file"],
+    sample_overrides = DECONTAMINATION["sample_overrides"],
+    discard_no_hit = DECONTAMINATION["discard_no_hit"]
+  priority: 0
+  shell:
+    """
+    cat {input.contigs_filt} | awk {FASTA_LIN_CMD:q} > {output.contigs_filt_lin}
 
-      for i in $(cat {input.bestscore} | sed '1,11d' | cut -f 22 | sort -u); do \
-          cat {input.bestscore} | sed '1,11d' | awk -v var=$i 'BEGIN {{printf "%s%s", var, ": "}} $22 == var {{count++}} END {{printf "%.2f\\n", count/NR}}'; \
-      done > {output.abund}
-
-      echo "Sample {wildcards.sample} composition:"
-      cat {output.abund}
-      
-      awk -v var="{params.genus}" 'tolower($22) ~ tolower("[:alpha:]*"var) {{print $1}}' {input.bestscore} > {output.list}
-      
-      grep -A1 -f {output.list} {output.contigs_filt_lin} | sed '/--/d' > {output.contigs_sel}
-      """
-else:
-  rule:
-    input:
-      contigs_filt = "01.pre-processing/{sample}/contigs_filt.fasta",
-      bestscore = "02.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt"
-    output:
-      contigs_filt_lin = "01.pre-processing/{sample}/contigs_filt_lin.fasta",
-      abund = "02.post-processing/contaminants/{sample}/{sample}_composition.txt",
-      list = "02.post-processing/contaminants/{sample}/contigs.list",
-      contigs_sel = "02.post-processing/contaminants/{sample}/contigs_sel.fasta"
-    priority: 0
-    shell:
-      """
-      cat {input.contigs_filt} | awk {FASTA_LIN_CMD:q} > {output.contigs_filt_lin}
-
-      for i in $(cat {input.bestscore} | sed '1,11d' | cut -f 22 | sort -u); do \
-          cat {input.bestscore} | sed '1,11d' | awk -v var=$i 'BEGIN {{printf "%s%s", var, ": "}} $22 == var {{count++}} END {{printf "%.2f\\n", count/NR}}'; \
-      done > {output.abund}
-
-      echo "Sample {wildcards.sample} composition:"
-      cat {output.abund}
-
-      for i in $(cat {output.abund} | sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p' | sed -e 's/Para//;s/Pseudo//;s/Paen//' | tr '[:upper:]' '[:lower:]'); do \
-          awk -v var="$i" 'tolower($22) ~ tolower("[:alpha:]*"var) {{print $1}}' {input.bestscore}; \
-      done > {output.list}
-
-      grep -A1 -f {output.list} {output.contigs_filt_lin} | sed '/--/d' > {output.contigs_sel}
-      """
+    python {params.selector:q} \
+      --bestscore {input.bestscore:q} \
+      --contigs {output.contigs_filt_lin:q} \
+      --sample {wildcards.sample:q} \
+      --mode {params.mode:q} \
+      --include-genera {params.include_genera:q} \
+      --include-genera-by-sample {params.include_genera_by_sample:q} \
+      --exclude-genera {params.exclude_genera:q} \
+      --exclude-genera-file {params.exclude_genera_file:q} \
+      --sample-overrides {params.sample_overrides:q} \
+      --discard-no-hit {params.discard_no_hit:q} \
+      --output-list {output.list:q} \
+      --output-fasta {output.contigs_sel:q} \
+      --composition {output.abund:q} \
+      --decisions {output.decisions:q}
+    """
 
 rule genome_assembly_evaluation:
   input:

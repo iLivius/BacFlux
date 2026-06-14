@@ -5,21 +5,24 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.2.2 — Genomic Analysis of Bacterial Illumina Reads
+BacFlux v1.3.0
+Genomic Analysis of Bacterial Illumina Reads
 
-
-Livio Antonielli, April 2026
+Livio Antonielli, June 2026
 ''')
 
-# Modules:
+# Python is used here only for orchestration: paths, config checks, and small
+# decisions. The biological work starts later in the Snakemake rules.
 import os
 import sys
 from urllib.parse import urlparse
 
-# Configuration file:
+# The default config is used unless the user provides another one with
+# --configfile. Snakemake loads it before evaluating the rest of this file.
 configfile: 'config/config.yaml'
 
-# Path to DBs and input/output directories in config file:
+# Keep frequently used config values in named variables. This makes the rule
+# section easier to read and keeps paths consistent across the workflow.
 workdir: config['directories']['output_dir']
 INPUTDIR = config['directories']['input_dir']
 BAKTADB = config['directories']['bakta_db']
@@ -28,16 +31,26 @@ DMNDDB = config['directories']['eggnog_db']
 GTDBTKDB = config['directories']['gtdbtk_db']
 PLATONDB = config['directories']['platon_db']
 
-# AMR DBs (ABRicate):
+# ABRicate is run once per database in this list.
 DATABASES = ["argannot", "card", "ecoh", "ecoli_vf", "megares", "ncbi", "resfinder", "vfdb"]
 
-# Hardware resources in config file:
+# Global resource and helper paths. Individual rules may still cap CPU use when
+# a tool does not benefit from all available threads.
 CPUS = config['resources']['threads']
 RAM = config['resources']['ram_gb']
+WORKFLOW_DIR = workflow.basedir
+PARAMETERS = config.get('parameters', {}) or {}
 
-# Define not allowed characters
+# Shared helper used after BlobTools. It reads contig taxonomy assignments and
+# decides which contigs are kept, discarded, or left untouched.
+SELECT_TAXONOMY_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "select_contigs_by_taxonomy.py")
+
+# Sample names become filenames, locus tags, and report labels. Reject
+# characters that make paths ambiguous or unsafe.
 not_allowed_chars = set("_*#@%^/! ?&:;|<>")
 
+# Bakta locus tags must be short, non-empty, and simple. This converts a sample
+# name into a safe prefix without changing the user's visible sample name.
 def bakta_locus_tag(sample):
     tag = "".join(char if char.isalnum() or char in "_.-" else "_" for char in str(sample))
     tag = tag[:24]
@@ -45,17 +58,68 @@ def bakta_locus_tag(sample):
         raise ValueError(f"Unable to derive a valid Bakta locus tag from sample name '{sample}'.")
     return tag
 
-# Sanity check of genus parameter:
-if config['parameters'] is not None and "genus" in config['parameters']:
-    genus = config['parameters']["genus"]
-    if genus is not None and len(genus) > 0:
-        print(f"The 'genus' parameter is specified in the config file with value: '{genus}'.")
-    else:
-        print("The 'genus' parameter value is not specified in the config file and will be inferred automatically.")
-else:
-    print("The 'genus' parameter is not present in the config file and contigs won't be filtered accordingly.")
+# Decontamination config values may be empty, strings, or YAML lists. The
+# selector script expects plain semicolon-separated text.
+def _as_decontam_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple, set)):
+        return ";".join(str(item).strip() for item in value if str(item).strip())
+    return str(value).strip()
 
-# Sanity check of checkv db link parameter:
+
+# Read boolean-like YAML values in a predictable way. This avoids silent
+# surprises such as "yes" and "true" being handled differently.
+def _config_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"true", "1", "yes", "on"}:
+        return True
+    if text in {"false", "0", "no", "off"}:
+        return False
+    raise ValueError(f"Invalid boolean config value: {value!r}")
+
+
+# Collect all decontamination choices into one dictionary passed to the selector
+# script. Legacy "genus" settings are still translated into the newer schema.
+def _decontam_settings(default_mode):
+    params = config.get("parameters", {}) or {}
+    settings = dict(params.get("decontamination") or {})
+    if not settings:
+        legacy_genus = params.get("genus", None)
+        if legacy_genus is not None and str(legacy_genus).strip():
+            settings = {"mode": "include", "include_genera": legacy_genus}
+        elif "genus" in params:
+            settings = {"mode": "auto"}
+        else:
+            settings = {"mode": default_mode}
+
+    mode = str(settings.get("mode", default_mode) or default_mode).strip().lower()
+    if mode not in {"auto", "include", "exclude", "off"}:
+        raise ValueError("Invalid decontamination.mode. Expected one of: auto, include, exclude, off.")
+    settings["mode"] = mode
+    settings["include_genera"] = _as_decontam_text(settings.get("include_genera", ""))
+    settings["include_genera_by_sample"] = _as_decontam_text(settings.get("include_genera_by_sample", ""))
+    settings["exclude_genera"] = _as_decontam_text(settings.get("exclude_genera", ""))
+    settings["exclude_genera_file"] = _as_decontam_text(settings.get("exclude_genera_file", ""))
+    settings["sample_overrides"] = _as_decontam_text(settings.get("sample_overrides", ""))
+    settings["discard_no_hit"] = str(_config_bool(settings.get("discard_no_hit"), False)).lower()
+    return settings
+
+
+# Decide once how contigs will be filtered after BlobTools. Rules below use
+# this normalized object instead of re-reading the config.
+DECONTAMINATION = _decontam_settings("auto")
+print(
+    "Decontamination mode: "
+    f"{DECONTAMINATION['mode']} (discard_no_hit={DECONTAMINATION['discard_no_hit']})."
+)
+
+# CheckV can download its own database, but when a link is provided it must
+# point to a tar.gz archive. The ID is used to name the local database folder.
 global id
 id = "checkv-db-v1.5"
 
@@ -81,9 +145,12 @@ else:
     id = os.path.splitext(os.path.splitext(db)[0])[0]
     print(f"Using CheckV database from link: '{link}' (db_id='{id}').")
 
-# Import FASTQ files from input dir:
+# Discover samples from R1 files. The matching R2 path is built later from the
+# same sample name and extension.
 SAMPLES, EXTENSIONS = glob_wildcards(os.path.join(INPUTDIR, '{sample}_R1.{extn}'))
 
+# Stop early if there are no usable inputs or if a sample name would create
+# confusing filenames downstream.
 if len(SAMPLES) == 0:
     sys.stderr.write(f"No files in {INPUTDIR}. Please, check directory.\n")
     sys.exit(0)
@@ -94,7 +161,8 @@ else:
             sys.exit(0)
         print(f"Sample {sample} in process...")
 
-# Check if files have nonunique extension:
+# Require one FASTQ extension for the batch. Mixed extensions make wildcard
+# expansion ambiguous when building R1/R2 paths.
 for extension in EXTENSIONS:
   if extension.endswith(("fastq", "fq", "fastq.gz", "fq.gz")):
     if len(set(EXTENSIONS)) != 1:
@@ -105,7 +173,7 @@ for extension in EXTENSIONS:
     sys.stderr.write("\nFile format not recognized.\n")
     sys.exit(0)
 
-# Create sample objects:
+# Reusable wildcard patterns for paired-end reads.
 EXTN = EXTENSIONS[0]
 R1 = '{sample}_R1.' + EXTN
 R2 = '{sample}_R2.' + EXTN
@@ -465,81 +533,43 @@ rule blob_table:
       --hits >> {log} 2>&1
     """
 
-# Execute either one rule or another according to presence/absence of 'genus' parameter
-if config.get('parameters') is not None and "genus" in config['parameters'] and config['parameters']['genus'] is not None and len(config['parameters']['genus']) > 0:
-  rule:
-    input:
-      bestscore = "03.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt",
-      contigs = "02.assembly/{sample}/contigs_filt.fasta"
-    output:
-      abund = "03.post-processing/contaminants/{sample}/{sample}_composition.txt",
-      list = "03.post-processing/contaminants/{sample}/contigs.list",
-      contigs = "02.assembly/{sample}/contigs_sel.fasta"
-    params:
-      genus = config['parameters']['genus']    
-    priority: 6
-    shell:
-      """
-      for i in $(cat {input.bestscore} | sed '1,11d' | cut -f 22 | sort -u); do \
-        cat {input.bestscore} | sed '1,11d' | awk -v var=$i 'BEGIN {{printf "%s%s", var, ": "}} $22 == var {{count++}} END {{printf "%.2f\\n", count/NR}}'; \
-      done > {output.abund}
-      
-      echo "Sample {wildcards.sample} composition:"
-      cat {output.abund}
-      
-      awk -v var="{params.genus}" 'tolower($22) ~ tolower("[:alpha:]*"var) {{print $1}}' {input.bestscore} > {output.list}
-      
-      grep -A1 -f {output.list} {input.contigs} | sed '/--/d' > {output.contigs}
-      """
-elif config.get('parameters') is not None and "genus" in config['parameters'] and (config['parameters']['genus'] is None or len(config['parameters']['genus']) == 0):
-  rule:
-    input:
-      bestscore = "03.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt",
-      contigs = "02.assembly/{sample}/contigs_filt.fasta"
-    output:
-      abund = "03.post-processing/contaminants/{sample}/{sample}_composition.txt",
-      list = "03.post-processing/contaminants/{sample}/contigs.list",
-      contigs = "02.assembly/{sample}/contigs_sel.fasta"
-    priority: 6
-    shell:
-      """
-      for i in $(cat {input.bestscore} | sed '1,11d' | cut -f 22 | sort -u); do \
-        cat {input.bestscore} | sed '1,11d' | awk -v var=$i 'BEGIN {{printf "%s%s", var, ": "}} $22 == var {{count++}} END {{printf "%.2f\\n", count/NR}}'; \
-      done > {output.abund}
-      
-      echo "Sample {wildcards.sample} composition:"
-      cat {output.abund}
-      for i in $(cat {output.abund} | sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p' | sed -e 's/Para//;s/Pseudo//;s/Paen//;s/Paeni//;s/Brady//;s/Meso//;s/Neo//;s/Sino//;s/Aeri//;s/Caldi//;s/Geo//' | tr '[:upper:]' '[:lower:]'); do \
-        awk -v var="$i" 'tolower($22) ~ tolower("[:alpha:]*"var) {{print $1}}' {input.bestscore}; \
-      done > {output.list}
-      
-      grep -A1 -f {output.list} {input.contigs} | sed '/--/d' > {output.contigs}
-      """
-else:
-  rule:
-    input:
-      bestscore = "03.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt",
-      contigs = "02.assembly/{sample}/contigs_filt.fasta"
-    output:
-      abund = "03.post-processing/contaminants/{sample}/{sample}_composition.txt",
-      list = "03.post-processing/contaminants/{sample}/contigs.list",
-      contigs = "02.assembly/{sample}/contigs_sel.fasta"
-    params:
-      nohit = "no-hit"   
-    priority: 6
-    shell:
-      """
-      for i in $(cat {input.bestscore} | sed '1,11d' | cut -f 22 | sort -u); do \
-        cat {input.bestscore} | sed '1,11d' | awk -v var=$i 'BEGIN {{printf "%s%s", var, ": "}} $22 == var {{count++}} END {{printf "%.2f\\n", count/NR}}'; \
-      done > {output.abund}
-      
-      echo "Sample {wildcards.sample} composition:"
-      cat {output.abund}
-      
-      awk -v var="{params.nohit}" 'tolower($22) !~ tolower("[:alpha:]*"var) {{print $1}}' {input.bestscore} > {output.list}
-      
-      grep -A1 -f {output.list} {input.contigs} | sed '/--/d' > {output.contigs}
-      """
+rule select_contigs:
+  input:
+    bestscore = "03.post-processing/contaminants/{sample}/bestscore.blob.blobDB.table.txt",
+    contigs = "02.assembly/{sample}/contigs_filt.fasta"
+  output:
+    abund = "03.post-processing/contaminants/{sample}/{sample}_composition.txt",
+    list = "03.post-processing/contaminants/{sample}/contigs.list",
+    decisions = "03.post-processing/contaminants/{sample}/contig_taxonomy_decisions.tsv",
+    contigs = "02.assembly/{sample}/contigs_sel.fasta"
+  params:
+    selector = SELECT_TAXONOMY_SCRIPT,
+    mode = DECONTAMINATION["mode"],
+    include_genera = DECONTAMINATION["include_genera"],
+    include_genera_by_sample = DECONTAMINATION["include_genera_by_sample"],
+    exclude_genera = DECONTAMINATION["exclude_genera"],
+    exclude_genera_file = DECONTAMINATION["exclude_genera_file"],
+    sample_overrides = DECONTAMINATION["sample_overrides"],
+    discard_no_hit = DECONTAMINATION["discard_no_hit"]
+  priority: 6
+  shell:
+    """
+    python {params.selector:q} \
+      --bestscore {input.bestscore:q} \
+      --contigs {input.contigs:q} \
+      --sample {wildcards.sample:q} \
+      --mode {params.mode:q} \
+      --include-genera {params.include_genera:q} \
+      --include-genera-by-sample {params.include_genera_by_sample:q} \
+      --exclude-genera {params.exclude_genera:q} \
+      --exclude-genera-file {params.exclude_genera_file:q} \
+      --sample-overrides {params.sample_overrides:q} \
+      --discard-no-hit {params.discard_no_hit:q} \
+      --output-list {output.list:q} \
+      --output-fasta {output.contigs:q} \
+      --composition {output.abund:q} \
+      --decisions {output.decisions:q}
+    """
 
 rule genome_assembly_evaluation:
   input:
@@ -1116,8 +1146,8 @@ sample_names_replace:
   '^01\.pre-processing \| ([^|]+)$': 'read QC | \1'
 
   # mapping QC (QualiMap)
-  '^03\.post-processing \| mapping_evaluation \| ([^|]+) \| \1_map$': 'map QC pt.1 | \1'
-  '^03\.post-processing \| mapping_evaluation \| ([^|]+) \| raw_data$': 'map QC pt.2 | \1'
+  '^03\.post-processing \| mapping_evaluation \| ([^|]+) \| \1_map$': 'mapping QC | \1'
+  '^03\.post-processing \| mapping_evaluation \| ([^|]+) \| raw_data$': 'mapping QC | \1'
 
   # assembly QC (Quast)
   '^03\.post-processing \| assembly_evaluation \| ([^|]+) \| contigs_sel$':  'assembly QC | \1'
@@ -1126,14 +1156,47 @@ sample_names_replace:
   '^05\.annotation \| bakta \| ([^|]+) \| \1$': 'annotation | \1'
 EOF
 
+    REPORT_INPUT_DIR="{output.multiqc_dir}/multiqc_inputs"
+    rm -rf "$REPORT_INPUT_DIR"
+    mkdir -p "$REPORT_INPUT_DIR/checkm" "$REPORT_INPUT_DIR/gtdbtk"
+
+    for checkm_dir in {input.checkm_dir}; do
+      sample=$(basename "$checkm_dir")
+      mkdir -p "$REPORT_INPUT_DIR/checkm/$sample"
+      awk -F '\t' -v OFS='\t' -v sample="$sample" '
+        NR == 1 {{ print; next }}
+        $1 == sample {{ $1 = "completeness | " sample }}
+        {{ print }}
+      ' "$checkm_dir/checkm_stats.tsv" > "$REPORT_INPUT_DIR/checkm/$sample/checkm_stats.tsv"
+    done
+
+    for gtdbtk_dir in {input.gtdbtk_dir}; do
+      sample=$(basename "$gtdbtk_dir")
+      summary=""
+      if [[ -d "$gtdbtk_dir/classify" ]]; then
+        summary=$(find "$gtdbtk_dir/classify" -maxdepth 1 -name 'gtdbtk.*.summary.tsv' -print -quit)
+      fi
+      if [[ -z "$summary" ]]; then
+        summary=$(find "$gtdbtk_dir" -maxdepth 1 -name 'gtdbtk.*.summary.tsv' -print -quit)
+      fi
+      if [[ -n "$summary" ]]; then
+        mkdir -p "$REPORT_INPUT_DIR/gtdbtk/$sample"
+        awk -F '\t' -v OFS='\t' -v sample="$sample" '
+          NR == 1 {{ print; next }}
+          $1 == sample {{ $1 = "taxonomy | " sample }}
+          {{ print }}
+        ' "$summary" > "$REPORT_INPUT_DIR/gtdbtk/$sample/$(basename "$summary")"
+      fi
+    done
+
     multiqc \
       --config "{output.multiqc_yaml}" \
       -d \
       {input.fastp_json} \
       {input.qualimap_dir} \
       {input.quast_dir} \
-      {input.checkm_dir} \
-      {input.gtdbtk_dir} \
+      "$REPORT_INPUT_DIR/checkm" \
+      "$REPORT_INPUT_DIR/gtdbtk" \
       {input.bakta_dir} \
       --outdir "{output.multiqc_dir}" \
       --filename "multiqc_report.html" > "{log}" 2>&1

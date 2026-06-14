@@ -11,13 +11,11 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.2.2
+BacFlux v1.3.0
 
-April 2026
+June 2026
 ```
----
-![BacFlux DAG](miscellaneous/BacFlux_v1.1.x_DAG.png)
----
+
 ## Authors and Contributors
 [AIT Austrian Institute of Technology, Center for Health & Bioresources](https://www.ait.ac.at/en/research-topics/bioresources)
 
@@ -50,7 +48,7 @@ Alternatively, previously assembled contigs can be provided in FASTA format and 
 - [References](#references)
 
 ## Quick Start
-This guide gets you started with `BacFlux`. Quick guide:
+This gets you started with `BacFlux`. Quick guide:
 
 - Download the latest release:
   ```bash
@@ -320,11 +318,27 @@ Before running `BacFlux`, you must edit the `config.yaml` file with a text edito
 
     1. **Database selection**: `BacFlux` requires specifying the version of the `NCBI nt` database for `BLAST` operations. You can choose between the `core_nt` and `nt_prok` versions. By default, the `config.yaml` configuration file is set to use the `core_nt` database. For instructions on installing the `BLAST` database, refer to the [installation](#installation).
 
-    2. **Genus filtering**: `BacFlux` includes an optional parameter to specify the bacterial `genus` of contigs you wish to retain in the final assembly. If left blank, `BacFlux` will automatically keep contigs associated with the most abundant taxon, based on relative composition determined through `BLAST` analysis. While this approach generally works well, it has limitations, such as reduced resolution at the species level due to reliance on the cumulative best scores of `BLAST` hits. Additionally, this method may be problematic if the contaminant organism belongs to the same genus as your target organism, or if you are working with co-cultured closely related species or strains. If the `genus` parameter introduces more issues than benefits, simply remove the `genus` option from the `config.yaml` file.
+    2. **Decontamination controls**: `BacFlux` and `FastaFlux` use a common taxonomy selector for the `BLAST`/`BlobTools` decontamination step. The default behavior is:
 
-        - **Using** the `genus` parameter: if a contaminant is ascertained to be more abundant than your target organism, you can re-run the workflow after reviewing the assembly [output](#output). Specify the `genus` of the desired bacterial taxon you want to keep in during the re-run. 
-    
-        - **Disabling** the `genus` filtering: if either the automatic inference of contaminant contigs or the manual selection of the desired taxon are still not working for you, simply delete the `genus` option from the `parameters`. In this case, only contigs tagged as "no-hit" after `BLAST` search will be filtered out.
+        ```yaml
+        decontamination:
+          mode: auto
+          discard_no_hit: true
+          include_genera:
+          include_genera_by_sample:
+          exclude_genera:
+          exclude_genera_file:
+          sample_overrides:
+        ```
+
+        - **mode**: controls how contigs are selected. Use `auto` to keep the most abundant genus inferred from the BlobTools output, `include` to keep only user-defined genera, `exclude` to remove user-defined genera, or `off` to skip genus-based filtering.
+        - **discard_no_hit**: when `true`, contigs with no informative BLAST genus assignment are removed. This is the bacterial default.
+        - **include_genera** and **exclude_genera**: optional comma- or semicolon-separated genus lists applied to all samples.
+        - **include_genera_by_sample**: optional TSV file with columns `sample` and `genus`, useful when different samples in the same run belong to different target genera.
+        - **exclude_genera_file**: optional plain-text file listing genera to remove, one per line or as comma-/semicolon-separated values.
+        - **sample_overrides**: optional TSV file with columns `sample`, `mode`, `include_genera`, `exclude_genera`, and `discard_no_hit`. Use it to correct only specific samples without changing global settings.
+
+        The selector writes `contig_taxonomy_decisions.tsv` next to `contigs.list`, so each kept or removed contig can be audited.
 
 [⬆ Back to Table of Contents](#table-of-contents)
 
@@ -338,7 +352,7 @@ conda activate snakemake
 # navigate inside the directory where the BacFlux archive was downloaded and decompressed
 
 # launch the workflow
-snakemake --sdm conda --jobs 4 --cores 20
+snakemake --sdm conda --jobs 4 --cores 12
 ```
 *NOTE:  Starting from Snakemake version 8.4.7, the --use-conda option has been deprecated. Instead, you should now use --software-deployment-method conda or --sdm conda.*
 
