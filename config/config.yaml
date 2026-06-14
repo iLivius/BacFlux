@@ -17,4 +17,11 @@ resources:
   threads: 24
 parameters:
   nt_version: "core_nt" #Options: core_nt, nt_prok
-  genus:
+  decontamination:
+    mode: auto # Options: auto, include, exclude, off
+    discard_no_hit: true
+    include_genera:
+    include_genera_by_sample:
+    exclude_genera:
+    exclude_genera_file:
+    sample_overrides:
