@@ -11,22 +11,10 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <  
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
                                                   
-BacFlux v1.3.0
+BacFlux v1.3.1
 
 June 2026
 ```
-
-## Authors and Contributors
-[AIT Austrian Institute of Technology, Center for Health & Bioresources](https://www.ait.ac.at/en/research-topics/bioresources)
-
-- Livio Antonielli
-- Dominik K. Großkinsky
-- Hanna Koch
-- Friederike Trognitz
-
-[IPK Leibniz Institute of Plant Genetics and Crop Plant Research, Cryo and Stress Biology](https://www.ipk-gatersleben.de/forschung/genbank/cryo-und-stressbiologie)
-- Manuela Nagel
-- Alexa Sanchez Mejia
 
 ## Synopsis
 `BacFlux` is a comprehensive and automated bioinformatics workflow designed specifically for the processing and analysis of bacterial genomic data sequenced using Illumina technology. It integrates several powerful tools, each performing a specific task, into a seamless workflow managed by a Snakemake script.  
@@ -75,7 +63,7 @@ Refer to the [installation](#installation), [configuration](#configuration) and 
 
 - Here is an example. Within the main workflow directory, launch the pipeline as follows:
    ```bash
-  snakemake --sdm conda --keep-going --ignore-incomplete --keep-incomplete --cores 50
+  snakemake --sdm conda --keep-going --ignore-incomplete --keep-incomplete --cores 24
   ```
 
   This  command uses the following options:
@@ -88,7 +76,7 @@ Refer to the [installation](#installation), [configuration](#configuration) and 
 
     - --keep-incomplete: keeps incomplete intermediate files
 
-    - --cores 50: cap the amount of local CPUs at this value (adjust as needed).
+    - --cores 24: cap the amount of local CPUs at this value (adjust as needed).
 
 [⬆ Back to Table of Contents](#table-of-contents)
 
@@ -339,6 +327,7 @@ Before running `BacFlux`, you must edit the `config.yaml` file with a text edito
         - **sample_overrides**: optional TSV file with columns `sample`, `mode`, `include_genera`, `exclude_genera`, and `discard_no_hit`. Use it to correct only specific samples without changing global settings.
 
         The selector writes `contig_taxonomy_decisions.tsv` next to `contigs.list`, so each kept or removed contig can be audited.
+        In `auto` and `include` modes, the selector also treats selected genus aliases and retained legacy prefixes as equivalent to reduce false removal caused by BLAST/BlobTools assignments across related or recently reclassified genera. For example, `Bacillus` can retain `Paenibacillus`, `Arthrobacter` can retain `Pseudarthrobacter`, `Pseudoarthrobacter`, or `Paenarthrobacter`, and `Burkholderia` can retain `Paraburkholderia`. Alias-based decisions are marked in `contig_taxonomy_decisions.tsv` with reasons such as `auto_genus_alias` or `included_genus_alias`. `exclude` mode remains exact, because broad alias removal could otherwise remove legitimate target contigs. These aliases are heuristic safeguards, not a formal taxonomic reconciliation system.
 
 [⬆ Back to Table of Contents](#table-of-contents)
 

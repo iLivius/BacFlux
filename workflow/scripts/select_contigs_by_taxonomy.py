@@ -37,6 +37,31 @@ VALID_MODES = {"auto", "include", "exclude", "off"}
 FALSE_VALUES = {"false", "0", "no", "off"}
 TRUE_VALUES = {"true", "1", "yes", "on"}
 
+# Some bacterial genera are frequently split across related names in BLAST /
+# BlobTools output, for example Bacillus/Paenibacillus,
+# Arthrobacter/Pseudarthrobacter, or Burkholderia/Paraburkholderia. Curated
+# aliases cover high-confidence cases observed in real runs. The prefix tuple
+# below preserves a limited part of the old BacFlux empirical regex behavior.
+# Together, these are heuristic safeguards against false contig removal, not a
+# formal taxonomic reconciliation system.
+GENUS_EQUIVALENCE_ALIASES = {
+    "paenibacillus": ("bacillus",),
+    "pseudarthrobacter": ("arthrobacter",),
+    "pseudoarthrobacter": ("arthrobacter",),
+    "paenarthrobacter": ("arthrobacter",),
+    "paraburkholderia": ("burkholderia",),
+}
+
+GENUS_EQUIVALENCE_PREFIXES = (
+    "brady",
+    "meso",
+    "neo",
+    "sino",
+    "aeri",
+    "caldi",
+    "geo",
+)
+
 
 # Small normalization helpers keep comparisons robust against empty values,
 # extra spaces, and different capitalization in config files or TSV inputs.
@@ -57,6 +82,36 @@ def normalize_genus(value):
     "Pseudomonas" versus "pseudomonas".
     """
     return normalize(value).lower()
+
+
+def genus_aliases(value):
+    """Return comparable aliases for a genus name.
+
+    The first alias is the normalized original genus. Additional aliases come
+    from curated common reclassification cases plus a small set of legacy
+    prefixes retained from the original BacFlux selector. For example:
+
+    - Paenibacillus -> paenibacillus, bacillus
+    - Pseudarthrobacter -> pseudarthrobacter, arthrobacter
+    - Paenarthrobacter -> paenarthrobacter, arthrobacter
+    - Paraburkholderia -> paraburkholderia, burkholderia
+
+    These heuristic aliases are used for auto/include matching only. Exclude
+    mode remains exact because over-broad contaminant removal is riskier there.
+    """
+    genus = normalize_genus(value)
+    aliases = {genus} if genus else set()
+    aliases.update(GENUS_EQUIVALENCE_ALIASES.get(genus, ()))
+    for prefix in GENUS_EQUIVALENCE_PREFIXES:
+        if genus.startswith(prefix) and len(genus) > len(prefix) + 3:
+            aliases.add(genus[len(prefix):])
+    return aliases
+
+
+def genus_matches(genus, targets):
+    """Return True when a genus matches any target directly or by alias."""
+    genus_keys = genus_aliases(genus)
+    return any(genus_keys & genus_aliases(target) for target in targets)
 
 
 def parse_bool(value, default=False):
@@ -314,6 +369,8 @@ def decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus):
             return "remove", "auto_no_genus"
         if genus_key == normalize_genus(auto_genus):
             return "keep", f"auto_genus:{auto_genus}"
+        if genus_matches(genus, [auto_genus]):
+            return "keep", f"auto_genus_alias:{auto_genus}"
         return "remove", f"not_auto_genus:{auto_genus}"
 
     # Include mode is strict: a user-provided target genus list is mandatory,
@@ -323,6 +380,8 @@ def decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus):
             raise ValueError("Mode 'include' requires at least one genus.")
         if genus_key in include_keys:
             return "keep", "included_genus"
+        if genus_matches(genus, include):
+            return "keep", "included_genus_alias"
         return "remove", "not_included_genus"
 
     # Exclude mode is the inverse: only the listed contaminant genera are
