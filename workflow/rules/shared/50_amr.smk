@@ -8,11 +8,14 @@
 # in every mode.
 #
 # Scope note: BacFlux detects AMR on THREE complementary legs (that is deliberate
-# — different methods catch different things). This file holds ONLY the
-# assembly/contig-based ABRicate leg, which is the same in all four modes. The
-# read-based CARD mapping leg (download_amr_db + map_amr_db) needs raw reads, so
-# it exists only in the short-read modes and is added later in Stage 3 (still in
-# this file, gated on HAS_SHORT_READS). It is intentionally NOT here yet.
+# — different methods catch different things). This file holds TWO of them:
+#   * the assembly/contig-based ABRicate leg, identical in all four modes; and
+#   * the read-based CARD mapping leg (download_amr_db + map_amr_db) at the bottom
+#     of this file, gated on HAS_SHORT_READS because it needs raw reads. Mapping
+#     READS against CARD is immune to the assembly collapsing repeated genes, so
+#     it catches resistance genes the contig leg can miss.
+# (The third leg, AMRFinderPlus, belongs to the future mobilome module — see
+#  docs/mobilome_module_SPEC.md §4.)
 #
 # Data flow:
 #
@@ -21,10 +24,18 @@
 #                                              AMR_summary ◄───────────┘
 #                                                   └─► abricate/{sample}/AMR_summary.txt
 #
+#   [short-read modes only]
+#   CARD tarball ─► download_amr_db ─► card_db/ ─┐
+#                                                 ├─► map_amr_db ─► mapping/{sample}/
+#   {sample}_trim_R{1,2}.fastq (from Stage 4) ───┘        {sample}_covstats.tsv
+#                                                        {sample}_AMR_legend.tsv
+#
 # Inherited from 00_common.smk (never re-derived here): FINAL_CONTIGS, DIR_AMR,
-# LOGS, DATABASES, DATABASE_PATTERN. The 8-database list lives ONCE in 00_common
-# and drives (a) the per-db fan-out in rule all, (b) the {db} wildcard constraint,
-# and (c) the summary input — one list, one source of truth (D7).
+# LOGS, DATABASES, DATABASE_PATTERN, and — for the CARD leg — CARD_TARBALL,
+# CARD_DB_DIR, TRIM_R1, TRIM_R2, RAM, capped_cpus, HAS_SHORT_READS. The
+# 8-database list lives ONCE in 00_common and drives (a) the per-db fan-out in
+# rule all, (b) the {db} wildcard constraint, and (c) the summary input — one
+# list, one source of truth (D7).
 #
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
 # "../../envs/abricate.yaml" climbs shared/ -> rules/ -> workflow/ and lands on
@@ -135,3 +146,160 @@ rule AMR_summary:
         """
         abricate --summary {input} > {output.amr_summary} 2> {log}
         """
+
+
+# ── CARD read-mapping leg — short-read modes only ────────────────────────────
+# Gated on the CAPABILITY flag HAS_SHORT_READS (illumina + hybrid), not on the
+# mode name (D7). This is the SAME flag _downstream_targets() in 00_common uses to
+# request these two files, so rule-all and the rule definitions can never
+# disagree: either both exist or neither does. nanopore and contigs get no CARD
+# leg at all — v1 had none for them, and neither mode's config even declares
+# links.card_link. Because envs/bbmap.yaml is referenced only from inside this
+# block, those two modes never build it either.
+#
+# Why a read-based leg at all, when ABRicate already screened the contigs? Because
+# assembly COLLAPSES repeats. A resistance gene present in several copies, or one
+# sitting on a repeat-rich mobile element that broke the assembly, can be
+# under-represented (or missing) in the contigs while still being plainly present
+# in the reads. Mapping the trimmed reads straight onto CARD's reference sequences
+# side-steps the assembly entirely.
+if HAS_SHORT_READS:
+
+    # ── Rule: download_amr_db — fetch the CARD reference sequences ───────────
+    # Takes in: nothing — a pure download from the URL in links.card_link.
+    # Does:     wget the .tar.bz2, then extract it.
+    # Produces: card_tarball (temp) and card_dir (temp DIRECTORY) — both are
+    #           deleted once the last map_amr_db job has finished, since nothing
+    #           downstream needs the raw database.
+    # Consumed by: map_amr_db (every sample waits on this one download).
+    #
+    # params.link is read from the config INSIDE the rule, deliberately: 00_common
+    # §7 leaves card_link and phix_link to their gated consumers, so a nanopore or
+    # contigs config that omits card_link still parses cleanly.
+    #
+    # Structural change from v1: v1 declared the tarball INSIDE the directory()
+    # output of the same rule (06.AMR/AMR_db/card.tar.bz2 inside
+    # directory("06.AMR/AMR_db")). They are SIBLINGS here — the house rule stated
+    # in 40_annotation.smk is that temp scratch never nests inside a directory
+    # output. Because of that the extraction directory now has to be created
+    # explicitly (v1 got it for free as the tarball's parent).
+    #
+    # conda: NONE — uses wget and tar from the launch environment, as v1 did. Same
+    # deferred decision as cazyme_db_download; see docs/README_notes.md item 3.
+    #
+    # (v1 message: "--- Download AMR features from CARD repository. ---")
+    rule download_amr_db:
+        output:
+            card_tarball = temp(CARD_TARBALL),
+            card_dir = temp(directory(CARD_DB_DIR)),
+        params:
+            # Resolved and validated once in 00_common (§7), so a missing key is
+            # reported by name at parse time rather than as a bare KeyError here.
+            link = CARD_LINK,
+        log:
+            LOGS + "/download_amr.log"
+        priority: 9
+        shell:
+            """
+            mkdir -p {output.card_dir}
+
+            wget {params.link} -O {output.card_tarball} > {log} 2>&1
+            tar -xjvf {output.card_tarball} -C {output.card_dir} >> {log} 2>&1
+            """
+
+    # ── Rule: map_amr_db — map trimmed reads onto CARD (BBMap) ───────────────
+    # Biology: align this sample's quality-trimmed Illumina pairs against CARD's
+    # protein-homolog-model nucleotide sequences at >=99% identity, and report how
+    # much of each reference gene was actually covered by reads. A resistance gene
+    # is called present when a large fraction of its length is covered — length
+    # coverage, not just "some reads hit it", which is what keeps short conserved
+    # domains from producing false positives.
+    #
+    # Takes in:
+    #   r1 / r2  = TRIM_R1 / TRIM_R2, the fastp-trimmed pairs written by the
+    #              Stage-4 illumina / hybrid front end. Both short-read modes write
+    #              them to the same path, hence one shared constant. They are
+    #              declared temp() by their producer, so Snakemake keeps them until
+    #              the assembler, map_contigs and this rule are all done.
+    #   card_dir = the extracted CARD database from download_amr_db.
+    # Does: BBMap at idfilter=0.99, then two post-processing steps —
+    #       (1) re-sort covstats by descending Covered_percent, header preserved;
+    #       (2) build a human-readable legend: for every feature covered >=70%,
+    #           pull its row out of CARD's aro_index.tsv so the output names the
+    #           drug class and mechanism rather than an ARO accession.
+    # Produces:
+    #   covstats     = 05.amr/mapping/{sample}/{sample}_covstats.tsv
+    #   amr_legend   = 05.amr/mapping/{sample}/{sample}_AMR_legend.tsv
+    #   (plus two temp() intermediates: BBMap's ref/ index and the unsorted
+    #    covstats). Those two kept paths are byte-identical to what
+    #    _downstream_targets() already requests.
+    # Consumed by: the user (terminal AMR products; not fed into MultiQC).
+    #
+    # PRESERVED FROM v1, ALL KNOWN WARTS, DELIBERATELY NOT FIXED:
+    #   * path={output.bbmap_temp} where bbmap_temp already ends in /ref, so BBMap
+    #     creates ref/ref/. Odd, harmless, kept.
+    #   * the legend's `grep $i {card_dir}/aro_index.tsv` is unquoted, unanchored
+    #     and not -F, so an ARO accession that is a substring of another one can
+    #     pull in extra rows. Kept as-is.
+    #   * NO `set -euo pipefail` in this rule. The legend's `for ... grep ... done`
+    #     loop legitimately exits non-zero when nothing clears 70%, and `set -e`
+    #     would turn "this isolate has no strongly covered AMR gene" — a perfectly
+    #     normal result — into a hard pipeline failure.
+    #
+    # One deliberate v1->v2 change: -Xmx32g was hard-coded, which fails outright on
+    # a machine with less RAM than that. It now asks for min(RAM, 32) GB, the same
+    # class of fix as Qualimap's --java-mem-size in shared/20_qc.smk (both taken
+    # together, for consistency). Like Qualimap's, this is a GB figure passed
+    # through to the JVM, not something the scheduler reserves.
+    #
+    # (v1 message: "--- Map trimmed reads against CARD db. ---")
+    rule map_amr_db:
+        input:
+            card_dir = CARD_DB_DIR,
+            r1 = TRIM_R1,
+            r2 = TRIM_R2,
+        output:
+            bbmap_temp = temp(directory(DIR_AMR + "/mapping/{sample}/ref")),
+            covstats_temp = temp(DIR_AMR + "/mapping/{sample}/{sample}_covstats_temp.tsv"),
+            covstats = DIR_AMR + "/mapping/{sample}/{sample}_covstats.tsv",
+            amr_legend = DIR_AMR + "/mapping/{sample}/{sample}_AMR_legend.tsv",
+        params:
+            # CARD ships several models; the protein homolog model is the one that
+            # holds acquired resistance genes (not the mutation-based models).
+            card_target = "nucleotide_fasta_protein_homolog_model.fasta",
+            min_id = 0.99,
+            max_ram = min(RAM, 32),
+        conda:
+            "../../envs/bbmap.yaml"
+        resources:
+            cpus = capped_cpus(24)
+        log:
+            LOGS + "/map_amr_{sample}.log"
+        priority: 5
+        shell:
+            # Column 5 of BBMap's covstats is Covered_percent; the >=70 threshold
+            # and the legend header text below are v1's, kept verbatim. The awk
+            # braces are doubled because this awk is written directly in the shell.
+            """
+            bbmap.sh \
+              -in={input.r1} \
+              -in2={input.r2} \
+              ref={input.card_dir}/{params.card_target} \
+              path={output.bbmap_temp} \
+              idfilter={params.min_id} \
+              idtag \
+              -Xmx{params.max_ram}g \
+              threads={resources.cpus} \
+              ambiguous=best \
+              secondary=f \
+              covstats={output.covstats_temp} > {log} 2>&1
+
+            (head -n 1 {output.covstats_temp} > {output.covstats}) && \
+            tail -n +2 {output.covstats_temp} | awk -F'\t' '{{print $5 "\t" $0}}' | sort -t$'\t' -k1,1nr | cut -f2- >> {output.covstats}
+
+            echo "#AMR features with a covered length of at least 70%" > {output.amr_legend}
+            (head -n 1 {input.card_dir}/aro_index.tsv >> {output.amr_legend}) && \
+            for i in $(tail -n +2 {output.covstats} | awk -F'\t' '$5 >=70' | cut -f1 | awk -F'|' '{{print $5}}'); do \
+                grep $i {input.card_dir}/aro_index.tsv; \
+            done >> {output.amr_legend}
+            """

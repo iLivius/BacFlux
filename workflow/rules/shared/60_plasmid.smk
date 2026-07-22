@@ -40,7 +40,7 @@
 # Snakemake orders work by the input/output DAG, not by directory number.
 #
 # Everything referenced here is defined once in 00_common.smk (never re-derived):
-# FINAL_CONTIGS, DIR_PLASMIDS, PLATONDB, BLASTOUT, PLATON_DIR, PLATON_VERIFIED,
+# FINAL_CONTIGS, DIR_PLASMIDS, PLATONDB, PLASMID_BLASTOUT, PLATON_DIR, PLATON_VERIFIED,
 # GENOMAD_DIR, GENOMAD_PREFIX, PLASMID_CONCORDANCE, PLASMID_CONCORDANCE_SCRIPT,
 # PHAGE_CALLER, LOGS, capped_cpus.
 #
@@ -62,12 +62,23 @@
 #   contigs = FINAL_CONTIGS — the finished, decontaminated assembly (D2). (v1 used
 #             contigs_sel.fasta; the new input is contigs_final.fasta, so Platon
 #             now names its outputs contigs_final.* instead of contigs_sel.*.)
-#   blast   = BLASTOUT — the contamination-screen BLAST table. CROSS-STAGE edge:
-#             PRODUCED by blast_contigs in the future shared/10_decontam.smk
-#             (Stage 3). Both sides use the one BLASTOUT constant from 00_common so
-#             they cannot drift (same pattern as COMPOSITION). CONTRACT for Stage 3:
-#             the table must carry subject titles (BLAST outfmt 6 with stitle last)
-#             or the `grep -q "plasmid"` check below has nothing to match.
+#   blast   = PLASMID_BLASTOUT — a BLAST-vs-nt table computed over THE SAME contigs
+#             Platon reported on, which is what the `grep -m 1 "$i"` contig-ID
+#             lookup below requires. CROSS-STAGE edge into shared/10_decontam.smk:
+#               * illumina / nanopore / contigs — PLASMID_BLASTOUT IS the
+#                 decontamination screen's BLASTOUT (rule blast_contigs), because
+#                 in those modes the screen already ran on this same contig set.
+#               * hybrid — the screen ran on the ILLUMINA draft while Platon runs
+#                 on the delivered ONT genome, and the two use completely
+#                 different contig names (SPAdes NODE_… vs Flye contig_…). So in
+#                 hybrid PLASMID_BLASTOUT is a SECOND blastn over FINAL_CONTIGS
+#                 (rule blast_final_contigs), exactly as v1 BacFluxL+ did with its
+#                 own in-rule blastn. Without this, every hybrid plasmid would come
+#                 back "not verified by BLAST search", silently.
+#             Both sides use the one PLASMID_BLASTOUT constant from 00_common so
+#             they cannot drift (same pattern as COMPOSITION). CONTRACT: the table
+#             must carry subject titles (BLAST outfmt 6 with stitle last) or the
+#             `grep -q "plasmid"` check below has nothing to match.
 # Does: run Platon over the contigs, then run the two-phase BLAST-text check
 #       verbatim from v1 (only the input filename changes contigs_sel→contigs_final).
 # Produces:
@@ -86,7 +97,7 @@
 rule plasmid_search:
     input:
         contigs = FINAL_CONTIGS,
-        blast = BLASTOUT,
+        blast = PLASMID_BLASTOUT,
     output:
         platon_dir = directory(PLATON_DIR),
         plasmids = PLATON_VERIFIED,
@@ -106,29 +117,48 @@ rule plasmid_search:
         LOGS + "/plasmid_search_{sample}.log"
     priority: 4
     shell:
-        # The if/while block is byte-for-byte v1, with only the plasmid FASTA
-        # filename swapped to {params.contigs_prefix}. $i is each plasmid contig's
-        # header (the contig ID, since front-end headers are trimmed to one token);
-        # `grep -m 1 "$i"` finds its first BLAST line, and `grep -q "plasmid"` tests
-        # whether that hit's subject title mentions a plasmid.
+        # The BLAST-text check is v1's, unified onto the HARDENED form the two
+        # long-read v1 workflows used (BacFluxL / BacFluxL+), because the plain
+        # illumina form silently mis-reports in several real situations:
+        #   * awk '/^>/{{sub(/^>/,""); print $1}}' takes the contig ID as the FIRST
+        #     TOKEN of the header. The illumina form (grep ">" | sed 's/^>//g')
+        #     keeps the WHOLE header line; Flye/dnaapler/Medaka/Polypolish headers
+        #     can carry a description, and an ID with spaces can never match a
+        #     tab-separated qseqid field — so every plasmid would come back
+        #     "not verified" with no error.
+        #   * grep -F  — fixed-string, so a contig ID containing regex
+        #     metacharacters (SPAdes cov_12.34 style) cannot false-match.
+        #   * grep -qi — NCBI subject titles routinely capitalise ("… Plasmid
+        #     unnamed1"), which a case-sensitive grep silently misses.
+        #   * `: > {output.plasmids}` truncates first, so a re-run does not append
+        #     to a stale verified_plasmids.txt.
+        # Platon itself is wrapped so a non-zero exit reports an explanatory line
+        # instead of killing the job (v1 BacFluxL+ behaviour).
         """
+        set +e
         platon \
           --db {params.platon_db} \
           --output {output.platon_dir} \
           --verbose \
           --threads {resources.cpus} \
           {input.contigs} > {log} 2>&1
+        platon_rc=$?
+        set -e
 
-        if [[ -s {output.platon_dir}/{params.contigs_prefix}.plasmid.fasta ]] && grep -q ">" {output.platon_dir}/{params.contigs_prefix}.plasmid.fasta; then
+        : > {output.plasmids}
+
+        if [ "$platon_rc" -ne 0 ]; then
+            echo "{wildcards.sample}: Platon exited with status $platon_rc; see the log." >> {output.plasmids}
+        elif [[ -s {output.platon_dir}/{params.contigs_prefix}.plasmid.fasta ]] && grep -q ">" {output.platon_dir}/{params.contigs_prefix}.plasmid.fasta; then
             while IFS= read -r i; do
-                if grep -m 1 "$i" {input.blast} | grep -q "plasmid"; then
+                if grep -m 1 -F "$i" {input.blast} | grep -qi "plasmid"; then
                     echo "{wildcards.sample}: $i is a plasmid." >> {output.plasmids}
                 else
                     echo "{wildcards.sample}: $i was not verified by BLAST search." >> {output.plasmids}
                 fi
-            done < <(grep ">" {output.platon_dir}/{params.contigs_prefix}.plasmid.fasta | sed 's/^>//g')
+            done < <(awk '/^>/{{sub(/^>/,""); print $1}}' {output.platon_dir}/{params.contigs_prefix}.plasmid.fasta)
         else
-            echo "Platon found no plasmid in sample {wildcards.sample}." > {output.plasmids}
+            echo "Platon found no plasmid in sample {wildcards.sample}." >> {output.plasmids}
         fi
         """
 

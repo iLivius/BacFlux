@@ -29,6 +29,7 @@ import glob
 import os
 import re
 import sys
+from collections import namedtuple
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -38,6 +39,16 @@ from snakemake.io import glob_wildcards
 
 
 # ─────────────────────────── 1. Mode dispatch ───────────────────────────────
+# The config is REQUIRED on the command line (Snakefile.v2 deliberately declares
+# no default `configfile:` — see the note there). Fail with an actionable message
+# rather than a bare KeyError if nothing was supplied.
+if not config:
+    sys.exit(
+        "[BacFlux] No configuration supplied. Pass one explicitly, e.g.:\n"
+        "  snakemake --sdm conda --cores N --resources cpus=N "
+        "--configfile config/config_v2.yaml"
+    )
+
 # The mode is REQUIRED. Bracket access means a config with no "mode" fails
 # immediately with a clear KeyError rather than silently guessing a pipeline.
 # .lower() normalises case so "Illumina" and "illumina" behave the same.
@@ -210,12 +221,22 @@ BENCH = OUT + "/benchmarks"
 FINAL_CONTIGS = DIR_ASSEMBLY + "/{sample}/contigs_final.fasta"
 
 # Second cross-stage hand-off, same single-source philosophy as FINAL_CONTIGS:
-# the "Genus:percentage" composition table. It is WRITTEN by the decontamination
-# selector (select_contigs, in the future shared/10_decontam.smk) and READ by the
-# Bakta annotation rule to pick the isolate's most likely genus. Defining the one
-# canonical path here means producer and consumer can never drift onto different
-# strings (the failure the Stage-2a review flagged). Lives under 02.assembly/ next
-# to the contaminant-screening outputs, per the D1 layout.
+# the genus-composition table. It is WRITTEN by the decontamination selector
+# (select_contigs, in shared/10_decontam.smk) and READ by the Bakta annotation
+# rule to pick the isolate's most likely genus. Defining the one canonical path
+# here means producer and consumer can never drift onto different strings (the
+# failure the Stage-2a review flagged). Lives under 02.assembly/ next to the
+# contaminant-screening outputs, per the D1 layout.
+#
+# CONTENT (verified against workflow/scripts/select_contigs_by_taxonomy.py, not
+# inferred): one line per genus, written as
+#     Genus: <relative frequency>
+# i.e. a COLON followed by a SPACE, then a fraction in 0.00-1.00 with 2 decimals
+# — NOT a percentage. Lines are sorted by descending contig count then genus
+# name; counts cover ALL contigs in the BlobTools table (not only the kept ones);
+# contigs with no taxonomic hit appear under the literal genus name "no-hit".
+# The Bakta rule's `sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p'` idiom reads
+# exactly this shape (numeric sort tolerates the leading space).
 COMPOSITION = DIR_ASSEMBLY + "/{sample}/contaminants/{sample}_composition.txt"
 
 # Shared antiSMASH reference-database directory: downloaded once by
@@ -263,13 +284,243 @@ PLATON_VERIFIED     = PLATON_DIR + "/verified_plasmids.txt"                     
 PLASMID_CONCORDANCE = DIR_PLASMIDS + "/{sample}/{sample}_plasmid_concordance.tsv"   # D9 terminal deliverable (rule plasmid_concordance)
 
 # Cross-stage input contract (same single-source idea as COMPOSITION): the
-# contamination-screen BLAST table. WRITTEN by blast_contigs in the future
-# shared/10_decontam.smk (Stage 3), READ here by plasmid_search's supplementary
-# "does the nt hit say plasmid?" check. CONTRACT for Stage 3: this file must be
-# BLAST outfmt 6 whose LAST column is the subject title (stitle), because the
-# check greps that title for the word "plasmid" (v1's blast_contigs already emits
-# exactly this outfmt — keep it). Cannot be verified until 10_decontam lands.
+# contamination-screen BLAST table. WRITTEN by blast_contigs in
+# shared/10_decontam.smk, READ by plasmid_search's supplementary "does the nt hit
+# say plasmid?" check. CONTRACT: this file must be BLAST outfmt 6 whose LAST
+# column is the subject title (stitle), because the check greps that title for
+# the word "plasmid" (v1's blast_contigs already emits exactly this outfmt — keep
+# it). The screen runs on the DRAFT assembly (DRAFT_CONTIGS, below).
+#
+# HYBRID CAVEAT — read PLASMID_BLASTOUT below before touching this: in hybrid mode
+# the decontamination screen runs on the ILLUMINA draft while Platon runs on the
+# delivered ONT genome. The two assemblies have completely different contig names
+# (SPAdes NODE_… vs Flye contig_…), so the plasmid check CANNOT use this file in
+# hybrid — it uses PLASMID_BLASTOUT instead.
 BLASTOUT = DIR_ASSEMBLY + "/{sample}/contaminants/{sample}_blastout"
+
+
+# ────────── 4b. Decontamination, read and QC hand-offs (Stage 3/4) ───────────
+# Everything below is a PATH (or a tiny parse-time derivation of one). No rule
+# logic lives here: the decontamination module (shared/10_decontam.smk), the QC
+# module (shared/20_qc.smk), taxonomy (shared/30_taxonomy.smk), the CARD leg in
+# shared/50_amr.smk and the report (shared/90_report.smk) all reference these
+# names, and the per-mode front ends added in Stage 4 must declare the ones
+# marked "Stage-4 contract" as the `output:` of whatever rule they choose. Same
+# anti-drift pattern as FINAL_CONTIGS and COMPOSITION: the file is named ONCE.
+
+# ── Where the contamination screen keeps its working files ───────────────────
+# This is the same directory COMPOSITION and BLASTOUT already live in; naming it
+# once keeps every file below from spelling out the stage path again.
+DECONTAM_DIR = DIR_ASSEMBLY + "/{sample}/contaminants"
+
+# Read alignment used ONLY to give BlobTools a coverage track (temp; deleted once
+# BlobTools and Qualimap are done with it).
+#
+# LANDMINE: BlobTools names its coverage file after the BAM's BASENAME, so
+# BLOB_COV is DERIVED from DECONTAM_BAM rather than typed out again. Renaming the
+# BAM would otherwise silently break blob_json's declared `cov` output. Keeping
+# the v1 basename ({sample}_map.bam) in every mode is deliberate for the same
+# reason.
+DECONTAM_BAM = DECONTAM_DIR + "/{sample}_map.bam"
+
+# BlobTools writes <prefix>.blobDB.json (create) and <prefix>.blob.blobDB.table.txt
+# (view), so both rules pass a PREFIX and we derive the real filenames from it.
+BLOB_PREFIX       = DECONTAM_DIR + "/blob"
+BLOB_JSON         = BLOB_PREFIX + ".blobDB.json"                                  # temp
+BLOB_COV          = BLOB_PREFIX + "." + os.path.basename(DECONTAM_BAM) + ".cov"   # temp
+BLOB_TABLE_PREFIX = DECONTAM_DIR + "/bestscore"
+BLOB_TABLE        = BLOB_TABLE_PREFIX + ".blob.blobDB.table.txt"
+
+# Selector outputs other than COMPOSITION. CONTIG_DECISIONS keeps its v1 name (no
+# {sample} prefix): it is the per-contig audit trail named in CLAUDE.md and the
+# mobilome spec, and other tooling looks for it by that exact name.
+CONTIG_LIST      = DECONTAM_DIR + "/contigs.list"
+CONTIG_DECISIONS = DECONTAM_DIR + "/contig_taxonomy_decisions.tsv"
+
+# ── The two per-mode assembly hand-offs (D3, Stage-4 contract) ───────────────
+# DRAFT_CONTIGS    — what goes INTO the contamination screen (BLAST + BlobTools +
+#                    selector). Stage 4's front end must declare this exact string
+#                    as an output.
+# DECONTAM_CONTIGS — what the selector WRITES. In illumina/contigs decontamination
+#                    is the last assembly step, so this IS the canonical
+#                    FINAL_CONTIGS. In nanopore/hybrid it is an intermediate and
+#                    FINAL_CONTIGS is produced later by Stage 4 (Medaka in
+#                    nanopore; the ONT+Polypolish genome in hybrid).
+#
+# This split is why select_contigs must not hard-code FINAL_CONTIGS on its output
+# side: doing so would create a cycle in nanopore (select → final → Medaka →
+# select). Verified acyclic in all four modes with the values below.
+if MODE == "illumina":
+    DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/spades/contigs_filt.fasta"
+    DECONTAM_CONTIGS = FINAL_CONTIGS                       # decontam IS the last assembly step
+elif MODE == "hybrid":
+    DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/spades/contigs_filt.fasta"   # the ILLUMINA draft
+    DECONTAM_CONTIGS = DECONTAM_DIR + "/contigs_sel.fasta"                    # Stage-4 Snippy reference + QC comparator
+elif MODE == "nanopore":
+    DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/fix_start/{sample}_fixed.fasta"
+    DECONTAM_CONTIGS = DECONTAM_DIR + "/assembly_decontam.fasta"              # -> Stage-4 Medaka
+else:  # contigs
+    DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/contigs_filt.fasta"
+    DECONTAM_CONTIGS = FINAL_CONTIGS                       # decontam IS the last assembly step
+
+# ── Which BLAST table the plasmid check greps ────────────────────────────────
+# plasmid_search looks each Platon-called contig up in a BLAST table BY CONTIG ID
+# (`grep -m 1 -F "$contig"`). That only works if the table was computed over the
+# SAME contig set Platon reported on. Whether it was depends on whether anything
+# between the contamination screen and the delivered genome can change contig
+# names — so we gate on that STRUCTURAL fact, not on a mode name:
+#
+#   illumina / contigs — the screen runs on the draft and the selector's output IS
+#       FINAL_CONTIGS (a subset with identical names). Reuse BLASTOUT: no cost.
+#   nanopore — the screen runs on the pre-Medaka fix_start assembly, but Platon
+#       runs on the post-Medaka consensus. Nothing guarantees Medaka preserves
+#       headers.
+#   hybrid  — the screen runs on the ILLUMINA draft (SPAdes NODE_… names) while
+#       Platon runs on the delivered ONT genome (Flye contig_… names). These can
+#       NEVER match.
+#
+# In the latter two, reusing BLASTOUT would make `grep` match nothing and EVERY
+# plasmid would come back "not verified by BLAST search" — silently, with no error.
+# So both long-read modes get a second blastn over FINAL_CONTIGS (v1 BacFluxL+ did
+# exactly this inside its own plasmid_search; v2 keeps it in 10_decontam, rule
+# blast_final_contigs, so the blastn command text lives in one place).
+# Consumed by plasmid_search in shared/60_plasmid.smk.
+NEEDS_FINAL_BLAST = HAS_LONG_READS
+PLASMID_BLASTOUT = (DECONTAM_DIR + "/{sample}_final_blastout") if NEEDS_FINAL_BLAST else BLASTOUT
+
+# ── Read hand-offs (Stage-4 contract) ────────────────────────────────────────
+# Gated exactly like the Flye/Medaka block in section 8, so referencing TRIM_R1 in
+# nanopore mode raises a clean NameError instead of silently building a path no
+# rule will ever produce. Stage 4's front ends must declare these strings as the
+# `output:` of their fastp / filtlong / NanoPlot rules.
+if HAS_SHORT_READS:
+    # fastp-trimmed pairs. Consumed by the assembler (Stage 4), by map_contigs in
+    # 10_decontam and by the CARD read-mapping leg in 50_amr. v1 wrote them to one
+    # shared path in BOTH short-read modes, so one constant is faithful. Stage 4
+    # declares them temp(); Snakemake keeps them until the last consumer is done.
+    TRIM_R1 = DIR_READS + "/{sample}/illumina/{sample}_trim_R1.fastq"
+    TRIM_R2 = DIR_READS + "/{sample}/illumina/{sample}_trim_R2.fastq"
+    # fastp's JSON report — MultiQC input only.
+    FASTP_JSON = DIR_READS + "/{sample}/illumina/{sample}_fastp.json"
+
+if HAS_LONG_READS:
+    # filtlong-filtered ONT reads: assembled by Flye (Stage 4) and mapped back
+    # onto the draft by map_contigs in 10_decontam.
+    FILT_LONG = DIR_READS + "/{sample}/ont/{sample}_filt.fastq"
+    # NanoPlot read-QC directories, before and after filtering — MultiQC inputs.
+    NANOPLOT_RAW_DIR  = DIR_READS + "/{sample}/ont/raw_qc"
+    NANOPLOT_FILT_DIR = DIR_READS + "/{sample}/ont/filt_qc"
+
+# ── Assembly QC + taxonomy paths (shared/20_qc.smk, shared/30_taxonomy.smk) ───
+# Everything genome-QC-ish lives under one 02.assembly/{sample}/eval/ parent.
+QC_GENOMES_DIR   = DIR_ASSEMBLY + "/{sample}/eval/genomes"                    # temp staging dir (see QC_GENOMES)
+QC_GENOME_TABLE  = DIR_ASSEMBLY + "/{sample}/eval/{sample}_qc_genomes.tsv"    # kept: which genome is which
+QUAST_DIR        = DIR_ASSEMBLY + "/{sample}/eval/quast"
+CHECKM_DIR       = DIR_ASSEMBLY + "/{sample}/eval/checkm"
+# NOTE the {sample}_ prefix — a deliberate rename from v1's bare checkm_stats.tsv.
+# The MultiQC staging loop used to recover the sample with `basename $checkm_dir`;
+# under the D1 layout that basename is now the literal "checkm", so the sample name
+# has to be carried by the FILE name instead.
+CHECKM_STATS     = CHECKM_DIR + "/{sample}_checkm_stats.tsv"
+CHECKM_LINEAGE   = CHECKM_DIR + "/lineage.ms"                                 # name chosen by CheckM itself
+QUALIMAP_DIR     = DIR_ASSEMBLY + "/{sample}/eval/qualimap"
+GTDBTK_DIR       = DIR_TAXONOMY + "/{sample}"
+
+# ── Which genomes get QC'd and classified, and what each one is called ───────
+# Three of the four modes deliver ONE genome per sample. Hybrid delivers the
+# ONT+Polypolish genome but ALSO keeps the decontaminated Illumina draft, and v1
+# BacFluxL+ ran CheckM and GTDB-Tk over both so the two could be compared. This
+# list is the single source for: the staged FASTA names, the QUAST assembly
+# labels, the CheckM bin ids, the GTDB-Tk bin ids, the MultiQC relabel keys and
+# the primary/comparator role column. In v1 the "_illumina"/"_ont" suffixes were
+# spelled out by hand in three places hundreds of lines apart.
+#
+#   suffix — appended to the sample name to build the staged FASTA name, which is
+#            what CheckM / GTDB-Tk / QUAST then use as the bin id
+#   path   — the {sample}-templated assembly to stage
+#   role   — "primary" (the delivered genome) or "comparator" (kept for contrast)
+#   label  — technology tag used in the MultiQC report ("" = no tag needed)
+QcGenome = namedtuple("QcGenome", "suffix path role label")
+
+if IS_HYBRID:
+    QC_GENOMES = [
+        QcGenome("_illumina", DECONTAM_CONTIGS, "comparator", "Illumina"),
+        QcGenome("_ont",      FINAL_CONTIGS,    "primary",    "ONT"),
+    ]
+else:
+    QC_GENOMES = [QcGenome("", FINAL_CONTIGS, "primary", "")]
+
+
+def qc_genome_fastas(wildcards):
+    # Input function for stage_qc_genomes: this sample's 1 (or, in hybrid, 2)
+    # assemblies. An input FUNCTION is needed because the number of files varies
+    # by mode, which a plain templated string cannot express.
+    return [genome.path.format(sample=wildcards.sample) for genome in QC_GENOMES]
+
+
+def qc_stage_commands(wildcards):
+    # One `cp` line per genome: source assembly -> staged FASTA named after its
+    # bin id. Generated at parse time so the literal commands show up in the dry
+    # run and in the log, instead of a loop over two hidden bash arrays.
+    dest = QC_GENOMES_DIR.format(sample=wildcards.sample)
+    lines = []
+    for genome in QC_GENOMES:
+        src = genome.path.format(sample=wildcards.sample)
+        lines.append(f"cp {src} {dest}/{wildcards.sample}{genome.suffix}.fasta")
+    return "\n".join(lines)
+
+
+def qc_genome_table_text(wildcards):
+    # The complete text of QC_GENOME_TABLE (header + one row per genome), built
+    # from the same QC_GENOMES list. The rule drops it into a quoted heredoc, so
+    # the tabs and newlines below are the literal file content — no shell quoting
+    # or printf format strings to get wrong. Answers, per sample and in writing,
+    # "which of these two hybrid rows is the delivered genome?".
+    rows = ["bin_id\trole\ttechnology\tsource_path"]
+    for genome in QC_GENOMES:
+        bin_id = f"{wildcards.sample}{genome.suffix}"
+        technology = genome.label or "NA"
+        source = genome.path.format(sample=wildcards.sample)
+        rows.append(f"{bin_id}\t{genome.role}\t{technology}\t{source}")
+    return "\n".join(rows)
+
+
+def _relabel_awk(kind):
+    # awk body that rewrites a CheckM / GTDB-Tk bin id into its MultiQC report
+    # label. `kind` is "completeness" or "taxonomy". Simple modes emit one match
+    # on the bare sample name; hybrid emits one per technology, using the SAME
+    # suffixes stage_qc_genomes copied the FASTAs under — one source of truth for
+    # both halves, which is what v1 lacked.
+    #
+    # The two match rules deliberately do NOT use `next`, and the report rule
+    # appends a bare `{ print }` after them, so a row matching neither key still
+    # passes through unchanged (v1 behaviour).
+    #
+    # BRACES: the text below is a params VALUE, and Snakemake formats only the
+    # shell TEMPLATE — substituted values are never re-scanned for placeholders.
+    # So these awk braces are SINGLE, the opposite of the {{ }} doubling required
+    # for awk written directly in a shell: block. Getting this backwards produces
+    # silently corrupted output rather than an error.
+    lines = []
+    for genome in QC_GENOMES:
+        label = (kind + " " + genome.label).strip()
+        key = f'sample "{genome.suffix}"' if genome.suffix else "sample"
+        lines.append(f'$1 == {key} {{ $1 = "{label} | " sample }}')
+    return "\n".join(lines)
+
+
+CHECKM_RELABEL_AWK = _relabel_awk("completeness")
+GTDBTK_RELABEL_AWK = _relabel_awk("taxonomy")
+
+# ── CARD read-mapping leg (shared/50_amr.smk, short-read modes only) ─────────
+# The tarball is a SIBLING of the extracted-database directory, not a file inside
+# it: the house rule (see 40_annotation.smk) is never to nest one declared output
+# inside another rule's directory() output. Both are temp() — the database is only
+# needed while BBMap runs. card_link itself is deliberately NOT resolved here (see
+# section 7); the download rule reads it, so a config without it still parses in
+# the two modes that never use it.
+CARD_TARBALL = DIR_AMR + "/card.tar.bz2"
+CARD_DB_DIR  = DIR_AMR + "/card_db"
 
 # dbCAN reference database directory + sentinel are defined in section 7, once
 # the download link has been resolved — the version folder name is derived from
@@ -460,9 +711,10 @@ print(
 
 # ─────────────── 7. Reference-database download links (parse-time) ───────────
 # CheckV and dbCAN links are resolved here because both databases are used by
-# every mode. phix_link and card_link are NOT resolved here — they are only
-# needed by the short-read front end and are read inside their rules, gated on
-# HAS_SHORT_READS.
+# every mode; card_link is resolved here too but only when the mode actually has
+# short reads. All of them fail EARLY with a message naming the config key, rather
+# than as a bare KeyError deep inside a rule. (phix_link stays unresolved here —
+# it is read by the Stage-4 short-read front end.)
 _links = config.get("links") or {}
 
 # CheckV: the link is OPTIONAL. When absent/empty, CheckV downloads its own
@@ -505,6 +757,17 @@ DBCAN_SHA_URL = DBCAN_LINK.replace(".tar.gz", ".sha256")
 DBCAN_DB_ID    = os.path.splitext(os.path.splitext(os.path.basename(urlparse(DBCAN_LINK).path))[0])[0]
 DBCAN_DB_DIR   = DIR_ANNOTATION + "/dbcan/" + DBCAN_DB_ID
 DBCAN_SENTINEL = DBCAN_DB_DIR + "/.verified.sha256"
+
+# CARD: needed only by the read-based AMR leg, which exists only where the mode
+# produces short reads (D7). Resolved here so a missing key reports the config key
+# by name at parse time instead of surfacing as a bare KeyError from inside the
+# download rule. Modes without short reads never look at it.
+CARD_LINK = str(_links.get("card_link") or "").strip()
+if HAS_SHORT_READS and not CARD_LINK:
+    sys.exit(
+        f"[BacFlux] mode={MODE} runs the read-based CARD AMR leg, which requires "
+        "'links.card_link' to be set in the config."
+    )
 
 
 # ──────────── 8. Long-read assembly / polishing options (gated) ──────────────
@@ -734,6 +997,14 @@ def _downstream_targets():
     # whole point of the D1 layout), with two conditional legs. These match the
     # rules that Stages 2–3 add under rules/shared/.
     targets = [
+        # 02.assembly/eval — assembly + genome QC leaves. Listed explicitly
+        # because v1's `rule all` listed them in all four workflows, and because
+        # CheckM is NOT on the path to anything else: GTDB-Tk now reads the staged
+        # genomes directly (not CheckM's output), so without this line CheckM
+        # would only be reached indirectly, via MultiQC.
+        *expand(QC_GENOME_TABLE, sample=SAMPLES),
+        *expand(QUAST_DIR,       sample=SAMPLES),
+        *expand(CHECKM_STATS,    sample=SAMPLES),
         # 03.taxonomy — GTDB-Tk (one output directory per sample)
         *expand(DIR_TAXONOMY + "/{sample}", sample=SAMPLES),
         # 04.annotation — Bakta, eggNOG, antiSMASH, dbCAN (shared DB + per sample)
@@ -758,14 +1029,29 @@ def _downstream_targets():
         # 09.report — MultiQC
         DIR_REPORT + "/multiqc_report.html",
     ]
+    # Mapping QC exists wherever real reads were mapped. Contigs mode maps the
+    # contigs against themselves purely to give BlobTools a coverage track, and a
+    # Qualimap report on a self-alignment says nothing — so it has none.
+    if HAS_READS:
+        targets += [*expand(QUALIMAP_DIR, sample=SAMPLES)]
     # CARD read-mapping AMR leg exists only where short reads are produced.
     if HAS_SHORT_READS:
         targets += [
             *expand(DIR_AMR + "/mapping/{sample}/{sample}_covstats.tsv", sample=SAMPLES),
             *expand(DIR_AMR + "/mapping/{sample}/{sample}_AMR_legend.tsv", sample=SAMPLES),
         ]
-    # Mobilome module (08.mobilome) is opt-in and default OFF.
+    # Mobilome module (08.mobilome) is opt-in and default OFF. The module itself
+    # is not written yet, so asking for its outputs would abort the DAG with a
+    # MissingInputException naming a directory rather than the config key that
+    # caused it. Fail with an actionable message instead, and only request the
+    # targets once the module actually exists on disk.
     if _config_bool((config.get("mobilome", {}) or {}).get("run"), False):
+        if not glob.glob(os.path.join(WORKFLOW_DIR, "rules", "shared", "80_mobilome.smk")):
+            sys.exit(
+                "[BacFlux] config.mobilome.run is true, but the mobilome module "
+                "(workflow/rules/shared/80_mobilome.smk) is not implemented yet. "
+                "Set mobilome.run: false."
+            )
         targets += [*expand(DIR_MOBILOME + "/{sample}", sample=SAMPLES)]
     return targets
 

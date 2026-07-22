@@ -145,6 +145,32 @@ Until decided, Stage 2a keeps `cazyme_db_download` env-less per v1.
 
 ---
 
+## 6. The mobilome spans stages 06 + 07 + 08 — explain this, don't rename anything
+
+**Status: DECIDED 2026-07-22 (option 3 — document, keep the layout as-is).**
+
+Plasmids and prophages ARE mobile genetic elements, so the output layout can read as if
+`08.mobilome/` were "the mobilome" and `06.plasmids/`/`07.phages/` were something else. They
+are not. The mobilome is spread across three stages, split by *when it runs and what question
+it answers*, not by whether the element is mobile:
+
+| Stage | Question | Runs |
+|---|---|---|
+| `06.plasmids/`, `07.phages/` | *What replicons and prophages are in this genome?* (detection/inventory) | always — standard WGS characterisation, as in v1 |
+| `08.mobilome/` | *Is each AMR gene embedded in a mobile element, and how transferable?* (integration/interpretation) + IS/transposon/integron/ICE detection | opt-in (`mobilome.run: false`), heavier, needs extra and partly licence-encumbered DBs |
+
+The mobilome module **consumes** 06/07 rather than re-detecting them — see
+`mobilome_module_SPEC.md` §7 (its co-localisation inputs include the "Platon/MOB-suite replicon
+call"), §9 (its output table carries `replicon(chromosome|plasmid_id)` and lists `plasmid` as
+one of the `mge_context` values), and §2.5 (mobility ladder tiers 5-6 are plasmid-based).
+
+**README wording to add** (Output section): a short paragraph making the above explicit — that
+06/07 are the always-on MGE *detection* stages, 08 is the opt-in *interpretation* layer that
+builds on them, and together they are the mobilome. Renaming `08.mobilome` was considered and
+deliberately rejected in favour of documenting it.
+
+---
+
 ## 5. Phage/plasmid: VirSorter2 is default; geNomad is opt-in and NON-COMMERCIAL
 
 **Status: DECIDED 2026-07-22. README must state the geNomad licence clearly.**

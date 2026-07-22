@@ -30,10 +30,18 @@ Illumina · Nanopore · Hybrid · Pre-assembled contigs
 Livio Antonielli, 2026
 ''')
 
-# Default config, resolved relative to the launch directory — so run from the
-# repository root (as the command above does). A user-supplied --configfile
-# overrides this at launch and is the normal way to point at a custom config.
-configfile: "config/config.yaml"
+# NO default `configfile:` here — this is deliberate.
+#
+# Snakemake MERGES a hard-coded `configfile:` with any --configfile given on the
+# command line (it does not replace it). With a default pointing at the v1
+# config/config.yaml, a v2 run that omitted a key would silently inherit the v1
+# value — a stale database path or download link — instead of failing. That
+# defeats the guarantee 00_common documents: a missing key must stop the run, not
+# default to something wrong. So the config is REQUIRED on the command line:
+#
+#   snakemake --sdm conda --cores N --resources cpus=N --configfile config/config_v2.yaml
+#
+# 00_common.smk exits with a clear message if no config was supplied.
 
 # 1) Foundation. 00_common.smk validates config["mode"], sets the working
 #    directory, discovers samples, and defines every shared helper/constant —

@@ -98,16 +98,40 @@ rule annotation:
         LOGS + "/annotation_{sample}.log"
     priority: 5
     shell:
-        # Genus selection preserved byte-for-byte from v1: sort the composition
-        # lines by the numeric abundance after the ':' (descending), take the
-        # genus name before the ':', keep only the first (most abundant) line.
+        # Genus hint for Bakta: take the most abundant genus from the composition
+        # table (sort on the abundance after the ':', descending; keep line 1).
+        #
+        # Two deliberate v2 changes over the plain v1 illumina form:
+        #
+        # 1. Skip "no-hit". The composition table counts EVERY contig in the
+        #    BlobTools table, and contigs with no informative BLAST assignment are
+        #    counted under the literal genus "no-hit". Without this, a
+        #    poorly-placed or heavily-contaminated sample can make "no-hit" the top
+        #    line and Bakta would be run with `--genus no-hit`.
+        # 2. Run Bakta EXACTLY ONCE, with the genus hint only if one was found.
+        #    v1 wrapped the bakta call in a `for` loop over that single genus, so
+        #    if no genus survived the filter the loop body never ran and Bakta was
+        #    never invoked — the rule would then fail on missing output. Here the
+        #    genus is resolved first and the hint is added conditionally, so a
+        #    sample with no usable genus is still annotated, just without the hint.
+        #    (This matches v1 BacFluxL+, which likewise passed no --genus/--species
+        #    when it had no clear winner. Reconciling all four modes onto L+'s
+        #    stricter kept-contigs-only rule is logged as a follow-up.)
         """
-        for i in $(cat {input.abund} | sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p'); do \
+        genus=$(grep -v '^no-hit:' {input.abund} | sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p')
+
+        if [ -n "$genus" ]; then
+            taxon_args="--genus $genus --species sp."
+            echo "Annotating {wildcards.sample} with genus hint: $genus" > {log}
+        else
+            taxon_args=""
+            echo "No usable genus for {wildcards.sample} (composition empty or all no-hit); annotating without a genus hint." > {log}
+        fi
+
         bakta \
           --db {params.bakta_db} \
           --verbose \
-          --genus $i \
-          --species sp. \
+          $taxon_args \
           --strain {wildcards.sample} \
           --translation-table 11 \
           --min-contig-length 500 \
@@ -116,8 +140,7 @@ rule annotation:
           --keep-contig-headers \
           --output {output.bakta_dir} \
           --threads {resources.cpus} \
-          --force {input.contigs}; \
-        done > {log} 2>&1
+          --force {input.contigs} >> {log} 2>&1
         """
 
 

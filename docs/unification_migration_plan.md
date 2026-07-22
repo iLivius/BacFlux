@@ -419,12 +419,77 @@ logging, honest documented limitation on reverse conflicts. **Verify on first re
 geNomad output filenames/columns, `--restart` need, the reverse-conflict upgrade (read geNomad's
 aggregated_classification.tsv), and VS2's `--skip-deps-install`/`--use-conda-off` flags.
 
+### Stage-4 design item (logged 2026-07-22): Bakta `--replicons` for the long-read modes
+
+Deferred to Stage 4 because the inputs come from the assembler front end. Currently BacFlux
+passes no `--replicons` table, so Bakta treats even a **closed circular** replicon as an
+incomplete linear contig. Per Bakta's docs the two columns differ in kind:
+
+- **`topology` (circular/linear) affects GENE PREDICTION** — *"De novo-prediction via Pyrodigal
+  respecting sequences' completeness"*, *"detection & annotation of features spanning sequence
+  edges"*. Genes crossing the origin of a closed replicon are currently at risk in
+  nanopore/hybrid (Flye+Medaka+dnaapler deliver circularised replicons).
+- **`type` (chromosome/plasmid/contig) + `name` are primarily OUTPUT METADATA** (INSDC-shaped
+  records; trivial downstream replicon attribution). No evidence found that it changes prediction.
+
+Sources of truth already produced by the pipeline:
+- **topology** — Flye `assembly_info.txt` circular flag, already parsed for `ignore_list`
+  (`IGNORE_LIST_CMD` in 00_common). A hard fact: populate it always.
+- **type** — dnaapler `all` already writes `{sample}_all_reorientation_summary.tsv` with a
+  per-contig `Gene_Reoriented` column (**dnaA→chromosome, repA→plasmid, terL→phage**) plus
+  identity/coverage. Verified on the real BacFluxL+ test output; BacFlux currently discards it.
+  An orthogonal signal to Platon (RDS) and geNomad (gene content) — but caveated: circular
+  contigs only (non-circular are `--ignore`d), long-read modes only, absence of a marker is not
+  evidence of absence (diverse plasmid replicons lack a recognisable repA), and dnaapler is
+  built for reorientation, not classification (off-label use).
+
+**Recommendation:** always set `topology` from Flye; set `type` only where signals concur (e.g.
+dnaapler dnaA + Platon chromosome), else the neutral `contig` — so a probabilistic call is never
+baked into the annotation artifact. Separately, surface dnaapler's `Gene_Reoriented` as an extra
+column in the long-read plasmid concordance, and use `terL` hits as a free cross-check against
+the phage stage.
+
 **Stage 2 — Clean-shared tail (Tier S). [original combined scoping, superseded by 2a/2b above]**
 `40_annotation`, `50_amr` (abricate leg), `60_plasmid`, `70_phage`. These consume
 `contigs_final.fasta` and are the safest (identical rules). **Gate:** with a stub
 `contigs_final.fasta`, each rule runs and matches the baseline output for that step.
 
-**Stage 3 — Mode-parameterized shared (Tier P).**
+**Stage 3 — Mode-parameterized shared (Tier P). ✓ DONE 2026-07-22 (gate passed).**
+Delivered `workflow/rules/shared/{10_decontam,20_qc,30_taxonomy,90_report}.smk` + the CARD
+read-mapping leg appended to `50_amr.smk`. **Contract closure achieved:** `select_contigs` now
+produces `COMPOSITION` and `blast_contigs` produces `BLASTOUT`, the two cross-stage inputs
+Stages 2a/2b already consumed as stubs. **Gate:** all four modes parse, and from a single
+front-end stub the full shared tail builds as ONE 16-job DAG (map_contigs -> blast -> blob ->
+select_contigs -> annotation / plasmid / QC / taxonomy / phage / multiqc).
+
+Built by an 11-agent Workflow; the review found 11 majors, all addressed:
+- **Hybrid plasmid regression (blocker-class):** the decontam BLAST screens the Illumina draft
+  (SPAdes names) while Platon runs on the delivered ONT genome (Flye names), so the contig-ID
+  lookup could never match and every hybrid plasmid would silently read "not verified". Fixed
+  with `PLASMID_BLASTOUT` + a `blast_final_contigs` rule — and the guard was widened from
+  hybrid-only to **both long-read modes** (`NEEDS_FINAL_BLAST`), since nanopore has the same
+  mismatch across Medaka.
+- **plasmid_search hardening:** restored the v1 long-read form — `grep -F` (fixed string),
+  `grep -qi` (NCBI titles capitalise "Plasmid", so the case-sensitive grep silently missed
+  them), first-token contig IDs via awk (whole-header IDs can never match), `: >` truncation,
+  and Platon exit-code capture.
+- **Bakta genus:** skip the literal `no-hit` genus, and run Bakta exactly once with the hint
+  applied conditionally — v1's `for`-loop form would skip annotation entirely if no genus
+  survived.
+- **GTDB-Tk ordering:** restored its scheduling edge on CheckM (v1 guaranteed serialisation;
+  without it two pplacer runs can collide and OOM on a large machine).
+- **Config merge leak:** Snakemake *merges* a hard-coded `configfile:` with `--configfile`, so
+  the v1 config was silently supplying values (verified). The default is removed; the config is
+  now required, with an actionable message. This immediately exposed a latent `card_link`
+  dependency, now validated by name in 00_common.
+- **`mobilome.run: true`** aborted with a MissingInputException naming a directory; now exits
+  with a message naming the config key.
+- **Report wiring:** QUAST renames are generated from `QC_GENOMES` (they were hand-typed and
+  branched on mode, so adding a QC genome updated CheckM/GTDB-Tk but silently not QUAST), and
+  staged CheckM/GTDB-Tk rows get prefix-stripping rules — without them MultiQC's `-d` prepended
+  the staging path and the hybrid Illumina-vs-ONT relabelling never reached the report.
+
+**Stage 3 — Mode-parameterized shared (Tier P). [original scoping]**
 `10_decontam`, `20_qc`, `30_taxonomy`, `50_amr` (CARD leg), `90_report`. Implement the
 hybrid dual-genome branch and the D3/D4 decisions here. **Gate:** dry run of all modes still
 parses; the dual-genome path resolves correct targets for hybrid.
