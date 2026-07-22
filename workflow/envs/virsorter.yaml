@@ -1,7 +1,56 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# VirSorter2 environment — deliberately SELF-SUFFICIENT.
+#
+# WHY THIS FILE LOOKS OVER-SPECIFIED (read before "tidying" it):
+#
+# VirSorter2 is itself a Snakemake workflow. Left to its own devices it builds a
+# SECOND conda environment at runtime (its internal `vs2` env) and runs its real
+# work inside that. That nested conda-inside-conda is fragile: it needs network
+# access mid-run, and the resolver it ships has repeatedly produced a broken
+# conda/mamba pairing (the `ModuleNotFoundError: No module named
+# 'conda._vendor.auxlib'` crash we hit on every phage run).
+#
+# So BacFlux switches that off. Two flags in rules/shared/70_phage.smk do it:
+#   * `virsorter setup --skip-deps-install`  — don't build the sub-env at setup
+#   * `virsorter run   --use-conda-off`      — don't use it at run time either
+#
+# The consequence, and the whole point of this file: with the sub-env disabled,
+# every tool VirSorter2's internal rules invoke must ALREADY be present in THIS
+# environment. The bioconda `virsorter` package alone does not bring them — it is
+# a thin wrapper that assumes the sub-env will supply them. Installing only
+# `virsorter` here fails at the first internal rule with
+# `ModuleNotFoundError: No module named 'screed'`.
+#
+# The dependency block below is therefore a faithful copy of VirSorter2's OWN
+# internal env spec, which ships inside the installed package at:
+#     <env>/lib/python3.*/site-packages/virsorter/envs/vs2.yaml
+# If VirSorter2 is ever unpinned from 2.2.4, re-read that file and re-sync this
+# one — that is the single maintenance obligation this approach creates.
+#
+# The pins are VirSorter2's, not ours, and they matter: the classifier ships as a
+# pickled scikit-learn 0.22.1 model, so a newer scikit-learn can fail to load it
+# or silently change calls. `python` is intentionally NOT pinned here — the pins
+# below already force Python 3.8, and stating it twice only creates a second
+# thing to keep in sync.
+# ─────────────────────────────────────────────────────────────────────────────
 name: virsorter
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - mamba>=1.5
   - virsorter=2.2.4
+
+  # VirSorter2's own internal dependencies (from its packaged envs/vs2.yaml).
+  # Required because we run with --use-conda-off; see the header above.
+  - click
+  - last
+  - ncbi-genome-download
+  - ruamel.yaml
+  - prodigal=2.6
+  - screed=1
+  - hmmer!=3.3.1
+  - scikit-learn=0.22.1
+  - imbalanced-learn
+  - pandas=1.2
+  - seaborn
+  - numpy<1.24

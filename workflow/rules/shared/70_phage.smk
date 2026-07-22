@@ -163,20 +163,29 @@ if PHAGE_CALLER == "genomad":
 
 
 # ── VirSorter2 DEFAULT path (only defined when PHAGE_CALLER == "virsorter2") ──
-# VS2 2.2.4 (Jan 2023) manages its OWN nested conda envs at runtime, and an
-# unpinned ancient transitive `mamba` in that machinery crashes (the v1.3.1
-# `virsorter_deps_env` saga). The fix has three parts, applied below and in
-# envs/virsorter.yaml:
-#   1. envs/virsorter.yaml adds `mamba>=1.5` so any mamba shell-out gets a modern
-#      build instead of the crashing ancient one.
+# VS2 2.2.4 (Jan 2023) is itself a Snakemake workflow, and it manages its OWN
+# nested conda env at runtime. That nesting is what crashed every v1.3.1 phage run
+# (an ancient transitive `mamba` against a modern `conda` -> "No module named
+# 'conda._vendor.auxlib'", the `virsorter_deps_env` saga).
+#
+# The fix is to switch the nesting OFF entirely and make our single env carry
+# everything VS2 needs. Three parts, applied below and in envs/virsorter.yaml:
+#   1. envs/virsorter.yaml installs VS2's OWN internal dependency list (copied
+#      from the `envs/vs2.yaml` that ships inside the virsorter package) next to
+#      virsorter itself, so the one env is self-sufficient.
 #   2. `virsorter setup --skip-deps-install` downloads only the DB and does NOT
-#      build VS2's per-rule nested dependency envs — we rely on the runtime tool
-#      closure that the bioconda `virsorter=2.2.4` package already pins.
+#      build VS2's per-rule nested dependency envs.
 #   3. `virsorter run --use-conda-off`, plus exporting the env's own bin onto PATH,
 #      makes VS2 subprocesses resolve OUR in-env binaries instead of nested envs.
-# VERIFY on the first real VS2 run: that --skip-deps-install / --use-conda-off are
-# accepted by the pinned 2.2.4 build and that no runtime tool VS2 formerly got from
-# a nested env is missing (if any is, add it to envs/virsorter.yaml).
+#
+# VERIFIED 2026-07-22 on the v2 illumina validation run. The check this comment
+# used to ask for has been done, and the answer was NOT the comfortable one: the
+# bioconda `virsorter=2.2.4` package does NOT pin the runtime tool closure. With
+# only `virsorter` in the env, screed, hmmer, prodigal, last, pandas,
+# scikit-learn, numpy, seaborn, imbalanced-learn and ncbi-genome-download were ALL
+# absent, and the run died at the first internal rule on `No module named
+# 'screed'`. Hence part 1 above. If VS2 is ever unpinned from 2.2.4, re-read its
+# packaged envs/vs2.yaml and re-sync envs/virsorter.yaml against it.
 if PHAGE_CALLER == "virsorter2":
 
     # ── Rule: virsorter2_db — one-off VirSorter2 reference download ──────────
