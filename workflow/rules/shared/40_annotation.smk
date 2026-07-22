@@ -81,6 +81,18 @@ rule annotation:
         # so the two can never drift onto different paths — the same single-source
         # pattern the assembly hand-off uses.
         abund = COMPOSITION,
+        # Replicon table (LONG-READ MODES ONLY). Tells Bakta which contigs are
+        # circular, which matters because Pyrodigal is then allowed to call genes
+        # across the origin of a closed replicon — typically a handful of genes at
+        # position 1 of a chromosome, often including dnaA itself. Built by
+        # build_replicons in shared/15_replicons.smk from Flye's circularity call
+        # plus dnaapler's start-gene marker.
+        #
+        # In illumina and contigs mode BAKTA_REPLICON_INPUT is an EMPTY LIST, so
+        # there is no DAG edge and no producer is required; Snakemake renders it as
+        # an empty string in the shell, where the `[ -s ]` test below is false and
+        # the flag is simply absent. One rule body, valid in all four modes.
+        replicons = BAKTA_REPLICON_INPUT,
     output:
         # Whole directory, not per-file outputs (faithful to v1); Bakta writes
         # {sample}.faa/.gff3/.gbff/.tsv/... inside it.
@@ -128,10 +140,22 @@ rule annotation:
             echo "No usable genus for {wildcards.sample} (composition empty or all no-hit); annotating without a genus hint." > {log}
         fi
 
+        # Replicon table, exactly the same idiom as the genus hint above. The
+        # -s test ("exists and is not empty") does double duty: it is false in the
+        # short-read modes, where the input is bound to an empty list and renders
+        # as "", AND it is the second guard against handing Bakta an EMPTY file,
+        # which it treats as a fatal format error rather than as "no information".
+        replicon_args=""
+        if [ -s "{input.replicons}" ]; then
+            replicon_args="--replicons {input.replicons}"
+            echo "Using replicon table: {input.replicons}" >> {log}
+        fi
+
         bakta \
           --db {params.bakta_db} \
           --verbose \
           $taxon_args \
+          $replicon_args \
           --strain {wildcards.sample} \
           --translation-table 11 \
           --min-contig-length 500 \

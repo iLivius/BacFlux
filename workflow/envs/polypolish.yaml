@@ -1,0 +1,7 @@
+name: polypolish
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - bwa=0.7.19
+  - polypolish=0.6.1

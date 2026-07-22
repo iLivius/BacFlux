@@ -494,7 +494,38 @@ Built by an 11-agent Workflow; the review found 11 majors, all addressed:
 hybrid dual-genome branch and the D3/D4 decisions here. **Gate:** dry run of all modes still
 parses; the dual-genome path resolves correct targets for hybrid.
 
-**Stage 4 — Front ends, one mode at a time, each a gate.**
+**Stage 4 — Front ends. ✓ DONE 2026-07-22 (gate passed, all four modes).**
+Delivered `workflow/rules/{illumina,nanopore,hybrid,contigs}/*.smk`, plus
+`shared/15_replicons.smk` + `workflow/scripts/build_bakta_replicons.py` (+16 passing tests)
+for the Bakta `--replicons` work. **This is the stage that flips `all_targets()` from empty to
+the full pipeline:** `snakemake -n` now plans a complete run for every mode — illumina 41 jobs,
+nanopore 41, hybrid 53, contigs 32. `build_replicons` fires only in the long-read modes (0 jobs
+in illumina/contigs); hybrid stages BOTH genomes for dual CheckM/GTDB-Tk.
+
+Review found 7 majors, all addressed. The most serious were data-loss and silent-failure bugs:
+- **DRAFT_CONTIGS was nested inside the assembler's `directory()` output** (`SPADES_DIR` was
+  derived as `dirname(DRAFT_CONTIGS)`). Snakemake wipes a `directory()` output before re-running
+  its rule, so any re-run of the assembler would have silently deleted the hand-off the entire
+  contamination screen keys on — reproduced by the reviewer on a minimal workflow. Fixed by
+  moving `contigs_filt.fasta` up beside the assembler directory (where contigs mode already put
+  it) and spelling `SPADES_DIR` out independently.
+- **Medaka auto-model resolution** was switched to the RAW ONT file; v1 used the filtlong output.
+  Restored — the raw input may be gzipped while the filtlong output never is, so the draft
+  introduced a failure mode v1 could not have.
+- **The replicons script treated a total join failure as a warning**, emitting a well-formed
+  all-linear table and exiting 0 — Bakta would then annotate as if no table existed, with the
+  only trace in an unread log. Zero overlap is now fatal (partial overlap stays a warning, since
+  dnaapler only reports contigs it could reorient).
+- **Hybrid's Qualimap panel was labelled generically** "mapping QC", though it is Illumina reads
+  on the PRE-decontamination SPAdes draft — a reader would take it as coverage of the delivered
+  ONT genome. Now tagged "mapping Illumina QC" in hybrid, matching the other tagged panels.
+
+Still open (logged, not blocking): Bakta's honouring of `type=contig` + `topology=circular` is
+pin-sensitive and nothing detects a future Bakta change silently reverting it to linear; and
+`FASTA_HEAD_CMD` strips the descriptions Bakta uses to infer topology in **contigs** mode, so a
+closed Unicycler/NCBI input genome is annotated as linear contigs.
+
+**Stage 4 — Front ends, one mode at a time, each a gate. [original scoping]**
 Do them in increasing complexity: `illumina` → `contigs` → `nanopore` → `hybrid`.
 After each, run the full mode end-to-end on the Stage-0 isolate. **Gate per mode:** output
 matches the baseline oracle (allowing for the intentional D1 layout change and the D4 phage

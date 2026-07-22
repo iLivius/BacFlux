@@ -350,11 +350,16 @@ CONTIG_DECISIONS = DECONTAM_DIR + "/contig_taxonomy_decisions.tsv"
 # This split is why select_contigs must not hard-code FINAL_CONTIGS on its output
 # side: doing so would create a cycle in nanopore (select → final → Medaka →
 # select). Verified acyclic in all four modes with the values below.
+# NOTE on the short-read paths: contigs_filt.fasta sits directly under
+# 02.assembly/{sample}/, NOT inside the spades/ sub-directory. The assembler
+# declares directory(SPADES_DIR) as an output, and Snakemake wipes a directory()
+# output before re-running its rule — so a filtered file placed inside spades/
+# would be destroyed by any re-run of the assembler.
 if MODE == "illumina":
-    DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/spades/contigs_filt.fasta"
+    DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/contigs_filt.fasta"
     DECONTAM_CONTIGS = FINAL_CONTIGS                       # decontam IS the last assembly step
 elif MODE == "hybrid":
-    DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/spades/contigs_filt.fasta"   # the ILLUMINA draft
+    DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/contigs_filt.fasta"          # the ILLUMINA draft
     DECONTAM_CONTIGS = DECONTAM_DIR + "/contigs_sel.fasta"                    # Stage-4 Snippy reference + QC comparator
 elif MODE == "nanopore":
     DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/fix_start/{sample}_fixed.fasta"
@@ -410,6 +415,119 @@ if HAS_LONG_READS:
     # NanoPlot read-QC directories, before and after filtering — MultiQC inputs.
     NANOPLOT_RAW_DIR  = DIR_READS + "/{sample}/ont/raw_qc"
     NANOPLOT_FILT_DIR = DIR_READS + "/{sample}/ont/filt_qc"
+
+# ── Front-end working paths (Stage-4 contract) ───────────────────────────────
+# Every file each mode's front end creates on the way from raw input to
+# DRAFT_CONTIGS / FINAL_CONTIGS. They are named HERE, not inside the front-end
+# modules, for two reasons: (a) shared code consumes some of them —
+# shared/15_replicons.smk reads FLYE_INFO and DNAAPLER_SUMMARY, and
+# shared/40_annotation.smk reads BAKTA_REPLICONS; and (b) the illumina and hybrid
+# front ends duplicate the same SPAdes rules, so a single definition means the
+# two copies can drift on flags but never on paths.
+#
+# Gated exactly like the read hand-offs above: referencing FLYE_DIR in illumina
+# mode raises a clean NameError instead of silently building a path no rule will
+# ever produce.
+
+if HAS_SHORT_READS:
+    # fastp's HTML report — the human-readable twin of FASTP_JSON (which is the
+    # one MultiQC reads). Written by trim_adapters; nothing downstream consumes it.
+    FASTP_HTML = DIR_READS + "/{sample}/illumina/{sample}_fastp.html"
+
+    # PhiX control genome + its Bowtie2 index. No {sample} in these paths: the
+    # download and the index happen ONCE per run and are shared by every sample.
+    # All of them are declared temp() by the front end.
+    PHIX_DIR        = DIR_READS + "/phix"
+    PHIX_FASTA      = PHIX_DIR + "/phix.fna.gz"
+    PHIX_BT2_PREFIX = PHIX_DIR + "/phix"
+
+    # SPAdes working directory and its raw output.
+    #
+    # DELIBERATELY NOT derived from DRAFT_CONTIGS (an earlier draft used
+    # os.path.dirname(DRAFT_CONTIGS) as an anti-drift trick). That only worked
+    # because DRAFT_CONTIGS then lived INSIDE this directory — and that nesting is
+    # a data-loss bug: illumina_assembly declares directory(SPADES_DIR) as an
+    # output, and Snakemake removes a directory() output before re-running its
+    # rule, so any re-run of the assembler would silently delete DRAFT_CONTIGS,
+    # the hand-off the whole contamination screen keys on.
+    #
+    # DRAFT_CONTIGS therefore sits one level up, beside the assembler directory
+    # rather than within it (the same place contigs mode already puts it), and
+    # these two are spelled out independently.
+    SPADES_DIR     = DIR_ASSEMBLY + "/{sample}/spades"
+    SPADES_CONTIGS = SPADES_DIR + "/contigs.fasta"
+
+if HAS_LONG_READS:
+    # Flye. assembly.fasta and assembly_info.txt are Flye's own names; the ignore
+    # list is ours, built by an awk pass in the same rule (contigs Flye did NOT
+    # call circular, which dnaapler must not rotate).
+    FLYE_DIR         = DIR_ASSEMBLY + "/{sample}/flye"
+    FLYE_CONTIGS     = FLYE_DIR + "/assembly.fasta"
+    FLYE_INFO        = FLYE_DIR + "/assembly_info.txt"       # -> shared/15_replicons.smk (topology)
+    FLYE_IGNORE_LIST = FLYE_DIR + "/ignore_list.txt"
+
+    # dnaapler (replicon reorientation). DNAAPLER_REORIENTED is dnaapler's own
+    # output; DNAAPLER_FIXED is that file with headers trimmed to one token and
+    # sequences linearised, and in NANOPORE mode it is also DRAFT_CONTIGS (see the
+    # assert below). DNAAPLER_SUMMARY is new in v2 as a declared output: v1 wrote
+    # it and never used it, but its Gene_Reoriented / Coverage /
+    # Identity_Percentage columns are what shared/15_replicons.smk turns into the
+    # Bakta replicon type.
+    DNAAPLER_DIR        = DIR_ASSEMBLY + "/{sample}/fix_start"
+    DNAAPLER_REORIENTED = DNAAPLER_DIR + "/{sample}_reoriented.fasta"
+    DNAAPLER_FIXED      = DNAAPLER_DIR + "/{sample}_fixed.fasta"
+    DNAAPLER_SUMMARY    = DNAAPLER_DIR + "/{sample}_all_reorientation_summary.tsv"
+
+    # Medaka (ONT consensus polishing). consensus.fasta is Medaka's own name.
+    MEDAKA_DIR       = DIR_ASSEMBLY + "/{sample}/medaka"
+    MEDAKA_CONSENSUS = MEDAKA_DIR + "/consensus.fasta"
+
+    # The Bakta --replicons table and its audit trail, both written by
+    # build_replicons in shared/15_replicons.smk. They live next to the assembly
+    # because they describe it.
+    BAKTA_REPLICONS       = DIR_ASSEMBLY + "/{sample}/{sample}_replicons.tsv"
+    BAKTA_REPLICONS_AUDIT = DIR_ASSEMBLY + "/{sample}/{sample}_replicons_audit.tsv"
+    REPLICONS_SCRIPT      = os.path.join(WORKFLOW_DIR, "scripts", "build_bakta_replicons.py")
+
+    # The nanopore screen runs on the reoriented assembly, so those two names must
+    # be the SAME file. Asserted rather than assumed: a future edit to either line
+    # would otherwise silently split the DAG into two parallel chains.
+    if MODE == "nanopore":
+        assert DNAAPLER_FIXED == DRAFT_CONTIGS, (
+            "nanopore: DNAAPLER_FIXED and DRAFT_CONTIGS must be the same path "
+            f"({DNAAPLER_FIXED!r} vs {DRAFT_CONTIGS!r})"
+        )
+
+    # The remaining long-read wiring constants — MEDAKA_INPUT, FINALIZE_SOURCE and
+    # POLISH_INPUT — are defined at the END of section 8, because two of them
+    # depend on USE_MEDAKA, which is only resolved there.
+
+if IS_HYBRID:
+    # The decontaminated Illumina pairs: the reads that mapped as proper pairs to
+    # the CLEAN Illumina assembly. Kept (not temp) exactly as in v1 — they have
+    # standalone value, and deleting them would force SPAdes and the whole screen
+    # to re-run just to re-polish with Polypolish.
+    SEL_R1 = DIR_READS + "/{sample}/illumina/{sample}_sel_R1.fastq"
+    SEL_R2 = DIR_READS + "/{sample}/illumina/{sample}_sel_R2.fastq"
+    # Polypolish working directory (its files are declared individually as temp();
+    # the directory itself is deliberately NOT a declared output — see the house
+    # rule in rules/hybrid/50_polish.smk).
+    POLYPOLISH_DIR = DIR_ASSEMBLY + "/{sample}/polypolish"
+    # Snippy star comparison of every ONT stage against the Illumina assembly.
+    SNPS_DIR     = DIR_ASSEMBLY + "/{sample}/snps"
+    SNPS_SUMMARY = SNPS_DIR + "/SNPs_summary.txt"
+
+# Bakta --replicons wiring. Mode-INDEPENDENT (rule annotation in
+# shared/40_annotation.smk is one rule shared by all four modes), but it has to be
+# defined AFTER BAKTA_REPLICONS above, not next to FINAL_CONTIGS, or the name
+# would not exist yet in the long-read modes.
+#
+# In illumina/contigs mode this is an EMPTY LIST, which Snakemake renders as an
+# empty string in the shell — so the annotation rule's `[ -s "{input.replicons}" ]`
+# test is simply false and no --replicons flag is added. One static shell text,
+# valid in all four modes, no duplicated rule body and no DAG edge where there is
+# no producer.
+BAKTA_REPLICON_INPUT = [BAKTA_REPLICONS] if HAS_LONG_READS else []
 
 # ── Assembly QC + taxonomy paths (shared/20_qc.smk, shared/30_taxonomy.smk) ───
 # Everything genome-QC-ish lives under one 02.assembly/{sample}/eval/ parent.
@@ -711,10 +829,9 @@ print(
 
 # ─────────────── 7. Reference-database download links (parse-time) ───────────
 # CheckV and dbCAN links are resolved here because both databases are used by
-# every mode; card_link is resolved here too but only when the mode actually has
-# short reads. All of them fail EARLY with a message naming the config key, rather
-# than as a bare KeyError deep inside a rule. (phix_link stays unresolved here —
-# it is read by the Stage-4 short-read front end.)
+# every mode; card_link and phix_link are resolved here too, but only checked when
+# the mode actually has short reads. All of them fail EARLY with a message naming
+# the config key, rather than as a bare KeyError deep inside a rule.
 _links = config.get("links") or {}
 
 # CheckV: the link is OPTIONAL. When absent/empty, CheckV downloads its own
@@ -767,6 +884,21 @@ if HAS_SHORT_READS and not CARD_LINK:
     sys.exit(
         f"[BacFlux] mode={MODE} runs the read-based CARD AMR leg, which requires "
         "'links.card_link' to be set in the config."
+    )
+
+# PhiX: the small bacteriophage genome Illumina spikes into essentially every
+# lane as a sequencing control. Its reads are real sequence from a different
+# organism, so the short-read front ends map them out before assembly. Resolved
+# here — rather than inline in the download rule as v1 did — because BOTH the
+# illumina and hybrid front ends need it and both need the same check, so there is
+# one copy of the validation instead of two. Modes without short reads never look
+# at it. (This deliberately revises the earlier note in this section that said
+# phix_link would stay unresolved here.)
+PHIX_LINK = str(_links.get("phix_link") or "").strip()
+if HAS_SHORT_READS and not PHIX_LINK:
+    sys.exit(
+        f"[BacFlux] mode={MODE} removes PhiX spike-in reads before assembly, which "
+        "requires 'links.phix_link' to be set in the config."
     )
 
 
@@ -824,6 +956,29 @@ if HAS_LONG_READS:
     else:
         FLYE_INPUT_MODE = FLYE_MODE_MAP[FLYE_MODE_KEY]
         print(f"Flye input mode overridden via config with value: '{FLYE_INPUT_MODE}'.")
+
+    # ── The two long-read modes differ ONLY in these wiring constants ─────────
+    # Expressing the difference here, once, is what lets the Flye / dnaapler /
+    # Medaka rules be byte-identical in rules/nanopore/ and rules/hybrid/. They
+    # live in THIS section, not with the other front-end paths in section 4b,
+    # because two of them depend on USE_MEDAKA, which is resolved just above.
+    #
+    # All three are PARSE-TIME constants, so the DAG is fixed before the run
+    # starts and `snakemake -n` shows the real chain. v1 used input FUNCTIONS
+    # (final_contigs(wc), polishing_input_contigs(wc)) that re-read the config
+    # while the DAG was being built.
+    if MODE == "nanopore":
+        # Medaka polishes AFTER the contamination screen (D3, v1 behaviour).
+        MEDAKA_INPUT = DECONTAM_CONTIGS
+        # What finalize_contigs copies to FINAL_CONTIGS.
+        FINALIZE_SOURCE = MEDAKA_CONSENSUS if USE_MEDAKA else DECONTAM_CONTIGS
+    else:  # hybrid
+        # The ONT leg is never decontaminated: its reads were already filtered
+        # against the decontaminated Illumina reads by filtlong. So Medaka
+        # polishes the PRE-screen reoriented assembly.
+        MEDAKA_INPUT = DNAAPLER_FIXED
+        # What Polypolish corrects, and therefore what becomes FINAL_CONTIGS.
+        POLISH_INPUT = MEDAKA_CONSENSUS if USE_MEDAKA else DNAAPLER_FIXED
 else:
     # Short-read-only and contigs modes never touch Flye/Medaka.
     USE_MEDAKA = None
@@ -985,11 +1140,37 @@ def _rule_modules_present():
 
 
 def _frontend_targets_for(mode):
-    # Front-end leaf targets. Every mode guarantees the canonical decontaminated
-    # assembly (D2); each front-end module (added in Stage 4) extends this with
-    # its own read-QC and assembly-QC leaves, which the report module also pulls
-    # in as its inputs.
-    return list(expand(FINAL_CONTIGS, sample=SAMPLES))
+    # Front-end leaf targets. Every mode guarantees the canonical finished
+    # assembly (D2, FINAL_CONTIGS); on top of that, ANYTHING a front end produces
+    # that no other rule consumes has to be asked for BY NAME here, or Snakemake
+    # will simply never build it.
+    #
+    # We branch on the capability FLAGS rather than on the `mode` argument (D7),
+    # so the intent reads as "this mode has long reads" instead of enumerating
+    # mode names. The parameter is kept only so the call site in all_targets()
+    # does not change.
+    targets = list(expand(FINAL_CONTIGS, sample=SAMPLES))
+
+    if HAS_SHORT_READS:
+        # Listed explicitly for clarity even though multiqc already depends on it.
+        targets += expand(FASTP_JSON, sample=SAMPLES)
+
+    if HAS_LONG_READS:
+        # The two NanoPlot report directories (multiqc pulls these in too).
+        targets += expand(NANOPLOT_RAW_DIR, sample=SAMPLES)
+        targets += expand(NANOPLOT_FILT_DIR, sample=SAMPLES)
+        # ORPHAN without this line: the replicon AUDIT table is terminal — nothing
+        # reads it — so it would never be produced. (BAKTA_REPLICONS itself is not
+        # an orphan: rule annotation consumes it. FLYE_INFO and DNAAPLER_SUMMARY
+        # are not orphans either, now that build_replicons reads them.)
+        targets += expand(BAKTA_REPLICONS_AUDIT, sample=SAMPLES)
+
+    if IS_HYBRID:
+        # ORPHAN without this line: the Snippy comparison of the ONT stages
+        # against the Illumina assembly is a terminal report.
+        targets += expand(SNPS_SUMMARY, sample=SAMPLES)
+
+    return targets
 
 
 def _downstream_targets():
