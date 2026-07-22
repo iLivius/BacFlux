@@ -39,7 +39,12 @@ Livio Antonielli, 2026
 # defeats the guarantee 00_common documents: a missing key must stop the run, not
 # default to something wrong. So the config is REQUIRED on the command line:
 #
-#   snakemake --sdm conda --cores N --resources cpus=N --configfile config/config_v2.yaml
+#   snakemake --sdm conda --cores N --configfile config/config_v2.yaml
+#
+# `--cores N` is the ONE knob for CPU. Every cpu-bound rule declares Snakemake's
+# built-in `threads:`, so --cores enforces the ceiling on its own. Do NOT also
+# pass `--jobs`/`-j`: for a local run it is an alias for --cores, and combining
+# the two can silently let rules oversubscribe the machine.
 #
 # 00_common.smk exits with a clear message if no config was supplied.
 

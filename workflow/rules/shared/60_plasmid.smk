@@ -111,8 +111,7 @@ rule plasmid_search:
         contigs_prefix = GENOMAD_PREFIX,
     conda:
         "../../envs/platon.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/plasmid_search_{sample}.log"
     priority: 4
@@ -140,7 +139,7 @@ rule plasmid_search:
           --db {params.platon_db} \
           --output {output.platon_dir} \
           --verbose \
-          --threads {resources.cpus} \
+          --threads {threads} \
           {input.contigs} > {log} 2>&1
         platon_rc=$?
         set -e

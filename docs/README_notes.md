@@ -9,24 +9,29 @@ treated as the final wording. Delete each entry once it's actually folded into t
 
 ## 1. Snakemake launch flags: `--cores` / `--resources cpus=N` / `--jobs` — urgent
 
-> **STATUS UPDATE 2026-07-22 — the underlying cause is now SCHEDULED to be fixed.**
-> The agreed fix is to convert every rule from the custom `resources: cpus = capped_cpus(N)`
-> to Snakemake's built-in `threads: capped_cpus(N)` (and `{resources.cpus}` -> `{threads}` in
-> the shells). That is mechanical and changes NO thread numbers — `capped_cpus(N)` returns the
-> same value either way — it only makes them auto-enforced by `--cores`, so `--resources` is no
-> longer needed and cannot be forgotten. Scheduled immediately AFTER the v2 validation runs
-> complete (converting mid-run would perturb an in-flight multi-hour job).
+> **RESOLVED 2026-07-22 — the underlying cause is FIXED. Read this before writing the README.**
+> Every cpu-bound rule now declares Snakemake's built-in `threads:` instead of the custom
+> `resources: cpus`. Thread NUMBERS are unchanged (`capped_cpus(N)` returns the same value);
+> only the mechanism changed, and the built-in one is enforced by `--cores` automatically.
 >
-> **Once that lands, the README should document the SIMPLE form** — `--cores N` only, still
-> never `--jobs` — and the `--resources cpus=N` workaround below becomes historical context
-> rather than instruction. Do not write the workaround into the README as the recommended
-> command if the conversion has already happened; check the rules first.
+> **So the README must document the SIMPLE form:**
+> ```bash
+> snakemake --sdm conda --cores 24 --configfile config/config_v2.yaml
+> ```
+> `--cores N` alone. No `--resources cpus=N`. Still never `--jobs`/`-j`.
 >
-> Verified while this was still outstanding: `--resources cpus=N` is a GLOBAL BUDGET (ceiling on
-> the sum of concurrently running jobs), NOT a per-rule default — per-rule caps are preserved
-> (e.g. `virsorter2_db` keeps 4 while others take 8 under the same flag). So the interim
-> workaround is correct, just fragile because it is optional.
-
+> Verified after the change: with `--cores 24` the per-rule caps are preserved
+> (`virsorter2_db`=4, ONT QC/Medaka=8, `trim_adapters`=16, the rest 24); with `--cores 8`
+> Snakemake caps every request at 8 on its own, except `virsorter2_db` whose lower cap of 4
+> correctly wins. That is the behaviour the old `resources: cpus` form could never give.
+>
+> Everything below this line is the HISTORICAL diagnosis, kept because the `--jobs` half of it
+> is still true and still needs saying. **Do not copy the `--resources cpus=N` workaround into
+> the README** — it is obsolete.
+>
+> One upgrade note worth a line in the release notes: because Snakemake hashes rule definitions,
+> this change makes it want to re-run outputs produced by a PRE-conversion v2. Irrelevant for
+> released v1.3.1 users; it only affects anyone who ran a v2 development build.
 
 **Status: the CURRENT README's documented launch commands are actively wrong, not just
 under-explained.**
@@ -93,10 +98,10 @@ nothing in BacFlux speaks `--cores`'s native currency (`threads:`).
      already agreed for v2 (config sets overall machine scale; each rule encodes its own
      tool-appropriate cap).
 
-3. **Longer-term, not urgent** (tracked as part of migration plan D7 — standardizing
-   resource keys): switch BacFlux's rules from `resources: cpus=N` to Snakemake's real
-   `threads: N` directive. That removes the need for `--resources cpus=N` entirely —
-   `--cores` alone would then be sufficient and safe, with nothing extra to remember.
+3. ~~**Longer-term, not urgent**: switch to `threads:`.~~ **DONE 2026-07-22** — see the
+   RESOLVED box at the top. `--cores` alone is now sufficient and safe. Item 1 of this
+   file is therefore reduced to a single instruction: document `--cores N`, and warn
+   against `--jobs`.
 
 ### Where this lands in the current README
 - "Running BacFlux" (~line 334–352): fix both example launch commands.

@@ -92,8 +92,7 @@ if USE_MEDAKA:
             model = MEDAKA_MODEL if MEDAKA_MODEL is not None else "",
         conda:
             "../../envs/medaka.yaml"
-        resources:
-            cpus = capped_cpus(24)
+        threads: capped_cpus(24)
         log:
             LOGS + "/long_read_consensus_{sample}.log"
         priority: 9
@@ -139,7 +138,7 @@ if USE_MEDAKA:
               medaka_consensus \
                 -i {input.reads} \
                 -d {input.contigs} \
-                -t {resources.cpus} \
+                -t {threads} \
                 -m "$model" \
                 -o {output.consensus_dir} > {log} 2>&1 || {{
                   cat {log}
@@ -172,7 +171,7 @@ if USE_MEDAKA:
               medaka_consensus \
                 -i {input.reads} \
                 -d {input.contigs} \
-                -t {resources.cpus} \
+                -t {threads} \
                 -m "$resolved_model" \
                 -o {output.consensus_dir} >> {log} 2>&1
 

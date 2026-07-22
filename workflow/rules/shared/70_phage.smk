@@ -55,8 +55,11 @@
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
 # "../../envs/x.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/x.yaml.
 #
-# Resource convention: cpu-bound rules request `resources: cpus = capped_cpus(N)`
-# and use {resources.cpus} in the shell — the same mechanism v1 used.
+# Resource convention: cpu-bound rules declare Snakemake's built-in
+# `threads: capped_cpus(N)` and refer to `{threads}` in the shell. Using the
+# BUILT-IN keyword (rather than a custom `resources: cpus`) is what makes
+# `--cores N` actually enforce the limit, so a plain `snakemake --cores N` is
+# safe on its own and no extra `--resources` flag is needed.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -146,8 +149,7 @@ if PHAGE_CALLER == "genomad":
             genomad_dir = directory(GENOMAD_DIR),
         conda:
             "../../envs/genomad.yaml"
-        resources:
-            cpus = capped_cpus(24)
+        threads: capped_cpus(24)
         log:
             LOGS + "/genomad_{sample}.log"
         priority: 8
@@ -155,7 +157,7 @@ if PHAGE_CALLER == "genomad":
             """
             genomad end-to-end \
               --cleanup \
-              --threads {resources.cpus} \
+              --threads {threads} \
               {input.contigs} \
               {output.genomad_dir} \
               {input.genomad_db} > {log} 2>&1
@@ -201,8 +203,7 @@ if PHAGE_CALLER == "virsorter2":
             vs2_db = directory(VS2_DB_DIR),
         conda:
             "../../envs/virsorter.yaml"
-        resources:
-            cpus = capped_cpus(4)
+        threads: capped_cpus(4)
         log:
             LOGS + "/virsorter2_db.log"
         priority: 9
@@ -210,7 +211,7 @@ if PHAGE_CALLER == "virsorter2":
             """
             virsorter setup \
               -d {output.vs2_db} \
-              -j {resources.cpus} \
+              -j {threads} \
               --skip-deps-install > {log} 2>&1
             """
 
@@ -234,8 +235,7 @@ if PHAGE_CALLER == "virsorter2":
             min_score = 0.5,
         conda:
             "../../envs/virsorter.yaml"
-        resources:
-            cpus = capped_cpus(24)
+        threads: capped_cpus(24)
         log:
             LOGS + "/viral_identification_{sample}.log"
         priority: 8
@@ -251,7 +251,7 @@ if PHAGE_CALLER == "virsorter2":
               --include-groups {params.viral_groups} \
               --min-score {params.min_score} \
               --use-conda-off \
-              -j {resources.cpus} \
+              -j {threads} \
               all > {log} 2>&1
             """
 
@@ -326,8 +326,7 @@ rule viral_quality:
         viral_rel = CHECKV_VIRAL_REL,
     conda:
         "../../envs/checkv.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/viral_quality_{sample}.log"
     priority: 7
@@ -358,7 +357,7 @@ rule viral_quality:
             checkv end_to_end \
               "$viral_fasta" \
               {output.checkv_dir} \
-              -t {resources.cpus} \
+              -t {threads} \
               -d "$checkv_db_dir" > {log} 2>&1
         fi
         """

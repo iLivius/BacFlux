@@ -66,7 +66,7 @@
 #     accident rather than a decision. pplacer's MEMORY scales with its thread
 #     count (tens of GB at high counts), so the 64 cap was the riskier of the two.
 #     With both at 24 the separate cpus_p resource key is no longer needed and
-#     {resources.cpus} drives both flags: one knob. Thread count affects speed and
+#     {threads} drives both flags: one knob. Thread count affects speed and
 #     memory only, not the classification.
 #
 # The skani sketch directory is created up front because GTDB-Tk writes its
@@ -80,7 +80,7 @@ rule taxonomic_assignment:
         # In all four v1 workflows taxonomic_assignment took CheckM's output as its
         # input, so GTDB-Tk was structurally guaranteed to run AFTER CheckM for a
         # given sample and the two never overlapped. Both tools run pplacer and can
-        # each use tens of GB; on a large box (e.g. --cores 64 --resources cpus=64)
+        # each use tens of GB; on a large box (e.g. --cores 64)
         # dropping that edge would let them run concurrently on the same sample and
         # risk an OOM that v1 could not produce. Keeping this input preserves v1's
         # ordering at zero cost.
@@ -94,8 +94,7 @@ rule taxonomic_assignment:
         skani_sketch_dir = f"{GTDBTKDB}/skani_sketches_r226_skani0.3.1",
     conda:
         "../../envs/gtdbtk.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/taxonomic_assignment_{sample}.log"
     priority: 5
@@ -111,6 +110,6 @@ rule taxonomic_assignment:
           --genome_dir {input.genomes_dir} \
           --out_dir {output.gtdbtk_dir} \
           --skani_sketch_dir {params.skani_sketch_dir:q} \
-          --cpus {resources.cpus} \
-          --pplacer_cpus {resources.cpus} > {log} 2>&1
+          --cpus {threads} \
+          --pplacer_cpus {threads} > {log} 2>&1
         """

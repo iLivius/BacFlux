@@ -35,10 +35,11 @@
 # at workflow/rules/shared/, so "../../envs/x.yaml" climbs shared/ -> rules/ ->
 # workflow/ and lands on workflow/envs/x.yaml (the single shared env copy).
 #
-# Resource convention: cpu-bound rules request `resources: cpus = capped_cpus(N)`
-# and refer to `{resources.cpus}` in the shell — the same mechanism v1 used
-# (`min(CPUS, N)`), now going through the 00_common helper. We do NOT switch to
-# Snakemake's `threads:` keyword.
+# Resource convention: cpu-bound rules declare Snakemake's built-in
+# `threads: capped_cpus(N)` and refer to `{threads}` in the shell. Using the
+# BUILT-IN keyword (rather than a custom `resources: cpus`) is what makes
+# `--cores N` actually enforce the limit, so a plain `snakemake --cores N` is
+# safe on its own and no extra `--resources` flag is needed.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -103,9 +104,8 @@ rule annotation:
         locus_tag = lambda wc: bakta_locus_tag(wc.sample),
     conda:
         "../../envs/bakta.yaml"
-    resources:
         # Bakta gains little past ~24 threads; cap via the shared helper.
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/annotation_{sample}.log"
     priority: 5
@@ -163,7 +163,7 @@ rule annotation:
           --prefix {wildcards.sample} \
           --keep-contig-headers \
           --output {output.bakta_dir} \
-          --threads {resources.cpus} \
+          --threads {threads} \
           --force {input.contigs} >> {log} 2>&1
         """
 
@@ -198,8 +198,7 @@ rule functional_annotation:
         dmnd_db = DMNDDB,
     conda:
         "../../envs/eggnog-mapper.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/functional_annotation_{sample}.log"
     priority: 4
@@ -211,7 +210,7 @@ rule functional_annotation:
         emapper.py \
           -i {input.bakta_dir}/{wildcards.sample}.faa \
           --output_dir {output.eggnog_dir} \
-          --cpu {resources.cpus} \
+          --cpu {threads} \
           -m diamond \
           --data_dir {params.dmnd_db} \
           --output {wildcards.sample} \
@@ -280,8 +279,7 @@ rule secondary_metabolites_analysis:
         genefinding_tool = 'none',
     conda:
         "../../envs/antismash.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/secondary_metabolites_{sample}.log"
     priority: 4
@@ -293,7 +291,7 @@ rule secondary_metabolites_analysis:
           --databases {input.antismash_db} \
           --taxon {params.taxon} \
           --genefinding-tool {params.genefinding_tool} \
-          --cpus {resources.cpus} \
+          --cpus {threads} \
           {input.bakta_dir}/{wildcards.sample}.gbff > {log} 2>&1
         """
 
@@ -392,8 +390,7 @@ rule cazyme_gene_cluster:
         dbcan_db = DBCAN_DB_DIR,
     conda:
         "../../envs/dbcan.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/cazyme_{sample}.log"
     priority: 4
@@ -405,7 +402,7 @@ rule cazyme_gene_cluster:
           --output_dir {output.dbcan_dir} \
           --db_dir {params.dbcan_db} \
           --mode protein \
-          --threads {resources.cpus} \
+          --threads {threads} \
           --methods hmm \
           --methods diamond \
           --methods dbCANsub > {log} 2>&1
@@ -416,7 +413,7 @@ rule cazyme_gene_cluster:
           --output_dir {output.dbcan_dir} \
           --db_dir {params.dbcan_db} \
           --gff_type prodigal \
-          --threads {resources.cpus} >> {log} 2>&1
+          --threads {threads} >> {log} 2>&1
 
         # CAZyme Gene Cluster (CGC) Identification
         run_dbcan cgc_finder \

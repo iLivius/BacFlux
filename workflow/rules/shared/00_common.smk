@@ -45,7 +45,7 @@ from snakemake.io import glob_wildcards
 if not config:
     sys.exit(
         "[BacFlux] No configuration supplied. Pass one explicitly, e.g.:\n"
-        "  snakemake --sdm conda --cores N --resources cpus=N "
+        "  snakemake --sdm conda --cores N "
         "--configfile config/config_v2.yaml"
     )
 

@@ -67,9 +67,11 @@
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
 # "../../envs/x.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/x.yaml.
 #
-# Resource convention: cpu-bound rules request `resources: cpus = ...` and use
-# {resources.cpus} in the shell — the same mechanism v1 used. We do NOT use
-# Snakemake's `threads:` keyword.
+# Resource convention: cpu-bound rules declare Snakemake's built-in
+# `threads: capped_cpus(N)` and refer to `{threads}` in the shell. Using the
+# BUILT-IN keyword (rather than a custom `resources: cpus`) is what makes
+# `--cores N` actually enforce the limit, so a plain `snakemake --cores N` is
+# safe on its own and no extra `--resources` flag is needed.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -170,10 +172,9 @@ if HAS_SHORT_READS:
             db = _BT2_PREFIX,
         conda:
             "../../envs/bowtie.yaml"
-        resources:
             # Uncapped, as in v1: bowtie2 and samtools sort both scale well, and
             # this is one of the few rules where the full budget is worth giving.
-            cpus = CPUS
+        threads: CPUS
         log:
             LOGS + "/map_contigs_{sample}.log"
         priority: 8
@@ -183,17 +184,17 @@ if HAS_SHORT_READS:
               -x {params.db} \
               -1 {input.r1} \
               -2 {input.r2} \
-              -p {resources.cpus} \
+              -p {threads} \
               -t 2> {log} | \
             samtools view \
-              -@ {resources.cpus} \
+              -@ {threads} \
               -hbS - | \
             samtools sort \
-              -@ {resources.cpus} \
+              -@ {threads} \
               -o {output.bam} - >> {log} 2>&1
 
             samtools index \
-              -@ {resources.cpus} \
+              -@ {threads} \
               -b {output.bam} >> {log} 2>&1
             """
 
@@ -221,8 +222,7 @@ elif HAS_LONG_READS:
             bai = temp(DECONTAM_BAM + ".bai"),
         conda:
             "../../envs/minimap.yaml"
-        resources:
-            cpus = CPUS
+        threads: CPUS
         log:
             LOGS + "/map_contigs_{sample}.log"
         priority: 8
@@ -235,14 +235,14 @@ elif HAS_LONG_READS:
               -S \
               -b \
               -u \
-              -@ {resources.cpus} | \
+              -@ {threads} | \
             samtools sort \
               -o {output.bam} \
-              -@ {resources.cpus} 2>> {log}
+              -@ {threads} 2>> {log}
 
             samtools index \
               {output.bam} \
-              -@ {resources.cpus} 2>> {log}
+              -@ {threads} 2>> {log}
             """
 
 else:
@@ -272,8 +272,7 @@ else:
             bai = temp(DECONTAM_BAM + ".bai"),
         conda:
             "../../envs/minimap.yaml"
-        resources:
-            cpus = CPUS
+        threads: CPUS
         log:
             LOGS + "/map_contigs_{sample}.log"
         priority: 8
@@ -287,14 +286,14 @@ else:
               -S \
               -b \
               -u \
-              -@ {resources.cpus} | \
+              -@ {threads} | \
             samtools sort \
               -o {output.bam} \
-              -@ {resources.cpus} 2>> {log}
+              -@ {threads} 2>> {log}
 
             samtools index \
               {output.bam} \
-              -@ {resources.cpus} 2>> {log}
+              -@ {threads} 2>> {log}
             """
 
 
@@ -332,8 +331,7 @@ rule blast_contigs:
         db = os.path.join(BLASTDB, NT_VERSION),
     conda:
         "../../envs/blast.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/blast_contigs_{sample}.log"
     priority: 7
@@ -345,7 +343,7 @@ rule blast_contigs:
           -query {input.contigs} \
           -db {params.db} \
           -outfmt '6 qseqid staxids bitscore pident evalue length qlen slen qcovs qcovhsp sskingdoms scomnames sscinames sblastnames stitle' \
-          -num_threads {resources.cpus} \
+          -num_threads {threads} \
           -evalue 1e-5 \
           -max_target_seqs 50 \
           -max_hsps 5 \
@@ -386,8 +384,7 @@ if NEEDS_FINAL_BLAST:
             db = os.path.join(BLASTDB, NT_VERSION),
         conda:
             "../../envs/blast.yaml"
-        resources:
-            cpus = capped_cpus(24)
+        threads: capped_cpus(24)
         log:
             LOGS + "/blast_final_contigs_{sample}.log"
         priority: 7
@@ -399,7 +396,7 @@ if NEEDS_FINAL_BLAST:
               -query {input.contigs} \
               -db {params.db} \
               -outfmt '6 qseqid staxids bitscore pident evalue length qlen slen qcovs qcovhsp sskingdoms scomnames sscinames sblastnames stitle' \
-              -num_threads {resources.cpus} \
+              -num_threads {threads} \
               -evalue 1e-5 \
               -max_target_seqs 50 \
               -max_hsps 5 \

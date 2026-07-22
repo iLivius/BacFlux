@@ -157,8 +157,7 @@ rule genome_assembly_evaluation:
         quast_dir = directory(QUAST_DIR),
     conda:
         "../../envs/quast.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/assembly_evaluation_{sample}.log"
     priority: 5
@@ -170,7 +169,7 @@ rule genome_assembly_evaluation:
           {input.genomes_dir}/*.fasta \
           -o {output.quast_dir} \
           --no-icarus \
-          -t {resources.cpus} > {log} 2>&1
+          -t {threads} > {log} 2>&1
         """
 
 
@@ -217,8 +216,7 @@ rule completeness_and_contamination:
         checkm_lineage = CHECKM_LINEAGE,
     conda:
         "../../envs/checkm.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/completeness_and_contamination_{sample}.log"
     priority: 5
@@ -230,13 +228,13 @@ rule completeness_and_contamination:
         mkdir -p {output.checkm_dir}
 
         checkm lineage_wf \
-          -t {resources.cpus} \
+          -t {threads} \
           -x fasta {input.genomes_dir} \
           {output.checkm_dir} > {log} 2>&1
 
         checkm qa \
           -o 2 \
-          -t {resources.cpus} \
+          -t {threads} \
           --tab_table \
           -f {output.checkm_stats} {output.checkm_lineage} {output.checkm_dir} >> {log} 2>&1
         """
@@ -269,9 +267,10 @@ if HAS_READS:
     # the hybrid form everywhere. The RESULTS are unchanged — this only makes the
     # rule faster and stops it running out of heap.
     #
-    # Resource note: java_mem is a GIGABYTE figure, not a CPU count. It is passed
-    # straight through to the JVM and is NOT scheduled against, so it sits outside
-    # this project's `--resources cpus=N` convention.
+    # Resource note: java_mem is a GIGABYTE figure, not a CPU count. It stays in
+    # `resources:` rather than `threads:` precisely because it is not a core
+    # count — it is passed straight through to the JVM and is not scheduled
+    # against unless you pass `--resources java_mem=N`.
     #
     # (v1 message: "--- Qualimap: Mapping evaluation. ---"; the nanopore v1 rule
     #  was named map_qc — D5 unifies on map_evaluation.)
@@ -282,8 +281,8 @@ if HAS_READS:
             qualimap_dir = directory(QUALIMAP_DIR),
         conda:
             "../../envs/qualimap.yaml"
+        threads: capped_cpus(24)
         resources:
-            cpus = capped_cpus(24),
             java_mem = min(RAM, 64)
         log:
             LOGS + "/map_evaluation_{sample}.log"
@@ -293,7 +292,7 @@ if HAS_READS:
             qualimap bamqc \
               -bam {input.bam} \
               --java-mem-size={resources.java_mem}G \
-              -nt {resources.cpus} \
+              -nt {threads} \
               -outdir {output.qualimap_dir} \
               -outformat html > {log} 2>&1
             """

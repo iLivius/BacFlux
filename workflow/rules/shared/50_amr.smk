@@ -42,7 +42,8 @@
 # workflow/envs/abricate.yaml (the single shared env copy).
 #
 # Resource convention: these ABRicate rules are single-threaded in v1 and declare
-# no `resources: cpus` — kept as-is (no thread request added).
+# no `threads:` — kept as-is (no thread request added), so Snakemake counts them
+# as 1 core each.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -271,8 +272,7 @@ if HAS_SHORT_READS:
             max_ram = min(RAM, 32),
         conda:
             "../../envs/bbmap.yaml"
-        resources:
-            cpus = capped_cpus(24)
+        threads: capped_cpus(24)
         log:
             LOGS + "/map_amr_{sample}.log"
         priority: 5
@@ -289,7 +289,7 @@ if HAS_SHORT_READS:
               idfilter={params.min_id} \
               idtag \
               -Xmx{params.max_ram}g \
-              threads={resources.cpus} \
+              threads={threads} \
               ambiguous=best \
               secondary=f \
               covstats={output.covstats_temp} > {log} 2>&1

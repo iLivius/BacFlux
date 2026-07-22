@@ -42,9 +42,11 @@
 # conda: paths resolve relative to THIS file (workflow/rules/illumina/), so
 # "../../envs/x.yaml" climbs illumina/ -> rules/ -> workflow/ -> workflow/envs/.
 #
-# Resource convention: cpu-bound rules request `resources: cpus = ...` and use
-# {resources.cpus} in the shell. We do NOT use Snakemake's `threads:` keyword,
-# which is why `--resources cpus=N` is mandatory on the command line.
+# Resource convention: cpu-bound rules declare Snakemake's built-in
+# `threads: capped_cpus(N)` and refer to `{threads}` in the shell. Using the
+# BUILT-IN keyword (rather than a custom `resources: cpus`) is what makes
+# `--cores N` actually enforce the limit, so a plain `snakemake --cores N` is
+# safe on its own and no extra `--resources` flag is needed.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -158,8 +160,7 @@ rule map_phix:
         basename = _READS_DIR + "/{sample}.fastq",
     conda:
         "../../envs/bowtie.yaml"
-    resources:
-        cpus = CPUS
+    threads: CPUS
     log:
         LOGS + "/map_phix_{sample}.log"
     priority: 10
@@ -168,7 +169,7 @@ rule map_phix:
         bowtie2 \
           -x {params.db} \
           -1 {input.r1} -2 {input.r2} \
-          --threads {resources.cpus} \
+          --threads {threads} \
           --un-conc {params.basename} \
           -S {output.sam} \
           --local \
@@ -206,8 +207,7 @@ rule trim_adapters:
         json = FASTP_JSON,
     conda:
         "../../envs/fastp.yaml"
-    resources:
-        cpus = capped_cpus(16)
+    threads: capped_cpus(16)
     log:
         LOGS + "/trim_adapters_{sample}.log"
     priority: 10
@@ -218,7 +218,7 @@ rule trim_adapters:
           --length_required 100 \
           --cut_front \
           --cut_right \
-          --thread {resources.cpus} \
+          --thread {threads} \
           --verbose \
           -i {input.r1} -I {input.r2} \
           -o {output.r1} -O {output.r2} \

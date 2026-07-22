@@ -94,8 +94,7 @@ rule short_read_correction:
         final = FINAL_CONTIGS,
     conda:
         "../../envs/polypolish.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/short_read_correction_{sample}.log"
     priority: 9
@@ -106,8 +105,8 @@ rule short_read_correction:
         cp {input.draft_contigs} {output.draft_copy}
 
         bwa index {output.draft_copy} > {log} 2>&1
-        bwa mem -t {resources.cpus} -a {output.draft_copy} {input.r1} 2>> {log} > {output.sam_1}
-        bwa mem -t {resources.cpus} -a {output.draft_copy} {input.r2} 2>> {log} > {output.sam_2}
+        bwa mem -t {threads} -a {output.draft_copy} {input.r1} 2>> {log} > {output.sam_1}
+        bwa mem -t {threads} -a {output.draft_copy} {input.r2} 2>> {log} > {output.sam_2}
 
         polypolish filter \
           --in1 {output.sam_1} \
@@ -186,8 +185,7 @@ rule compare_hybrid_assemblies:
         use_medaka = "true" if USE_MEDAKA else "false",
     conda:
         "../../envs/snippy.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/compare_hybrid_assemblies_{sample}.log"
     priority: 5
@@ -197,14 +195,14 @@ rule compare_hybrid_assemblies:
           --prefix "01.long-read_assembly" \
           --ref {input.sel_contigs} \
           --ctgs {input.flye_contigs} \
-          --cpus {resources.cpus} \
+          --cpus {threads} \
           --outdir {output.flye_snps_dir} > {log} 2>&1
 
         snippy \
           --prefix "02.replicon_reorientation" \
           --ref {input.sel_contigs} \
           --ctgs {input.dnaapler_contigs} \
-          --cpus {resources.cpus} \
+          --cpus {threads} \
           --outdir {output.dnaapler_snps_dir} >> {log} 2>&1
 
         if [[ "{params.use_medaka}" == "true" ]]; then
@@ -212,7 +210,7 @@ rule compare_hybrid_assemblies:
             --prefix "03.long-read_correction" \
             --ref {input.sel_contigs} \
             --ctgs {input.medaka_contigs} \
-            --cpus {resources.cpus} \
+            --cpus {threads} \
             --outdir {output.medaka_snps_dir} >> {log} 2>&1
         else
           mkdir -p {output.medaka_snps_dir}
@@ -223,7 +221,7 @@ rule compare_hybrid_assemblies:
           --prefix "04.short-read_correction" \
           --ref {input.sel_contigs} \
           --ctgs {input.polished_contigs} \
-          --cpus {resources.cpus} \
+          --cpus {threads} \
           --outdir {output.polypolish_snps_dir} >> {log} 2>&1
 
         echo "01. Long-read assembly" > {output.snps_summary}

@@ -58,9 +58,8 @@ rule raw_long_read_qc:
         nanoplot_raw_dir = directory(NANOPLOT_RAW_DIR),
     conda:
         "../../envs/nanoplot.yaml"
-    resources:
         # NanoPlot is plotting, not aligning; it stops scaling early.
-        cpus = capped_cpus(8)
+    threads: capped_cpus(8)
     log:
         LOGS + "/raw_long_read_qc_{sample}.log"
     priority: 10
@@ -68,7 +67,7 @@ rule raw_long_read_qc:
         """
         NanoPlot \
           --fastq {input.fastq} \
-          --threads {resources.cpus} \
+          --threads {threads} \
           --loglength \
           --prefix "{wildcards.sample}_" \
           --outdir {output.nanoplot_raw_dir} > {log} 2>&1
@@ -137,8 +136,7 @@ rule filtered_long_read_qc:
         nanoplot_filt_dir = directory(NANOPLOT_FILT_DIR),
     conda:
         "../../envs/nanoplot.yaml"
-    resources:
-        cpus = capped_cpus(8)
+    threads: capped_cpus(8)
     log:
         LOGS + "/filtered_long_read_qc_{sample}.log"
     priority: 10
@@ -146,7 +144,7 @@ rule filtered_long_read_qc:
         """
         NanoPlot \
           --fastq {input.fastq} \
-          --threads {resources.cpus} \
+          --threads {threads} \
           --loglength \
           --prefix "{wildcards.sample}_" \
           --outdir {output.nanoplot_filt_dir} > {log} 2>&1

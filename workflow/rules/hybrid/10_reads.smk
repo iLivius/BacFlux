@@ -134,8 +134,7 @@ rule map_phix:
         basename = _READS_DIR + "/{sample}.fastq",
     conda:
         "../../envs/bowtie.yaml"
-    resources:
-        cpus = CPUS
+    threads: CPUS
     log:
         LOGS + "/map_phix_{sample}.log"
     priority: 10
@@ -144,7 +143,7 @@ rule map_phix:
         bowtie2 \
           -x {params.db} \
           -1 {input.r1} -2 {input.r2} \
-          --threads {resources.cpus} \
+          --threads {threads} \
           --un-conc {params.basename} \
           -S {output.sam} \
           --local \
@@ -178,8 +177,7 @@ rule trim_adapters:
         json = FASTP_JSON,
     conda:
         "../../envs/fastp.yaml"
-    resources:
-        cpus = capped_cpus(16)
+    threads: capped_cpus(16)
     log:
         LOGS + "/trim_adapters_{sample}.log"
     priority: 10
@@ -190,7 +188,7 @@ rule trim_adapters:
           --length_required 100 \
           --cut_front \
           --cut_right \
-          --thread {resources.cpus} \
+          --thread {threads} \
           --verbose \
           -i {input.r1} -I {input.r2} \
           -o {output.r1} -O {output.r2} \
@@ -222,8 +220,7 @@ rule raw_long_read_qc:
         nanoplot_raw_dir = directory(NANOPLOT_RAW_DIR),
     conda:
         "../../envs/nanoplot.yaml"
-    resources:
-        cpus = capped_cpus(8)
+    threads: capped_cpus(8)
     log:
         LOGS + "/raw_long_read_qc_{sample}.log"
     priority: 10
@@ -231,7 +228,7 @@ rule raw_long_read_qc:
         """
         NanoPlot \
           --fastq {input.fastq} \
-          --threads {resources.cpus} \
+          --threads {threads} \
           --loglength \
           --prefix "{wildcards.sample}_" \
           --outdir {output.nanoplot_raw_dir} > {log} 2>&1

@@ -124,8 +124,7 @@ rule map_sel_contigs:
         db = _BT2_SEL_PREFIX,
     conda:
         "../../envs/bowtie.yaml"
-    resources:
-        cpus = CPUS
+    threads: CPUS
     log:
         LOGS + "/map_sel_contigs_{sample}.log"
     priority: 6
@@ -135,7 +134,7 @@ rule map_sel_contigs:
           -x {params.db} \
           -1 {input.r1} \
           -2 {input.r2} \
-          -p {resources.cpus} \
+          -p {threads} \
           -t \
           --no-unal \
           -S {output.sam} > {log} 2>&1
@@ -224,8 +223,7 @@ rule filtered_long_read_qc:
         nanoplot_filt_dir = directory(NANOPLOT_FILT_DIR),
     conda:
         "../../envs/nanoplot.yaml"
-    resources:
-        cpus = capped_cpus(8)
+    threads: capped_cpus(8)
     log:
         LOGS + "/filtered_long_read_qc_{sample}.log"
     priority: 6
@@ -233,7 +231,7 @@ rule filtered_long_read_qc:
         """
         NanoPlot \
           --fastq {input.fastq} \
-          --threads {resources.cpus} \
+          --threads {threads} \
           --loglength \
           --prefix "{wildcards.sample}_" \
           --outdir {output.nanoplot_filt_dir} > {log} 2>&1

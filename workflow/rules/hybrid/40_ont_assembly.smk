@@ -78,8 +78,7 @@ rule ont_assembly:
         iterations = 5,
     conda:
         "../../envs/flye.yaml"
-    resources:
-        cpus = CPUS
+    threads: CPUS
     log:
         LOGS + "/ont_assembly_{sample}.log"
     priority: 10
@@ -89,7 +88,7 @@ rule ont_assembly:
           {params.input_mode} \
           {input.filt_long} \
           --out-dir {output.flye_dir} \
-          --threads {resources.cpus} \
+          --threads {threads} \
           --iterations {params.iterations} > {log} 2>&1
 
         # Contigs Flye did NOT call circular (column "circ." != "Y").
@@ -137,8 +136,7 @@ rule fix_start:
         seed = 42,
     conda:
         "../../envs/dnaapler.yaml"
-    resources:
-        cpus = capped_cpus(24)
+    threads: capped_cpus(24)
     log:
         LOGS + "/fix_start_{sample}.log"
     priority: 9
@@ -149,7 +147,7 @@ rule fix_start:
           -p {wildcards.sample} \
           -e {params.evalue} \
           --seed_value {params.seed} \
-          -t {resources.cpus} \
+          -t {threads} \
           -o {output.dnaapler_dir} \
           --ignore {input.ignore_list} \
           --force > {log} 2>&1
@@ -200,8 +198,7 @@ if USE_MEDAKA:
             model = MEDAKA_MODEL if MEDAKA_MODEL is not None else "",
         conda:
             "../../envs/medaka.yaml"
-        resources:
-            cpus = capped_cpus(8)
+        threads: capped_cpus(8)
         log:
             LOGS + "/long_read_consensus_{sample}.log"
         priority: 9
@@ -247,7 +244,7 @@ if USE_MEDAKA:
               medaka_consensus \
                 -i {input.reads} \
                 -d {input.contigs} \
-                -t {resources.cpus} \
+                -t {threads} \
                 -m "$model" \
                 -o {output.consensus_dir} > {log} 2>&1 || {{
                   cat {log}
@@ -275,7 +272,7 @@ if USE_MEDAKA:
               medaka_consensus \
                 -i {input.reads} \
                 -d {input.contigs} \
-                -t {resources.cpus} \
+                -t {threads} \
                 -m "$resolved_model" \
                 -o {output.consensus_dir} >> {log} 2>&1
 

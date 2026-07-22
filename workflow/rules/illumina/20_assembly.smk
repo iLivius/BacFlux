@@ -65,22 +65,22 @@ rule illumina_assembly:
         contigs = SPADES_CONTIGS,
     conda:
         "../../envs/spades.yaml"
+    threads: CPUS
     resources:
         # Uncapped as in v1: SPAdes is the single most expensive step in this mode
         # and scales with both cores and RAM. RAM is a hard ceiling in GB (-m).
-        cpus = CPUS,
         ram = RAM
     log:
         LOGS + "/illumina_assembly_{sample}.log"
     priority: 10
     shell:
         """
-        OMP_NUM_THREADS={resources.cpus} \
+        OMP_NUM_THREADS={threads} \
         spades.py -k 21,33,55,77,99,127 --isolate \
           --pe1-1 {input.r1} \
           --pe1-2 {input.r2} \
           -o {output.dir} \
-          -t {resources.cpus} \
+          -t {threads} \
           -m {resources.ram} > {log} 2>&1
         """
 
