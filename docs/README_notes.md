@@ -255,59 +255,72 @@ pin**, not a workaround — and it was validated by actually testing the current
 
 ## 7. `medaka_model` and `flye_input_mode` are COUPLED in auto mode — document this
 
-**Status: real trap, found while setting up the v2 nanopore validation (2026-07-22).**
+**Status: real trap, confirmed against the BacFluxL baseline (2026-07-22).**
 
 When `flye_input_mode: auto` (the default), the Flye read mode is chosen from the Medaka
-model name: if an explicit model containing the word **"fast"** is set, Flye switches to
-`--nano-raw`; otherwise it uses `--nano-hq`. The logic is in `00_common.smk` (~line 949) and
-is inherited unchanged from v1 BacFluxL, so this is documentation-only, not a code change.
+model name: an explicit model whose name contains **"fast"** switches Flye to `--nano-raw`;
+anything else gives `--nano-hq`. The logic is in `00_common.smk` (~line 949) and is inherited
+unchanged from v1, so this is documentation-only, not a code change.
 
-The consequence users will not expect: **setting `medaka_model` explicitly can silently change
-the ASSEMBLER**, not just the polisher. Writing what looks like a harmless pin —
+The consequence users will not expect: **setting `medaka_model` changes the ASSEMBLER, not
+just the polisher.** The published BacFluxL baseline is itself an example — its
+`config_custom.yaml` has
 
 ```yaml
-medaka_model: r941_min_fast_g507     # <- contains "fast"
 flye_input_mode: auto
+medaka_model: r941_min_fast_g507     # <- contains "fast"
 ```
 
-— makes Flye run `--nano-raw` instead of `--nano-hq`. And because `auto` on a modern run
-usually *resolves to that very same model anyway*, the user gets a different assembly from a
-setting they believed was a no-op.
-
-This nearly invalidated the nanopore validation: the config pinned
-`medaka_model: r941_min_fast_g507`, while the BacFluxL baseline it was being compared against
-used `medaka_model: auto` and therefore assembled with `--nano-hq`. Same model in the end, but
-a different assembler mode - the comparison would have shown a large bogus "regression".
+and its `flye.log` confirms it therefore assembled with `--nano-raw`, not `--nano-hq`.
 
 ### What the README needs to say
 - State the coupling explicitly under `parameters.nanopore` / `parameters.hybrid`.
-- Say that to pin the Medaka model WITHOUT affecting the assembler, set `flye_input_mode`
-  explicitly (`nano-hq` or `nano-raw`) rather than leaving it on `auto`.
-- Note that `auto` Medaka + `auto` Flye is the reproducible default and what the published
-  baselines used.
+- To pin the Medaka model WITHOUT touching the assembler, set `flye_input_mode` explicitly
+  (`nano-hq` or `nano-raw`) instead of leaving it on `auto`.
+- Note that the published long-read baselines were produced with `--nano-raw` via this route.
 
 ---
 
-## 8. Long-read modes are NOT bit-reproducible — set the expectation
+## 8. `medaka_model: auto` only works if the FASTQ headers carry a basecaller tag
 
-**Status: observed in the v2 nanopore validation (2026-07-22).**
+**Status: confirmed empirically (2026-07-22).**
 
-Illumina mode reproduces v1.3.1 **byte for byte** (both the draft and the decontaminated
-assembly matched by md5). Long-read mode does not, and users should not expect it to.
+`auto` runs `medaka tools resolve_model --auto_model consensus_bacteria <reads>`, which reads
+the basecaller model out of the FASTQ headers. If the headers do not contain exactly one
+model reference, it fails with:
 
-Re-running the same ONT reads through the same pipeline gave a single circular contig of
-**5,164,206 bp** against the BacFluxL baseline's **5,164,207 bp** - one base in 5.16 Mb, and
-1x coverage apart. Everything controllable was verified identical first:
+```
+ValueError: Input file did not contain precisely 1 basecaller model reference.
+```
 
-- input ONT FASTQ: same file
-- filtlong output: **byte-identical** (md5 `06f5865d…`), so Flye received identical reads
-- Flye version: 2.9.6-b1802 both runs
-- command line: same flags, same order, `--nano-hq … --threads 24 --iterations 5`
-
-With every input identical, the difference arises inside Flye itself (its polishing iterations
-process alignments in parallel, and thread scheduling can break ties differently).
+The CDRTa11 ONT test data has **no basecaller tag at all** — verified on both the raw FASTQ
+and the filtlong output, so this is a property of the data, not of which file BacFlux feeds
+in. `auto` simply cannot work for such a dataset, in v1 or v2. That is exactly why the
+BacFluxL baseline pins the model explicitly.
 
 ### What the README needs to say
-A short "reproducibility" note: short-read results are bit-reproducible; long-read assemblies
-may differ by a handful of bases between runs even with identical inputs and settings. Compare
-long-read outputs by contig count, length, circularity and gene counts - not by checksum.
+State that `auto` requires ONT reads basecalled by a version that stamps the model into the
+headers (Guppy/Dorado do; older or re-headered/public data often does not), and that the
+remedy is to name the model explicitly — while remembering item 7 above, since an explicit
+"fast" model also flips the assembler.
+
+---
+
+## 9. Comparing against a published baseline: check WHICH config it used
+
+**Status: process lesson, learned the hard way (2026-07-22).**
+
+The BacFluxL / BacFluxL+ baselines in `*_test/output_dir` were produced from
+`config/config_custom.yaml`, **not** `config/config.yaml`. The two differ in ways that change
+results:
+
+| | `config.yaml` | `config_custom.yaml` (what the baselines used) |
+|---|---|---|
+| `threads` | 24 | **56** |
+| `medaka_model` | `auto` | **`r941_min_fast_g507`** (and so, via item 7, `--nano-raw`) |
+
+A v2 validation set up from `config.yaml` therefore ran `--nano-hq` at 24 threads against a
+baseline built with `--nano-raw` at 56 threads, and the resulting 1 bp assembly difference
+looked like tool non-determinism when it was simply a different command. Always read the
+baseline's own `flye.log` / `params.json` for the command that actually ran, rather than
+inferring it from the repo default config.
