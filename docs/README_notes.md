@@ -9,6 +9,25 @@ treated as the final wording. Delete each entry once it's actually folded into t
 
 ## 1. Snakemake launch flags: `--cores` / `--resources cpus=N` / `--jobs` — urgent
 
+> **STATUS UPDATE 2026-07-22 — the underlying cause is now SCHEDULED to be fixed.**
+> The agreed fix is to convert every rule from the custom `resources: cpus = capped_cpus(N)`
+> to Snakemake's built-in `threads: capped_cpus(N)` (and `{resources.cpus}` -> `{threads}` in
+> the shells). That is mechanical and changes NO thread numbers — `capped_cpus(N)` returns the
+> same value either way — it only makes them auto-enforced by `--cores`, so `--resources` is no
+> longer needed and cannot be forgotten. Scheduled immediately AFTER the v2 validation runs
+> complete (converting mid-run would perturb an in-flight multi-hour job).
+>
+> **Once that lands, the README should document the SIMPLE form** — `--cores N` only, still
+> never `--jobs` — and the `--resources cpus=N` workaround below becomes historical context
+> rather than instruction. Do not write the workaround into the README as the recommended
+> command if the conversion has already happened; check the rules first.
+>
+> Verified while this was still outstanding: `--resources cpus=N` is a GLOBAL BUDGET (ceiling on
+> the sum of concurrently running jobs), NOT a per-rule default — per-rule caps are preserved
+> (e.g. `virsorter2_db` keeps 4 while others take 8 under the same flag). So the interim
+> workaround is correct, just fragile because it is optional.
+
+
 **Status: the CURRENT README's documented launch commands are actively wrong, not just
 under-explained.**
 
