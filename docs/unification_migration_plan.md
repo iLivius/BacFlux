@@ -552,6 +552,28 @@ Two defects found and fixed by this run:
 Not covered by this run, still to do: nanopore and hybrid validations; the `checkv_db`
 DOWNLOAD rule (the database was staged by hand because portal.nersc.gov was unreachable).
 
+**Stage 4.6 — Real end-to-end validation, nanopore mode. ✓ PASSED 2026-07-22.**
+Run at `/media/data/antonielli_dir/BacFlux_v2_validation/nanopore/` (see its `RUN_NOTES.md`).
+34/34 steps, zero errors, launched with `--cores 56` and NO `--resources` flag — so this run
+is also the end-to-end gate for the `cpus`→`threads:` conversion (`bdb2a57`).
+
+- **The entire genome chain is byte-identical to the BacFluxL baseline**: Flye assembly,
+  dnaapler reorientation, decontamination, Medaka consensus, delivered genome.
+- Downstream identical: eggNOG 4564, antiSMASH 7 regions, dbCAN 315, GTDB-Tk *Arthrobacter*,
+  VirSorter2 0 calls, CheckV 0 rows.
+- **Bakta differs by exactly one feature (4999 → 4998), and it is intended.** v2 passes
+  `--replicons` (`contig_1 - chromosome circular`); v1 did not. The diff is one alternative
+  start-codon call (`nucS` extended 102 bp 5′) plus one 150 bp CDS, not an origin artefact —
+  declaring the replicon circular makes Bakta run Pyrodigal in closed mode, whose globally
+  trained model shifts marginal starts anywhere in the genome. 0.02%, and the better call.
+
+The first attempt failed and taught the more valuable lesson: the BacFluxL baseline was
+produced from `config_custom.yaml` (`threads: 56`, explicit `medaka_model`), not
+`config.yaml`. Validating against the wrong config produced a 1 bp assembly difference that
+briefly looked like Flye non-determinism. It was not — see `README_notes.md` items 7–9, which
+also record that `medaka_model` is coupled to the Flye read mode, and that `auto` needs a
+basecaller tag this dataset does not have.
+
 **Stage 4 — Front ends, one mode at a time, each a gate. [original scoping]**
 Do them in increasing complexity: `illumina` → `contigs` → `nanopore` → `hybrid`.
 After each, run the full mode end-to-end on the Stage-0 isolate. **Gate per mode:** output
