@@ -574,6 +574,33 @@ briefly looked like Flye non-determinism. It was not — see `README_notes.md` i
 also record that `medaka_model` is coupled to the Flye read mode, and that `auto` needs a
 basecaller tag this dataset does not have.
 
+**Stage 4.7 — Real end-to-end validation, hybrid mode. ✓ PASSED 2026-07-22.**
+Run at `/media/data/antonielli_dir/BacFlux_v2_validation/hybrid/` (see its `RUN_NOTES.md`).
+52/52 steps, zero errors, first attempt, `--cores 12` with no `--resources` flag.
+
+- **Genome chain byte-identical to BacFluxL+**: SPAdes draft, Flye ONT assembly, Medaka
+  consensus, and the delivered genome after Polypolish/Snippy. The SPAdes draft also matches
+  the illumina-mode run's draft.
+- Downstream identical: antiSMASH 7 regions, dbCAN 315, GTDB-Tk *Arthrobacter*, VirSorter2 1
+  call, CheckV 1 row. Bakta +1 feature (4773→4774) with eggNOG following it (+1) — the same
+  `--replicons`/Pyrodigal-closed-mode effect as nanopore, in the opposite direction.
+- **Polypolish leaves no tag in the delivered FASTA headers** (plain `>contig_1`, identical to
+  the baseline) — closes the concern raised during Stage 4.
+- **The Stage-3 hybrid plasmid ID-mismatch fix is structurally confirmed**: the extra
+  `_final_blastout` exists and uses the `contig_1` namespace Platon uses. Caveat — this strain
+  carries no plasmid, so only the namespace alignment is proven, not the positive path.
+
+**Validation summary: all three read-based modes pass.** Illumina, nanopore and hybrid each
+reproduce their v1 baseline byte-for-byte through the entire genome chain, with the only
+downstream deltas being the intended `--replicons` effect. `contigs` mode has no v1 baseline
+run to compare against and remains unvalidated end-to-end.
+
+**METHOD WARNING for whoever does the next comparison.** Two false readings came from sloppy
+path globs in one evening: ABRicate compared against a non-existent v1 path (both sides "0
+hits, same" — a PASS manufactured by a missing file), and antiSMASH read as 3 vs 7 because
+`ls $(find ... -name antismash)/...` matched more than one directory. Assert the reference
+file exists before comparing, and never build a path from an unquoted `find`.
+
 **Stage 4 — Front ends, one mode at a time, each a gate. [original scoping]**
 Do them in increasing complexity: `illumina` → `contigs` → `nanopore` → `hybrid`.
 After each, run the full mode end-to-end on the Stage-0 isolate. **Gate per mode:** output
