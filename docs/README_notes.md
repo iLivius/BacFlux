@@ -250,3 +250,64 @@ pin**, not a workaround — and it was validated by actually testing the current
   the high-confidence calls are unaffected.
 - Migration to 5.2.x is a deliberate future task (resolve the CGC issue, switch to
   `easy_substrate`, re-baseline counts, update parsing), not a config-URL swap.
+
+---
+
+## 7. `medaka_model` and `flye_input_mode` are COUPLED in auto mode — document this
+
+**Status: real trap, found while setting up the v2 nanopore validation (2026-07-22).**
+
+When `flye_input_mode: auto` (the default), the Flye read mode is chosen from the Medaka
+model name: if an explicit model containing the word **"fast"** is set, Flye switches to
+`--nano-raw`; otherwise it uses `--nano-hq`. The logic is in `00_common.smk` (~line 949) and
+is inherited unchanged from v1 BacFluxL, so this is documentation-only, not a code change.
+
+The consequence users will not expect: **setting `medaka_model` explicitly can silently change
+the ASSEMBLER**, not just the polisher. Writing what looks like a harmless pin —
+
+```yaml
+medaka_model: r941_min_fast_g507     # <- contains "fast"
+flye_input_mode: auto
+```
+
+— makes Flye run `--nano-raw` instead of `--nano-hq`. And because `auto` on a modern run
+usually *resolves to that very same model anyway*, the user gets a different assembly from a
+setting they believed was a no-op.
+
+This nearly invalidated the nanopore validation: the config pinned
+`medaka_model: r941_min_fast_g507`, while the BacFluxL baseline it was being compared against
+used `medaka_model: auto` and therefore assembled with `--nano-hq`. Same model in the end, but
+a different assembler mode - the comparison would have shown a large bogus "regression".
+
+### What the README needs to say
+- State the coupling explicitly under `parameters.nanopore` / `parameters.hybrid`.
+- Say that to pin the Medaka model WITHOUT affecting the assembler, set `flye_input_mode`
+  explicitly (`nano-hq` or `nano-raw`) rather than leaving it on `auto`.
+- Note that `auto` Medaka + `auto` Flye is the reproducible default and what the published
+  baselines used.
+
+---
+
+## 8. Long-read modes are NOT bit-reproducible — set the expectation
+
+**Status: observed in the v2 nanopore validation (2026-07-22).**
+
+Illumina mode reproduces v1.3.1 **byte for byte** (both the draft and the decontaminated
+assembly matched by md5). Long-read mode does not, and users should not expect it to.
+
+Re-running the same ONT reads through the same pipeline gave a single circular contig of
+**5,164,206 bp** against the BacFluxL baseline's **5,164,207 bp** - one base in 5.16 Mb, and
+1x coverage apart. Everything controllable was verified identical first:
+
+- input ONT FASTQ: same file
+- filtlong output: **byte-identical** (md5 `06f5865d…`), so Flye received identical reads
+- Flye version: 2.9.6-b1802 both runs
+- command line: same flags, same order, `--nano-hq … --threads 24 --iterations 5`
+
+With every input identical, the difference arises inside Flye itself (its polishing iterations
+process alignments in parallel, and thread scheduling can break ties differently).
+
+### What the README needs to say
+A short "reproducibility" note: short-read results are bit-reproducible; long-read assemblies
+may differ by a handful of bases between runs even with identical inputs and settings. Compare
+long-read outputs by contig count, length, circularity and gene counts - not by checksum.
