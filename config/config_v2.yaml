@@ -1,0 +1,93 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# BacFlux v2.0.0 — unified configuration
+#
+# ONE config drives all four input modes. Set `mode` first; then fill in only
+# the blocks that mode reads (each key below notes which modes use it). Keys a
+# mode does not read are harmless if left at their defaults.
+#
+# Quick start:
+#   1. mode:              which pipeline to run
+#   2. input.*_dir:       where the raw inputs live (per technology)
+#   3. directories.*:     where the reference databases live + the output dir
+#   4. links.*:           download URLs for the auto-fetched databases
+#   5. resources / parameters: tune threads, RAM, and per-mode options
+#
+# directories.output_dir is resolved to an absolute path automatically, so it
+# may be given as relative (e.g. "results/run1") and will still land where you
+# expect. Other paths (input.*_dir, directories.*_db, links.*_file) are used
+# as-is: give them as absolute paths unless you're sure what they're relative
+# to (the workflow's launch directory, not output_dir).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# REQUIRED. Which pipeline to run. Selects rules/<mode>/*.smk and the matching
+# sample-discovery logic.
+mode: illumina                 # Options: illumina | nanopore | hybrid | contigs
+
+# Raw input directories, split by technology. A mode reads only the dir(s) it
+# needs; the others may stay empty.
+input:
+  illumina_dir: ""             # required: illumina, hybrid   — expects {sample}_R1.<ext> + {sample}_R2.<ext>
+  nanopore_dir: ""             # required: nanopore, hybrid   — expects {sample}_ont.<ext>
+  contigs_dir:  ""             # required: contigs            — expects {sample}.<fasta|fa|fna>
+                               # (<ext> = fastq | fq | fastq.gz | fq.gz)
+
+# Reference databases (user-downloaded) and the output directory. Required for
+# every mode.
+directories:
+  output_dir: ""               # all results are written here (created if absent)
+  bakta_db:   ""               # Bakta database (also holds amrfinderplus-db/)
+  blast_db:   ""               # NCBI nucleotide DB dir; the parameters.nt_version subfolder is used
+  eggnog_db:  ""               # eggNOG-mapper database
+  gtdbtk_db:  ""               # GTDB-Tk release database
+  platon_db:  ""               # Platon plasmid database
+
+# Download URLs for databases the workflow fetches itself.
+links:
+  phix_link:   ""              # read by illumina, hybrid only (PhiX spike-in removal)
+  dbcan_link:  "https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz"  # REQUIRED, all modes — must be a .tar.gz (the .sha256 checksum URL and the extracted-DB folder name are derived from it)
+  card_link:   ""              # read by illumina, hybrid only (CARD read-mapping AMR leg)
+  checkv_link: ""              # optional, all modes — empty => CheckV downloads its database automatically
+
+# Compute limits.
+resources:
+  threads: 16                  # all modes  (default 16 if omitted)
+  ram_gb:  64                  # read by illumina, hybrid (SPAdes / JVM tools); default 64 if omitted
+
+# Analysis parameters.
+parameters:
+  nt_version: core_nt          # all modes — which NCBI blast_db subfolder to screen against. Options: core_nt | nt_prok
+
+  # Decontamination policy — SHARED across all four modes. After BlobTools
+  # assigns each contig a genus, the selector keeps/discards contigs per this
+  # policy and writes an audit TSV of every decision.
+  decontamination:
+    mode: auto                 # Options: auto | include | exclude | off
+    discard_no_hit: true       # discard contigs with no taxonomic hit
+    include_genera:            # null | "GenusA;GenusB" | [GenusA, GenusB]   (inline genus list to KEEP)
+    include_genera_by_sample:  # null | PATH to a 2-column TSV (sample, genus)  ← a FILE PATH, not a mapping
+    exclude_genera:            # null | inline genus list to DISCARD
+    exclude_genera_file:       # null | PATH to a one-genus-per-line file        ← a FILE PATH
+    sample_overrides:          # null | PATH to a per-sample override TSV        ← a FILE PATH
+
+  # Long-read assembly / polishing options, namespaced per mode.
+  nanopore:                    # read only when mode == nanopore
+    flye_input_mode: auto      # Options: auto | nano-raw | nano-hq
+    medaka_model: auto         # auto/TRUE/empty = infer from FASTQ headers; FALSE = skip Medaka; else an explicit model name
+  hybrid:                      # read only when mode == hybrid
+    flye_input_mode: auto      # Options: auto | nano-raw | nano-hq
+    medaka_model: auto         # auto/TRUE/empty = infer; FALSE = skip; else an explicit model name
+
+# Phage / virus caller (decision D8). geNomad is the default; VirSorter2 stays
+# selectable. Read by the shared phage module (added in a later stage); reserved
+# here so the schema is complete. CheckV runs downstream of whichever caller.
+# Virus/prophage caller. Default VirSorter2 (permissive licence, commercial use OK).
+# geNomad is OPT-IN: it is licensed ACADEMIC / NON-COMMERCIAL-USE-ONLY (Berkeley Lab,
+# "accredited academic institution" only). Selecting it also turns on the Platon+
+# geNomad plasmid concordance. Only set `genomad` if you are entitled to use it.
+phage:
+  caller: virsorter2           # Options: virsorter2 (default) | genomad (opt-in, non-commercial licence)
+
+# Optional mobilome / AMR-mobility module (see docs/mobilome_module_SPEC.md).
+# Default OFF; when true, adds the 08.mobilome/ stage.
+mobilome:
+  run: false

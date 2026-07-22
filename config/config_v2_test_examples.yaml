@@ -1,0 +1,145 @@
+# =============================================================================
+# BacFlux v2.0.0 — Stage-1 dry-run test configs (one per mode)
+#
+# Four MINIMAL, INDEPENDENT configs. Use them ONE AT A TIME: copy a single block
+# into config/config.yaml, then run `snakemake -n`. They are NOT one YAML file —
+# each block is a complete standalone config for its mode.
+#
+# ALL PATHS ARE PLACEHOLDERS — replace before running. Three rules the dry run
+# actually enforces:
+#   * Use ABSOLUTE paths. 00_common sets `workdir: <output_dir>` at parse time,
+#     which changes the working directory, so a RELATIVE input path would be
+#     resolved under the output dir instead of your launch dir.
+#   * directories.output_dir must be a CREATABLE, WRITABLE absolute path. The
+#     `workdir:` directive creates it and chdir's into it at parse time — even
+#     for `snakemake -n` — so a non-writable placeholder (e.g. /abs/...) makes
+#     the dry run die with PermissionError before it can parse.
+#   * input.<mode>_dir must be an EXISTING directory holding >=1 correctly-named
+#     sample file — discovery (as in v1) exits on an empty/absent input dir.
+#   For a pure parse check, stub real dirs first, e.g.:
+#         mkdir -p /tmp/bf/out/illumina
+#         mkdir -p /tmp/bf/in/illumina && touch /tmp/bf/in/illumina/S1_R1.fastq.gz /tmp/bf/in/illumina/S1_R2.fastq.gz
+#         mkdir -p /tmp/bf/in/nanopore && touch /tmp/bf/in/nanopore/S1_ont.fastq.gz
+#         mkdir -p /tmp/bf/in/contigs  && touch /tmp/bf/in/contigs/S1.fasta
+#   then point output_dir / input.<mode>_dir at those real dirs.
+#   The database dirs (bakta_db, blast_db, …) are NOT checked at parse time, so
+#   placeholder paths there are fine for a dry run.
+# =============================================================================
+
+
+# ====================== BEGIN CONFIG: mode = illumina ========================
+# Illumina paired-end short reads. Copy this block to config/config.yaml.
+mode: illumina
+input:
+  illumina_dir: /abs/placeholder/in/illumina   # expects {sample}_R1.<ext> + {sample}_R2.<ext>
+directories:
+  output_dir: /abs/placeholder/out/illumina
+  bakta_db: /abs/placeholder/db/bakta
+  blast_db: /abs/placeholder/db/NCBI_core_nt
+  eggnog_db: /abs/placeholder/db/eggnog
+  gtdbtk_db: /abs/placeholder/db/gtdbtk
+  platon_db: /abs/placeholder/db/platon
+links:
+  phix_link: ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
+  dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
+  card_link: https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2
+  checkv_link: https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz
+resources:
+  threads: 8
+  ram_gb: 32
+parameters:
+  nt_version: core_nt
+  decontamination:
+    mode: auto
+    discard_no_hit: true
+# ======================= END CONFIG: mode = illumina =========================
+
+
+# ====================== BEGIN CONFIG: mode = nanopore ========================
+# Oxford Nanopore long reads. Copy this block to config/config.yaml.
+# (No phix_link / card_link / ram_gb: nanopore has no short-read leg and never
+#  reads them — 00_common supplies safe defaults for the omitted keys.)
+mode: nanopore
+input:
+  nanopore_dir: /abs/placeholder/in/nanopore   # expects {sample}_ont.<ext>
+directories:
+  output_dir: /abs/placeholder/out/nanopore
+  bakta_db: /abs/placeholder/db/bakta
+  blast_db: /abs/placeholder/db/NCBI_core_nt
+  eggnog_db: /abs/placeholder/db/eggnog
+  gtdbtk_db: /abs/placeholder/db/gtdbtk
+  platon_db: /abs/placeholder/db/platon
+links:
+  dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
+  checkv_link: https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz
+resources:
+  threads: 8
+parameters:
+  nt_version: core_nt
+  decontamination:
+    mode: auto
+    discard_no_hit: true
+  nanopore:
+    flye_input_mode: auto     # auto | nano-raw | nano-hq
+    medaka_model: auto        # auto/TRUE/empty = infer; FALSE = skip; else explicit model
+# ======================= END CONFIG: mode = nanopore =========================
+
+
+# ======================= BEGIN CONFIG: mode = hybrid =========================
+# Illumina + ONT (ONT-first assembly). Copy this block to config/config.yaml.
+# Hybrid reads TWO input dirs; point both keys at the same dir to reproduce the
+# v1 single-directory layout.
+mode: hybrid
+input:
+  illumina_dir: /abs/placeholder/in/illumina   # expects {sample}_R1.<ext> + {sample}_R2.<ext>
+  nanopore_dir: /abs/placeholder/in/nanopore   # expects {sample}_ont.<ext>
+directories:
+  output_dir: /abs/placeholder/out/hybrid
+  bakta_db: /abs/placeholder/db/bakta
+  blast_db: /abs/placeholder/db/NCBI_core_nt
+  eggnog_db: /abs/placeholder/db/eggnog
+  gtdbtk_db: /abs/placeholder/db/gtdbtk
+  platon_db: /abs/placeholder/db/platon
+links:
+  phix_link: ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
+  dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
+  card_link: https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2
+  checkv_link: https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz
+resources:
+  threads: 8
+  ram_gb: 32
+parameters:
+  nt_version: core_nt
+  decontamination:
+    mode: auto
+    discard_no_hit: true
+  hybrid:
+    flye_input_mode: auto     # auto | nano-raw | nano-hq
+    medaka_model: auto        # auto/TRUE/empty = infer; FALSE = skip; else explicit model
+# ======================== END CONFIG: mode = hybrid ==========================
+
+
+# ======================= BEGIN CONFIG: mode = contigs ========================
+# Pre-assembled genomes. Copy this block to config/config.yaml.
+# (No read-based keys at all; contigs mode starts from FASTA.)
+mode: contigs
+input:
+  contigs_dir: /abs/placeholder/in/contigs     # expects {sample}.<fasta|fa|fna>
+directories:
+  output_dir: /abs/placeholder/out/contigs
+  bakta_db: /abs/placeholder/db/bakta
+  blast_db: /abs/placeholder/db/NCBI_core_nt
+  eggnog_db: /abs/placeholder/db/eggnog
+  gtdbtk_db: /abs/placeholder/db/gtdbtk
+  platon_db: /abs/placeholder/db/platon
+links:
+  dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
+  checkv_link: https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz
+resources:
+  threads: 8
+parameters:
+  nt_version: core_nt
+  decontamination:
+    mode: auto
+    discard_no_hit: true
+# ======================== END CONFIG: mode = contigs =========================
