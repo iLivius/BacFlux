@@ -147,11 +147,28 @@ PLATONDB = config["directories"]["platon_db"]
 # already hold on disk removes that dependency completely.
 #
 # When set, it takes PRECEDENCE over links.checkv_link and over CheckV's own
-# downloader: nothing is fetched and the `checkv_db` rule is not even defined
-# (see 70_phage.smk). That last part matters — the rule's output is a
-# directory(), and Snakemake WIPES a directory output before re-running its rule,
-# so a rule pointed at your shared database could delete it. Not defining the rule
-# is what makes this safe, not merely convenient.
+# downloader: nothing is fetched.
+#
+# BacFlux does NOT hand this path straight to CheckV, for two reasons found the
+# hard way on a real shared database:
+#
+#   1. CheckV needs a DIAMOND index (genome_db/checkv_reps.dmnd) that the official
+#      archive does not ship — it is built locally after unpacking. So whatever
+#      index sits in a shared database was built by whichever DIAMOND that site
+#      happened to have. DIAMOND's database format is versioned, and 2.0.4 cannot
+#      run blastp against a format-1 index built by an older build: CheckV dies at
+#      "[3/8] Running DIAMOND blastp search... DIAMOND task failed", AFTER the
+#      contamination stage has already succeeded, which makes it look like a
+#      CheckV bug rather than an index mismatch.
+#   2. A shared database is typically NOT writable by the person running the
+#      workflow (and must not be rewritten anyway — other people rely on it), so
+#      "just rebuild the index in place" is not available.
+#
+# So rule checkv_db_local (70_phage.smk) builds a local VIEW instead: symlinks to
+# the big read-only files, plus a DIAMOND index built by THIS workflow's own
+# DIAMOND. Costs ~950 MB and a couple of minutes once per output directory, and
+# makes the feature independent of who built the shared index, or with what.
+# Your database is only ever read.
 #
 # Point it at the PARENT directory holding the versioned DB folder, i.e. the same
 # shape BacFlux would have created itself:
@@ -293,11 +310,13 @@ VS2_DB_DIR = DIR_PHAGES + "/vs2_db"                             # produced by ru
 VS2_DIR    = DIR_PHAGES + "/virsorter/{sample}"                 # produced by rule viral_identification_virsorter2 (a DIRECTORY)
 
 # CheckV — completeness/contamination QC of whichever caller's virus calls.
-# Either a database the user already holds (directories.checkv_db, used as-is and
-# never written to) or one BacFlux downloads into the output dir. viral_quality
-# consumes this name either way and resolves the versioned sub-folder at runtime,
-# so nothing downstream needs to know which of the two it got.
-CHECKV_DB_DIR = CHECKVDB if CHECKVDB else DIR_PHAGES + "/checkv_db"
+# ALWAYS this path: "the CheckV database this run uses". Exactly one of two
+# mutually exclusive rules in 70_phage.smk produces it —
+#   * checkv_db       downloads a database into it (no directories.checkv_db), or
+#   * checkv_db_local builds a symlink VIEW of the user's own database into it.
+# viral_quality consumes this one name either way and resolves the versioned
+# sub-folder at runtime, so nothing downstream knows or cares which it got.
+CHECKV_DB_DIR = DIR_PHAGES + "/checkv_db"
 
 # Platon — primary plasmid caller (rule plasmid_search, 60_plasmid.smk). v2 moves
 # Platon's output into a platon/ sub-dir (v1 wrote it straight into {sample}/) so

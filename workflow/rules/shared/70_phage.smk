@@ -268,15 +268,85 @@ if PHAGE_CALLER == "virsorter2":
 #       link and the derived folder id (CHECKV_DB_ID) come from 00_common.
 # Produces: 07.phages/checkv_db/ (CHECKV_DB_DIR).
 # Consumed by: viral_quality.
-# DEFINED ONLY when BacFlux is the one providing the database. If the user pointed
-# directories.checkv_db at a copy they already hold, this rule must NOT exist.
+# ── Rule: checkv_db_local — build a usable VIEW of the user's own database ───
+# Defined ONLY when directories.checkv_db is set. See the long note in
+# 00_common.smk for why BacFlux does not simply point CheckV at that path: the
+# DIAMOND index inside a shared database was built by whatever DIAMOND that site
+# had, and DIAMOND's database format is versioned, so CheckV can fail deep into
+# the completeness stage with "DIAMOND task failed". Shared databases are also
+# usually read-only to the person running the workflow.
 #
-# That is a safety requirement, not tidiness. The output below is a `directory()`,
-# and Snakemake DELETES a directory output before re-running its rule. If this rule
-# were defined with CHECKV_DB_DIR pointing at a shared database on a NAS, then any
-# trigger to re-run it — a changed env file, a --forcerun, an interrupted job —
-# would wipe that shared database for everyone using it. Leaving the rule undefined
-# means Snakemake treats the path as a plain existing input it may only read.
+# Takes in: the user's CheckV database directory (read-only; never written).
+# Does: recreate the versioned folder locally, symlinking every large file so no
+#       gigabytes are copied, then build the DIAMOND index with THIS workflow's
+#       DIAMOND so it is guaranteed compatible.
+#       genome_db/ must be a REAL directory (the new index is written into it);
+#       hmm_db/ can be a single symlink because nothing writes there.
+# Produces: 07.phages/checkv_db/ — the same path the download rule would produce,
+#       so viral_quality is identical either way.
+# Consumed by: viral_quality.
+#
+# Disk cost: the index only (~950 MB), versus ~6.4 GB for a full downloaded copy.
+if CHECKVDB:
+
+    rule checkv_db_local:
+        input:
+            src = CHECKVDB,
+        output:
+            checkv_db = directory(CHECKV_DB_DIR),
+        params:
+            db_id = CHECKV_DB_ID,
+        conda:
+            "../../envs/checkv.yaml"
+        threads: capped_cpus(8)
+        log:
+            LOGS + "/checkv_db_local.log"
+        priority: 9
+        shell:
+            """
+            # Locate the versioned DB folder inside the user's directory the same
+            # way viral_quality does, so both agree on what "the database" is.
+            src_db=$(dirname "$(dirname "$(find {input.src} -type f -path '*/genome_db/checkv_reps.faa' | sort | head -n 1)")")
+            dst="{output.checkv_db}/{params.db_id}"
+
+            {{
+              echo "Building a local CheckV view"
+              echo "  source (read-only): $src_db"
+              echo "  view:               $dst"
+            }} > {log}
+
+            mkdir -p "$dst/genome_db"
+
+            # Symlink every genome_db file EXCEPT the index: that one we rebuild,
+            # because the source copy may be in a DIAMOND format this environment's
+            # DIAMOND cannot read.
+            for f in "$src_db"/genome_db/*; do
+                case "$(basename "$f")" in
+                    checkv_reps.dmnd) continue ;;
+                esac
+                ln -sfn "$f" "$dst/genome_db/$(basename "$f")"
+            done
+
+            # Nothing writes into hmm_db/, so one symlink for the whole tree.
+            ln -sfn "$src_db/hmm_db" "$dst/hmm_db"
+            [ -e "$src_db/README.txt" ] && ln -sfn "$src_db/README.txt" "$dst/README.txt"
+
+            echo "Building DIAMOND index with $(diamond --version 2>&1 | head -n1)" >> {log}
+            diamond makedb \
+              --in "$dst/genome_db/checkv_reps.faa" \
+              --db "$dst/genome_db/checkv_reps" \
+              --threads {threads} >> {log} 2>&1
+            """
+
+
+# DEFINED ONLY when BacFlux is the one downloading the database.
+#
+# Keeping these two mutually exclusive is a safety requirement, not tidiness. The
+# output below is a `directory()`, and Snakemake DELETES a directory output before
+# re-running its rule. Both rules therefore write to BacFlux's own
+# 07.phages/checkv_db and never to the user's directory — if a rule's output ever
+# pointed at a shared database, any re-run trigger (a changed env file, a
+# --forcerun, an interrupted job) would wipe it for everyone using it.
 if not CHECKVDB:
 
     rule checkv_db:
