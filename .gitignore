@@ -1,3 +1,6 @@
 .snakemake/
 
 config/config_custom.yaml
+
+__pycache__/
+*.pyc
