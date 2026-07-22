@@ -138,6 +138,28 @@ DMNDDB   = config["directories"]["eggnog_db"]
 GTDBTKDB = config["directories"]["gtdbtk_db"]
 PLATONDB = config["directories"]["platon_db"]
 
+# CheckV is the ONE database BacFlux can also fetch for itself, so unlike the five
+# above its path is OPTIONAL — hence .get() rather than bracket access.
+#
+# Why it exists: the official CheckV database lives on portal.nersc.gov, which goes
+# down often enough to cost real time (it was unreachable for the whole of
+# 2026-07-22, blocking three validation runs). Pointing this key at a copy you
+# already hold on disk removes that dependency completely.
+#
+# When set, it takes PRECEDENCE over links.checkv_link and over CheckV's own
+# downloader: nothing is fetched and the `checkv_db` rule is not even defined
+# (see 70_phage.smk). That last part matters — the rule's output is a
+# directory(), and Snakemake WIPES a directory output before re-running its rule,
+# so a rule pointed at your shared database could delete it. Not defining the rule
+# is what makes this safe, not merely convenient.
+#
+# Point it at the PARENT directory holding the versioned DB folder, i.e. the same
+# shape BacFlux would have created itself:
+#     /path/to/checkv/                 <- put THIS in the config
+#         checkv-db-v1.5/
+#             genome_db/  hmm_db/  README.txt
+CHECKVDB = str((config["directories"].get("checkv_db") or "")).strip()
+
 # workflow.basedir is the absolute path of the workflow/ directory (independent
 # of workdir). It anchors the helper script and the on-disk rule-module lookup.
 WORKFLOW_DIR = workflow.basedir
@@ -271,7 +293,11 @@ VS2_DB_DIR = DIR_PHAGES + "/vs2_db"                             # produced by ru
 VS2_DIR    = DIR_PHAGES + "/virsorter/{sample}"                 # produced by rule viral_identification_virsorter2 (a DIRECTORY)
 
 # CheckV — completeness/contamination QC of whichever caller's virus calls.
-CHECKV_DB_DIR = DIR_PHAGES + "/checkv_db"                       # produced by rule checkv_db
+# Either a database the user already holds (directories.checkv_db, used as-is and
+# never written to) or one BacFlux downloads into the output dir. viral_quality
+# consumes this name either way and resolves the versioned sub-folder at runtime,
+# so nothing downstream needs to know which of the two it got.
+CHECKV_DB_DIR = CHECKVDB if CHECKVDB else DIR_PHAGES + "/checkv_db"
 
 # Platon — primary plasmid caller (rule plasmid_search, 60_plasmid.smk). v2 moves
 # Platon's output into a platon/ sub-dir (v1 wrote it straight into {sample}/) so
@@ -841,7 +867,40 @@ _links = config.get("links") or {}
 # on a missing link — that user-hostile hard-exit is dropped here.)
 CHECKV_LINK = str(_links.get("checkv_link") or "").strip()
 CHECKV_DB_ID = "checkv-db-v1.5"
-if not CHECKV_LINK:
+
+# Three ways to get a CheckV database, in strict order of precedence:
+#   1. directories.checkv_db  — a copy you already hold. Nothing is downloaded.
+#   2. links.checkv_link      — fetch this .tar.gz, unpack it, build the diamond DB.
+#   3. neither                — let CheckV fetch its own default database.
+# Case 1 wins outright, and we say so out loud when a link was ALSO set, because a
+# silently ignored config key is exactly the kind of thing that wastes an afternoon.
+if CHECKVDB:
+    # Fail here, at parse time, rather than an hour into a run when viral_quality
+    # finally opens the directory. Checking for the actual reference FASTA (not
+    # just that the directory exists) also catches the common mistake of pointing
+    # at the versioned folder's PARENT's parent, or at a half-unpacked archive.
+    _checkv_reps = glob.glob(os.path.join(CHECKVDB, "*", "genome_db", "checkv_reps.faa"))
+    if not os.path.isdir(CHECKVDB):
+        sys.exit(
+            f"[BacFlux] directories.checkv_db points at '{CHECKVDB}', which is not a "
+            "directory. Give the PARENT directory that holds the versioned database "
+            "folder, e.g. /path/to/checkv/ containing checkv-db-v1.5/."
+        )
+    if len(_checkv_reps) != 1:
+        sys.exit(
+            f"[BacFlux] directories.checkv_db is '{CHECKVDB}', but that directory holds "
+            f"{len(_checkv_reps)} CheckV database(s) (looking for */genome_db/checkv_reps.faa). "
+            "Exactly one is required. Give the PARENT directory that holds a single "
+            "versioned database folder, e.g. /path/to/checkv/ containing checkv-db-v1.5/."
+        )
+    CHECKV_DB_ID = os.path.basename(os.path.dirname(os.path.dirname(_checkv_reps[0])))
+    print(f"Using the local CheckV database at '{CHECKVDB}' (db_id='{CHECKV_DB_ID}'). Nothing will be downloaded.")
+    if CHECKV_LINK:
+        print(
+            "  NOTE: links.checkv_link is also set and is being IGNORED — "
+            "directories.checkv_db takes precedence."
+        )
+elif not CHECKV_LINK:
     print(
         "The link to the CheckV database is not specified (or empty). "
         "CheckV will download the database automatically."

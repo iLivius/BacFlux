@@ -40,13 +40,21 @@ directories:
   eggnog_db:  ""               # eggNOG-mapper database
   gtdbtk_db:  ""               # GTDB-Tk release database
   platon_db:  ""               # Platon plasmid database
+  checkv_db:  ""               # OPTIONAL — a CheckV database you already hold. Give the PARENT
+                               #   directory containing the versioned folder, e.g.
+                               #   /path/to/checkv/ holding checkv-db-v1.5/.
+                               #   When set, NOTHING is downloaded: this overrides links.checkv_link
+                               #   AND CheckV's own downloader. Use it to stay independent of
+                               #   portal.nersc.gov, which is frequently unavailable.
+                               #   BacFlux only ever READS this path; it is never written or deleted.
 
 # Download URLs for databases the workflow fetches itself.
 links:
   phix_link:   ""              # read by illumina, hybrid only (PhiX spike-in removal)
   dbcan_link:  "https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz"  # REQUIRED, all modes — must be a .tar.gz (the .sha256 checksum URL and the extracted-DB folder name are derived from it)
   card_link:   ""              # read by illumina, hybrid only (CARD read-mapping AMR leg)
-  checkv_link: ""              # optional, all modes — empty => CheckV downloads its database automatically
+  checkv_link: ""              # optional, all modes — empty => CheckV downloads its database automatically.
+                               #   IGNORED when directories.checkv_db is set.
 
 # Compute limits.
 resources:

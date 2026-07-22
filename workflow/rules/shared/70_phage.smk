@@ -268,30 +268,41 @@ if PHAGE_CALLER == "virsorter2":
 #       link and the derived folder id (CHECKV_DB_ID) come from 00_common.
 # Produces: 07.phages/checkv_db/ (CHECKV_DB_DIR).
 # Consumed by: viral_quality.
-rule checkv_db:
-    output:
-        checkv_db = directory(CHECKV_DB_DIR),
-    params:
-        checkv_link = CHECKV_LINK,
-        db_id = CHECKV_DB_ID,
-        tries = 5,
-    conda:
-        "../../envs/checkv.yaml"
-    log:
-        LOGS + "/checkv_db.log"
-    priority: 9
-    shell:
-        """
-        if [ -z "{params.checkv_link}" ]; then
-            checkv download_database {output.checkv_db} > {log} 2>&1
-        else
-            wget --tries={params.tries} -c {params.checkv_link} -P {output.checkv_db} > {log} 2>&1
-            tar -xzvf {output.checkv_db}/{params.db_id}.tar.gz -C {output.checkv_db} >> {log} 2>&1
-            diamond makedb \
-              --in {output.checkv_db}/{params.db_id}/genome_db/checkv_reps.faa \
-              --db {output.checkv_db}/{params.db_id}/genome_db/checkv_reps >> {log} 2>&1
-        fi
-        """
+# DEFINED ONLY when BacFlux is the one providing the database. If the user pointed
+# directories.checkv_db at a copy they already hold, this rule must NOT exist.
+#
+# That is a safety requirement, not tidiness. The output below is a `directory()`,
+# and Snakemake DELETES a directory output before re-running its rule. If this rule
+# were defined with CHECKV_DB_DIR pointing at a shared database on a NAS, then any
+# trigger to re-run it — a changed env file, a --forcerun, an interrupted job —
+# would wipe that shared database for everyone using it. Leaving the rule undefined
+# means Snakemake treats the path as a plain existing input it may only read.
+if not CHECKVDB:
+
+    rule checkv_db:
+        output:
+            checkv_db = directory(CHECKV_DB_DIR),
+        params:
+            checkv_link = CHECKV_LINK,
+            db_id = CHECKV_DB_ID,
+            tries = 5,
+        conda:
+            "../../envs/checkv.yaml"
+        log:
+            LOGS + "/checkv_db.log"
+        priority: 9
+        shell:
+            """
+            if [ -z "{params.checkv_link}" ]; then
+                checkv download_database {output.checkv_db} > {log} 2>&1
+            else
+                wget --tries={params.tries} -c {params.checkv_link} -P {output.checkv_db} > {log} 2>&1
+                tar -xzvf {output.checkv_db}/{params.db_id}.tar.gz -C {output.checkv_db} >> {log} 2>&1
+                diamond makedb \
+                  --in {output.checkv_db}/{params.db_id}/genome_db/checkv_reps.faa \
+                  --db {output.checkv_db}/{params.db_id}/genome_db/checkv_reps >> {log} 2>&1
+            fi
+            """
 
 
 # ── Rule: viral_quality — completeness/contamination of virus calls (CheckV) ──
