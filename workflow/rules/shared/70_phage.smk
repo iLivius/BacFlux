@@ -306,7 +306,10 @@ if CHECKVDB:
             """
             # Locate the versioned DB folder inside the user's directory the same
             # way viral_quality does, so both agree on what "the database" is.
-            src_db=$(dirname "$(dirname "$(find {input.src} -type f -path '*/genome_db/checkv_reps.faa' | sort | head -n 1)")")
+            # -L for the same reason as in viral_quality: the user's own database
+            # may itself be reached through symlinks, and a plain `find -type f`
+            # would silently find nothing.
+            src_db=$(dirname "$(dirname "$(find -L {input.src} -type f -path '*/genome_db/checkv_reps.faa' | sort | head -n 1)")")
             dst="{output.checkv_db}/{params.db_id}"
 
             {{
@@ -426,7 +429,14 @@ rule viral_quality:
             printf "contig_id\tcontig_length\tprovirus\tproviral_length\tgene_count\tviral_genes\thost_genes\tcheckv_quality\tmiuvig_quality\tcompleteness\tcompleteness_method\tcontamination\tkmer_freq\twarnings\n" \
               > {output.checkv_dir}/quality_summary.tsv
         else
-            checkv_rep_files=$(find {input.checkv_db} -type f -path "*/genome_db/checkv_reps.faa" | sort)
+            # -L (follow symlinks) is REQUIRED, not cosmetic. When the database is
+            # a local view of a user-provided copy (rule checkv_db_local), every
+            # file in it is a symlink, and a plain `find -type f` reports those as
+            # type l and matches NOTHING — the resolver then reports "found 0
+            # candidate(s)" for a database that is perfectly fine. With -L, find
+            # follows the link and tests the TARGET's type, so real files and
+            # symlinked files both match.
+            checkv_rep_files=$(find -L {input.checkv_db} -type f -path "*/genome_db/checkv_reps.faa" | sort)
             checkv_rep_file=$(printf "%s\n" "$checkv_rep_files" | head -n 1)
             checkv_rep_count=$(printf "%s\n" "$checkv_rep_files" | sed '/^$/d' | wc -l)
             if [ "$checkv_rep_count" -ne 1 ]; then
