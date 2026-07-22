@@ -525,6 +525,33 @@ pin-sensitive and nothing detects a future Bakta change silently reverting it to
 `FASTA_HEAD_CMD` strips the descriptions Bakta uses to infer topology in **contigs** mode, so a
 closed Unicycler/NCBI input genome is annotated as linear contigs.
 
+**Stage 4.5 — Real end-to-end validation, illumina mode. ✓ PASSED 2026-07-22.**
+Full run on strain CDRTa11 at `/media/data/antonielli_dir/BacFlux_v2_validation/illumina/`
+(see its `RUN_NOTES.md` for the complete table and the caveats). 10/10 steps, zero errors,
+every stage compared against the v1.3.1 baseline in `BacFlux_test/output_dir`:
+
+- **Both the draft and the decontaminated assembly are byte-identical to v1.3.1**
+  (`33b1582f…`, `d8c836d9…`). The v2 restructuring changed the plumbing, not the biology.
+- Identical downstream: CheckM (35 contigs / N50 746047), GTDB-Tk (*Arthrobacter*), Bakta
+  (4748 features), ABRicate (8 DBs, tables byte-identical), CARD mapping (6052 rows),
+  eggNOG (4360), antiSMASH (7 regions), dbCAN (313 CAZymes, 5.1.2 from Zenodo).
+- **The phage stage completed for the first time on BacFlux short-read.** v1.3.1 never
+  produced VirSorter2 output at all. Zero viral contigs is the correct answer here:
+  BacFluxL (same strain) also calls zero; only the more contiguous BacFluxL+ hybrid
+  assembly pushes one marginal prophage past the 0.5 threshold.
+
+Two defects found and fixed by this run:
+- **`envs/virsorter.yaml` was not self-sufficient.** v2 carried `--use-conda-off` +
+  `--skip-deps-install` (introduced in `dbf47b8`; present in NO v1 workflow) without the
+  dependency list those flags require, so VirSorter2 died on `No module named 'screed'`.
+  Fixed in `1f40303` by installing VirSorter2's own packaged `envs/vs2.yaml` list.
+- **A false PASS in the comparison method itself.** The first ABRicate check read a v1 path
+  that does not exist, so both sides reported "0 hits, same". Baseline comparisons must
+  assert the reference file exists before comparing counts.
+
+Not covered by this run, still to do: nanopore and hybrid validations; the `checkv_db`
+DOWNLOAD rule (the database was staged by hand because portal.nersc.gov was unreachable).
+
 **Stage 4 — Front ends, one mode at a time, each a gate. [original scoping]**
 Do them in increasing complexity: `illumina` → `contigs` → `nanopore` → `hybrid`.
 After each, run the full mode end-to-end on the Stage-0 isolate. **Gate per mode:** output
