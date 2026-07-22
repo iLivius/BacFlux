@@ -324,3 +324,10 @@ baseline built with `--nano-raw` at 56 threads, and the resulting 1 bp assembly 
 looked like tool non-determinism when it was simply a different command. Always read the
 baseline's own `flye.log` / `params.json` for the command that actually ran, rather than
 inferring it from the repo default config.
+
+**Resolved, and the result is worth stating positively:** after matching the baseline's
+settings exactly (`--nano-raw`, 56 threads, explicit Medaka model), the v2 assembly came out
+**byte-identical** to the BacFluxL baseline — md5 `e8dceaca…`, 5,164,207 bp, coverage 96,
+circular. So Flye IS bit-reproducible given identical reads, version, read mode and thread
+count, and long-read mode reproduces v1 just as exactly as illumina mode does. The earlier
+"1 bp apart" observation was purely the mis-set config, and nothing about the tool.
