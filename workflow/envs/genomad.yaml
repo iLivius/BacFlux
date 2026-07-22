@@ -1,7 +1,6 @@
-name: virsorter
+name: genomad
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - mamba>=1.5
-  - virsorter=2.2.4
+  - genomad=1.12.0

@@ -1,7 +1,7 @@
-name: virsorter
+name: checkv
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - mamba>=1.5
-  - virsorter=2.2.4
+  - checkv=1.0.3
+  - wget
