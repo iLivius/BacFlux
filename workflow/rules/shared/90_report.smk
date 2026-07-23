@@ -307,9 +307,22 @@ EOF
         IGNORE_ARG=""
         {params.ignore_guard}
 
+        # --force is REQUIRED for re-runs, not a convenience. Without it MultiQC
+        # refuses to overwrite an existing multiqc_report.html and silently writes
+        # multiqc_report_1.html instead ("Existing reports found, adding suffix to
+        # filenames"). The rule then fails on a missing declared output even though
+        # MultiQC exited 0 - so the workflow works on a clean directory and breaks
+        # the moment you re-run it, which is the normal case when adding a sample.
+        #
+        # v1 avoided this only by declaring the whole 09.report/ as a directory()
+        # output, so Snakemake wiped it before every re-run. That is the same
+        # nested-directory data-loss hazard fixed elsewhere in v2 (it also deleted
+        # anything else the user had put in 09.report), so v2 declares the real
+        # files instead and lets --force do the overwriting.
         multiqc \
           $IGNORE_ARG \
           --config "{output.multiqc_yaml}" \
+          --force \
           -d \
           {params.qc_rel} \
           "{params.staging_rel}/checkm" \
