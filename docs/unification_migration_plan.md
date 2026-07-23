@@ -601,6 +601,43 @@ hits, same" — a PASS manufactured by a missing file), and antiSMASH read as 3 
 `ls $(find ... -name antismash)/...` matched more than one directory. Assert the reference
 file exists before comparing, and never build a path from an unquoted `find`.
 
+**Stage 4.8 — Refresh of all three validations against the CURRENT code. ✓ PASSED 2026-07-23.**
+Re-ran illumina, nanopore and hybrid with `directories.checkv_db` pointed at a local
+CheckV copy, all launched with `--cores N` and no `--resources` flag. Delivered genomes
+still byte-identical to their v1 baselines in all three modes; hybrid's CheckV summary
+byte-identical too (illumina and nanopore have no CheckV baseline to compare against —
+v1 illumina never completed VirSorter2, and v1 nanopore wrote no summary for a
+zero-virus sample, where v2 now writes a header-only one).
+
+**The refresh earned its keep: it found three bugs that the original passing runs could not.**
+
+1. `78c9028` — **CheckV died with `DIAMOND task failed`.** The official CheckV archive
+   ships no DIAMOND index, so the one in any shared database was built by whatever
+   DIAMOND that site had. The NAS copy is format 1; the env's DIAMOND 2.0.4 needs
+   format 3. The shared database is also not writable, so it cannot be rebuilt in
+   place. Fixed by building a local *view* — symlinks to the read-only files plus an
+   index built by this workflow's own DIAMOND. ~908 MB per run vs ~6.4 GB for a full copy.
+2. `c4af086` — **`find -type f` does not follow symlinks**, so the resolver reported
+   "found 0 candidate(s)" for a perfectly good view. Introduced while fixing (1).
+3. `11df5e9` — **MultiQC has no `--force`**, so on a re-run it refuses to overwrite
+   `multiqc_report.html`, writes `multiqc_report_1.html`, exits 0, and the rule fails on
+   a missing declared output. A v2 regression from an otherwise-correct change: v1
+   declared all of `09.report/` as a `directory()` output and so wiped it every run
+   (which also deleted anything else the user kept there).
+
+**THE METHODOLOGICAL POINT, and the most transferable thing in this document:**
+bugs (1) and (2) both went undetected by illumina AND nanopore, because those samples
+call **zero viral contigs** and take the empty-input shortcut before ever touching the
+database. Only hybrid — the one sample carrying a prophage — exercises that path. A
+green run on a negative sample is not evidence that the code path works; it is evidence
+that the code path was skipped. Bug (3) was invisible for a different reason: it can
+only appear on a RE-RUN, and every earlier validation ran once into a clean directory.
+
+Together with the two false readings recorded under Stage 4.7 (a PASS manufactured by a
+missing file, a regression manufactured by a wrong directory), the lesson is the same in
+both directions: **verify that a check actually executed against the thing you think it
+did, before believing either its pass or its failure.**
+
 **Stage 4 — Front ends, one mode at a time, each a gate. [original scoping]**
 Do them in increasing complexity: `illumina` → `contigs` → `nanopore` → `hybrid`.
 After each, run the full mode end-to-end on the Stage-0 isolate. **Gate per mode:** output
