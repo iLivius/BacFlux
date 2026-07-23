@@ -53,8 +53,7 @@ links:
   phix_link:   ""              # read by illumina, hybrid only (PhiX spike-in removal)
   dbcan_link:  "https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz"  # REQUIRED, all modes — must be a .tar.gz (the .sha256 checksum URL and the extracted-DB folder name are derived from it)
   card_link:   ""              # read by illumina, hybrid only (CARD read-mapping AMR leg)
-  checkv_link: ""              # optional, all modes — empty => CheckV downloads its database automatically.
-                               #   IGNORED when directories.checkv_db is set.
+  checkv_link: "https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz"  # all modes — unmodified mirror of CheckV's own DB (portal.nersc.gov is frequently unreachable). Empty => CheckV downloads its own default DB (from that same NERSC host). IGNORED when directories.checkv_db is set.
 
 # Compute limits.
 resources:
