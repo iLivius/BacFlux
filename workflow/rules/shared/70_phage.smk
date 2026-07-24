@@ -198,22 +198,61 @@ if PHAGE_CALLER == "virsorter2":
     #       fragile nested-env build (fix part 2 above).
     # Produces: 07.phages/vs2_db/ (VS2_DB_DIR).
     # Consumed by: viral_identification_virsorter2.
-    rule virsorter2_db:
-        output:
-            vs2_db = directory(VS2_DB_DIR),
-        conda:
-            "../../envs/virsorter.yaml"
-        threads: capped_cpus(4)
-        log:
-            LOGS + "/virsorter2_db.log"
-        priority: 9
-        shell:
-            """
-            virsorter setup \
-              -d {output.vs2_db} \
-              -j {threads} \
-              --skip-deps-install > {log} 2>&1
-            """
+    #
+    # DEFINED ONLY when BacFlux is the one downloading the database — mutually
+    # exclusive with virsorter2_db_local below, same safety reasoning as
+    # checkv_db/checkv_db_local (directory() outputs get wiped before a rule
+    # reruns, so a shared user directory must never be one).
+    if not VS2DB:
+
+        rule virsorter2_db:
+            output:
+                vs2_db = directory(VS2_DB_DIR),
+            conda:
+                "../../envs/virsorter.yaml"
+            threads: capped_cpus(4)
+            log:
+                LOGS + "/virsorter2_db.log"
+            priority: 9
+            shell:
+                """
+                virsorter setup \
+                  -d {output.vs2_db} \
+                  -j {threads} \
+                  --skip-deps-install > {log} 2>&1
+                """
+
+    # ── Rule: virsorter2_db_local — use an already-downloaded VS2 database ───
+    # Defined ONLY when directories.vs2_db is set. Symlinks the setup output
+    # (hmm/, group/, rbs/, Done_all_setup) into BacFlux's own directory rather
+    # than reading the user's path directly, so the directory()-wipe-on-rerun
+    # hazard above can never reach it. No index is rebuilt here (unlike
+    # checkv_db_local) — no cross-build incompatibility has been found for VS2's
+    # HMM files, so this is a plain, cheap view.
+    # Produces: 07.phages/vs2_db/ — the same path the download rule would
+    #           produce, so viral_identification_virsorter2 is identical either way.
+    if VS2DB:
+
+        rule virsorter2_db_local:
+            input:
+                src = VS2DB,
+            output:
+                vs2_db = directory(VS2_DB_DIR),
+            log:
+                LOGS + "/virsorter2_db_local.log"
+            priority: 9
+            shell:
+                """
+                mkdir -p {output.vs2_db}
+                {{
+                  echo "Building a local VirSorter2 database view"
+                  echo "  source (read-only): {input.src}"
+                  echo "  view:               {output.vs2_db}"
+                }} > {log}
+                for f in "{input.src}"/*; do
+                    ln -sfn "$f" "{output.vs2_db}/$(basename "$f")"
+                done
+                """
 
     # ── Rule: viral_identification_virsorter2 — VS2 virus calling ────────────
     # Biology: identify phages / prophages on the finished genome. Faithful port
@@ -263,11 +302,19 @@ if PHAGE_CALLER == "virsorter2":
 # to get CheckV. CheckV is permissively licensed (LBNL BSD), commercial use OK.
 #
 # Takes in: nothing (pure download).
-# Does: if CHECKV_LINK is empty, let CheckV download its own default DB; otherwise
-#       wget the given .tar.gz, extract it, and (re)build the diamond DB. Both the
-#       link and the derived folder id (CHECKV_DB_ID) come from 00_common.
+# Does: if CHECKV_LINK is empty, let CheckV download its own default DB (CheckV's
+#       own tool is responsible for its own integrity there); otherwise wget the
+#       given .tar.gz AND its .sha256, hard-fail if the computed hash does not
+#       match the expected one (same discipline as dbCAN's cazyme_db_download —
+#       a truncated or tampered download must never be silently extracted), then
+#       extract and (re)build the diamond DB. Link, sha256 URL, and the derived
+#       folder id (CHECKV_DB_ID) all come from 00_common.
 # Produces: 07.phages/checkv_db/ (CHECKV_DB_DIR).
 # Consumed by: viral_quality.
+#
+# threads: the diamond index build is the one real CPU cost here; capped_cpus(8)
+# matches the sibling checkv_db_local rule, which does the identical diamond
+# makedb step for a user-provided database.
 # ── Rule: checkv_db_local — build a usable VIEW of the user's own database ───
 # Defined ONLY when directories.checkv_db is set. See the long note in
 # 00_common.smk for why BacFlux does not simply point CheckV at that path: the
@@ -357,10 +404,12 @@ if not CHECKVDB:
             checkv_db = directory(CHECKV_DB_DIR),
         params:
             checkv_link = CHECKV_LINK,
+            sha_url = CHECKV_SHA_URL,
             db_id = CHECKV_DB_ID,
             tries = 5,
         conda:
             "../../envs/checkv.yaml"
+        threads: capped_cpus(8)
         log:
             LOGS + "/checkv_db.log"
         priority: 9
@@ -369,11 +418,28 @@ if not CHECKVDB:
             if [ -z "{params.checkv_link}" ]; then
                 checkv download_database {output.checkv_db} > {log} 2>&1
             else
+                TAR="{output.checkv_db}/{params.db_id}.tar.gz"
+                SHA="{output.checkv_db}/{params.db_id}.sha256"
+
                 wget --tries={params.tries} -c {params.checkv_link} -P {output.checkv_db} > {log} 2>&1
-                tar -xzvf {output.checkv_db}/{params.db_id}.tar.gz -C {output.checkv_db} >> {log} 2>&1
+                wget --tries={params.tries} -c {params.sha_url} -O "$SHA" >> {log} 2>&1
+
+                # Hard-fail on a mismatch, exactly like dbCAN's cazyme_db_download:
+                # a truncated or tampered archive must never reach `tar`/`diamond`.
+                expected="$(awk 'NR==1{{print $1}}' "$SHA")"
+                actual="$(sha256sum "$TAR" | awk '{{print $1}}')"
+                if [ "$expected" != "$actual" ]; then
+                    echo "ERROR: checksum mismatch for $TAR" >> {log}
+                    echo "  expected: $expected" >> {log}
+                    echo "  actual:   $actual" >> {log}
+                    exit 1
+                fi
+
+                tar -xzvf "$TAR" -C {output.checkv_db} >> {log} 2>&1
                 diamond makedb \
                   --in {output.checkv_db}/{params.db_id}/genome_db/checkv_reps.faa \
-                  --db {output.checkv_db}/{params.db_id}/genome_db/checkv_reps >> {log} 2>&1
+                  --db {output.checkv_db}/{params.db_id}/genome_db/checkv_reps \
+                  --threads {threads} >> {log} 2>&1
             fi
             """
 

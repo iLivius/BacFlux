@@ -236,20 +236,57 @@ rule functional_annotation:
 # (v1 relied on Snakemake's concrete-beats-wildcard tie-break instead; the
 # constraint makes it explicit and collision-proof.)
 #
+# DEFINED ONLY when BacFlux is the one downloading the database — mutually
+# exclusive with secondary_metabolites_db_local below, same directory()-wipe
+# safety reasoning as checkv_db/checkv_db_local.
+#
 # (v1 message: "--- antiSMASH: database download. ---")
-rule secondary_metabolites_db:
-    output:
-        antismash_db = directory(ANTISMASH_DB_DIR),
-    conda:
-        "../../envs/antismash.yaml"
-    log:
-        LOGS + "/secondary_metabolites_database.log"
-    priority: 4
-    shell:
-        """
-        download-antismash-databases \
-          --database-dir {output.antismash_db} > {log} 2>&1
-        """
+if not ANTISMASHDB:
+
+    rule secondary_metabolites_db:
+        output:
+            antismash_db = directory(ANTISMASH_DB_DIR),
+        conda:
+            "../../envs/antismash.yaml"
+        log:
+            LOGS + "/secondary_metabolites_database.log"
+        priority: 4
+        shell:
+            """
+            download-antismash-databases \
+              --database-dir {output.antismash_db} > {log} 2>&1
+            """
+
+# ── Rule: secondary_metabolites_db_local — use an already-downloaded DB ──────
+# Defined ONLY when directories.antismash_db is set. Symlinks the database's
+# top-level entries (clusterblast/, pfam/, ...) into BacFlux's own directory
+# rather than pointing antiSMASH at the user's path directly, for the same
+# directory()-wipe-on-rerun reason as checkv_db_local. No index is rebuilt here
+# — no cross-build incompatibility has been found for antiSMASH's database
+# (this exact database was reused as-is, via a plain copy, across two real
+# screening batches this session with zero errors).
+if ANTISMASHDB:
+
+    rule secondary_metabolites_db_local:
+        input:
+            src = ANTISMASHDB,
+        output:
+            antismash_db = directory(ANTISMASH_DB_DIR),
+        log:
+            LOGS + "/secondary_metabolites_database_local.log"
+        priority: 4
+        shell:
+            """
+            mkdir -p {output.antismash_db}
+            {{
+              echo "Building a local antiSMASH database view"
+              echo "  source (read-only): {input.src}"
+              echo "  view:               {output.antismash_db}"
+            }} > {log}
+            for f in "{input.src}"/*; do
+                ln -sfn "$f" "{output.antismash_db}/$(basename "$f")"
+            done
+            """
 
 
 # ── Rule: secondary_metabolites_analysis — BGC detection per sample (antiSMASH) ─
@@ -327,37 +364,79 @@ rule secondary_metabolites_analysis:
 #
 # Note on the doubled braces in the shell: Snakemake treats {…} as a placeholder,
 # so a literal brace for awk must be written as {{…}} to survive to the shell.
-rule cazyme_db_download:
-    output:
-        dbcan_db = directory(DBCAN_DB_DIR),
-        dbcan_verified = DBCAN_SENTINEL,
-    params:
-        dbcan_db_url = DBCAN_LINK,
-        sha_url = DBCAN_SHA_URL,
-    log:
-        LOGS + "/cazyme_db_download.log"
-    priority: 4
-    shell:
-        """
-        mkdir -p "{output.dbcan_db}"
+# DEFINED ONLY when BacFlux is the one downloading the database — mutually
+# exclusive with cazyme_db_local below, same directory()-wipe safety reasoning
+# as checkv_db/checkv_db_local.
+if not DBCANDB:
 
-        TAR="{output.dbcan_db}/$(basename "{params.dbcan_db_url}")"
-        SHA="{output.dbcan_db}/$(basename "{params.sha_url}")"
+    rule cazyme_db_download:
+        output:
+            dbcan_db = directory(DBCAN_DB_DIR),
+            dbcan_verified = DBCAN_SENTINEL,
+        params:
+            dbcan_db_url = DBCAN_LINK,
+            sha_url = DBCAN_SHA_URL,
+        log:
+            LOGS + "/cazyme_db_download.log"
+        priority: 4
+        shell:
+            """
+            mkdir -p "{output.dbcan_db}"
 
-        wget -O "$TAR" "{params.dbcan_db_url}" > "{log}" 2>&1
-        wget -O "$SHA" "{params.sha_url}" >> "{log}" 2>&1
+            TAR="{output.dbcan_db}/$(basename "{params.dbcan_db_url}")"
+            SHA="{output.dbcan_db}/$(basename "{params.sha_url}")"
 
-        # verify checksum
-        expected="$(awk 'NR==1{{print $1}}' "$SHA")"
-        actual="$(sha256sum "$TAR" | awk '{{print $1}}')"
-        test "$expected" = "$actual"
+            wget -O "$TAR" "{params.dbcan_db_url}" > "{log}" 2>&1
+            wget -O "$SHA" "{params.sha_url}" >> "{log}" 2>&1
 
-        # extract (flatten top-level directory)
-        tar -xzf "$TAR" -C "{output.dbcan_db}" --strip-components=1 >> "{log}" 2>&1
+            # verify checksum
+            expected="$(awk 'NR==1{{print $1}}' "$SHA")"
+            actual="$(sha256sum "$TAR" | awk '{{print $1}}')"
+            test "$expected" = "$actual"
 
-        # create sentinel containing verified checksum
-        echo "$actual" > "{output.dbcan_verified}"
-        """
+            # extract (flatten top-level directory)
+            tar -xzf "$TAR" -C "{output.dbcan_db}" --strip-components=1 >> "{log}" 2>&1
+
+            # create sentinel containing verified checksum
+            echo "$actual" > "{output.dbcan_verified}"
+            """
+
+# ── Rule: cazyme_db_local — use an already-downloaded dbCAN database ────────
+# Defined ONLY when directories.dbcan_db is set. Symlinks the database's
+# top-level files (dbCAN.hmm, CAZy.dmnd, ...) into BacFlux's own directory for
+# the same directory()-wipe-on-rerun reason as checkv_db_local — no index is
+# rebuilt (no cross-build incompatibility has been found for dbCAN's HMM/DIAMOND
+# files; this exact database was reused as-is, via a plain copy, across two real
+# screening batches this session with zero errors).
+#
+# The sentinel here records that this is an UNVERIFIED user-supplied copy
+# (distinct from cazyme_db_download's sentinel, which holds a checksum actually
+# computed from a download this run performed) — cazyme_gene_cluster only checks
+# that the sentinel exists, not its content, so this satisfies the same gate.
+if DBCANDB:
+
+    rule cazyme_db_local:
+        input:
+            src = DBCANDB,
+        output:
+            dbcan_db = directory(DBCAN_DB_DIR),
+            dbcan_verified = DBCAN_SENTINEL,
+        log:
+            LOGS + "/cazyme_db_local.log"
+        priority: 4
+        shell:
+            """
+            mkdir -p "{output.dbcan_db}"
+            {{
+              echo "Building a local dbCAN database view"
+              echo "  source (read-only, unverified): {input.src}"
+              echo "  view:                           {output.dbcan_db}"
+            }} > {log}
+            for f in "{input.src}"/*; do
+                ln -sfn "$f" "{output.dbcan_db}/$(basename "$f")"
+            done
+            echo "local copy, not independently checksummed" > {output.dbcan_verified}
+            """
 
 
 # ── Rule: cazyme_gene_cluster — CAZyme + gene-cluster annotation (run_dbcan) ─────

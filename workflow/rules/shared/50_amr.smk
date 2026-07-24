@@ -188,25 +188,62 @@ if HAS_SHORT_READS:
     # conda: NONE — uses wget and tar from the launch environment, as v1 did. Same
     # deferred decision as cazyme_db_download; see docs/README_notes.md item 3.
     #
+    # DEFINED ONLY when BacFlux is the one downloading the database — mutually
+    # exclusive with download_amr_db_local below, same directory()-wipe safety
+    # reasoning as checkv_db/checkv_db_local.
+    #
     # (v1 message: "--- Download AMR features from CARD repository. ---")
-    rule download_amr_db:
-        output:
-            card_tarball = temp(CARD_TARBALL),
-            card_dir = temp(directory(CARD_DB_DIR)),
-        params:
-            # Resolved and validated once in 00_common (§7), so a missing key is
-            # reported by name at parse time rather than as a bare KeyError here.
-            link = CARD_LINK,
-        log:
-            LOGS + "/download_amr.log"
-        priority: 9
-        shell:
-            """
-            mkdir -p {output.card_dir}
+    if not CARDDB:
 
-            wget {params.link} -O {output.card_tarball} > {log} 2>&1
-            tar -xjvf {output.card_tarball} -C {output.card_dir} >> {log} 2>&1
-            """
+        rule download_amr_db:
+            output:
+                card_tarball = temp(CARD_TARBALL),
+                card_dir = temp(directory(CARD_DB_DIR)),
+            params:
+                # Resolved and validated once in 00_common (§7), so a missing key is
+                # reported by name at parse time rather than as a bare KeyError here.
+                link = CARD_LINK,
+            log:
+                LOGS + "/download_amr.log"
+            priority: 9
+            shell:
+                """
+                mkdir -p {output.card_dir}
+
+                wget {params.link} -O {output.card_tarball} > {log} 2>&1
+                tar -xjvf {output.card_tarball} -C {output.card_dir} >> {log} 2>&1
+                """
+
+    # ── Rule: download_amr_db_local — use an already-extracted CARD database ──
+    # Defined ONLY when directories.card_db is set. Symlinks CARD's reference
+    # files (aro_index.tsv, nucleotide_fasta_protein_homolog_model.fasta, ...)
+    # into BacFlux's own directory for the same directory()-wipe-on-rerun reason
+    # as checkv_db_local. CARD needs no local rebuild at all — map_amr_db only
+    # ever READS these files (BBMap's own index is built per-sample into a
+    # separate temp directory, never into card_dir), so this is the simplest of
+    # the four *_db_local rules.
+    if CARDDB:
+
+        rule download_amr_db_local:
+            input:
+                src = CARDDB,
+            output:
+                card_dir = temp(directory(CARD_DB_DIR)),
+            log:
+                LOGS + "/download_amr_db_local.log"
+            priority: 9
+            shell:
+                """
+                mkdir -p {output.card_dir}
+                {{
+                  echo "Building a local CARD database view"
+                  echo "  source (read-only): {input.src}"
+                  echo "  view:               {output.card_dir}"
+                }} > {log}
+                for f in "{input.src}"/*; do
+                    ln -sfn "$f" "{output.card_dir}/$(basename "$f")"
+                done
+                """
 
     # ── Rule: map_amr_db — map trimmed reads onto CARD (BBMap) ───────────────
     # Biology: align this sample's quality-trimmed Illumina pairs against CARD's

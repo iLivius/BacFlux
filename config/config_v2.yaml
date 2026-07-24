@@ -47,6 +47,24 @@ directories:
                                #   AND CheckV's own downloader. Use it to stay independent of
                                #   portal.nersc.gov, which is frequently unavailable.
                                #   BacFlux only ever READS this path; it is never written or deleted.
+  vs2_db:       ""             # OPTIONAL — a VirSorter2 database you already hold: the directory
+                               #   `virsorter setup` produced (containing hmm/, group/, rbs/,
+                               #   Done_all_setup). Skips the ~10 GB download. Read by virsorter2
+                               #   mode only (phage.caller); ignored when phage.caller: genomad.
+  antismash_db: ""             # OPTIONAL — an antiSMASH database directory you already hold (what
+                               #   `download-antismash-databases` produces: clusterblast/, pfam/, ...).
+                               #   Skips the download. Read in all modes.
+  dbcan_db:     ""             # OPTIONAL — a dbCAN database directory you already hold, matching
+                               #   the version in links.dbcan_link (dbCAN.hmm, CAZy.dmnd, ...).
+                               #   Skips the download. Read in all modes.
+  card_db:      ""             # OPTIONAL — an extracted CARD database directory you already hold
+                               #   (aro_index.tsv, nucleotide_fasta_protein_homolog_model.fasta).
+                               #   Skips the download. Read by illumina, hybrid only (CARD read-
+                               #   mapping AMR leg).
+                               #
+                               # All four above follow the same rule as checkv_db: BacFlux only
+                               # ever READS these paths (via a local symlink view, never in place),
+                               # and each one, when set, overrides the matching download entirely.
 
 # Download URLs for databases the workflow fetches itself.
 links:

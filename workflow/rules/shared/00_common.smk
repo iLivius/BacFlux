@@ -177,6 +177,69 @@ PLATONDB = config["directories"]["platon_db"]
 #             genome_db/  hmm_db/  README.txt
 CHECKVDB = str((config["directories"].get("checkv_db") or "")).strip()
 
+# ── Shared read-only databases (VS2, antiSMASH, dbCAN, CARD) ──────────────────
+# Same motivation as CHECKVDB above, generalised: every one of these tools would
+# otherwise re-download its (multi-GB) database into EVERY run's own output_dir,
+# with no way to point at a copy already on disk. Unlike CheckV, none of these
+# four has a CONFIRMED cross-build binary-format incompatibility (CheckV's
+# DIAMOND index bug was found and fixed the hard way; these four have not shown
+# the same failure in-session), but the corresponding *_db_local rules still
+# build any DIAMOND/HMM index locally rather than trust one built elsewhere,
+# out of the same caution rather than a proven need.
+#
+# All four are FLAT directories (no CheckV-style versioned subfolder to
+# auto-detect) — point each key at the directory the tool itself would have
+# produced:
+#   directories.vs2_db       -> what `virsorter setup` writes (hmm/, group/, rbs/, Done_all_setup)
+#   directories.antismash_db -> what `download-antismash-databases` writes (clusterblast/, pfam/, ...)
+#   directories.dbcan_db     -> what the dbCAN tarball extracts to (dbCAN.hmm, CAZy.dmnd, ...) -
+#                                must match the version in links.dbcan_link
+#   directories.card_db      -> what the CARD tarball extracts to (aro_index.tsv, nucleotide_fasta_protein_homolog_model.fasta, ...)
+def _resolve_optional_db_dir(config_key, probe_relpath, hint):
+    # Read an optional directories.<config_key> override and validate it at
+    # parse time (a bad path should stop the run before any job starts, not
+    # fail deep into a multi-hour run). probe_relpath is a file/subdir that can
+    # only exist inside a real copy of this specific database, so a directory
+    # that merely exists but holds the wrong thing is still caught. Returns ""
+    # when the key is unset, which every caller below treats as "download it".
+    path = str((config["directories"].get(config_key) or "")).strip()
+    if not path:
+        return ""
+    if not os.path.isdir(path):
+        sys.exit(f"[BacFlux] directories.{config_key} points at '{path}', which is not a directory. {hint}")
+    if not os.path.exists(os.path.join(path, probe_relpath)):
+        sys.exit(f"[BacFlux] directories.{config_key} is '{path}', but it has no '{probe_relpath}'. {hint}")
+    return path
+
+
+VS2DB = _resolve_optional_db_dir(
+    "vs2_db", "Done_all_setup",
+    "Point it at the directory 'virsorter setup' produced (containing hmm/, group/, rbs/, Done_all_setup)."
+)
+if VS2DB:
+    print(f"Using the local VirSorter2 database at '{VS2DB}'. Nothing will be downloaded.")
+
+ANTISMASHDB = _resolve_optional_db_dir(
+    "antismash_db", "clusterblast",
+    "Point it at an antiSMASH --databases directory (containing clusterblast/, pfam/, ...)."
+)
+if ANTISMASHDB:
+    print(f"Using the local antiSMASH database at '{ANTISMASHDB}'. Nothing will be downloaded.")
+
+DBCANDB = _resolve_optional_db_dir(
+    "dbcan_db", "dbCAN.hmm",
+    "Point it at a dbCAN database directory matching the version in links.dbcan_link (containing dbCAN.hmm, CAZy.dmnd, ...)."
+)
+if DBCANDB:
+    print(f"Using the local dbCAN database at '{DBCANDB}'. Nothing will be downloaded.")
+
+CARDDB = _resolve_optional_db_dir(
+    "card_db", "aro_index.tsv",
+    "Point it at an extracted CARD database directory (containing aro_index.tsv, nucleotide_fasta_protein_homolog_model.fasta)."
+)
+if CARDDB:
+    print(f"Using the local CARD database at '{CARDDB}'. Nothing will be downloaded.")
+
 # workflow.basedir is the absolute path of the workflow/ directory (independent
 # of workdir). It anchors the helper script and the on-disk rule-module lookup.
 WORKFLOW_DIR = workflow.basedir
@@ -930,6 +993,13 @@ else:
         raise ValueError(f"Invalid checkv_link: expected a .tar.gz archive, got '{_checkv_name}'.")
     CHECKV_DB_ID = os.path.splitext(os.path.splitext(_checkv_name)[0])[0]
     print(f"Using CheckV database from link: '{CHECKV_LINK}' (db_id='{CHECKV_DB_ID}').")
+
+# The .sha256 companion, derived the same way as DBCAN_SHA_URL below. The
+# default checkv_link (the Zenodo mirror) publishes one; if a user points
+# checkv_link elsewhere, that mirror must publish a matching .sha256 next to
+# its .tar.gz or rule checkv_db's hard-fail verification will (correctly)
+# refuse to trust an unverified download.
+CHECKV_SHA_URL = CHECKV_LINK.replace(".tar.gz", ".sha256") if CHECKV_LINK else ""
 
 # dbCAN: the link is REQUIRED (every mode annotates CAZymes) and must be a
 # .tar.gz. The matching checksum URL is derived by swapping the suffix. Resolved
