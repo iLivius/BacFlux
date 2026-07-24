@@ -217,6 +217,24 @@ default, geNomad never runs.
   is Platon's `verified_plasmids.txt`.
 - Correct any earlier claim that geNomad is BSD-licensed (the bioconda tag is wrong).
 
+**Added 2026-07-24 — geNomad's database has the SAME hosting problem as CheckV's.**
+Verified by running it: geNomad downloads its database from `portal.nersc.gov`, the very host
+whose outages made us mirror the CheckV database to Zenodo. The URL is hard-coded inside the
+geNomad package — there is no `--url` flag and no mirror option — so when that host is down,
+`genomad download-database` simply cannot succeed, and a Zenodo mirror cannot be wired in the
+way `links.checkv_link` was. (It failed exactly this way during implementation:
+`URLError: [Errno 113] No route to host`.)
+
+The fallback is therefore a local copy, and BacFlux now supports one via **`directories.genomad_db`**
+(rule `genomad_db_local`, same symlink-view pattern as `vs2_db`). The README should tell anyone
+opting into geNomad to set it, and note that this machine already holds a copy under
+`/data/x1hbrnas4/big_db/genomad/`. Two gotchas worth stating, both found by running it:
+- geNomad reads `version.txt` on startup, so that file must be **readable**, not merely present.
+  In a shared database it is easy for that one small file to end up mode 0640 while every large
+  data file beside it is world-readable. BacFlux checks this at parse time now.
+- The database directory to point at is the inner `genomad_db/` — the one holding `version.txt`
+  and `genomad_db.dbtype`, not its parent.
+
 ---
 
 ## 4. dbCAN is deliberately pinned to v5.1.2 (+ the Zenodo-hosted DB) — reframe, don't apologize
@@ -331,3 +349,41 @@ settings exactly (`--nano-raw`, 56 threads, explicit Medaka model), the v2 assem
 circular. So Flye IS bit-reproducible given identical reads, version, read mode and thread
 count, and long-read mode reproduces v1 just as exactly as illumina mode does. The earlier
 "1 bp apart" observation was purely the mis-set config, and nothing about the tool.
+
+---
+
+## 10. CONJscan's models are CC BY-NC-SA — the mobilome module needs a licence notice
+
+**Status: DECIDED 2026-07-23 (option A: one switch). README must carry the notice below.**
+
+The mobilome module (`mobilome.run: true`, default OFF) runs **CONJscan**, the MacSyFinder
+model set that detects conjugation machinery. This is what lets BacFlux say a chromosomal AMR
+gene sits in an ICE — i.e. tiers 5–6 of the mobility ladder, the "predicted self-transmissible"
+call. Nothing else in the workflow can see that.
+
+**The licence split matters and is easy to get backwards:**
+- **MacSyFinder itself** (the engine) is GPLv3 — fine, commercial use allowed.
+- **The CONJscan model package** (the HMM profiles + system definitions, from Institut
+  Pasteur / CNRS, verified from the package's own `metadata.yml`) is
+  **CC BY-NC-SA 4.0 — non-commercial + share-alike**.
+
+**Why this does NOT contaminate BacFlux's MIT licence.** Spec §11 draws the line that decides
+this: share-alike attaches to *distributed source*, not to *execution*. BacFlux never vendors
+the CONJscan models — the repo contains no model file, only the code that fetches them at the
+user's request (`macsydata install`/`msf_data`). The user downloads them under their own
+agreement with the licensor. That is precisely the treatment `bakta_db`, `platon_db`,
+`gtdbtk_db` and the CARD link already get, and it is why default-off is sufficient here when it
+would NOT have been sufficient for copied code.
+
+**Decided shape (option A, chosen 2026-07-23): ONE switch, not two.** CONJscan runs whenever
+`mobilome.run: true`. A separate `conjscan.run` sub-switch was considered and rejected: without
+CONJscan the module can only ever reach ladder tier 4, so the sub-switch would mostly produce
+a quietly degraded module that still looks complete — the failure mode is a *missing* ICE call,
+which reads identically to "no ICE present". One honest switch beats two confusing ones.
+
+**README wording to add** (Configuration → `mobilome`, next to the geNomad notice):
+- Enabling the mobilome module downloads the CONJscan models, which are licensed
+  **CC BY-NC-SA 4.0 (non-commercial)** by Institut Pasteur/CNRS.
+- Commercial users should either leave `mobilome.run: false` (the default) or obtain
+  permission from the model authors. BacFlux's own code stays MIT either way.
+- Cite CONJscan/MacSyFinder (Abby et al. 2014; Néron et al. 2023) — already in CITATIONS.md.

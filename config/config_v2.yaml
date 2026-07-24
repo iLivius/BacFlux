@@ -61,6 +61,14 @@ directories:
                                #   (aro_index.tsv, nucleotide_fasta_protein_homolog_model.fasta).
                                #   Skips the download. Read by illumina, hybrid only (CARD read-
                                #   mapping AMR leg).
+  genomad_db:   ""             # OPTIONAL — a geNomad database directory you already hold: what
+                               #   `genomad download-database <parent>` leaves in <parent>/genomad_db
+                               #   (genomad_db.dbtype, genomad_marker_metadata.tsv, ...). Read ONLY
+                               #   when phage.caller: genomad.
+                               #   STRONGLY RECOMMENDED if you opt in: geNomad downloads from
+                               #   portal.nersc.gov — the same host as CheckV's database, which is
+                               #   frequently unreachable — and its downloader has NO mirror option,
+                               #   so this path is the only fallback when that host is down.
                                #
                                # All four above follow the same rule as checkv_db: BacFlux only
                                # ever READS these paths (via a local symlink view, never in place),

@@ -96,21 +96,71 @@ if PHAGE_CALLER == "genomad":
     #       DIR_PHAGES and declare the output as DIR_PHAGES/genomad_db.
     # Produces: 07.phages/genomad_db/ — the shared geNomad DB directory.
     # Consumed by: genomad_end_to_end (every sample waits on this DB).
-    rule genomad_db:
-        output:
-            genomad_db = directory(GENOMAD_DB_DIR),
-        params:
-            # geNomad appends "genomad_db" to this parent path; see GENOMAD_DB_DIR.
-            parent = DIR_PHAGES,
-        conda:
-            "../../envs/genomad.yaml"
-        log:
-            LOGS + "/genomad_db.log"
-        priority: 9
-        shell:
-            """
-            genomad download-database {params.parent} > {log} 2>&1
-            """
+    #
+    # VERIFIED 2026-07-24: `genomad download-database DESTINATION` does create the
+    # "genomad_db" subfolder inside DESTINATION, so pointing it at DIR_PHAGES and
+    # declaring DIR_PHAGES/genomad_db is right.
+    #
+    # DEFINED ONLY when BacFlux is the one downloading — mutually exclusive with
+    # genomad_db_local below, same reasoning as checkv_db / virsorter2_db.
+    #
+    # HEADS-UP: the download URL is hard-coded to portal.nersc.gov inside the
+    # geNomad package, the same host whose outages forced the CheckV Zenodo mirror.
+    # There is no --url option to point elsewhere, so if this rule fails with
+    # "No route to host", the fix is directories.genomad_db, not a retry.
+    if not GENOMADDB:
+
+        rule genomad_db:
+            output:
+                genomad_db = directory(GENOMAD_DB_DIR),
+            params:
+                # geNomad appends "genomad_db" to this parent path; see GENOMAD_DB_DIR.
+                parent = DIR_PHAGES,
+            conda:
+                "../../envs/genomad.yaml"
+            log:
+                LOGS + "/genomad_db.log"
+            priority: 9
+            shell:
+                """
+                genomad download-database {params.parent} > {log} 2>&1
+                """
+
+    # ── Rule: genomad_db_local — use an already-downloaded geNomad database ───
+    # Defined ONLY when directories.genomad_db is set. Symlinks the database files
+    # into BacFlux's own directory rather than reading the user's path directly,
+    # because a directory() output is WIPED before its rule reruns — pointing that
+    # at a shared database would delete it. Same shape as virsorter2_db_local.
+    #
+    # No index is rebuilt (unlike checkv_db_local): geNomad's files are MMseqs2
+    # databases and plain tables, which MMseqs2 reads through symlinks without
+    # complaint, and none of geNomad's steps writes into the database directory.
+    #
+    # Takes in: the user's geNomad database directory (read-only; never written).
+    # Produces: 07.phages/genomad_db/ — the same path the download rule produces,
+    #           so genomad_end_to_end is identical either way.
+    if GENOMADDB:
+
+        rule genomad_db_local:
+            input:
+                src = GENOMADDB,
+            output:
+                genomad_db = directory(GENOMAD_DB_DIR),
+            log:
+                LOGS + "/genomad_db_local.log"
+            priority: 9
+            shell:
+                """
+                mkdir -p {output.genomad_db}
+                {{
+                  echo "Building a local geNomad database view"
+                  echo "  source (read-only): {input.src}"
+                  echo "  view:               {output.genomad_db}"
+                }} > {log}
+                for f in "{input.src}"/*; do
+                    ln -sfn "$f" "{output.genomad_db}/$(basename "$f")"
+                done
+                """
 
     # ── Rule: genomad_end_to_end — virus + plasmid calling in one run ────────
     # Biology: geNomad scans the finished genome and, in a single end-to-end run,

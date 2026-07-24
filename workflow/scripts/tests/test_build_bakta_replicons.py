@@ -168,9 +168,18 @@ class TestDnaaplerStatusStrings(unittest.TestCase):
 
 class TestGracefulDegradation(unittest.TestCase):
 
-    def test_zero_overlap_join_warns_and_stays_neutral(self):
+    def test_zero_overlap_join_is_fatal(self):
         # Simulates the silent failure this script exists to catch: a later step
         # renamed the contigs, so neither table joins.
+        #
+        # This case USED to be only a warning, and the row-building half below still
+        # shows why that was not enough: with nothing joined, build_rows produces a
+        # perfectly well-formed all-linear, all-"contig" table that Bakta would
+        # accept without complaint, annotating exactly as if no replicon table had
+        # been passed at all. Nothing downstream can tell that apart from a genome
+        # that really is all linear contigs. So report_join_health was deliberately
+        # changed to STOP the run on zero overlap; this test pins that down, because
+        # a regression here would be invisible in the output.
         renamed_flye = FLYE_INFO.replace("contig_", "polished_")
         renamed_dnaapler = DNAAPLER_SUMMARY.replace("contig_", "polished_")
         rows, all_rows = build(flye=renamed_flye, dnaapler=renamed_dnaapler)
@@ -181,11 +190,27 @@ class TestGracefulDegradation(unittest.TestCase):
         contig_ids = [row["contig"] for row in all_rows]
         topology = br.parse_flye_info(write_temp(renamed_flye))
         markers = br.parse_dnaapler_summary(write_temp(renamed_dnaapler, ".tsv"))
-        flye_matches, dnaapler_matches = br.report_join_health(
-            contig_ids, topology, markers
+        with self.assertRaises(SystemExit) as caught:
+            br.report_join_health(contig_ids, topology, markers)
+        # The message must name the cause (renamed contigs), not just fail.
+        self.assertIn("NONE of their IDs match", str(caught.exception))
+
+    def test_partial_overlap_join_is_only_a_warning(self):
+        # The counterpart to the test above, and the reason zero-overlap has to be
+        # judged separately: dnaapler only reports the contigs it could reorient, so
+        # a PARTIAL join is a normal biological outcome, not a broken pipeline. It
+        # must stay non-fatal, or every ordinary genome would fail the run.
+        contig_ids = br.read_contig_ids(write_temp(FASTA, ".fasta"))
+        topology = br.parse_flye_info(write_temp(FLYE_INFO))
+        partial_markers = br.parse_dnaapler_summary(
+            write_temp(DNAAPLER_SUMMARY, ".tsv")
         )
-        self.assertEqual(flye_matches, 0)
-        self.assertEqual(dnaapler_matches, 0)
+        partial_markers.pop(next(iter(partial_markers)))  # drop one reoriented contig
+        flye_matches, dnaapler_matches = br.report_join_health(
+            contig_ids, topology, partial_markers
+        )
+        self.assertGreater(flye_matches, 0)
+        self.assertGreater(dnaapler_matches, 0)
 
     def test_missing_input_files_do_not_crash(self):
         contig_ids = br.read_contig_ids(write_temp(FASTA, ".fasta"))

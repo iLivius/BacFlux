@@ -241,6 +241,77 @@ CARDDB = _resolve_optional_db_dir(
 if CARDDB:
     print(f"Using the local CARD database at '{CARDDB}'. Nothing will be downloaded.")
 
+# geNomad's database is served from portal.nersc.gov — the SAME host as CheckV's,
+# which is unreachable often enough that BacFlux already ships a Zenodo mirror for
+# CheckV. geNomad's downloader has no mirror option (the URL is hard-coded in the
+# package), so when that host is down the ONLY way to run geNomad is to point at a
+# copy you already hold. Hence this override matters more here than elsewhere.
+#
+GENOMADDB = _resolve_optional_db_dir(
+    "genomad_db", "version.txt",
+    "Point it at the genomad_db directory 'genomad download-database' produced "
+    "(containing version.txt, genomad_db.dbtype, genomad_marker_metadata.tsv, ...)."
+)
+if GENOMADDB:
+    # EXISTING is not enough for this one, because a shared database can be
+    # PARTLY readable. Seen on this machine: of 27 files, 11 were mode 0640 —
+    # version.txt, both hallmark annotation tables, and the whole
+    # genomad_integrase_db set — while the big data files beside them were
+    # world-readable. os.path.exists() returns True for a file you may stat but
+    # not read, so the probe above passes and the run then dies minutes later,
+    # first on PermissionError for version.txt, and after that on a buried
+    # "Could not open data file …genomad_integrase_db.dbtype" from mmseqs.
+    #
+    # So check every file for real READ access, and name the offenders. This is
+    # cheap (a few dozen files) and turns a confusing mid-run crash into one
+    # line at startup that says exactly which files to fix.
+    _genomad_unreadable = sorted(
+        entry.name
+        for entry in os.scandir(GENOMADDB)
+        if entry.is_file() and not os.access(entry.path, os.R_OK)
+    )
+    if _genomad_unreadable:
+        _shown = ", ".join(_genomad_unreadable[:6])
+        _more = f" (and {len(_genomad_unreadable) - 6} more)" if len(_genomad_unreadable) > 6 else ""
+        sys.exit(
+            f"[BacFlux] directories.genomad_db is '{GENOMADDB}', but "
+            f"{len(_genomad_unreadable)} file(s) in it are not readable by you: "
+            f"{_shown}{_more}. geNomad needs all of them and would fail partway "
+            f"through the run. Ask whoever owns that directory to make it readable "
+            f"(chmod -R a+r), or point at a copy you own."
+        )
+
+    # A geNomad DATABASE is coupled to the geNomad RELEASE, and geNomad itself does
+    # not check this: it reads version.txt only to print it, then parses
+    # genomad_marker_metadata.tsv positionally, unpacking the LAST columns of each
+    # row. An older database has one fewer trailing column, so every field shifts by
+    # one and geNomad dies minutes into the run on
+    #   ValueError: invalid literal for int() with base 10: '1398618at2'
+    # — a marker accession being read as a hallmark count. Verified here on
+    # 2026-07-24 with database v1.7 against geNomad 1.12.0.
+    #
+    # The check is deliberately on the SCHEMA rather than on a version number: the
+    # trailing PREVIOUS_MARKER_ACCESSION column is the actual thing whose absence
+    # causes the crash, so testing for it is exact and needs no guessing about which
+    # database version pairs with which release. If a future geNomad adds yet
+    # another column, this check will pass and the crash will return — at which
+    # point update the expected column here.
+    _genomad_metadata = os.path.join(GENOMADDB, "genomad_marker_metadata.tsv")
+    if os.path.exists(_genomad_metadata):
+        with open(_genomad_metadata) as _fh:
+            _genomad_columns = _fh.readline().rstrip("\n").split("\t")
+        if "PREVIOUS_MARKER_ACCESSION" not in _genomad_columns:
+            sys.exit(
+                f"[BacFlux] directories.genomad_db is '{GENOMADDB}', but that database "
+                f"is too old for the geNomad this workflow installs: its "
+                f"genomad_marker_metadata.tsv has {len(_genomad_columns)} columns and "
+                f"lacks PREVIOUS_MARKER_ACCESSION. geNomad would not notice and would "
+                f"fail partway through with a confusing 'invalid literal for int()'. "
+                f"Point at a database downloaded for a current geNomad release."
+            )
+
+    print(f"Using the local geNomad database at '{GENOMADDB}'. Nothing will be downloaded.")
+
 # workflow.basedir is the absolute path of the workflow/ directory (independent
 # of workdir). It anchors the helper script and the on-disk rule-module lookup.
 WORKFLOW_DIR = workflow.basedir
