@@ -1135,6 +1135,21 @@ if HAS_LONG_READS:
     else:
         print("Medaka model will be inferred automatically from FASTQ headers.")
 
+    # ── Early Medaka-model validation (rule check_medaka_model) ───────────────
+    # Medaka polishing is one of the LAST steps of a long-read run, so a bad model
+    # (a typo, or one dropped in a newer Medaka) used to fail only after the
+    # assembler had already run for an hour+. check_medaka_model
+    # (shared/12_medaka_check.smk) validates the model right after read filtering
+    # and gates the assembler on it, and writes the confirmed/resolved name here
+    # for long_read_consensus to reuse — so the model is resolved once and a bad
+    # one fails in seconds. See scripts/medaka_model_check.py.
+    MEDAKA_CHECK_SCRIPT   = os.path.join(WORKFLOW_DIR, "scripts", "medaka_model_check.py")
+    MEDAKA_MODEL_RESOLVED = DIR_ASSEMBLY + "/{sample}/{sample}_medaka_model.txt"
+    # Opt-in middle option: when an EXPLICIT model is invalid, fall back to
+    # auto-inference instead of failing. Default off — an explicit choice is
+    # honoured or reported, never silently swapped for a guess.
+    MEDAKA_MODEL_FALLBACK_AUTO = _config_bool(_lr_params.get("medaka_model_fallback_auto"), False)
+
     # In auto mode only an explicit *fast* Medaka model switches Flye to
     # --nano-raw (fast basecalling => noisier reads); otherwise assume
     # high-quality ONT reads and use --nano-hq.

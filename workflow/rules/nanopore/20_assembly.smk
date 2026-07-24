@@ -80,6 +80,10 @@
 rule ont_assembly:
     input:
         filt_long = FILT_LONG,
+        # GATE (not used in the shell): don't spend an hour assembling if the
+        # Medaka model is already known bad. check_medaka_model writes this after
+        # read filtering; [] when Medaka is off, so there is no gate then.
+        medaka_ok = MEDAKA_MODEL_RESOLVED if USE_MEDAKA else [],
     output:
         flye_dir = directory(FLYE_DIR),
         flye_contigs = FLYE_CONTIGS,

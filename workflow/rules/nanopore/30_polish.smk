@@ -85,11 +85,15 @@ if USE_MEDAKA:
         input:
             reads = FILT_LONG,
             contigs = MEDAKA_INPUT,
+            # The model NAME, already validated (explicit) or inferred (auto) by
+            # check_medaka_model (shared/12_medaka_check.smk), which also gated the
+            # assembler. Reading it here means the model is resolved once, and any
+            # bad-model failure already happened before assembly — so this rule
+            # trusts the name unconditionally and stays a plain Medaka call.
+            model = MEDAKA_MODEL_RESOLVED,
         output:
             consensus_dir = directory(MEDAKA_DIR),
             consensus_contigs = MEDAKA_CONSENSUS,
-        params:
-            model = MEDAKA_MODEL if MEDAKA_MODEL is not None else "",
         conda:
             "../../envs/medaka.yaml"
         threads: capped_cpus(24)
@@ -97,85 +101,15 @@ if USE_MEDAKA:
             LOGS + "/long_read_consensus_{sample}.log"
         priority: 9
         shell:
-            # A NOTE ON BACKSLASHES BELOW: this shell block is an ordinary Python
-            # string, so a backslash-n written once would become a real newline
-            # before bash ever sees it. Where bash itself needs the two characters
-            # \n (in printf and tr), they are written doubled: \\n.
             """
-            if [ -n "{params.model}" ]; then
-
-              # ── The user named a model explicitly ─────────────────────────
-              model="{params.model}"
-
-              # PRE-FLIGHT CHECK (kept from v1 nanopore): a wrong model name is
-              # the most common Medaka failure, and without this check it only
-              # shows up after Medaka has already loaded the reads. Skip the
-              # check when the value points at a local model file on disk.
-              if [ ! -e "$model" ]; then
-                models=$(medaka tools list_models 2>&1) || {{
-                  {{
-                    echo "ERROR: Unable to query Medaka models in the current conda environment."
-                    echo "  medaka_model: $model"
-                    echo "  reason: 'medaka tools list_models' failed."
-                    echo ""
-                    echo "$models"
-                  }} > {log}
-                  cat {log} >&2
-                  exit 1
-                }}
-                if ! printf '%s\\n' "$models" | sed -n 's/^Available: //p' | tr ',' '\\n' | sed 's/^ *//; s/ *$//' | grep -Fxq "$model"; then
-                  {{
-                    echo "ERROR: Invalid Medaka model configured for consensus polishing."
-                    echo "  medaka_model: $model"
-                    echo "  reason: this model is not available in the current Medaka environment."
-                    echo "  next steps: choose a model from 'medaka tools list_models', set 'parameters.nanopore.medaka_model' to auto to infer it from the FASTQ headers, set it to FALSE to skip Medaka, or use a Medaka 1.x environment if this exact legacy model is required."
-                  }} > {log}
-                  cat {log} >&2
-                  exit 1
-                fi
-              fi
-
-              medaka_consensus \
-                -i {input.reads} \
-                -d {input.contigs} \
-                -t {threads} \
-                -m "$model" \
-                -o {output.consensus_dir} > {log} 2>&1 || {{
-                  cat {log}
-                  echo "" >&2
-                  echo "Medaka failed while using the explicit model setting '$model'." >&2
-                  echo "If this is an older ONT model, it may be deprecated in Medaka v2 or its model weights may not be installed locally." >&2
-                  echo "For Medaka v2, prefer a supported model such as 'r941_min_fast_g507' over deprecated legacy names like 'r941_min_fast_g303'." >&2
-                  echo "Otherwise set 'parameters.nanopore.medaka_model' to FALSE to skip Medaka." >&2
-                  exit 1
-                }}
-
-            else
-
-              # ── Infer the model from the read headers ─────────────────────
-              # ONT basecallers stamp the model into the FASTQ header, and
-              # filtlong preserves headers on the reads it keeps — so the filtered
-              # file carries the tag just as v1 BacFluxL relied on. Using the same
-              # reads being polished also keeps this immune to the raw input's
-              # compression (the raw file may be .gz; this one never is).
-              resolved_model=$(medaka tools resolve_model --auto_model consensus_bacteria {input.reads} 2> {log}) || {{
-                cat {log}
-                echo "" >&2
-                echo "Medaka could not auto-infer a consensus model from {input.reads}." >&2
-                echo "This usually means the ONT FASTQ headers do not contain exactly one basecaller model reference." >&2
-                echo "Set 'parameters.nanopore.medaka_model' in the config to auto, an explicit Medaka model name, or FALSE to skip Medaka." >&2
-                exit 1
-              }}
-              echo "Resolved Medaka model: $resolved_model" >> {log}
-
-              medaka_consensus \
-                -i {input.reads} \
-                -d {input.contigs} \
-                -t {threads} \
-                -m "$resolved_model" \
-                -o {output.consensus_dir} >> {log} 2>&1
-
-            fi
+            model=$(cat {input.model})
+            echo "Polishing with Medaka model: $model" > {log}
+            medaka_consensus \
+              -i {input.reads} \
+              -d {input.contigs} \
+              -t {threads} \
+              -m "$model" \
+              -o {output.consensus_dir} >> {log} 2>&1
             """
 
 
