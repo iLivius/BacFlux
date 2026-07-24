@@ -708,6 +708,78 @@ stay valid for reproducibility.
 Now add it **once** in `shared/80_mobilome.smk` + `scripts/mobilome/`, gated by
 `config.mobilome.run`, following `mobilome_module_SPEC.md`.
 
+**Stage 7 — IMPLEMENTED, and validated on real genomes. ✓ 2026-07-25.**
+Taken out of order at the user's request (Stages 5 and 6 deferred). Built once in
+`shared/80_mobilome.smk`, so all four modes get it for free — the module consumes only
+`FINAL_CONTIGS` plus Bakta and Platon output, none of which is mode-specific.
+
+*Shape.* 10 rules and 5 scripts, gated behind `mobilome.run` (default OFF), delivering
+WP-A (AMRFinderPlus surfaced), WP-C (ISEScan + a tidy IS table), WP-D (AMR × MGE
+co-localisation → the 6-tier mobility ladder), CONJscan for tiers 5–6, and Platon-derived
+replicon calls. WP-E (ICE boundary refinement, spec §8) is deliberately NOT built: it is
+BacFluxL-only in the spec, and the att-site search is the expensive part.
+
+*The lesson worth carrying forward.* The spec's §1.2 path table was explicitly marked
+UNVERIFIED, and it deserved to be. Running each tool before writing its rule turned up
+**seven** wrong or missing assumptions, every one of which would have been a silent
+runtime failure rather than a parse error:
+- AMRFinderPlus's database lives at `…/amrfinderplus-db/latest`, not the parent, and its
+  column is `Element symbol`, not `Gene symbol`.
+- ISEScan writes **no files at all** for a genome with no IS (a normal biological result,
+  not an error), **reuses** a previous run's intermediate directories unless they are
+  cleared, and must be invoked so conda resolves its own python or `libssw.so` fails to load.
+- Platon **skips any contig over 500 kb**, so on a complete assembly the chromosome appears
+  in neither output FASTA. Uncompensated, this would have capped confidence on every
+  chromosomal AMR gene in every closed genome. `platon_replicons.py` infers chromosome
+  above a 2 Mb ceiling instead, and records that inference in the audit column.
+- CONJscan's models are CC BY-NC-SA (fetched, never vendored), and `macsydata` is
+  deprecated in favour of `msf_data`.
+
+*Validation.* Ran for real through Snakemake against the existing `hybrid_screen_batch2`
+output (`--rerun-triggers mtime`, so only the 29 new jobs ran): **29/29 steps, exit 0**,
+13 files per sample. Biology checked by hand, not just exit codes:
+- 006 → 5 AMR genes, all tier 1 `intrinsic_candidate`, high confidence; 17 IS.
+- 015 → 3 AMR genes, all tier 1; 21 IS.
+- 386 → 0 AMR genes but 31 IS and one **24.5 kb chromosomal IME candidate**
+  (`contig_1|ime-1166923:1191384`): integrase + MOBF relaxase + T4CP, but no mating-pair
+  apparatus and machinery incomplete (wholeness 0.667), so reported as *mobilisable with a
+  helper*, NOT self-transmissible. Precisely the distinction the ladder exists to make.
+- The GTDB→AMRFinderPlus organism map correctly declined all three: `Pseudomonas_E` is a
+  GTDB split from NCBI *Pseudomonas* and is not the same taxon, and *Arthrobacter* is not
+  among AMRFinderPlus's 31 curated organisms. Point-mutation detection stays off, silently
+  and correctly, with the reason written to the audit TSV.
+- Discard audits carry a reason per dropped item (`no_conjugation_anchor`,
+  `machinery_degraded`, `cluster_shorter_than_min`), satisfying the CLAUDE.md hard rule.
+
+*Known gap, not a bug.* The main deliverable is one row per AMR gene, so on a sample like
+386 — a real mobilisable element carrying no AMR cargo — `386_amr_mobility.tsv` is
+header-only and the IME is visible only in `386_ice_candidates.tsv`. Correct per the
+spec's scope, but a reader of the main table alone would miss it. Worth a line in the
+README when Stage 5 happens.
+
+**Stage 7b — geNomad opt-in path made installable. ✓ 2026-07-25.**
+geNomad was written in Stage 4 (D8/D9) but had never been executed. Running it found that
+its database is served from `portal.nersc.gov` — the same host whose outages forced the
+CheckV Zenodo mirror — with the URL hard-coded in the package, so no mirror can be wired
+in. While that host is down, opting into geNomad was impossible. Fixed by giving geNomad
+the shared-database treatment every other large database already had
+(`directories.genomad_db` + `genomad_db_local`); it was the only one missing it.
+
+Two further ways a *present* local database still fails, both hit for real here and both
+now caught at parse time: a partly-unreadable copy (11 of 27 files were mode 0640, and
+`os.path.exists` is true for a file you may stat but not read), and a database too old for
+the installed release (geNomad parses its marker metadata positionally from the right and
+never validates the version, so an older schema shifts every field and dies on
+`invalid literal for int()`). The CLI contract itself — positional `INPUT OUTPUT DATABASE`,
+the `<prefix>_summary/` output layout, and clean execution into the pre-created directory
+Snakemake makes for a `directory()` output — was verified against the real tool, closing
+the VERIFY note left in the rule.
+
+D9 was exercised on real output for the first time: on 386, geNomad and Platon
+independently call `contig_2` a plasmid (`agreement=both`, `confidence=high`), and
+geNomad's MOBP1 relaxase agrees with both Platon's mobilization/conjugation counts and
+CONJscan's finding in the mobilome module — three independent tools, one conclusion.
+
 ---
 
 ## 8. Risks & must-verify-during-implementation
