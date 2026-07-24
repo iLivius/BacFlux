@@ -114,13 +114,22 @@ def test_main_explicit_invalid_fails_with_suggestion(tmp_path, monkeypatch, caps
     assert "r941_min_hac_g507" in capsys.readouterr().err
 
 
-def test_main_auto_success(tmp_path, monkeypatch):
+# The realistic thing `medaka tools resolve_model` prints: a PATH to the model
+# file, NOT a bare name — so it is NEVER a member of the (bare-name) AVAILABLE
+# list. Auto mode must accept it anyway (it is a valid `-m` argument). This is
+# the regression the adversarial review caught: an earlier version required the
+# resolved value to be in AVAILABLE, which failed every real auto run.
+RESOLVED_PATH = "/opt/medaka/data/r941_min_hac_g507_model_pt.tar.gz"
+
+
+def test_main_auto_success_accepts_a_path_not_in_the_name_list(tmp_path, monkeypatch):
     monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
-    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: "r941_min_hac_g507")
+    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: RESOLVED_PATH)
+    assert RESOLVED_PATH not in AVAILABLE          # guard: it is a path, not a name
     out = tmp_path / "model.txt"
     rc = mc.main(["--model", "", "--reads", "x.fastq", "--out", str(out)])
     assert rc == 0
-    assert out.read_text().strip() == "r941_min_hac_g507"
+    assert out.read_text().strip() == RESOLVED_PATH
 
 
 def test_main_auto_failure_shows_menu(tmp_path, monkeypatch, capsys):
@@ -137,13 +146,14 @@ def test_main_auto_failure_shows_menu(tmp_path, monkeypatch, capsys):
 
 def test_main_middle_option_falls_back_to_auto(tmp_path, monkeypatch, capsys):
     # Invalid explicit model + fallback on + auto succeeds -> use auto, warn.
+    # Auto returns a PATH (as real medaka does), which must be accepted.
     monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
-    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: "r941_min_hac_g507")
+    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: RESOLVED_PATH)
     out = tmp_path / "model.txt"
     rc = mc.main(["--model", "r941_min_hac_g999", "--reads", "x.fastq",
                   "--fallback-to-auto", "true", "--out", str(out)])
     assert rc == 0
-    assert out.read_text().strip() == "r941_min_hac_g507"
+    assert out.read_text().strip() == RESOLVED_PATH
     assert "WARNING" in capsys.readouterr().err
 
 

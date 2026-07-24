@@ -215,17 +215,15 @@ def main(argv=None):
     available = list_available_models()
 
     # ── AUTO mode ────────────────────────────────────────────────────────────
+    # resolve_model returns a PATH to the model file (e.g. .../r941_min_hac_g507_
+    # model_pt.tar.gz), NOT a bare name, and only on success — a non-zero exit
+    # means it could not infer. So a truthy result is already a valid, usable
+    # `-m` argument; trust it exactly as v1 did. Do NOT cross-check it against the
+    # bare-name list (a path can never match, which would fail every auto run).
     if not model:
         resolved = resolve_from_reads(args.reads)
-        if resolved and resolved in available:
-            return succeed(resolved)
         if resolved:
-            # Medaka named a model its own list does not contain — treat as a
-            # failure rather than trust an unusable name downstream.
-            return fail(
-                f"Auto-inference returned '{resolved}', which is not in this Medaka "
-                f"version's model list.\n\n" + auto_failure_message(available)
-            )
+            return succeed(resolved)
         return fail(auto_failure_message(available))
 
     # ── EXPLICIT model ───────────────────────────────────────────────────────
@@ -238,16 +236,17 @@ def main(argv=None):
         return succeed(model)
 
     # Invalid explicit model. The opt-in middle option: try auto before failing.
+    # As in AUTO mode above, resolve_from_reads returns a usable path on success.
     if fallback:
         resolved = resolve_from_reads(args.reads)
-        if resolved and resolved in available:
+        if resolved:
             return succeed(
                 resolved,
                 note=(
                     f"WARNING: configured medaka_model '{model}' is not available in "
-                    f"this Medaka version; fell back to the auto-inferred '{resolved}' "
-                    f"(parameters.<mode>.medaka_model_fallback_auto is on). Set "
-                    f"medaka_model to '{resolved}' or to auto to silence this."
+                    f"this Medaka version; fell back to the auto-inferred model "
+                    f"'{resolved}' (parameters.<mode>.medaka_model_fallback_auto is "
+                    f"on). Set medaka_model to auto to silence this."
                 ),
             )
         # Fall-through: fallback was requested but auto could not help either.

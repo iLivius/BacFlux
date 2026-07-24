@@ -54,10 +54,14 @@ if HAS_LONG_READS and USE_MEDAKA:
         # it up promptly and a bad model surfaces as early as possible.
         priority: 10
         shell:
+            # On failure, echo the log (which holds the suggestion table — the
+            # whole point of this rule) to stderr so it lands on the Snakemake
+            # console, not only in the per-sample log file. Mirrors v1's
+            # `cat {log} >&2` in every error branch.
             """
             python {params.script} \
               --model "{params.model}" \
               --reads {input.reads} \
               --fallback-to-auto {params.fallback} \
-              --out {output.resolved} > {log} 2>&1
+              --out {output.resolved} > {log} 2>&1 || {{ cat {log} >&2; exit 1; }}
             """

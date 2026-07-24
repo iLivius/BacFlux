@@ -209,6 +209,10 @@ if USE_MEDAKA:
             LOGS + "/long_read_consensus_{sample}.log"
         priority: 9
         shell:
+            # check_medaka_model already validated the NAME (or resolved auto), so
+            # a failure here is a RUNTIME one — model weights not installed (no
+            # network to fetch them), or a legacy model broken under Medaka v2.
+            # The hint keeps that case actionable instead of a bare stack trace.
             """
             model=$(cat {input.model})
             echo "Polishing with Medaka model: $model" > {log}
@@ -217,5 +221,12 @@ if USE_MEDAKA:
               -d {input.contigs} \
               -t {threads} \
               -m "$model" \
-              -o {output.consensus_dir} >> {log} 2>&1
+              -o {output.consensus_dir} >> {log} 2>&1 || {{
+                cat {log} >&2
+                echo "" >&2
+                echo "Medaka failed at polishing with the pre-validated model '$model'." >&2
+                echo "The name was accepted by check_medaka_model, so this is a RUNTIME failure: the model weights may not be installed locally (no network to fetch them), or a legacy model may be broken under Medaka v2." >&2
+                echo "Set 'parameters.hybrid.medaka_model' to a supported model, or to FALSE to skip Medaka." >&2
+                exit 1
+              }}
             """
