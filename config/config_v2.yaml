@@ -82,6 +82,16 @@ resources:
 parameters:
   nt_version: core_nt          # all modes — which NCBI blast_db subfolder to screen against. Options: core_nt | nt_prok
 
+  # eggNOG-mapper functional annotation — the slowest tail rule on large genomes.
+  eggnog:
+    dbmem: false               # all modes. false (default): read eggnog.db from disk.
+                               #   true: load the 39 GB eggnog.db entirely into RAM to
+                               #   speed the annotation phase. Costs ~42 GB RAM PER
+                               #   concurrent eggNOG job. Requires resources.ram_gb >= 42
+                               #   (checked at parse time). When on, BacFlux prints the
+                               #   exact '--resources mem_gb=N' flag to add so Snakemake
+                               #   caps concurrent eggNOG jobs to what your RAM holds.
+
   # Decontamination policy — SHARED across all four modes. After BlobTools
   # assigns each contig a genus, the selector keeps/discards contigs per this
   # policy and writes an audit TSV of every decision.

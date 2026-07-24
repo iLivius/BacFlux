@@ -835,6 +835,50 @@ def _config_bool(value, default=False):
     raise ValueError(f"Invalid boolean config value: {value!r}")
 
 
+# ─────────────── eggNOG-mapper --dbmem (opt-in RAM acceleration) ─────────────
+# emapper's annotation phase does random-access lookups into the 39 GB eggnog.db
+# SQLite once per seed ortholog. On a ~6000-protein genome that on-disk phase is
+# the slow tail of a whole run (it is why functional_annotation is always the
+# last rule finishing). --dbmem loads eggnog.db wholly into RAM so those lookups
+# become in-memory; the DB is released when emapper exits.
+#
+# OPT-IN (default off, matching emapper's own default): it costs ~42 GB of RAM per
+# CONCURRENT eggNOG job (eggnog.db is 39 GB + emapper's own working set). Every
+# number here is derived from resources.ram_gb — the budget the user already
+# declares — NOT from probing live free memory. Live probing is unreliable exactly
+# when it matters: the value at parse time cannot predict how many eggNOG jobs run
+# concurrently, `free` reports the HOST's RAM inside a container/cgroup, and on a
+# cluster the submit node's RAM is not the compute node's. A declared budget
+# travels correctly and keeps the run reproducible.
+#
+# This block sits with the resource accessors conceptually, but is placed here
+# because it calls _config_bool (defined just above).
+_eggnog_params = (config.get("parameters", {}) or {}).get("eggnog") or {}
+EGGNOG_DBMEM = _config_bool(_eggnog_params.get("dbmem"), False)
+EGGNOG_DBMEM_GB = 42   # eggnog.db is 39 GB on disk; 42 leaves headroom for emapper.
+if EGGNOG_DBMEM:
+    # Guard: at least ONE --dbmem job must fit in the declared budget, or the rule
+    # would OOM the instant it starts. Fail at parse time with an actionable
+    # message — never silently ignore a setting the user turned on.
+    if RAM < EGGNOG_DBMEM_GB:
+        sys.exit(
+            f"[BacFlux] parameters.eggnog.dbmem is on, but resources.ram_gb={RAM} is below "
+            f"the ~{EGGNOG_DBMEM_GB} GB one --dbmem eggNOG job needs (eggnog.db is 39 GB). "
+            f"Raise ram_gb to at least {EGGNOG_DBMEM_GB}, or set parameters.eggnog.dbmem to false."
+        )
+    # Snakemake only ENFORCES a named resource (mem_gb, below) when the launch line
+    # passes it — identical to Qualimap's java_mem. So rather than leave the user
+    # to work out a number, print the exact flag with their own ram_gb filled in:
+    # copy-paste, nothing to remember. Without the flag the run still works; eggNOG
+    # concurrency then falls back to the --cores/thread bound instead of the RAM one.
+    print(
+        f"eggNOG --dbmem is ON: each functional_annotation job loads the 39 GB eggnog.db into "
+        f"RAM (~{EGGNOG_DBMEM_GB} GB/job; {max(1, RAM // EGGNOG_DBMEM_GB)} fit in ram_gb={RAM}). "
+        f"To have Snakemake cap concurrent eggNOG jobs to that many, add "
+        f"'--resources mem_gb={RAM}' to your launch command."
+    )
+
+
 def _decontam_settings(default_mode):
     # Collect every decontamination choice into one dict passed verbatim to the
     # selector script, so all samples follow the same filtering policy.

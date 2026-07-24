@@ -196,14 +196,27 @@ rule functional_annotation:
         eggnog_dir = directory(DIR_ANNOTATION + "/eggnog/{sample}"),
     params:
         dmnd_db = DMNDDB,
+        # "--dbmem" when parameters.eggnog.dbmem is on, else empty. Resolved once
+        # in 00_common (with a parse-time RAM guard); see EGGNOG_DBMEM there.
+        dbmem_flag = "--dbmem" if EGGNOG_DBMEM else "",
     conda:
         "../../envs/eggnog-mapper.yaml"
     threads: capped_cpus(24)
+    resources:
+        # RAM this job needs, in GB. Zero unless --dbmem is on, in which case it is
+        # the ~42 GB required to hold eggnog.db in memory. Like Qualimap's java_mem,
+        # mem_gb is a GIGABYTE figure, not a CPU count, and Snakemake only schedules
+        # against it when the launch line passes `--resources mem_gb=N` (00_common
+        # prints the exact flag when --dbmem is on). Harmlessly 0 on the default,
+        # --dbmem-off path.
+        mem_gb = EGGNOG_DBMEM_GB if EGGNOG_DBMEM else 0,
     log:
         LOGS + "/functional_annotation_{sample}.log"
     priority: 4
     shell:
         # Both output dirs are created up front (emapper expects them to exist).
+        # {params.dbmem_flag} is empty on the default path, adding nothing to the
+        # command line; when on it inserts --dbmem, loading eggnog.db into RAM.
         """
         mkdir -p {output.temp_dir} {output.eggnog_dir}
 
@@ -213,6 +226,7 @@ rule functional_annotation:
           --cpu {threads} \
           -m diamond \
           --data_dir {params.dmnd_db} \
+          {params.dbmem_flag} \
           --output {wildcards.sample} \
           --temp_dir {output.temp_dir} \
           --override > {log} 2>&1
