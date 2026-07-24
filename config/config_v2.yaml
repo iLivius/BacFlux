@@ -129,4 +129,22 @@ phage:
 # Optional mobilome / AMR-mobility module (see docs/mobilome_module_SPEC.md).
 # Default OFF; when true, adds the 08.mobilome/ stage.
 mobilome:
-  run: false
+  run: false                   # master switch, default OFF. When true, adds stage
+                               #   08.mobilome/: for every AMR gene found, report the
+                               #   mobile-element context and a mobility tier
+                               #   (1 = chromosomal/intrinsic candidate ... 6 = inside an
+                               #   ICE or on a conjugative plasmid = PREDICTED
+                               #   self-transmissible). Adds two tools (ISEScan,
+                               #   CONJscan/MacSyFinder), both bioconda, no licence-
+                               #   encumbered database required.
+                               #   READ THIS: on short-read (fragmented) assemblies the
+                               #   located IS count is a FLOOR, not a count — IS elements
+                               #   are the main cause of contig breaks, so the element you
+                               #   are looking for is often what broke the assembly. Every
+                               #   call carries a confidence tier and a contig-boundary
+                               #   flag; read them, never a bare count.
+  max_composite_span_bp: 20000 # two IS copies further apart than this are not called one
+                               #   composite transposon. A CONVENTION, not biology — the
+                               #   measured distance is always reported next to the call.
+  contig_boundary_bp: 100      # how close to a contig end counts as "at the boundary".
+                               #   Anything flagged is capped at low confidence.

@@ -1,0 +1,16 @@
+# ISEScan — insertion-sequence (IS) detection on assembled contigs.
+#
+# Why this tool (mobilome spec §3.1): IS elements are the workhorse of the
+# bacterial mobilome, and ISEScan finds them with its own bundled profile HMMs —
+# no external database to download or license. It works on draft assemblies and,
+# importantly for us, flags whether each copy is complete or partial, which is
+# what lets BacFlux tier its calls honestly on fragmented short-read assemblies.
+#
+# Pinned so a future ISEScan release cannot silently change the output columns
+# the parser (scripts/mobilome/isescan_to_table.py) keys on.
+name: isescan
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - isescan=1.7.3

@@ -102,8 +102,9 @@ if PHAGE_CALLER == "genomad":
 else:
     print("Phage caller: virsorter2 (default). Plasmid stage: Platon-only (geNomad off).")
 
-
-# ─────────────────── 2. Output root, databases, paths ────────────────────────
+# (The mobilome module's settings are resolved further down, in section 8, next to
+# the other config-driven module gates — they need _config_bool, which is defined
+# later in this file.)
 # MetaFlux-style: resolve the output directory to one absolute root (OUT) and
 # build every stage path off it, instead of Snakemake's `workdir:` directive.
 #
@@ -255,6 +256,13 @@ SELECT_TAXONOMY_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "select_contigs_b
 # already ships a Python — so this adds no dependency).
 PLASMID_CONCORDANCE_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "plasmid_concordance.py")
 
+# Mobilome helper scripts (workflow/scripts/mobilome/). Each is stdlib-only Python
+# and is unit-tested outside Snakemake; see docs/mobilome_module_SPEC.md §10.
+MOBILOME_SCRIPTS_DIR   = os.path.join(WORKFLOW_DIR, "scripts", "mobilome")
+ORGANISM_SCRIPT        = os.path.join(MOBILOME_SCRIPTS_DIR, "gtdb_amrfinder_organism.py")
+ISESCAN_TABLE_SCRIPT   = os.path.join(MOBILOME_SCRIPTS_DIR, "isescan_to_table.py")
+COLOCALISE_SCRIPT      = os.path.join(MOBILOME_SCRIPTS_DIR, "colocalise.py")
+
 
 # ───────────────────────── 3a. Resource accessors ───────────────────────────
 # Single source of truth for compute limits. .get with a default means a config
@@ -304,6 +312,31 @@ DIR_AMR        = OUT + "/05.amr"         # abricate/ , mapping/  (mapping only i
 DIR_PLASMIDS   = OUT + "/06.plasmids"    # platon + geNomad concordance
 DIR_PHAGES     = OUT + "/07.phages"      # geNomad|virsorter2 caller + checkv
 DIR_MOBILOME   = OUT + "/08.mobilome"    # mobilome module, only when config.mobilome.run
+
+# ── Mobilome module paths (08.mobilome), used only when config.mobilome.run ──
+# The module answers one question per sample: for each AMR gene, is it sitting in
+# a mobile genetic element, and how transferable is that element? See
+# docs/mobilome_module_SPEC.md and rules/shared/80_mobilome.smk.
+#
+# The per-sample DELIVERABLE is a FILE (the mobility table), not a directory. That
+# is deliberate and matches every other stage's terminal product: a directory()
+# output is deleted before its rule re-runs, so making the stage's headline
+# product a directory would put every other file anyone dropped in there at risk.
+MOBILOME_DIR             = DIR_MOBILOME + "/{sample}"
+AMRFINDER_TSV            = MOBILOME_DIR + "/{sample}_amrfinderplus.tsv"
+AMRFINDER_MUTATIONS      = MOBILOME_DIR + "/{sample}_amrfinderplus_mutations.tsv"
+AMRFINDER_ORGANISM       = MOBILOME_DIR + "/{sample}_amrfinder_organism.txt"
+AMRFINDER_ORGANISM_AUDIT = MOBILOME_DIR + "/{sample}_amrfinder_organism_audit.tsv"
+CONTIG_LENGTHS           = MOBILOME_DIR + "/{sample}_contig_lengths.tsv"
+ISESCAN_DIR              = MOBILOME_DIR + "/isescan"          # a DIRECTORY (rule isescan)
+IS_TABLE                 = MOBILOME_DIR + "/{sample}_is_elements.tsv"
+IS_SUMMARY               = MOBILOME_DIR + "/{sample}_is_summary.tsv"
+IS_AUDIT                 = MOBILOME_DIR + "/{sample}_is_discarded.tsv"
+CONJSCAN_DIR             = MOBILOME_DIR + "/conjscan"         # a DIRECTORY (rule conjscan)
+CONJSCAN_TABLE           = MOBILOME_DIR + "/{sample}_conjugation.tsv"
+MOBILOME_REPLICONS       = MOBILOME_DIR + "/{sample}_replicon_calls.tsv"
+MOBILITY_TABLE           = MOBILOME_DIR + "/{sample}_amr_mobility.tsv"   # THE deliverable
+MOBILITY_AUDIT           = MOBILOME_DIR + "/{sample}_amr_mobility_audit.tsv"
 DIR_REPORT     = OUT + "/09.report"      # multiqc
 
 # Cross-cutting output locations, sitting alongside the numbered stages rather
@@ -833,6 +866,40 @@ def _config_bool(value, default=False):
     if text in {"false", "0", "no", "off"}:
         return False
     raise ValueError(f"Invalid boolean config value: {value!r}")
+
+
+# ── Mobilome / AMR-mobility module (stage 08), opt-in and default OFF ─────────
+# What it is for: for every AMR gene the pipeline found, say whether it sits in a
+# mobile genetic element and how transferable that element is — the evidence
+# behind the intrinsic-vs-acquired distinction. Full design in
+# docs/mobilome_module_SPEC.md; the rules live in rules/shared/80_mobilome.smk.
+#
+# Default OFF because it adds two tools (ISEScan, CONJscan/MacSyFinder). Resolved
+# once here so the rules never re-read the config. Placed in this section because
+# it needs _config_bool, defined just above.
+_mobilome_cfg = config.get("mobilome", {}) or {}
+MOBILOME_RUN = _config_bool(_mobilome_cfg.get("run"), False)
+
+# The composite-transposon span limit. A CONVENTION, not biology: two IS copies
+# further apart than this are not treated as one composite element. The
+# co-localisation script always reports the real measured distance next to the
+# call, so a reader can disagree with the threshold without re-running anything.
+MOBILOME_MAX_COMPOSITE_SPAN = int(_mobilome_cfg.get("max_composite_span_bp", 20000))
+
+# How close to a contig end counts as "at the boundary". IS elements are the main
+# reason short-read assemblies break, so an IS (or an AMR gene) sitting at a contig
+# end is exactly where the evidence runs out — every such call carries this flag
+# and is capped at low confidence.
+MOBILOME_BOUNDARY_BP = int(_mobilome_cfg.get("contig_boundary_bp", 100))
+
+if MOBILOME_RUN:
+    print(
+        "Mobilome module: ON (stage 08.mobilome). For each AMR gene it reports the "
+        "mobile-element context and a mobility tier (1 intrinsic candidate .. 6 "
+        "predicted self-transmissible). Composite span <= "
+        f"{MOBILOME_MAX_COMPOSITE_SPAN} bp; contig-boundary window "
+        f"{MOBILOME_BOUNDARY_BP} bp."
+    )
 
 
 # ─────────────── eggNOG-mapper --dbmem (opt-in RAM acceleration) ─────────────
@@ -1433,14 +1500,22 @@ def _downstream_targets():
     # MissingInputException naming a directory rather than the config key that
     # caused it. Fail with an actionable message instead, and only request the
     # targets once the module actually exists on disk.
-    if _config_bool((config.get("mobilome", {}) or {}).get("run"), False):
+    if MOBILOME_RUN:
         if not glob.glob(os.path.join(WORKFLOW_DIR, "rules", "shared", "80_mobilome.smk")):
             sys.exit(
                 "[BacFlux] config.mobilome.run is true, but the mobilome module "
                 "(workflow/rules/shared/80_mobilome.smk) is not implemented yet. "
                 "Set mobilome.run: false."
             )
-        targets += [*expand(DIR_MOBILOME + "/{sample}", sample=SAMPLES)]
+        # Ask for the FILES, not the directory: the mobility table is the module's
+        # headline product, and the IS summary carries the honest QC signal (what
+        # fraction of IS calls sit at a contig end) that the table must be read
+        # alongside. Requesting files rather than a directory() also keeps the
+        # stage safe from the delete-before-rerun behaviour of directory outputs.
+        targets += [
+            *expand(MOBILITY_TABLE, sample=SAMPLES),
+            *expand(IS_SUMMARY, sample=SAMPLES),
+        ]
     return targets
 
 

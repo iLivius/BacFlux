@@ -1,0 +1,20 @@
+# MacSyFinder — the engine CONJscan runs on.
+#
+# Why this tool (mobilome spec §3.1): CONJscan is a MacSyFinder MODEL PACKAGE that
+# detects the machinery a cell needs to conjugate — relaxase (MOB), coupling
+# protein (T4CP) and the type IV secretion system (T4SS/MPF). That machinery is
+# what separates the top of BacFlux's mobility ladder: an element carrying it is
+# PREDICTED self-transmissible (tier 6), one lacking it needs a helper (tier 5).
+#
+# It is conservative and model-based, so there is no giant sequence database to
+# ship — only the small CONJscan model package, fetched once by `macsydata install`
+# in the mobilome module's database rule.
+#
+# Pinned for the same reason as ISEScan: the results table's column names are a
+# contract the downstream parser depends on.
+name: macsyfinder
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - macsyfinder=2.1.6
