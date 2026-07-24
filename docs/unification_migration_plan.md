@@ -638,6 +638,56 @@ missing file, a regression manufactured by a wrong directory), the lesson is the
 both directions: **verify that a check actually executed against the thing you think it
 did, before believing either its pass or its failure.**
 
+**Stage 4.9 — Post-audit hardening + the last mode validated. ✓ 2026-07-24.**
+Triggered by an independent 5-agent audit of the whole v2 tree (git history, the three
+baseline validations, the two screening batches, the open-issues docs, and a fresh code
+pass). The audit re-confirmed every prior claim against live files and surfaced work that
+this stage closed:
+
+- **Two real `checkv_db` bugs, both in a path that had never run all session** (every run
+  used `directories.checkv_db`, so the download rule was dormant): it had no `threads:` and
+  its `diamond makedb` no `--threads` (could grab every core, unaccounted by `--cores`), and
+  its download had NO checksum verification. Fixed to match `checkv_db_local`'s thread cap and
+  dbCAN's `.sha256` discipline (`01fcb75`). The download rule was then exercised for real
+  (1.6 GB Zenodo mirror, checksum verified, index built at the capped thread count) — the
+  first time all session, closing the long-standing "checkv_db download untested" item.
+- **Shared-database pattern extended** (`01fcb75`): the `directories.checkv_db` idea (point at
+  a copy you already hold; nothing re-downloaded into every run's output_dir) now also covers
+  `directories.vs2_db` / `antismash_db` / `dbcan_db` / `card_db`, each with a `*_db_local`
+  symlink-view rule. Closes the ~85 GB-of-duplicated-downloads finding. All four verified by
+  running their local-view rules against real (or, for CARD, stub) shared directories.
+- **eggNOG `--dbmem`** (`d968e16`): opt-in RAM acceleration for the slow `functional_annotation`
+  tail, derived from the declared `resources.ram_gb` (not a live probe), with a parse-time
+  guard and a printed `--resources mem_gb=N` hint. Follows Qualimap's `java_mem` convention.
+- **Early Medaka-model validation + suggester** (`f2310fe`): `check_medaka_model` validates the
+  model right after read filtering and gates the assembler, so a typo/unsupported model fails
+  in seconds (with a flowcell/device/accuracy suggestion table) instead of after Flye. Logic in
+  `scripts/medaka_model_check.py` (+15 pytest). Opt-in `medaka_model_fallback_auto`. One
+  documented v1→v2 change: hybrid auto-inference now resolves from `FILT_LONG` like nanopore.
+
+**Stage 4.10 — Real end-to-end validation, contigs mode. ✓ PASSED 2026-07-24.**
+Run at `/media/data/antonielli_dir/BacFlux_v2_validation/contigs_validation/` (see its
+`SAMPLE_NOTES.md`). 162/162 steps, zero errors, `--cores 96`, no `--resources`. This is the
+mode with NO v1 FastaFlux baseline, so it is not a byte-comparison — it is the first exercise
+of contigs-mode's OWN code: sample discovery from bare FASTA, its decontamination screen run
+from scratch, and the shared tail. Input was 6 genomes drawn at random (seed 20260724) from
+BacFlux's own assemblies — 3 SPAdes-origin, 3 Flye-origin, deliberately mixing raw drafts
+(pre-decontam) with finished single-mode genomes:
+
+- **The decontamination screen demonstrably works**: raw SPAdes drafts were cleaned
+  (399_spades 211→75 contigs, 006_spades 88→50), while already-decontaminated / long-read
+  genomes were correctly left untouched (CDRTa11 35→35; the three Flye drafts unchanged).
+- **Also first real use of the Stage-4.9 shared-database feature** (`directories.vs2_db` /
+  `antismash_db` / `dbcan_db` pointed at the screening batches' copies — ~25 GB not re-fetched)
+  and of the shared local-view rules in a production run.
+- 399 was drawn in BOTH pools (chance); its SPAdes and Flye drafts both classified
+  *Paenibacillus*, confirming the mode handles two assembler representations of one organism
+  consistently.
+
+**Validation status: ALL FOUR modes now pass end-to-end** — illumina/nanopore/hybrid
+byte-identical to their v1 baselines (Stage 4.5–4.8), and contigs exercised on its own code
+(Stage 4.10). The "contigs mode unvalidated" gap is closed.
+
 **Stage 4 — Front ends, one mode at a time, each a gate. [original scoping]**
 Do them in increasing complexity: `illumina` → `contigs` → `nanopore` → `hybrid`.
 After each, run the full mode end-to-end on the Stage-0 isolate. **Gate per mode:** output
