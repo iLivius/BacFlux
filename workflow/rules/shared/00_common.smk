@@ -262,6 +262,11 @@ MOBILOME_SCRIPTS_DIR   = os.path.join(WORKFLOW_DIR, "scripts", "mobilome")
 ORGANISM_SCRIPT        = os.path.join(MOBILOME_SCRIPTS_DIR, "gtdb_amrfinder_organism.py")
 ISESCAN_TABLE_SCRIPT   = os.path.join(MOBILOME_SCRIPTS_DIR, "isescan_to_table.py")
 COLOCALISE_SCRIPT      = os.path.join(MOBILOME_SCRIPTS_DIR, "colocalise.py")
+CONJSCAN_ICE_SCRIPT    = os.path.join(MOBILOME_SCRIPTS_DIR, "conjscan_to_ice.py")
+# Named REPLICONS_MOBILOME_SCRIPT, not REPLICONS_SCRIPT: the latter already
+# exists for the Bakta --replicons table in the long-read modes, and the two do
+# entirely different jobs.
+REPLICONS_MOBILOME_SCRIPT = os.path.join(MOBILOME_SCRIPTS_DIR, "platon_replicons.py")
 
 
 # ───────────────────────── 3a. Resource accessors ───────────────────────────
@@ -333,7 +338,14 @@ IS_TABLE                 = MOBILOME_DIR + "/{sample}_is_elements.tsv"
 IS_SUMMARY               = MOBILOME_DIR + "/{sample}_is_summary.tsv"
 IS_AUDIT                 = MOBILOME_DIR + "/{sample}_is_discarded.tsv"
 CONJSCAN_DIR             = MOBILOME_DIR + "/conjscan"         # a DIRECTORY (rule conjscan)
-CONJSCAN_TABLE           = MOBILOME_DIR + "/{sample}_conjugation.tsv"
+# The CONJscan model package is fetched ONCE and shared by every sample, so it
+# lives beside the per-sample directories rather than inside one of them.
+CONJSCAN_MODELS_DIR      = DIR_MOBILOME + "/conjscan_models"   # a DIRECTORY (rule conjscan_models)
+# ICE / IME candidates derived from the CONJscan hits. This is the SECOND source
+# of mobile elements (insertion sequences are the first); both are fed to the
+# co-localisation step, which accepts --is-table more than once.
+ICE_TABLE                = MOBILOME_DIR + "/{sample}_ice_candidates.tsv"
+ICE_AUDIT                = MOBILOME_DIR + "/{sample}_ice_discarded.tsv"
 MOBILOME_REPLICONS       = MOBILOME_DIR + "/{sample}_replicon_calls.tsv"
 MOBILITY_TABLE           = MOBILOME_DIR + "/{sample}_amr_mobility.tsv"   # THE deliverable
 MOBILITY_AUDIT           = MOBILOME_DIR + "/{sample}_amr_mobility_audit.tsv"

@@ -85,9 +85,9 @@ if MOBILOME_RUN:
         priority: 3
         shell:
             """
-            python {params.script} contig-lengths \
-              --contigs {input.contigs} \
-              --out {output.lengths} > {log} 2>&1
+            python {params.script} \
+              --genome-fasta {input.contigs} \
+              --out-contig-lengths {output.lengths} > {log} 2>&1
             """
 
     # ── Rule: amrfinder_organism — can we ask for point mutations? ───────────
@@ -219,4 +219,317 @@ if MOBILOME_RUN:
                 # a missing file, and every downstream reader can stay simple.
                 printf 'No --organism was matched for this sample, so AMRFinderPlus point-mutation screening was not available.\n' > {output.mutations}
             fi
+            """
+
+    # ── Rule: isescan — find insertion sequences on the genome (WP-C) ────────
+    # Biology: IS elements are the workhorse of the bacterial mobilome — small,
+    # self-mobile, and present in many copies. They matter here for two reasons:
+    # an IS beside an AMR gene can supply a promoter (raising expression without
+    # moving anything), and two copies of the SAME IS bracketing a gene make a
+    # composite transposon that can move the gene within the cell.
+    #
+    # Takes in: FINAL_CONTIGS.
+    # Does: ISEScan with its bundled profile HMMs — no external database.
+    #       DELIBERATELY WITHOUT --removeShortIS: that flag drops partial copies,
+    #       and on a fragmented assembly a "partial" IS is usually a real IS the
+    #       contig ran out on. We keep them and tier them honestly instead.
+    # Produces: 07/08 ISESCAN_DIR — declared a DIRECTORY because ISEScan writes a
+    #       tree, not one file (see the two gotchas below).
+    # Consumed by: isescan_table.
+    #
+    # THREE VERIFIED GOTCHAS, each handled in the shell below:
+    #  1. ISEScan writes NO FILES AT ALL when it finds no IS. A genome with no
+    #     detectable IS is a perfectly ordinary result, so the rule creates the
+    #     output directory itself and never depends on the tool having written
+    #     into it. Without this the run dies on a MissingOutputException for a
+    #     biologically normal sample.
+    #  2. It CACHES: if a previous run's proteome/ and hmm/ sub-directories are
+    #     present it silently reuses them, so a re-run on changed contigs would
+    #     report the OLD genome's IS. The directory is cleared first.
+    #  3. It must run with its own env's python (it loads libssw.so relative to
+    #     the interpreter), so the command calls `isescan.py` BY NAME and lets
+    #     the activated conda env resolve it — never by absolute path.
+    rule isescan:
+        input:
+            contigs = FINAL_CONTIGS,
+        output:
+            isescan_dir = directory(ISESCAN_DIR),
+        conda:
+            "../../envs/isescan.yaml"
+        threads: capped_cpus(8)
+        log:
+            LOGS + "/mobilome_isescan_{sample}.log"
+        priority: 3
+        shell:
+            # `|| true` on the tool itself, then create the directory
+            # unconditionally: "no IS found" exits non-zero on some inputs and is
+            # not an error. isescan_table (next rule) decides what the result
+            # means, and writes a well-formed empty table when there is nothing.
+            """
+            rm -rf {output.isescan_dir}
+            mkdir -p {output.isescan_dir}
+
+            isescan.py \
+              --seqfile {input.contigs} \
+              --output {output.isescan_dir} \
+              --nthread {threads} > {log} 2>&1 || {{
+                echo "" >> {log}
+                echo "NOTE: ISEScan exited non-zero. On a genome with no detectable IS it writes no output at all, which is a normal result, so the module continues and the IS table will be empty. Check the log above if you expected IS elements." >> {log}
+              }}
+            """
+
+    # ── Rule: isescan_table — tidy the IS calls and measure the honesty ──────
+    # Takes in: the ISEScan output directory and the contig lengths.
+    # Does: normalise ISEScan's 24-column table to one tidy row per IS, and
+    #       compute the QC that keeps this module truthful — how many IS calls
+    #       sit within MOBILOME_BOUNDARY_BP of a contig end, and what fraction of
+    #       the total that is.
+    # Produces: IS_TABLE (rows), IS_SUMMARY (the QC line), IS_AUDIT (dropped rows
+    #       with a reason).
+    # Consumed by: amr_mge_colocalisation; IS_SUMMARY is also a rule-all target,
+    #       so the QC is always produced, never optional.
+    #
+    # WHY THE QC MATTERS: IS elements are the main cause of contig breaks, so a
+    # high boundary fraction means the assembly fragmented exactly where the
+    # elements are, and the located count is a FLOOR rather than a count.
+    rule isescan_table:
+        input:
+            isescan_dir = ISESCAN_DIR,
+            lengths = CONTIG_LENGTHS,
+        output:
+            table = IS_TABLE,
+            summary = IS_SUMMARY,
+            audit = IS_AUDIT,
+        params:
+            script = ISESCAN_TABLE_SCRIPT,
+            boundary_bp = MOBILOME_BOUNDARY_BP,
+        log:
+            LOGS + "/mobilome_isescan_table_{sample}.log"
+        priority: 3
+        shell:
+            """
+            python {params.script} \
+              --sample {wildcards.sample} \
+              --isescan-out {input.isescan_dir} \
+              --contig-lengths {input.lengths} \
+              --boundary-bp {params.boundary_bp} \
+              --out-table {output.table} \
+              --out-summary {output.summary} \
+              --out-audit {output.audit} > {log} 2>&1
+            """
+
+    # ── Rule: conjscan_models — fetch the CONJscan model package once ────────
+    # Biology: CONJscan is a set of profile models describing the machinery a
+    # cell needs to conjugate — a relaxase (nicks the DNA), a coupling protein,
+    # and a type IV secretion system (the mating apparatus). Which of those are
+    # present is what separates "can be moved by a helper" from "moves itself".
+    #
+    # ⚠ LICENCE (verified from the package's own metadata.yml): the CONJscan
+    # MODELS are CC BY-NC-SA 4.0 (Institut Pasteur / CNRS) — academic and
+    # non-commercial use only. BacFlux never vendors them: they are fetched here,
+    # at the user's request, under the user's own agreement with the licensor,
+    # exactly as this workflow already treats bakta_db, blast_db and the rest.
+    # BacFlux's own MIT licence is unaffected. Turning the mobilome module on
+    # means accepting that dependency — it is stated in the README and printed
+    # at parse time.
+    #
+    # Takes in: nothing (a network fetch).
+    # Produces: 08.mobilome/conjscan_models/ — one shared copy for all samples.
+    # Consumed by: conjscan.
+    #
+    # GOTCHA: `macsydata` is DEPRECATED in MacSyFinder 2.1.6 and prints a rename
+    # warning; the current command is `msf_data`. The shell prefers msf_data and
+    # falls back, so the rule works across both spellings.
+    rule conjscan_models:
+        output:
+            models = directory(CONJSCAN_MODELS_DIR),
+        conda:
+            "../../envs/macsyfinder.yaml"
+        log:
+            LOGS + "/mobilome_conjscan_models.log"
+        priority: 4
+        shell:
+            """
+            mkdir -p {output.models}
+            {{
+              echo "Installing the CONJScan model package."
+              echo "NOTE: these models are licensed CC BY-NC-SA 4.0 (Institut Pasteur/CNRS) - academic / non-commercial use only. They are downloaded here at your request and are never redistributed by BacFlux."
+            }} > {log}
+
+            if command -v msf_data >/dev/null 2>&1; then
+                msf_data install --target {output.models} CONJScan >> {log} 2>&1
+            else
+                macsydata install --target {output.models} CONJScan >> {log} 2>&1
+            fi
+            """
+
+    # ── Rule: conjscan — conjugation machinery on THIS genome ────────────────
+    # Takes in: Bakta's proteins (.faa) and the CONJscan models.
+    # Does: MacSyFinder with the CONJScan/Chromosome model set. Chromosome, not
+    #       Plasmids, because that is the question nothing else in BacFlux can
+    #       answer: Platon already reports plasmid mobility from its own table,
+    #       but it SKIPS any contig over 500 kb, so it never looks at the
+    #       chromosome. Conjugation machinery on a chromosome means an ICE — the
+    #       case that breaks the naive "chromosomal, therefore not transferable"
+    #       assumption.
+    # Produces: 08.mobilome/{sample}/conjscan/ (best_solution.tsv and friends).
+    # Consumed by: conjscan_ice.
+    #
+    # --db-type ordered_replicon is right for one genome's proteome, and Bakta
+    # writes its .faa in genome order. CAVEAT recorded in the ground-truth doc:
+    # on a fragmented assembly MacSyFinder treats the whole proteome as one
+    # pseudo-replicon and can cluster hits ACROSS contigs; conjscan_ice therefore
+    # flags any system whose hits span contigs and caps it at low confidence.
+    #
+    # Most isolates carry no conjugative system at all, so a run finding nothing
+    # is the common case and must not fail the pipeline.
+    rule conjscan:
+        input:
+            bakta_dir = DIR_ANNOTATION + "/bakta/{sample}",
+            models = CONJSCAN_MODELS_DIR,
+        output:
+            conjscan_dir = directory(CONJSCAN_DIR),
+        conda:
+            "../../envs/macsyfinder.yaml"
+        threads: capped_cpus(8)
+        log:
+            LOGS + "/mobilome_conjscan_{sample}.log"
+        priority: 3
+        shell:
+            """
+            rm -rf {output.conjscan_dir}
+            mkdir -p {output.conjscan_dir}
+
+            macsyfinder \
+              --models CONJScan/Chromosome all \
+              --sequence-db {input.bakta_dir}/{wildcards.sample}.faa \
+              --db-type ordered_replicon \
+              --models-dir {input.models} \
+              --out-dir {output.conjscan_dir} \
+              --worker {threads} \
+              --force > {log} 2>&1 || {{
+                echo "" >> {log}
+                echo "NOTE: MacSyFinder exited non-zero. A genome with no conjugative system is the common case for environmental isolates; the module continues and the ICE/IME table will be empty." >> {log}
+              }}
+            """
+
+    # ── Rule: conjscan_ice — turn machinery hits into ICE / IME candidates ───
+    # Takes in: CONJscan's best_solution.tsv, Bakta's GFF3 (for the genomic
+    #           coordinates of each protein hit AND for integrase genes, found by
+    #           product regex), and the contig lengths.
+    # Does: spec §8 Phases 0-2 and 4 — collect anchors (relaxase, coupling
+    #       protein, T4SS, integrase), cluster them on one contig, and classify:
+    #         integrase + relaxase + T4SS -> ICE  (predicted self-transmissible)
+    #         integrase + relaxase        -> IME  (mobilisable, needs a helper)
+    #         integrase only              -> passive island
+    #         relaxase + T4SS, no integrase -> conjugative region, NOT an ICE
+    #       Phase 3 (att-site boundaries) is deliberately NOT done here — it is
+    #       long-read work; the columns exist so BacFluxL can fill them later.
+    # Produces: the ICE/IME element table + its audit.
+    # Consumed by: amr_mge_colocalisation, as a SECOND element source alongside
+    #              the IS table.
+    rule conjscan_ice:
+        input:
+            conjscan_dir = CONJSCAN_DIR,
+            bakta_dir = DIR_ANNOTATION + "/bakta/{sample}",
+            lengths = CONTIG_LENGTHS,
+        output:
+            table = ICE_TABLE,
+            audit = ICE_AUDIT,
+        params:
+            script = CONJSCAN_ICE_SCRIPT,
+        log:
+            LOGS + "/mobilome_conjscan_ice_{sample}.log"
+        priority: 3
+        shell:
+            # best_solution.tsv is absent when MacSyFinder found nothing; the
+            # script treats a missing file as "no systems" and still writes a
+            # well-formed empty table, so no guard is needed here.
+            """
+            python {params.script} \
+              --sample {wildcards.sample} \
+              --conjscan-tsv {input.conjscan_dir}/best_solution.tsv \
+              --bakta-gff {input.bakta_dir}/{wildcards.sample}.gff3 \
+              --contig-lengths {input.lengths} \
+              --out-table {output.table} \
+              --out-audit {output.audit} > {log} 2>&1
+            """
+
+    # ── Rule: mobilome_replicons — is each contig chromosome or plasmid? ─────
+    # Takes in: the Platon directory this sample's plasmid stage already produced,
+    #           plus the genome (so contigs Platon skipped are still listed).
+    # Does: read Platon's chromosome/plasmid split and its own # Conjugation /
+    #       # Mobilization / # OriT counts, and turn them into a per-contig call
+    #       plus a plasmid mobility class.
+    # Produces: MOBILOME_REPLICONS.
+    # Consumed by: amr_mge_colocalisation, where it decides ladder tiers 5 and 6
+    #              for anything sitting on a plasmid.
+    rule mobilome_replicons:
+        input:
+            platon_dir = PLATON_DIR,
+            contigs = FINAL_CONTIGS,
+        output:
+            replicons = MOBILOME_REPLICONS,
+        params:
+            script = REPLICONS_MOBILOME_SCRIPT,
+            prefix = GENOMAD_PREFIX,
+        log:
+            LOGS + "/mobilome_replicons_{sample}.log"
+        priority: 3
+        shell:
+            """
+            python {params.script} \
+              --sample {wildcards.sample} \
+              --platon-dir {input.platon_dir} \
+              --prefix {params.prefix} \
+              --contigs {input.contigs} \
+              --out {output.replicons} > {log} 2>&1
+            """
+
+    # ── Rule: amr_mge_colocalisation — the deliverable (WP-D) ────────────────
+    # Biology: this is where the module answers its question. For every AMR gene
+    # AMRFinderPlus found, look at what mobile elements sit around it and decide
+    # where it lands on the mobility ladder:
+    #   1 chromosomal, nothing nearby      -> intrinsic candidate
+    #   2 IS adjacent, pointing at it      -> expression change, NOT mobilisation
+    #   3 between two copies of one IS     -> composite transposon, moves in-cell
+    #   4 in a named transposon / integron -> mobilisable, named architecture
+    #   5 on a mobilisable plasmid         -> transferable with a helper
+    #   6 in an ICE, or on a conjugative plasmid -> PREDICTED self-transmissible
+    # An IS sitting INSIDE an AMR gene is reported separately as likely
+    # inactivation — it must not be counted as mobilisation.
+    #
+    # Takes in: the AMR calls, BOTH element sources (IS and ICE/IME — --is-table
+    #           is repeatable), the replicon calls, and the contig lengths.
+    # Produces: MOBILITY_TABLE (the deliverable, one row per AMR gene) and
+    #           MOBILITY_AUDIT (why every gene without context got none).
+    # Consumed by: the user. This is the module's terminal product.
+    rule amr_mge_colocalisation:
+        input:
+            amrfinder = AMRFINDER_TSV,
+            is_table = IS_TABLE,
+            ice_table = ICE_TABLE,
+            replicons = MOBILOME_REPLICONS,
+            lengths = CONTIG_LENGTHS,
+        output:
+            table = MOBILITY_TABLE,
+            audit = MOBILITY_AUDIT,
+        params:
+            script = COLOCALISE_SCRIPT,
+            max_span = MOBILOME_MAX_COMPOSITE_SPAN,
+        log:
+            LOGS + "/mobilome_colocalisation_{sample}.log"
+        priority: 3
+        shell:
+            """
+            python {params.script} \
+              --sample {wildcards.sample} \
+              --amrfinder {input.amrfinder} \
+              --is-table {input.is_table} \
+              --is-table {input.ice_table} \
+              --replicons {input.replicons} \
+              --contig-lengths {input.lengths} \
+              --max-composite-span {params.max_span} \
+              --out-table {output.table} \
+              --out-audit {output.audit} > {log} 2>&1
             """

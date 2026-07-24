@@ -1589,10 +1589,15 @@ def main(argv=None):
                         help="Sample name, written into the first column of both outputs.")
     parser.add_argument("--amrfinder", required=True,
                         help="AMRFinderPlus 4.x TSV. REQUIRED: it defines the report rows.")
-    parser.add_argument("--is-table", default=None,
-                        help="Mobile-element table (ISEScan-derived; may also carry named "
-                             "transposons/integrons and ICE/IME rows via an element_type "
-                             "column). May be absent or empty.")
+    parser.add_argument("--is-table", action="append", default=None,
+                        help="Mobile-element table with coordinates. REPEATABLE: pass it "
+                             "once per source and the rows are pooled, because the module "
+                             "produces elements from two independent places — ISEScan "
+                             "(insertion sequences) and CONJscan (ICE/IME candidates). "
+                             "Each file is read on its own terms (they have different "
+                             "columns), so no pre-merge step is needed. May be absent or "
+                             "empty; every file that is missing or has no usable rows is "
+                             "recorded in the audit.")
     parser.add_argument("--replicons", default=None,
                         help="Per-contig chromosome/plasmid call plus plasmid mobility "
                              "typing. May be absent or empty.")
@@ -1613,7 +1618,13 @@ def main(argv=None):
     # allowed to be missing so the module still runs on an isolate with no IS
     # calls and no plasmids.
     amr_hits = parse_amrfinder(args.amrfinder)
-    elements = parse_mobile_elements(args.is_table)
+    # --is-table is repeatable (ISEScan's insertion sequences and CONJscan's
+    # ICE/IME candidates arrive as separate files with different columns), so
+    # parse each one on its own and pool the rows.
+    element_table_paths = args.is_table or []
+    elements = []
+    for element_table_path in element_table_paths:
+        elements.extend(parse_mobile_elements(element_table_path))
     replicons = parse_replicons(args.replicons)
     contig_lengths = parse_contig_lengths(args.contig_lengths)
 
