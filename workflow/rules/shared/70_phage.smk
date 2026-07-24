@@ -150,14 +150,20 @@ if PHAGE_CALLER == "genomad":
                 LOGS + "/genomad_db_local.log"
             priority: 9
             shell:
+                # The symlink TARGET must be absolute. A relative directories.genomad_db
+                # would put a relative target inside the view directory, where it would
+                # resolve against the VIEW's location instead of the launch directory -
+                # i.e. every link dangles, and geNomad fails on a database that is
+                # actually there. `cd … && pwd` resolves it before any link is made.
                 """
                 mkdir -p {output.genomad_db}
+                src_abs=$(cd "{input.src}" && pwd)
                 {{
                   echo "Building a local geNomad database view"
-                  echo "  source (read-only): {input.src}"
+                  echo "  source (read-only): $src_abs"
                   echo "  view:               {output.genomad_db}"
                 }} > {log}
-                for f in "{input.src}"/*; do
+                for f in "$src_abs"/*; do
                     ln -sfn "$f" "{output.genomad_db}/$(basename "$f")"
                 done
                 """
@@ -292,14 +298,18 @@ if PHAGE_CALLER == "virsorter2":
                 LOGS + "/virsorter2_db_local.log"
             priority: 9
             shell:
+                # Absolute target, for the same reason as genomad_db_local below:
+                # a relative directories.vs2_db would produce links that resolve
+                # against the view directory and therefore dangle.
                 """
                 mkdir -p {output.vs2_db}
+                src_abs=$(cd "{input.src}" && pwd)
                 {{
                   echo "Building a local VirSorter2 database view"
-                  echo "  source (read-only): {input.src}"
+                  echo "  source (read-only): $src_abs"
                   echo "  view:               {output.vs2_db}"
                 }} > {log}
-                for f in "{input.src}"/*; do
+                for f in "$src_abs"/*; do
                     ln -sfn "$f" "{output.vs2_db}/$(basename "$f")"
                 done
                 """

@@ -66,7 +66,14 @@ def read_tsv(path):
 
 # Column order used by every synthetic mobile-element table below. It matches
 # what the module's loader is expected to hand over: one row per called element.
-IS_HEADER = ["contig", "start", "end", "strand", "family", "cluster",
+# Column names here must be the ones isescan_to_table.py ACTUALLY writes. This
+# header used to say "family", which no real BacFlux table has ever contained -
+# the real one is "is_family" - and because colocalise matches columns by name and
+# silently ignores a name it cannot find, every test below passed against a
+# contract that did not exist while is_family came out NA on real data and the
+# IS26/IS6 tests never fired. If you add a column here, copy the name from a real
+# {sample}_is_elements.tsv rather than inventing one.
+IS_HEADER = ["contig", "start", "end", "strand", "is_family", "cluster",
              "is_complete", "is_id", "element_type", "name"]
 
 
@@ -84,10 +91,29 @@ REPLICON_HEADER = ["contig", "replicon", "replicon_id", "plasmid_mobility",
                    "mobility_evidence"]
 LENGTH_HEADER = ["contig", "length"]
 
+# The ICE/IME table is a SEPARATE element source, passed as a second --is-table
+# exactly as rule amr_mge_colocalisation does. Column names copied from a real
+# {sample}_ice_candidates.tsv. The last four are the quality judgements
+# conjscan_to_ice.py makes about the element and that the mobility row must
+# inherit - they do not exist in the IS table.
+ICE_HEADER = ["contig", "start", "end", "strand", "mge_id", "mge_name",
+              "element_type", "mobility", "machinery_intact", "degraded_reason",
+              "spans_contigs", "confidence"]
+
+
+def ice_row(contig="contig_1", start=5000, end=25000, strand=".",
+            mge_id="ICE_1", mge_name="ICEEc2-like", element_type="ice",
+            mobility="self-transmissible", machinery_intact="TRUE",
+            degraded_reason="NA", spans_contigs="FALSE", confidence="high"):
+    """One ICE/IME candidate row; defaults describe a clean, intact ICE."""
+    return [contig, str(start), str(end), strand, mge_id, mge_name,
+            element_type, mobility, machinery_intact, degraded_reason,
+            spans_contigs, confidence]
+
 
 def run_colocalise(tmp_path, amr_rows, is_rows=None, replicon_rows=None,
                    length_rows=(("contig_1", 50000),), max_span=20000,
-                   is_table="write", replicon_table="write"):
+                   is_table="write", replicon_table="write", ice_rows=None):
     """Write the inputs, run the CLI end to end, return (report_rows, audit_rows).
 
     `is_table` / `replicon_table` accept the string "absent" to test the path
@@ -113,16 +139,22 @@ def run_colocalise(tmp_path, amr_rows, is_rows=None, replicon_rows=None,
     out_table = str(tmp_path / "mobility.tsv")
     out_audit = str(tmp_path / "audit.tsv")
 
-    co.main([
+    argv = [
         "--sample", "sampleA",
         "--amrfinder", amr_path,
         "--is-table", is_path,
+    ]
+    # Second element source, same as the real rule: --is-table is repeatable.
+    if ice_rows is not None:
+        argv += ["--is-table", write_tsv(tmp_path / "ice.tsv", ICE_HEADER, ice_rows)]
+    argv += [
         "--replicons", replicon_path,
         "--contig-lengths", length_path,
         "--max-composite-span", str(max_span),
         "--out-table", out_table,
         "--out-audit", out_audit,
-    ])
+    ]
+    co.main(argv)
     return read_tsv(out_table), read_tsv(out_audit)
 
 
@@ -1055,3 +1087,110 @@ def test_real_sample_006_is_five_intrinsic_candidates(tmp_path):
     assert {row["replicon"] for row in report} == {"chromosome"}
     # No IS table was supplied at all, so none of these may claim high confidence.
     assert {row["confidence"] for row in report} == {"medium"}
+
+
+# ---------------------------------------------------------------------------
+# The ICE/IME element's OWN verdict must reach the AMR row.
+#
+# conjscan_to_ice.py already decides whether a candidate's machinery is intact,
+# whether it straddles a contig break, and what confidence it deserves. Those
+# judgements used to be computed and then dropped here, so an AMR gene sitting in
+# a half-broken, contig-spanning element was still reported as tier 6 at high
+# confidence — the strongest claim the module can make, resting on an element the
+# module itself had flagged as doubtful. These tests pin that shut.
+# ---------------------------------------------------------------------------
+
+
+def test_degraded_ice_machinery_caps_the_genes_confidence(tmp_path):
+    """A decayed ICE must not yield a high-confidence self-transmissible call."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(symbol="tetM", start=10000, stop=11000)],
+        ice_rows=[ice_row(machinery_intact="FALSE",
+                          degraded_reason="low_system_wholeness",
+                          mobility="self-transmissible - machinery incomplete",
+                          confidence="medium")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "6"          # the tier itself is still right
+    assert row["confidence"] != "high"          # but the certainty is not
+    assert "mge_machinery_not_intact" in audit_reasons(audit)
+
+
+def test_ice_spanning_contigs_is_capped_at_low_and_says_so(tmp_path):
+    """Spec §8 phase 6: spanning contigs caps at low, whatever else is true.
+
+    The generic cross-contig detector cannot see this case — an ICE id embeds its
+    contig and each element is one row — so the element's own flag is the only
+    evidence there is.
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(symbol="tetM", start=10000, stop=11000)],
+        ice_rows=[ice_row(spans_contigs="TRUE", confidence="low")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["confidence"] == "low"
+    assert row["spans_contigs"] == "yes"        # must not claim "no"
+    assert "mge_spans_contigs" in audit_reasons(audit)
+
+
+def test_a_clean_intact_ice_still_earns_high_confidence(tmp_path):
+    """The counterpart: the caps must not fire on a good element."""
+    report, _audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(symbol="tetM", start=10000, stop=11000)],
+        ice_rows=[ice_row()],                   # intact, single contig, high
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "6"
+    assert row["mobility_tier_label"] == "predicted_self_transmissible"
+    assert row["confidence"] == "high"
+    assert row["spans_contigs"] == "no"
+
+
+def test_a_non_mobilisable_plasmid_is_not_labelled_mobilisable(tmp_path):
+    """Tier 5 is 'on a plasmid'; its generic label must not contradict the typing.
+
+    The gene IS acquired (that is the regulatory question), so the tier stays 5,
+    but calling a plasmid we just typed non-mobilisable "mobilisable_needs_helper"
+    contradicts our own evidence in the column most people read.
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000)],
+        replicon_rows=[["contig_1", "plasmid", "p1", "non-mobilisable",
+                        "no mobility genes detected by Platon"]],
+        length_rows=(("contig_1", 50000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "5"
+    assert row["mobility_tier_label"] != "mobilisable_needs_helper"
+    assert row["mobility_tier_label"] == "on_plasmid_typed_non_mobilisable"
+    assert "plasmid_typed_non_mobilisable" in audit_reasons(audit)
+
+
+def test_an_is_partly_overlapping_the_gene_is_not_reported_as_clean_context(tmp_path):
+    """Below the disruption threshold, an overlapping IS used to vanish entirely.
+
+    It is not a disruption call, and the nearest-IS search skips anything that
+    overlaps, so the row read "intrinsic candidate, nothing nearby" at high
+    confidence while an IS was physically sitting on the gene.
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000)],          # 1001 bp gene
+        is_rows=[is_row(start=9800, end=10200)],              # ~20% overlap
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+    )
+    row = report[0]
+    assert row["is_inside_amr_cds"] == "no"     # correctly NOT a disruption call
+    assert int(row["is_amr_overlap_bp"]) > 0    # the overlap is still measured
+    assert row["confidence"] != "high"          # but the context is not clean
+    assert "is_partially_overlaps_amr_gene" in audit_reasons(audit)

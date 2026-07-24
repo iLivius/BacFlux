@@ -143,8 +143,16 @@ mobilome:
                                #   (1 = chromosomal/intrinsic candidate ... 6 = inside an
                                #   ICE or on a conjugative plasmid = PREDICTED
                                #   self-transmissible). Adds two tools (ISEScan,
-                               #   CONJscan/MacSyFinder), both bioconda, no licence-
-                               #   encumbered database required.
+                               #   CONJscan/MacSyFinder), both bioconda; no database
+                               #   download to configure (nothing to set here).
+                               #   LICENCE: turning this on fetches the CONJscan MODELS,
+                               #   which Institut Pasteur/CNRS license CC BY-NC-SA 4.0
+                               #   (NON-COMMERCIAL). BacFlux never ships them - they are
+                               #   downloaded at your request, under your own agreement
+                               #   with the licensor, exactly like bakta_db and the other
+                               #   user-supplied databases - so BacFlux's own MIT licence
+                               #   is unaffected. Commercial users should leave this off
+                               #   or obtain permission from the model authors.
                                #   READ THIS: on short-read (fragmented) assemblies the
                                #   located IS count is a FLOOR, not a count — IS elements
                                #   are the main cause of contig breaks, so the element you
@@ -154,5 +162,18 @@ mobilome:
   max_composite_span_bp: 20000 # two IS copies further apart than this are not called one
                                #   composite transposon. A CONVENTION, not biology — the
                                #   measured distance is always reported next to the call.
-  contig_boundary_bp: 100      # how close to a contig end counts as "at the boundary".
-                               #   Anything flagged is capped at low confidence.
+  contig_boundary_bp: 100      # how close to a contig end counts as "at the boundary"
+                               #   when FLAGGING an IS call (columns at_contig_boundary
+                               #   and fraction_at_contig_boundary in the IS summary).
+                               #   A high fraction means the assembly broke exactly where
+                               #   the IS elements are - read the located IS count as a
+                               #   floor, not a count.
+                               #   NOTE this is NOT the same number as the window used to
+                               #   CAP confidence in the mobility table. That one is a
+                               #   fixed 1000 bp (CONTIG_END_WINDOW_BP in colocalise.py)
+                               #   and answers a different question: was there enough
+                               #   flanking sequence to have SEEN a neighbouring element
+                               #   at all? An IS 500 bp from a contig end is not "at the
+                               #   edge", but you still could not have seen its partner
+                               #   2 kb away, so absence of evidence there is not
+                               #   evidence of absence. Deliberately separate knobs.

@@ -515,12 +515,29 @@ def parse_mobile_elements(path):
         )
 
     strand_index = find_column(header, ["strand"])
-    family_index = find_column(header, ["family"])
+    # "is_family" FIRST because that is what isescan_to_table.py actually writes.
+    # This used to accept only "family", which matches nothing in our own IS table,
+    # so is_family came out NA on every row and the IS26/IS6 same-family tests
+    # below silently never fired. Matching is exact (see find_column), so a missing
+    # alias is invisible rather than an error - hence listing the real name first.
+    family_index = find_column(header, ["is_family", "family"])
     cluster_index = find_column(header, ["cluster"])
-    type_index = find_column(header, ["element_type", "type_of_element"])
+    type_index = find_column(header, ["element_type", "type_of_element", "mge_type"])
     complete_index = find_column(header, ["is_complete", "complete", "completeness", "type"])
     id_index = find_column(header, ["is_id", "id", "element_id", "mge_id"])
     name_index = find_column(header, ["name", "element_name", "mge_name"])
+
+    # Quality columns that only the ICE/IME table carries (conjscan_to_ice.py).
+    # That script already decides whether an element's machinery is intact, whether
+    # it straddles a contig break, and what confidence it deserves - and those
+    # judgements must survive into the deliverable, or the AMR row ends up more
+    # confident than the element it rests on. They are absent from the IS table,
+    # where find_column simply returns None and the fields stay empty.
+    machinery_index = find_column(header, ["machinery_intact"])
+    spans_contigs_index = find_column(header, ["spans_contigs"])
+    element_confidence_index = find_column(header, ["confidence"])
+    mobility_label_index = find_column(header, ["mobility"])
+    degraded_reason_index = find_column(header, ["degraded_reason"])
 
     elements = []
     for line_number, row in enumerate(data_rows, start=2):
@@ -555,8 +572,74 @@ def parse_mobile_elements(path):
             "complete": normalise_completeness(cell(row, complete_index, default="")),
             "id": cell(row, id_index, default="") or f"{contig}_MGE_{line_number - 1}",
             "name": cell(row, name_index, default=""),
+            # ICE/IME-only quality judgements; empty string for IS rows.
+            "machinery_intact": cell(row, machinery_index, default=""),
+            "spans_contigs": cell(row, spans_contigs_index, default=""),
+            "own_confidence": cell(row, element_confidence_index, default=""),
+            "mobility_label": cell(row, mobility_label_index, default=""),
+            "degraded_reason": cell(row, degraded_reason_index, default=""),
         })
     return elements
+
+
+def element_says_false(value):
+    """Is this element-table cell an explicit FALSE?
+
+    conjscan_to_ice.py writes TRUE/FALSE; other loaders might write no/0. Anything
+    else - including an empty cell from the IS table, which has no such column - is
+    treated as "not stated", so a missing column can never be read as a failure.
+    """
+    return str(value).strip().lower() in {"false", "no", "0"}
+
+
+def element_quality_caps(element):
+    """Turn an ICE/IME element's OWN quality flags into confidence caps.
+
+    Biology and why this matters: conjscan_to_ice.py already asks the hard
+    questions about each candidate - is the conjugation machinery complete, or is
+    this a decayed element that can no longer move? does it straddle a contig
+    break, so its extent is a guess? Those answers were being computed and then
+    thrown away here, so an AMR gene sitting in a half-broken, contig-spanning
+    element was still reported as tier 6 at high confidence. The element's own
+    verdict must travel with it.
+
+    Returns a list of (cap_level, reason, detail) in the same shape assess_gene's
+    local `caps` list uses.
+    """
+    caps = []
+
+    # Spec section 8 phase 6: anything spanning contigs is capped at low, whatever
+    # else is true, because its coordinates are not established by this assembly.
+    if str(element.get("spans_contigs", "")).strip().lower() in {"true", "yes", "1"}:
+        caps.append((
+            "low", "mge_spans_contigs",
+            f"the element setting this context ({element['id']}) is reported across "
+            "more than one contig, so its extent is not established by this assembly",
+        ))
+
+    # A degraded element is the classic overcall: decayed ICEs are common, and a
+    # relaxase or VirB4 covering too little of its profile means the machinery
+    # probably no longer works.
+    if element_says_false(element.get("machinery_intact", "")):
+        reason_detail = element.get("degraded_reason", "") or "machinery incomplete"
+        caps.append((
+            "medium", "mge_machinery_not_intact",
+            f"the element setting this context ({element['id']}) has incomplete "
+            f"conjugation machinery ({reason_detail}), so it may no longer be able "
+            "to move itself",
+        ))
+
+    # Belt and braces: never report the AMR gene more confidently than the element
+    # the call rests on, whatever the reason that element was downgraded.
+    own_confidence = str(element.get("own_confidence", "")).strip().lower()
+    if own_confidence in {"low", "medium"}:
+        caps.append((
+            own_confidence, "mge_own_confidence",
+            f"the element setting this context ({element['id']}) was itself called "
+            f"at {own_confidence} confidence",
+        ))
+
+    return caps
 
 
 def normalise_completeness(value):
@@ -788,7 +871,14 @@ def find_disrupting_is(gene, insertion_sequences):
     -f 0.5`). The measured overlap in bp is reported either way, so a smaller
     overlap is still visible in the table.
 
-    Returns (element_or_None, overlap_bp) for the largest overlap found.
+    Returns (disrupting_element_or_None, overlap_bp, overlapping_element_or_None).
+
+    The third value exists because an overlap BELOW the disruption threshold used
+    to disappear completely: it is not a disruption call, and find_nearest_is
+    skips anything that overlaps the gene at all, so an IS covering (say) 40% of
+    the CDS was invisible to every context test and the gene was reported as
+    "intrinsic candidate, nothing nearby" at high confidence while an IS sat on
+    it. Handing the element back lets the caller flag that honestly.
     """
     gene_length = gene["end"] - gene["start"] + 1
     best_element = None
@@ -801,11 +891,11 @@ def find_disrupting_is(gene, insertion_sequences):
             best_element = element
 
     if best_element is None:
-        return None, 0
+        return None, 0, None
     if gene_length > 0 and (best_overlap / gene_length) >= MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION:
-        return best_element, best_overlap
-    # An overlap too small to call disruption: report the number, not the call.
-    return None, best_overlap
+        return best_element, best_overlap, best_element
+    # Too small to call disruption: report the number AND the element, not the call.
+    return None, best_overlap, best_element
 
 
 def is_upstream_of_gene(element, gene):
@@ -1204,7 +1294,8 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                   "and were ignored")
 
     # --- Step 4: has an IS landed inside the gene? (inactivation, not mobility)
-    disrupting_is, disruption_overlap = find_disrupting_is(gene, insertion_sequences)
+    disrupting_is, disruption_overlap, overlapping_is = \
+        find_disrupting_is(gene, insertion_sequences)
     row["is_amr_overlap_bp"] = str(disruption_overlap)
     if disrupting_is is not None:
         row["is_inside_amr_cds"] = "yes"
@@ -1215,6 +1306,20 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             "disrupted and the gene inactivated. Reported in is_inside_amr_cds and "
             "deliberately NOT counted as mobilisation.",
         )
+    elif overlapping_is is not None:
+        # An IS physically overlaps the gene, but by too little to call the CDS
+        # disrupted. It is also excluded from every other test - find_nearest_is
+        # skips overlapping elements, and the flanking/composite tests need the IS
+        # to sit clear of the gene - so without this the row would read as
+        # "nothing nearby" while an IS is sitting on the gene. Do not change the
+        # tier (we cannot say what this means biologically), but do not claim
+        # certainty either.
+        caps.append((
+            "medium", "is_partially_overlaps_amr_gene",
+            f"IS {overlapping_is['id']} overlaps {disruption_overlap} bp of this gene "
+            "- too little to call the coding sequence disrupted, but the gene's "
+            "context is not clean",
+        ))
 
     # --- Step 5: nearest IS, and the tier-2 upstream-promoter test ----------
     nearest_is, nearest_distance = find_nearest_is(gene, insertion_sequences)
@@ -1269,6 +1374,10 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     replicon = row["replicon"]
     plasmid_mobility = row["plasmid_mobility"]
     base_confidence = "medium"
+    # Normally the label is just MOBILITY_TIER_LABELS[tier]. A branch sets this
+    # when the generic tier wording would misstate its own evidence (see the
+    # non-mobilisable plasmid case below).
+    tier_label_override = None
     # The element(s) that actually SET the context below. Each branch fills this
     # in, so the contig-end check in step 9 examines the right features and not
     # merely whichever element happened to be found first.
@@ -1285,6 +1394,12 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         row["distance_bp"] = "0"
         base_confidence = "high"
         context_elements = [ice_element]
+        # The ICE step's own verdict on this element (degraded machinery, spans a
+        # contig break, low own confidence) must cap the gene's confidence too -
+        # otherwise the strongest claim the module can make, "predicted
+        # self-transmissible", would be asserted at high confidence on top of an
+        # element the module itself flagged as doubtful.
+        caps.extend(element_quality_caps(ice_element))
 
     elif replicon == "plasmid" and plasmid_mobility == "conjugative":
         # Tier 6: a plasmid that encodes its own conjugation machinery.
@@ -1304,6 +1419,8 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         row["distance_bp"] = "0"
         base_confidence = "high"
         context_elements = [ime_element]
+        # Same reasoning as the ICE branch above: carry the element's own verdict.
+        caps.extend(element_quality_caps(ime_element))
 
     elif replicon == "plasmid":
         # Tier 5: on a plasmid. Whether it can actually move depends on the
@@ -1318,6 +1435,13 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             base_confidence = "high"
         elif plasmid_mobility == "non_mobilisable":
             base_confidence = "high"
+            # The tier number stays 5 - the gene IS on a plasmid, which is the
+            # acquired-vs-intrinsic answer the regulator asks for - but tier 5's
+            # generic label reads "mobilisable_needs_helper", and saying that about
+            # a plasmid we just typed NON-mobilisable contradicts our own evidence
+            # in the one column most people read. Override the wording; the audit
+            # line below explains it.
+            tier_label_override = "on_plasmid_typed_non_mobilisable"
             add_audit(
                 "tier_not_raised", "plasmid_typed_non_mobilisable",
                 "the gene is on a plasmid (tier 5 = plasmid context) but the plasmid "
@@ -1483,10 +1607,23 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     # "NA" is excluded explicitly: it is our own placeholder for "no element", and
     # a loader that wrote the literal string NA into the id column would otherwise
     # make every unnamed element look like one element spread over the assembly.
+    # Two independent ways an element can span contigs, and BOTH are needed:
+    #
+    #  1. We see the same element id on two different contig rows. This is how a
+    #     split IS shows up.
+    #  2. The element's own table says so. An ICE/IME row already carries a
+    #     spans_contigs flag that conjscan_to_ice.py worked out from where its
+    #     anchor genes landed - and detector 1 is structurally BLIND to it,
+    #     because an ICE id embeds its contig ("contig_1|ice-100:200") and each
+    #     element is written as exactly one row. So before this, spans_contigs
+    #     could never read "yes" for an ICE no matter what the ICE step found.
     spanning_ids = {element["id"] for element in context_elements
                     if element["id"] != "NA" and element["id"] in multi_contig_element_ids}
     if row["mge_id"] != "NA" and row["mge_id"] in multi_contig_element_ids:
         spanning_ids.add(row["mge_id"])
+    for context_element in context_elements:
+        if str(context_element.get("spans_contigs", "")).strip().lower() in {"true", "yes", "1"}:
+            spanning_ids.add(context_element["id"])
     if spanning_ids:
         row["spans_contigs"] = "yes"
         caps.append((
@@ -1511,7 +1648,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                 ))
 
     # --- Step 10: final confidence, and an audit line per cap that fired ----
-    row["mobility_tier_label"] = MOBILITY_TIER_LABELS[row["mobility_tier"]]
+    row["mobility_tier_label"] = tier_label_override or MOBILITY_TIER_LABELS[row["mobility_tier"]]
     row["confidence"] = apply_confidence_caps(base_confidence, caps)
     for cap_level, reason, detail in caps:
         add_audit("confidence_capped", reason, f"capped at {cap_level}: {detail}",
