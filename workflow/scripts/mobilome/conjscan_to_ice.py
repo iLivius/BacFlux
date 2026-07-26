@@ -48,6 +48,13 @@ Three pieces of machinery decide what an element can actually do:
     relaxase plus a coupling protein on the chromosome and NO mating-pair
     apparatus, so it is mobilisable, not self-transmissible.
 
+    ** A mating-pair hit only counts as an APPARATUS when CONJscan called a
+    typed T4SS system (`T4SS_type*` / `dCONJ_type*`). ** The `MOB` model is
+    relaxase-only by definition and lists VirB4 as an ACCESSORY gene, so one
+    incidental VirB4 inside a MOB system is not a mating bridge and must not
+    raise an IME to an ICE. The hit is still reported in `has_t4ss`, with the
+    reason for not counting it written to the audit file.
+
   * INTEGRASE (from the Bakta product text) - the recombinase that puts the
     element into the chromosome and takes it out again. It is what separates an
     ICE (integrates) from a plain conjugative region sitting on a contig.
@@ -191,6 +198,47 @@ def machinery_label(gene_name):
     return gene_name.split("_")[-1] if gene_name else "NA"
 
 
+# The one alternative name a VirB4 hit can be reported under. Every CONJscan
+# model that contains VirB4 lists `T4SS_I_traU` as an EXCHANGEABLE profile for it
+# (see MOB.xml, T4SS_typeI.xml and the rest of the definitions directory), so a
+# VirB4 can legitimately reach us under either name.
+#
+# Careful: `T4SS_F_traU` is a DIFFERENT profile - an F-type mating-pair gene in
+# its own right, not a VirB4 stand-in - which is why the name below is matched
+# exactly rather than as a substring of "traU".
+VIRB4_EXCHANGEABLE_GENE_NAME = "T4SS_I_traU"
+
+
+def hit_is_virb4(hit):
+    """Say whether one CONJscan hit is VirB4, under whichever name it was reported.
+
+    Input:  one hit dict from read_conjscan_hits.
+    Output: True/False. Used only by the truncation check in
+            build_conjscan_anchors, because VirB4 - the ATPase that powers the
+            mating bridge - is, with the relaxase, one of the two components that
+            has to WORK for conjugation to happen.
+
+    Why this needs two columns rather than one string test: MacSyFinder writes
+    the profile that ACTUALLY matched in `gene_name` and keeps the model's own
+    gene in `hit_gene_ref`. The real output of sample 006 shows exactly that -
+    `gene_name = T4SS_MOBM` for a hit found under the model gene `T4SS_MOBB`. So
+    a truncated VirB4 that matched the exchangeable traU profile is written as
+    `T4SS_I_traU`, and a check that only looked at `gene_name` for the string
+    'virb4' would miss it and leave the element reported as intact.
+    """
+    gene_name = hit["gene_name"]
+    # .get, because `hit_gene_ref` is not one of the columns we insist on: a
+    # MacSyFinder version that does not write it must not crash the sample.
+    gene_ref = hit.get("hit_gene_ref", "")
+
+    if "virb4" in gene_name.lower() or "virb4" in gene_ref.lower():
+        return True
+
+    # Fallback when there is no hit_gene_ref to consult: the exchangeable profile
+    # name itself, matched exactly (see the note above about T4SS_F_traU).
+    return gene_name.strip() == VIRB4_EXCHANGEABLE_GENE_NAME
+
+
 def mpf_type_from_model(model_fqn):
     """Pull the MPF type letter out of a CONJscan model name, if it has one.
 
@@ -279,7 +327,7 @@ PROFILE_COVERAGE_INTACT_MIN = 0.7
 MIN_ANCHOR_CLASSES_FOR_HIGH = 3
 
 
-def classify_cluster(has_integrase, has_relaxase, has_t4ss):
+def classify_cluster(has_integrase, has_relaxase, has_mpf_apparatus):
     """Turn "which anchors are present" into a class and a mobility statement.
 
     This is the whole of spec §8 Phase 4, written as a pure function so it can be
@@ -290,6 +338,11 @@ def classify_cluster(has_integrase, has_relaxase, has_t4ss):
             in the table but it does not change the class, because a coupling
             protein without a relaxase transfers nothing and a coupling protein
             without an MPF has nothing to hand the DNA to.
+
+            `has_mpf_apparatus` is deliberately STRICTER than "a mating-pair
+            component was hit somewhere": it means CONJscan called a typed T4SS
+            system. See the block that computes it in build_candidates - an
+            accessory VirB4 inside a relaxase-only MOB system does not count.
     Output: (mge_class, mobility_wording).
 
     The spec's table, verbatim:
@@ -315,7 +368,7 @@ def classify_cluster(has_integrase, has_relaxase, has_t4ss):
       * relaxase or T4SS alone, no integrase - grouped with the conjugative
         region, with wording that says which half is missing.
     """
-    if has_integrase and has_relaxase and has_t4ss:
+    if has_integrase and has_relaxase and has_mpf_apparatus:
         return MGE_CLASS_ICE, "predicted self-transmissible"
 
     if has_integrase and has_relaxase:
@@ -325,7 +378,7 @@ def classify_cluster(has_integrase, has_relaxase, has_t4ss):
         # Integrase but no relaxase: it can integrate, it cannot be mobilised.
         return MGE_CLASS_ISLAND, "passive"
 
-    if has_relaxase and has_t4ss:
+    if has_relaxase and has_mpf_apparatus:
         return MGE_CLASS_CONJ_REGION, "conjugative region, boundaries not established"
 
     if has_relaxase:
@@ -701,6 +754,9 @@ def read_conjscan_hits(path):
             "sys_wholeness": _float_or_none(field(row, "sys_wholeness")),
             "hit_profile_cov": _float_or_none(field(row, "hit_profile_cov")),
             "hit_status": field(row, "hit_status"),
+            # The model's OWN gene, which may differ from gene_name: see
+            # hit_is_virb4 below for why we need both.
+            "hit_gene_ref": field(row, "hit_gene_ref"),
         })
     return hits
 
@@ -792,9 +848,11 @@ def build_conjscan_anchors(sample, hits, features_by_id):
         # to WORK for transfer are tested - the relaxase, and VirB4, the ATPase
         # that powers the mating bridge. A short alignment to a structural
         # accessory gene is much less informative.
+        # hit_is_virb4 checks both names VirB4 can arrive under; see the note
+        # there about the exchangeable T4SS_I_traU profile.
         is_core_component = (
             anchor_class == ANCHOR_RELAXASE
-            or "virb4" in hit["gene_name"].lower()
+            or hit_is_virb4(hit)
         )
         coverage = hit["hit_profile_cov"]
         if is_core_component and coverage is not None and coverage < PROFILE_COVERAGE_INTACT_MIN:
@@ -1082,7 +1140,61 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             if cluster_has_class(cluster, anchor_class)
         ]
 
-        mge_class, mobility = classify_cluster(has_integrase, has_relaxase, has_t4ss)
+        # --- does the SYSTEM itself evidence a mating-pair apparatus? --------
+        # `has_t4ss` above only says that SOME mating-pair profile was hit inside
+        # this cluster. That alone must not make an ICE, because CONJscan's
+        # relaxase-centred `MOB` model lists VirB4 as an ACCESSORY gene: a MOB
+        # system is BY DEFINITION a relaxase-only system - it describes DNA that
+        # can be picked up by someone else's machinery - and one incidental VirB4
+        # inside it is not evidence that this cell can build a mating bridge.
+        #
+        # Only the typed models (`T4SS_type*`, and their decayed `dCONJ_type*`
+        # counterparts) describe a complete mating-pair apparatus. So we ask, per
+        # mating-pair hit, which model it was found under, and count only the
+        # typed ones. Without this test a single accessory VirB4 would promote an
+        # IME (mobilisable, needs a helper) straight to an ICE (predicted
+        # self-transmissible) - the worst overcall this script could make, since
+        # tier 6 is exactly the answer a regulator reads.
+        # Ask the SYSTEM, not the individual hit. An earlier version of this test
+        # looked at each mating-pair anchor's own model, which diverges from the
+        # system view in a case that really happens: in T4SS_typeF both the
+        # relaxase and the coupling protein are declared loner genes, so a typed
+        # system can contribute those two while a separate MOB system in the same
+        # cluster contributes the accessory VirB4. The per-hit test then said "no
+        # apparatus" for a cluster that plainly had a typed T4SS system in it, and
+        # wrote an audit line asserting something the row's own mpf_type column
+        # contradicted. Whether CONJscan called a typed mating-pair SYSTEM here is
+        # the question that matters, and mpf_types already answers it.
+        # Which typed mating-pair systems do the anchors in this cluster belong
+        # to? Computed here from the anchors' own system ids, because the tier
+        # decision below needs the answer; the descriptive mpf_types list further
+        # down is built the same way and reports it.
+        cluster_system_ids = {anchor["sys_id"] for anchor in cluster
+                              if anchor.get("sys_id")}
+        cluster_mpf_types = {
+            mpf_type
+            for sys_id in cluster_system_ids
+            for mpf_type in systems.get(sys_id, {}).get("mpf_types", set())
+        }
+        has_mpf_apparatus = bool(cluster_mpf_types)
+
+        if has_t4ss and not has_mpf_apparatus:
+            audit_rows.append(audit_row(
+                sample, "kept_flagged", "mpf_marker_without_typed_system",
+                "a mating-pair marker was hit in this cluster, but CONJscan called "
+                "no typed mating-pair system here - the hit came under a "
+                "relaxase-centred MOB model, which lists VirB4 as an accessory "
+                "gene. The marker is still reported "
+                "in has_t4ss, but it was NOT counted as a mating-pair apparatus "
+                "when classifying this cluster, so the element was not raised to "
+                "ICE (predicted self-transmissible) on the strength of it. A "
+                "relaxase-only system is mobilisable, not self-transmissible.",
+                contig=contig, start=start, end=end,
+            ))
+
+        mge_class, mobility = classify_cluster(
+            has_integrase, has_relaxase, has_mpf_apparatus
+        )
 
         # --- is the machinery actually intact? ------------------------------
         # Three independent ways of being broken, all reported by name so the
@@ -1162,21 +1274,12 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             for sys_id in contributing_systems
             for mpf_type in systems.get(sys_id, {}).get("mpf_types", set())
         })
-        # A T4SS_type*/dCONJ_type* model means CONJscan called a whole typed
-        # mating-pair system. If the only MPF evidence came from a hit under the
-        # relaxase-centred MOB model (which lists VirB4 as an accessory gene),
-        # we have the marker but not the system - worth knowing before believing
-        # an ICE call.
+        # A T4SS_type*/dCONJ_type* model among the contributing systems means
+        # CONJscan called a whole typed mating-pair system somewhere in this
+        # cluster. Reported as a column so a reader can see at a glance whether
+        # the call rests on a typed system; the classification decision itself
+        # was already made above, per mating-pair hit, and audited there.
         mpf_typed_system = bool(mpf_types)
-        if has_t4ss and not mpf_typed_system:
-            audit_rows.append(audit_row(
-                sample, "kept_flagged", "mpf_marker_without_typed_system",
-                "a mating-pair component was found, but CONJscan did not call a "
-                "typed T4SS system (the hit came from the relaxase-centred MOB "
-                "model, which lists VirB4 as an accessory gene). The marker is "
-                "present; the complete apparatus is not demonstrated.",
-                contig=contig, start=start, end=end,
-            ))
 
         integrase_products = [
             anchor["label"] for anchor in cluster

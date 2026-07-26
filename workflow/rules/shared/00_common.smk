@@ -1195,6 +1195,34 @@ else:
 # refuse to trust an unverified download.
 CHECKV_SHA_URL = CHECKV_LINK.replace(".tar.gz", ".sha256") if CHECKV_LINK else ""
 
+# geNomad database mirror. geNomad's own downloader hard-codes portal.nersc.gov -
+# the same host as CheckV's database, frequently unreachable, with no --url option
+# to point elsewhere - so BacFlux fetches the archive itself when a link is given.
+# geNomad's authors publish the same database on Zenodo (linked from their own
+# README), which is what the shipped default points at.
+#
+# Resolution order for the geNomad database, highest first:
+#   1. directories.genomad_db  -> rule genomad_db_local, nothing downloaded
+#   2. links.genomad_link      -> rule genomad_db fetches + verifies + extracts
+#   3. neither                 -> rule genomad_db falls back to geNomad's own
+#                                 downloader, i.e. portal.nersc.gov
+GENOMAD_LINK = str(_links.get("genomad_link") or "").strip()
+if GENOMAD_LINK and not GENOMAD_LINK.endswith(".tar.gz"):
+    sys.exit(
+        f"[BacFlux] Invalid links.genomad_link: expected a .tar.gz archive, got "
+        f"'{os.path.basename(urlparse(GENOMAD_LINK).path)}'. It must be the geNomad "
+        f"DATABASE archive (genomad_db_v*.tar.gz), not the HMM or MSA archive that "
+        f"sits beside it on the same Zenodo record."
+    )
+
+# Zenodo publishes an MD5 per file, not the .sha256 sidecar the CheckV and dbCAN
+# mirrors carry, and we cannot add files to someone else's record - so the
+# expected hash is configured directly rather than derived from the URL. Leaving
+# it empty downloads without verification (logged, not silent); setting a link
+# without updating the hash is the one case rule genomad_db refuses outright,
+# because a stale hash is worse than an absent one.
+GENOMAD_MD5 = str(_links.get("genomad_md5") or "").strip().lower()
+
 # dbCAN: the link is REQUIRED (every mode annotates CAZymes) and must be a
 # .tar.gz. The matching checksum URL is derived by swapping the suffix. Resolved
 # once here (v1 did this inline per rule) so a bad link fails fast at parse time.

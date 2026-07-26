@@ -47,9 +47,15 @@ WHAT THIS SCRIPT PRODUCES (and what consumes it)
                    the QC metric the spec asks for; it travels with the report so a
                    reader can see how fragmented the evidence is.
     --out-audit    one row per IS record we DROPPED or FLAGGED, with an explicit
-                   reason column. BacFlux convention (see
+                   reason column, PLUS one sample-level row when there was nothing
+                   to report at all, saying which of the two very different
+                   situations applies: ISEScan wrote no results file (so the run
+                   itself, not the biology, is why the table is empty) or ISEScan
+                   reported zero IS for this genome. BacFlux convention (see
                    contig_taxonomy_decisions.tsv): every filtering decision must be
-                   inspectable afterwards; nothing disappears silently.
+                   inspectable afterwards; nothing disappears silently, and "the
+                   tool produced nothing" must never look like "the genome has
+                   nothing".
 
 COORDINATES
     ISEScan reports isBegin/isEnd as 1-based and inclusive of both ends. We keep
@@ -205,14 +211,17 @@ SUMMARY_COLUMNS = [
     "n_records_flagged",
 ]
 
-# One row per IS record we dropped or flagged, with the reason spelled out.
+# One row per IS record we dropped or flagged, with the reason spelled out, plus
+# (at most) one sample-level row explaining an empty table — see
+# startup_audit_rows. contig/start/end are NA on that sample-level row, because it
+# is about the whole run rather than about one element.
 AUDIT_COLUMNS = [
     "sample",
     "contig",
     "start",
     "end",
-    "action",     # dropped | kept_flagged
-    "reason",     # short machine-readable token, see the reasons used in normalise_records
+    "action",     # dropped | kept_flagged | input_missing | input_empty
+    "reason",     # short machine-readable token, see normalise_records and startup_audit_rows
     "detail",     # human-readable explanation + the offending raw line
 ]
 
@@ -718,6 +727,88 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
     return rows, audit_rows
 
 
+def startup_audit_rows(sample, isescan_out, results_file, n_records):
+    """Write down WHY this sample has no IS to report, when that is the case.
+
+    Input:  the --isescan-out path as the rule passed it, the results file
+            find_isescan_results resolved it to (or None), and how many records
+            read_isescan_table got out of that file.
+    Output: a list of zero or one audit rows, written to --out-audit ahead of the
+            per-record drop/flag rows. Nothing else consumes it; it exists purely
+            so a human reading the audit file can interpret an empty IS table.
+
+    Why this matters, in biology terms: an empty {sample}_is_elements.tsv can mean
+    two completely different things, and a reader judging a mobility call needs to
+    know which.
+      * ISEScan reported no insertion sequences  -> a real biological statement
+        about this genome (still a FLOOR, see the module docstring, but a result).
+      * ISEScan wrote no results file at all     -> we know nothing about this
+        genome's IS content. ISEScan does write nothing when it finds no IS, so
+        this is the EXPECTED look of a genuinely IS-free genome — but a crashed or
+        killed run looks exactly the same from here, which is why we say so
+        instead of quietly reporting zero.
+    An absent --isescan-out path is a third case and a different kind of problem
+    (the rule's wiring, not the tool), so it gets its own reason token.
+
+    BacFlux hard rule (CLAUDE.md): every such decision gets an audit row with a
+    reason, so "the tool produced nothing" is never indistinguishable from "the
+    biology genuinely had nothing".
+    """
+    # Records were parsed, so the table is not empty for any of these reasons and
+    # there is nothing to explain here.
+    if results_file is not None and n_records > 0:
+        return []
+
+    if results_file is None and (not isescan_out or not os.path.exists(isescan_out)):
+        # The path the rule handed us is not there at all. ISEScan's own rule
+        # creates its output directory unconditionally, so this normally means the
+        # directory was removed or the path was mis-wired — not a statement about
+        # the genome.
+        action = "input_missing"
+        reason = "isescan_output_path_missing"
+        detail = (
+            f"--isescan-out '{isescan_out}' does not exist, so ISEScan's results were "
+            "never looked at. Nothing about this genome's insertion sequences is known; "
+            "the empty IS table is a wiring problem, not a biological result."
+        )
+    elif results_file is None:
+        # The directory is there but holds no results .tsv. This is exactly what a
+        # genuinely IS-free genome looks like, and also exactly what a crashed run
+        # looks like, so we report both readings rather than pick one.
+        action = "input_missing"
+        reason = "isescan_wrote_no_results_file"
+        detail = (
+            f"no ISEScan results .tsv under '{isescan_out}'. ISEScan writes no output at "
+            "all when it finds no insertion sequences, so the expected reading is 'no IS "
+            "detected in this genome', but an ISEScan run that failed leaves exactly the "
+            "same empty directory: check the isescan log for this sample before quoting "
+            "zero."
+        )
+    else:
+        # A results file WAS found and read; it simply lists no IS. This is the
+        # one case where the empty table is a statement about the genome.
+        action = "input_empty"
+        reason = "isescan_results_file_has_no_rows"
+        detail = (
+            f"ISEScan results file '{results_file}' was found but contains no IS rows "
+            "(empty, or header only), i.e. ISEScan reported no insertion sequences for "
+            "this genome. Unlike a missing results file, this is a statement about the "
+            "assembly, not about the run."
+        )
+
+    return [{
+        "sample": sample,
+        "contig": "NA",
+        "start": "NA",
+        "end": "NA",
+        "action": action,
+        "reason": reason,
+        # Not truncated to AUDIT_DETAIL_MAX_CHARS: unlike the per-record rows this
+        # detail quotes no raw ISEScan line, it is a whole sentence a reader needs.
+        "detail": detail,
+    }]
+
+
 def summarise(sample, rows, audit_rows, boundary_bp, min_length_bp, results_file):
     """Build the one-row per-sample QC summary.
 
@@ -867,13 +958,21 @@ def main(argv=None):
     rows, audit_rows = normalise_records(
         args.sample, records, contig_lengths, args.boundary_bp, args.min_length_bp
     )
+    # When there is nothing to report, say in the audit file WHY there is nothing:
+    # "ISEScan found no IS in this genome" and "ISEScan produced no results file"
+    # are different statements and a reader must not have to guess which happened.
+    # These rows are deliberately NOT counted as dropped/flagged records in the
+    # summary — nothing was filtered out, there was simply nothing to filter.
+    startup_audit = startup_audit_rows(
+        args.sample, args.isescan_out, results_file, len(records)
+    )
     summary = summarise(
         args.sample, rows, audit_rows, args.boundary_bp, args.min_length_bp, results_file
     )
 
     write_tsv(args.out_table, OUTPUT_COLUMNS, rows)
     write_tsv(args.out_summary, SUMMARY_COLUMNS, [summary])
-    write_tsv(args.out_audit, AUDIT_COLUMNS, audit_rows)
+    write_tsv(args.out_audit, AUDIT_COLUMNS, startup_audit + audit_rows)
 
     # A short, honest line for the run log. Never used for filtering — it just
     # makes the fragmentation visible without opening the summary file.
@@ -886,6 +985,12 @@ def main(argv=None):
         f"{summary['n_records_dropped']} record(s) dropped, "
         f"{summary['n_records_flagged']} flagged (see {args.out_audit})."
     )
+    # Repeat the sample-level explanation in the log, so an empty IS table is
+    # explained both in the run log and in the audit file that outlives it.
+    for startup_row in startup_audit:
+        print(f"  nothing to report - reason: {startup_row['reason']}. "
+              f"{startup_row['detail']}")
+
     if float(summary["fraction_at_contig_boundary"]) >= BOUNDARY_FRACTION_WARN:
         _warn(
             f"{summary['fraction_at_contig_boundary']} of the IS calls for "

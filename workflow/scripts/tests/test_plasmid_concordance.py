@@ -212,3 +212,50 @@ class TestWriteAndReadBack(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestPlatonFailureIsNotASecondOpinion(unittest.TestCase):
+    """A crashed Platon must not be scored as a genuine second opinion.
+
+    The distinction that matters, and that an earlier attempt at this fix got
+    wrong: an EMPTY Platon directory is NOT a failure. A completed, exit-0 Platon
+    run writes almost nothing when every contig exceeds its 500 kb size filter,
+    which is the ordinary outcome for a closed genome. Only the explicit
+    "Platon exited with status N" line that the plasmid_search rule writes means
+    the tool actually crashed.
+    """
+
+    def test_crash_marker_is_detected(self):
+        crashed = write_temp("sampleA: Platon exited with status 1; see the log.\n")
+        self.assertTrue(pc.platon_run_failed(crashed))
+
+    def test_a_normal_no_plasmid_run_is_not_a_failure(self):
+        # What plasmid_search writes for a genome where Platon found no plasmid.
+        normal = write_temp("Platon found no plasmid in sample sampleA.\n")
+        self.assertFalse(pc.platon_run_failed(normal))
+
+    def test_an_empty_platon_directory_is_not_a_failure(self):
+        # The closed-genome case: nothing written at all, exit 0.
+        empty = write_temp("")
+        self.assertFalse(pc.platon_run_failed(empty))
+        self.assertFalse(pc.platon_run_failed("/nonexistent/verified_plasmids.txt"))
+
+    def test_a_crash_downgrades_genomad_only_to_platon_unavailable(self):
+        # Without this, geNomad's calls would be reported as agreement=genomad_only
+        # at medium confidence: a two-tool tier that was never assessed.
+        rows = pc.build_rows(
+            "sampleA", {}, set(), {},
+            pc.parse_genomad_plasmids(write_temp(GENOMAD_SUMMARY)),
+            platon_assessed=False,
+        )
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertEqual(row["platon_call"], "not_assessed")
+            self.assertEqual(row["agreement"], "platon_unavailable")
+            self.assertEqual(row["confidence"], "low")
+
+    def test_classify_refuses_to_grade_an_unassessed_contig(self):
+        self.assertEqual(pc.classify("not_assessed", "plasmid"),
+                         ("platon_unavailable", "low"))
+        self.assertEqual(pc.classify("not_assessed", "absent"),
+                         ("platon_unavailable", "low"))

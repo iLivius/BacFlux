@@ -204,6 +204,96 @@ def test_gtdb_suffixed_species_epithet_blocks_a_species_level_organism():
     assert "suffixed species" in reason
 
 
+# ── GTDB moved the genus but kept the species: the hand-checked exceptions ───
+#
+# Why this section exists. GTDB uses the same "_A/_B/_E" suffix for two very
+# different things, and the difference decides whether AMRFinderPlus may be told
+# the organism:
+#   * suffix on the GENUS  — GTDB broke up a genus NCBI keeps whole. The species
+#     moves to a new genus name but keeps its epithet, so
+#     "s__Enterococcus_B faecium" IS NCBI's Enterococcus faecium.
+#   * suffix on the EPITHET — GTDB split the species itself, so
+#     "faecalis_A" is a different taxon from NCBI's E. faecalis.
+# Only the first kind may be mapped, and only for names checked by hand against
+# the GTDB release (see GTDB_SPECIES_EQUIVALENCES in the script).
+
+def test_gtdb_split_genus_still_matches_enterococcus_faecium():
+    # The case that motivated this exception: GTDB R226 has no unsuffixed
+    # "Enterococcus faecium" at all, so before the exception table every
+    # E. faecium isolate silently ran AMRFinderPlus without --organism and none
+    # of its curated point mutations (daptomycin liaR/liaS/cls, linezolid 23S)
+    # could ever be reported.
+    organism, reason = gao.map_classification(
+        lineage("Enterococcus_B", "Enterococcus_B faecium"))
+    assert organism == "Enterococcus_faecium"
+    assert reason.startswith("hand-checked GTDB/NCBI name difference")
+    # The audit must quote the GTDB name as GTDB writes it, so the decision can
+    # be re-checked against the taxonomy file later.
+    assert "Enterococcus_B faecium" in reason
+
+
+def test_enterococcus_faecalis_still_matches_by_the_ordinary_species_rule():
+    # The sister case, and the reason faecalis is NOT in the exception table:
+    # GTDB keeps it in the unsuffixed g__Enterococcus, so nothing special is
+    # needed and nothing special must be added.
+    organism, reason = gao.map_classification(
+        lineage("Enterococcus", "Enterococcus faecalis"))
+    assert organism == "Enterococcus_faecalis"
+    assert reason.startswith("exact species match")
+
+
+def test_split_species_inside_the_split_genus_is_still_blocked():
+    # "Enterococcus_B faecalis_A" is a real GTDB R226 name and is NOT NCBI's
+    # E. faecalis. The exception must not open a door for it.
+    organism, reason = gao.map_classification(
+        lineage("Enterococcus_B", "Enterococcus_B faecalis_A"))
+    assert organism == ""
+    assert reason.startswith("no curated organism for this taxon")
+
+
+def test_placeholder_species_inside_the_split_genus_is_still_blocked():
+    # An unnamed Enterococcus_B is not E. faecium, whatever the genus says.
+    organism, _ = gao.map_classification(
+        lineage("Enterococcus_B", "Enterococcus_B sp900766935"))
+    assert organism == ""
+
+
+def test_suffixed_genus_not_in_the_exception_table_is_still_blocked():
+    # The general rule is unchanged: only names on the hand-checked list get
+    # through, and the audit says so rather than leaving the reader guessing why
+    # one Enterococcus_B was accepted and this was not.
+    organism, reason = gao.map_classification(
+        lineage("Klebsiella_A", "Klebsiella_A pneumoniae"))
+    assert organism == ""
+    assert "GTDB_SPECIES_EQUIVALENCES" in reason
+
+
+def test_exception_table_maps_only_onto_real_amrfinder_organisms():
+    # A typo in the table would produce an --organism value AMRFinderPlus
+    # rejects, which fails the run instead of degrading quietly.
+    for gtdb_name, organism in gao.GTDB_SPECIES_EQUIVALENCES.items():
+        assert organism in gao.ALL_ORGANISMS, gtdb_name
+
+
+def test_exception_table_holds_only_genus_renames_not_species_splits():
+    # Structural guard on the table itself: every entry must be a GTDB genus
+    # rename (suffixed genus, plain epithet) whose epithet is unchanged from the
+    # AMRFinderPlus name. That is what makes the mapping safe; an entry with a
+    # suffixed or placeholder epithet would be mapping a different taxon.
+    for gtdb_name, organism in gao.GTDB_SPECIES_EQUIVALENCES.items():
+        gtdb_genus, gtdb_epithet = gtdb_name.split(" ")
+        _, genus_is_suffixed = gao.strip_gtdb_suffix(gtdb_genus)
+        _, epithet_is_suffixed = gao.strip_gtdb_suffix(gtdb_epithet)
+        assert genus_is_suffixed, gtdb_name
+        assert not epithet_is_suffixed, gtdb_name
+        assert not gao.is_placeholder_species(gtdb_epithet), gtdb_name
+        ncbi_genus, ncbi_epithet = organism.split("_", 1)
+        assert gtdb_epithet == ncbi_epithet, gtdb_name
+        # The GTDB genus must be a suffixed form of the NCBI genus, not some
+        # other genus entirely.
+        assert gtdb_genus.startswith(ncbi_genus + "_"), gtdb_name
+
+
 def test_placeholder_species_in_a_curated_genus():
     # Klebsiella has curated species but no genus-level entry, so an unnamed
     # Klebsiella gets nothing — and the audit says exactly why.
@@ -553,6 +643,34 @@ def test_cli_writes_the_organism_and_the_audit_on_a_match(tmp_path):
     assert row["reason"].startswith("exact species match")
 
 
+def test_cli_writes_the_organism_for_a_gtdb_split_genus(tmp_path):
+    # End to end for the exception: a hybrid E. faecium sample (two assemblies,
+    # both classified as Enterococcus_B) must end up with a NON-empty organism
+    # file, because that file is the only thing the Snakemake rule looks at when
+    # deciding whether to pass --organism to AMRFinderPlus.
+    summary = write_summary(tmp_path, [
+        ("EF01_illumina", lineage("Enterococcus_B", "Enterococcus_B faecium")),
+        ("EF01_ont", lineage("Enterococcus_B", "Enterococcus_B faecium")),
+    ])
+    organism_file = tmp_path / "EF01_amrfinder_organism.txt"
+    audit_file = tmp_path / "EF01_amrfinder_organism_decision.tsv"
+
+    exit_code = gao.main([
+        "--gtdbtk-summary", summary,
+        "--sample", "EF01",
+        "--out-organism", str(organism_file),
+        "--out-audit", str(audit_file),
+    ])
+
+    assert exit_code == 0
+    assert organism_file.read_text().strip() == "Enterococcus_faecium"
+
+    _, row = read_audit(str(audit_file))
+    assert row["matched_organism"] == "Enterococcus_faecium"
+    assert row["reason"].startswith("hand-checked GTDB/NCBI name difference")
+    assert "2 assemblies of this sample agree" in row["reason"]
+
+
 def test_cli_writes_an_empty_file_and_exits_zero_on_no_match(tmp_path):
     # The common case for environmental isolates: the file must be genuinely
     # empty so `[ -n "$(cat ...)" ]` in the rule is false and AMRFinderPlus runs
@@ -659,3 +777,52 @@ def test_real_gtdbtk_summary_gives_no_organism(tmp_path):
     assert "Pseudomonas_E" in reason
     # Both hybrid rows were seen and agreed.
     assert "006_illumina" in reason and "006_ont" in reason
+
+
+# ── Regression anchor against the real GTDB taxonomy ─────────────────────────
+
+# The exception table is only correct for as long as GTDB keeps these names, so
+# this checks it against the taxonomy file that ships inside the GTDB release
+# (the directory config key `gtdbtk_db` points at, R226 on this machine). If a
+# future release renames things, this test fails and the table gets revisited
+# instead of quietly mapping the wrong taxon. Skipped where the DB is absent.
+GTDB_TAXONOMY = ("/data/x1hbrnas4/big_db/GTDB_R226/release226/taxonomy/"
+                 "gtdb_taxonomy.tsv")
+
+
+def gtdb_species_names_matching(prefix):
+    """Every distinct GTDB species name (the s__ value) starting with `prefix`.
+
+    Reads the release's own taxonomy TSV — one genome per line, the lineage in
+    the second column — and returns the species field only, e.g.
+    {"Enterococcus faecalis", "Enterococcus_B faecium", ...}.
+    """
+    names = set()
+    with open(GTDB_TAXONOMY) as handle:
+        for line in handle:
+            lineage_field = line.rstrip("\n").split("\t")[-1]
+            species_field = lineage_field.split(";")[-1]
+            if not species_field.startswith("s__"):
+                continue
+            species_name = species_field[3:]
+            if species_name.startswith(prefix):
+                names.add(species_name)
+    return names
+
+
+def test_gtdb_really_has_no_unsuffixed_enterococcus_faecium():
+    if not os.path.isfile(GTDB_TAXONOMY):
+        import pytest
+        pytest.skip("GTDB taxonomy not present on this machine")
+
+    enterococci = gtdb_species_names_matching("Enterococcus")
+    faecium_names = {n for n in enterococci if n.split()[1] == "faecium"}
+    # The whole reason for the exception: the plain NCBI name does not exist in
+    # GTDB, only the split-genus form does.
+    assert faecium_names == {"Enterococcus_B faecium"}
+    # And the reason faecalis needs no exception: it is there unsuffixed.
+    assert "Enterococcus faecalis" in enterococci
+    # Every key of the exception table must still be a name GTDB actually uses.
+    for gtdb_name in gao.GTDB_SPECIES_EQUIVALENCES:
+        genus = gtdb_name.split()[0]
+        assert gtdb_name in gtdb_species_names_matching(genus), gtdb_name

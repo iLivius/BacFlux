@@ -23,6 +23,12 @@ WHY THIS EXISTS
     P. aeruginosa's curated mutation list. That is worse than no call at all,
     so every mismatch below is handled explicitly.
 
+    The suffix rule is not symmetric, though. When GTDB breaks up a genus, the
+    species that move out keep their epithet, so `s__Enterococcus_B faecium`
+    really is NCBI's Enterococcus faecium and does deserve the flag. Those cases
+    are listed one at a time in GTDB_SPECIES_EQUIVALENCES, checked by hand
+    against the GTDB release, rather than allowed by a blanket rule.
+
 WHERE IT RUNS
     In the mobilome module's WP-A step, between GTDB-Tk (stage 03.taxonomy) and
     AMRFinderPlus (stage 05.amr / 08.mobilome). It is pure text handling —
@@ -146,7 +152,13 @@ AUDIT_HEADER = ["sample", "gtdb_classification", "matched_organism", "reason"]
 # GTDB marks a lineage it has split off from the NCBI name with an underscore
 # plus capital letters at the END of the word: Pseudomonas_E, Klebsiella_A,
 # Escherichia coli_D. The suffix means "related to, but NOT the same taxon as"
-# the unsuffixed name, so it must always block a match.
+# the unsuffixed name, so by default it blocks a match.
+#
+# ONE deliberate exception, and only on the GENUS half of the name: see
+# GTDB_SPECIES_EQUIVALENCES below. When GTDB breaks up a genus that NCBI keeps
+# whole, a species that moves out keeps its own epithet and is still the same
+# species, so a hand-checked list of exact names may override this rule. A suffix
+# on the EPITHET is never overridden - there GTDB split the species itself.
 GTDB_SUFFIX = re.compile(r"_[A-Z]+$")
 
 # GTDB gives genomes with no validly published species name a placeholder
@@ -154,6 +166,52 @@ GTDB_SUFFIX = re.compile(r"_[A-Z]+$")
 # "s__Pseudomonas_E sp010095445". It is not a species name, so it can never
 # match a curated species.
 GTDB_PLACEHOLDER_SPECIES = re.compile(r"^sp\d*$")
+
+# ── Hand-checked exceptions: GTDB moved the GENUS, but it is the same species ─
+# The suffix rule above is right about lineages GTDB split off (Pseudomonas_E is
+# genuinely not NCBI Pseudomonas), but it is too strict in one real case. When
+# GTDB breaks up a genus that NCBI keeps whole, the species that move out get
+# the new genus name and KEEP their epithet, so "s__Enterococcus_B faecium" is
+# exactly NCBI's Enterococcus faecium, just filed under a different GTDB genus.
+# A suffix on the EPITHET means the opposite — there GTDB split the species
+# itself, so "Enterococcus_B faecalis_A" is NOT NCBI's E. faecalis and stays
+# blocked.
+#
+# This is deliberately a short list of exact GTDB names and not a general
+# "a genus suffix is fine" rule. A general rule would silently accept any
+# Genus_X + curated-epithet combination a future GTDB release invents, which is
+# the very failure mode this script exists to prevent.
+#
+# How the list was checked, against the taxonomy that ships with the GTDB
+# release `gtdbtk_db` points at (R226 here):
+#     grep -o "s__<Genus>[_A-Z]* <epithet>[_A-Z]*" \
+#       $gtdbtk_db/taxonomy/gtdb_taxonomy.tsv | sort -u
+# Re-checked against R226 on 2026-07-26: 26 of the 28 curated species are present
+# under the plain NCBI name and need no entry. TWO are not.
+#
+#   * Enterococcus faecium - handled by the entry below.
+#   * Burkholderia pseudomallei - deliberately NOT given an entry. GTDB R226 has
+#     no "pseudomallei" epithet at all; it folds those genomes into
+#     s__Burkholderia mallei (the two are >99% ANI). Adding an equivalence would
+#     mean writing one NCBI species name for genomes GTDB calls another, which is
+#     the taxon-substitution this whole block exists to prevent. The cost is only
+#     that --organism Burkholderia_pseudomallei can never be emitted from a GTDB
+#     call; the cost of the alternative is a wrong organism, which the module
+#     docstring rightly calls worse than no call at all.
+#
+# GTDB R226 holds NO unsuffixed "Enterococcus faecium" at all. Without this entry,
+# every E. faecium isolate ran AMRFinderPlus with no --organism and none of its
+# curated point mutations could be reported — 41 protein mutations (daptomycin:
+# liaR, liaS, cls, dltC, rpoC) and 2 in 23S rRNA (linezolid: G2505A, G2576T),
+# counted in the AMRFinderPlus DB shipped with Bakta. Those are precisely the
+# intrinsic, chromosomal, non-transferable calls that tier 1 of the mobility
+# ladder is built from, in a food-chain organism EFSA cares about.
+# E. faecalis is NOT listed here: GTDB keeps it in the unsuffixed
+# g__Enterococcus, so the ordinary species rule already matches it.
+GTDB_SPECIES_EQUIVALENCES = {
+    # GTDB species name (the s__ value, minus the "s__")  ->  AMRFinderPlus organism
+    "Enterococcus_B faecium": "Enterococcus_faecium",
+}
 
 
 # ── Reading the GTDB-Tk summary ──────────────────────────────────────────────
@@ -333,7 +391,26 @@ def map_classification(classification):
     genus_base, genus_is_suffixed = strip_gtdb_suffix(genus)
     epithet_base, epithet_is_suffixed = strip_gtdb_suffix(epithet)
 
-    # Step 1 — exact species match.
+    # The species name spelled exactly as GTDB writes it ("Enterococcus_B
+    # faecium"). Used for the hand-checked lookup in step 1 and again in the
+    # "why not" reasons at the bottom, so the audit quotes the real GTDB name.
+    gtdb_binomial = (genus + " " + epithet).strip()
+
+    # Step 1 — a hand-checked GTDB/NCBI name difference.
+    # Checked before anything else, because these are exactly the names where
+    # step 2's suffix rule would give the wrong answer: GTDB has moved the
+    # species into a split-off genus, but it is still the same organism
+    # AMRFinderPlus curates. See GTDB_SPECIES_EQUIVALENCES for how each entry
+    # was verified.
+    if gtdb_binomial in GTDB_SPECIES_EQUIVALENCES:
+        equivalent_organism = GTDB_SPECIES_EQUIVALENCES[gtdb_binomial]
+        return equivalent_organism, (
+            "hand-checked GTDB/NCBI name difference (GTDB s__%s is the same "
+            "species as AMRFinderPlus organism '%s'; GTDB moved it to a "
+            "split-off genus but kept the species epithet)"
+            % (gtdb_binomial, equivalent_organism))
+
+    # Step 2 — exact species match.
     # Only allowed when NEITHER token carries a GTDB suffix and the epithet is a
     # real name, because "Pseudomonas_E aeruginosa" or "Enterobacter cloacae_A"
     # would otherwise collapse onto the NCBI species they are explicitly not.
@@ -345,7 +422,7 @@ def map_classification(classification):
         if species_key in SPECIES_ORGANISMS:
             return species_key, "exact species match (GTDB s__%s %s)" % (genus, epithet)
 
-    # Step 2 — genus-level match.
+    # Step 3 — genus-level match.
     # Three AMRFinderPlus organisms are curated for a whole genus, so any
     # species in it qualifies — including unnamed ones, and including Shigella,
     # which GTDB has already folded into g__Escherichia. A GTDB-suffixed genus
@@ -354,7 +431,7 @@ def map_classification(classification):
         return genus, ("genus-level match (AMRFinderPlus curates '%s' at genus "
                        "level; GTDB g__%s)" % (genus, genus))
 
-    # Step 3 — no match. Say which of the GTDB/NCBI mismatches caused it, so the
+    # Step 4 — no match. Say which of the GTDB/NCBI mismatches caused it, so the
     # audit row is useful six months later. The generic reason comes first
     # because for most environmental isolates (Paenibacillus, Arthrobacter) the
     # genus simply has nothing curated, and the suffix/placeholder detail would
@@ -363,10 +440,15 @@ def map_classification(classification):
         return "", ("no curated organism for this taxon (AMRFinderPlus curates 31 "
                     "organisms; genus '%s' is not one of them)" % genus)
 
+    # A suffixed genus is normally a lineage GTDB split off from the NCBI genus,
+    # so it is not the same taxon. Since step 1 accepts a few hand-checked
+    # exceptions to that, the reason names the list, so a reader who sees one
+    # Enterococcus_B accepted and another refused can tell why.
     if genus_is_suffixed:
         return "", ("no curated organism for this taxon: GTDB-suffixed genus '%s' "
-                    "is a lineage split off from NCBI '%s' and is not the same "
-                    "taxon" % (genus, genus_base))
+                    "is a lineage split off from NCBI '%s', and '%s' is not one of "
+                    "the hand-checked GTDB/NCBI name differences (see "
+                    "GTDB_SPECIES_EQUIVALENCES)" % (genus, genus_base, gtdb_binomial))
 
     if is_placeholder_species(epithet):
         return "", ("GTDB placeholder species (sp<digits>: '%s %s') - not a curated "

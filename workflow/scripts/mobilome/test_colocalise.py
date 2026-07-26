@@ -641,7 +641,12 @@ def test_tier6_conjugative_plasmid_is_predicted_self_transmissible(tmp_path):
     assert row["mobility_tier_label"] == "predicted_self_transmissible"
     assert row["mge_context"] == "plasmid"
     assert row["plasmid_mobility"] == "conjugative"
-    assert row["confidence"] == "high"
+    # NOT high. This tier rests on Platon's conjugation HMM hit COUNT, which does
+    # not establish that a complete mating apparatus is present - and on the
+    # chromosome the same evidence is refused an ICE call and marked "machinery
+    # incomplete". The tier stands; the certainty is capped, and audited.
+    assert row["confidence"] == "medium"
+    assert "plasmid_conjugation_from_hit_counts_only" in audit_reasons(_audit)
 
 
 def test_tier6_ice_on_a_chromosome_beats_the_naive_chromosomal_assumption(tmp_path):
@@ -1194,3 +1199,152 @@ def test_an_is_partly_overlapping_the_gene_is_not_reported_as_clean_context(tmp_
     assert int(row["is_amr_overlap_bp"]) > 0    # the overlap is still measured
     assert row["confidence"] != "high"          # but the context is not clean
     assert "is_partially_overlaps_amr_gene" in audit_reasons(audit)
+
+
+# ---------------------------------------------------------------------------
+# "Nothing found" must mean "looked and found nothing", never "did not look".
+# ---------------------------------------------------------------------------
+
+
+def test_an_ice_row_does_not_stand_in_for_missing_is_calls(tmp_path):
+    """One ICE row used to make the module believe ISEScan had run.
+
+    ISEScan legitimately writes nothing when a genome has no IS, so the module
+    caps confidence when no IS calls exist. That check counted the POOLED rows of
+    both element tables, so a single unrelated ICE row silently satisfied it and
+    the same genome jumped from medium to high confidence on identical IS
+    evidence (none).
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000)],
+        is_rows=[],                                   # ISEScan found no IS
+        ice_rows=[ice_row(start=400000, end=420000)],  # unrelated, far away
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 500000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "1"
+    assert row["confidence"] != "high"
+    assert "no_is_calls_available" in audit_reasons(audit)
+
+
+def test_a_gene_inside_a_conjugative_region_is_not_an_intrinsic_candidate(tmp_path):
+    """conjugative_region / genomic_island were unrecognised and vanished.
+
+    They deliberately do not raise the tier (spec §8 phase 4 — a conjugative
+    region with no integrase has no established boundaries). But being unmapped
+    made them invisible to every test, so the gene came back "intrinsic candidate,
+    high confidence" with a contradictory "unrecognised element_type" audit line.
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000)],
+        ice_rows=[ice_row(start=5000, end=25000, mge_id="REGION_1",
+                          element_type="conjugative_region",
+                          mobility="conjugative region, boundaries not established")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "1"              # correctly NOT raised
+    assert row["mge_context"] == "conjugative_region"
+    assert row["mge_id"] == "REGION_1"
+    assert row["confidence"] != "high"
+    assert "inside_context_only_element" in audit_reasons(audit)
+
+
+def test_a_gene_just_outside_an_ime_is_reported_with_its_distance(tmp_path):
+    """The nearest-element scan was insertion-sequence-only.
+
+    The interval an ICE/IME carries is the span of its machinery genes, not a
+    resolved boundary, so a gene sitting just outside it may still be carried by
+    the element. It used to read "intrinsic candidate, nothing nearby".
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000)],
+        ice_rows=[ice_row(start=13000, end=33000, mge_id="IME_9",
+                          element_type="ime")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "1"
+    assert row["mge_id"] == "IME_9"
+    assert int(row["distance_bp"]) > 0              # the measured gap is reported
+    assert row["confidence"] != "high"
+    assert "near_but_outside_element_machinery_span" in audit_reasons(audit)
+
+
+def test_the_no_context_audit_line_only_claims_what_was_checked(tmp_path):
+    """It said "no mobile element on this contig" having checked only IS calls."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000)],
+        is_rows=[is_row(start=300000, end=301000)],   # far away, so no context
+        ice_rows=[ice_row(start=400000, end=420000, mge_id="ICE_FAR")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 500000),),
+    )
+    reasons = audit_reasons(audit)
+    assert "no_mobile_element_on_this_contig" not in reasons
+
+
+# ---------------------------------------------------------------------------
+# The IS-into-gene architecture, as it actually appears in the data.
+# ---------------------------------------------------------------------------
+
+
+def test_an_is_abutting_a_partial_hit_is_called_inactivation_not_expression(tmp_path):
+    """The canonical architecture the >=50% overlap test could never catch.
+
+    When an IS lands in a resistance gene, AMRFinderPlus reports only the
+    surviving fragment, so the gene's coordinates STOP where the IS starts and the
+    overlap is ~0. Taken from the reviewer's real-world example: a PARTIALX
+    aac(3)-IIa fragment with an IS26 flush against its upstream side. This used to
+    come out as tier 2 "expression modulation" — the opposite conclusion (gene
+    working harder) from the true one (gene broken).
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(symbol="aac(3)-IIa", start=10000, stop=10450,
+                          strand="-", method="PARTIALX")],
+        is_rows=[is_row(start=10451, end=11670, strand="-", family="IS6",
+                        cluster="IS6_1", is_id="IS26_a")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["is_inside_amr_cds"] == "yes"
+    assert row["mobility_tier"] != "2"          # NOT expression modulation
+    assert "is_abuts_partial_amr_hit_likely_inactivation" in audit_reasons(audit)
+
+
+def test_a_partial_hit_truncated_by_the_contig_end_is_not_called_inactivation(tmp_path):
+    """The guard: AMRFinderPlus says when the ASSEMBLY, not an IS, did the cutting."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(symbol="aac(3)-IIa", start=10000, stop=10450,
+                          strand="-", method="PARTIAL_CONTIG_END")],
+        is_rows=[is_row(start=10451, end=11670, strand="-", family="IS6")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["is_inside_amr_cds"] == "no"
+    assert "is_abuts_partial_amr_hit_likely_inactivation" not in audit_reasons(audit)
+
+
+def test_a_complete_gene_next_to_an_is_is_still_ordinary_context(tmp_path):
+    """The other guard: a full-coverage hit beside an IS is not an inactivation."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000, strand="-", method="EXACTX")],
+        is_rows=[is_row(start=11001, end=12200, strand="-", family="IS6")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["is_inside_amr_cds"] == "no"
+    assert "is_abuts_partial_amr_hit_likely_inactivation" not in audit_reasons(audit)

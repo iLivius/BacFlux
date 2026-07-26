@@ -157,6 +157,19 @@ MIN_AMR_FRACTION_INSIDE_ELEMENT = 0.9
 # Same 0.5 the spec's bedtools recipe uses (`bedtools intersect -f 0.5`).
 MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION = 0.5
 
+# How close an IS must sit to the edge of a PARTIAL AMR hit before we read the
+# pair as "the IS landed in this gene and split it". A transposition leaves the
+# insertion flush against the interrupted sequence, usually with a short
+# target-site duplication of a few bp, so this window is deliberately tight - it
+# is testing for "butted up against", not "nearby". See
+# find_truncating_abutting_is for why this second test is needed at all.
+ABUTTING_IS_MAX_GAP_BP = 25
+
+# Below this % coverage of the reference, an AMRFinderPlus hit is treated as a
+# FRAGMENT of the gene rather than the whole thing. Only used together with the
+# abutting-IS test above; on its own a low coverage means nothing about mobility.
+MIN_COVERAGE_FOR_INTACT_GENE = 90.0
+
 # IS families whose copies flank a cargo gene in DIRECT orientation. IS26 (family
 # IS6) is the single most clinically important AMR architecture there is: it
 # builds "translocatable units" with its copies in direct, not inverted,
@@ -321,6 +334,19 @@ def to_int(value):
         return None
 
 
+def to_float(value):
+    """Parse a percentage into a float, or return None if it is not a number.
+
+    Used for AMRFinderPlus's "% Coverage of reference", which is "NA" whenever the
+    hit came from an HMM rather than an alignment. None means "not stated", and
+    every caller treats that as "cannot judge", never as zero.
+    """
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def overlap_bp(a_start, a_end, b_start, b_end):
     """How many bases two 1-based inclusive intervals share (0 if they do not).
 
@@ -460,7 +486,28 @@ ELEMENT_TYPE_SYNONYMS = {
     "conjugative_integron": "ice",   # the SO term for an ICE is conjugative_integron
     "ice": "ice",
     "ime": "ime",
+    # The two classes conjscan_to_ice.py reports but deliberately does NOT let
+    # raise the tier (spec §8 phase 4: a conjugative region with no integrase is
+    # unbounded - "report, don't call ICE"; an island has no conjugation machinery
+    # at all). They must still be RECOGNISED here. While they were missing from
+    # this table they parsed as element_type None, which meant they were dropped
+    # from every test AND logged as an "unrecognised element_type" - so an AMR gene
+    # sitting inside a predicted chromosomal conjugative region came out as
+    # "intrinsic candidate" at high confidence, with a contradictory audit line
+    # beside it. Recognised-but-not-tier-raising is the correct handling: they set
+    # the context and cap the confidence (see the tier-1 branch), without ever
+    # claiming self-transmissibility the evidence does not support.
+    "conjugative_region": "conjugative_region",
+    "genomic_island": "genomic_island",
+    "island": "genomic_island",
+    "cime": "genomic_island",        # a CIME is an integrated, non-mobile island
 }
+
+# Element types that describe a real mobile-element neighbourhood but are NOT
+# allowed to raise the mobility tier on their own. Used by the tier-1 branch to
+# turn "nothing found" into an honest "something is here, but it does not prove
+# mobility".
+CONTEXT_ONLY_ELEMENT_TYPES = {"conjugative_region", "genomic_island"}
 
 
 def parse_mobile_elements(path):
@@ -898,6 +945,59 @@ def find_disrupting_is(gene, insertion_sequences):
     return None, best_overlap, best_element
 
 
+def find_truncating_abutting_is(gene, insertion_sequences):
+    """An IS butted up against a gene that AMRFinderPlus only found PART of.
+
+    Biology, and why the overlap test above is not enough on its own. When an IS
+    transposes INTO a resistance gene it splits the coding sequence, and
+    AMRFinderPlus then reports only the surviving fragment - the part that still
+    matches its reference. So the coordinates it gives END where the IS BEGINS.
+    The overlap between the reported gene and the IS is therefore ~0 by
+    construction, and the >=50% overlap test can essentially never fire for the
+    very architecture it exists to catch. What that architecture looks like on
+    paper is a PARTIAL hit sitting flush against an IS.
+
+    This is a second, independent signal, added ALONGSIDE the overlap test rather
+    than replacing it - the overlap test still catches an IS called across a
+    complete gene, which this one would miss.
+
+    Two guards keep it honest:
+      * The hit must be partial for a reason OTHER than the contig running out.
+        AMRFinderPlus says which: a method naming CONTIG_END means the assembly
+        truncated the gene, not an IS, so those are excluded.
+      * The IS must be within ABUTTING_IS_MAX_GAP_BP of the gene's edge. A
+        transposition leaves the two flush (often with a short target-site
+        duplication), so this window is small on purpose.
+
+    Returns (element_or_None, gap_bp, which_end) - which_end is "start" or "end",
+    naming the side of the gene the IS sits against.
+    """
+    method = str(gene.get("method", "")).upper()
+    coverage = to_float(gene.get("pct_coverage", ""))
+
+    # "Partial for a reason other than the contig ending." PARTIALX / PARTIALP etc.
+    # mean AMRFinderPlus matched only part of its reference; *CONTIG_END* means the
+    # assembly is to blame, which is already reported separately.
+    method_says_partial = "PARTIAL" in method and "CONTIG_END" not in method
+    coverage_says_partial = coverage is not None and coverage < MIN_COVERAGE_FOR_INTACT_GENE
+    if not (method_says_partial or coverage_says_partial):
+        return None, None, None
+
+    best_element = None
+    best_gap = None
+    best_end = None
+    for element in insertion_sequences:
+        gap_before_gene = gene["start"] - element["end"] - 1   # IS ends just before the gene
+        gap_after_gene = element["start"] - gene["end"] - 1    # IS starts just after the gene
+        for gap, which_end in ((gap_before_gene, "start"), (gap_after_gene, "end")):
+            if 0 <= gap <= ABUTTING_IS_MAX_GAP_BP:
+                if best_gap is None or gap < best_gap:
+                    best_gap = gap
+                    best_element = element
+                    best_end = which_end
+    return best_element, best_gap, best_end
+
+
 def is_upstream_of_gene(element, gene):
     """Is this element upstream of the gene, in the gene's own reading direction?
 
@@ -970,6 +1070,34 @@ def find_nearest_is(gene, insertion_sequences):
         if overlap_bp(gene["start"], gene["end"], element["start"], element["end"]) > 0:
             continue
         distance = gap_bp(gene["start"], gene["end"], element["start"], element["end"])
+        if best_distance is None or distance < best_distance:
+            best_distance = distance
+            best_element = element
+    return best_element, best_distance
+
+
+def find_nearest_element(gene, candidate_elements):
+    """Closest element of ANY type -> (element, distance), 0 when it overlaps.
+
+    The sibling of find_nearest_is above, for the large elements (ICE, IME,
+    conjugative region, genomic island) rather than insertion sequences. Two
+    deliberate differences:
+
+      * It does NOT skip overlapping elements. An element that overlaps the gene
+        without covering the 90% needed to say the gene is "inside" it is exactly
+        the ambiguous case worth reporting, not hiding; it comes back at distance 0.
+      * It is only ever used to add context and cap confidence, never to raise a
+        tier, so a loose match here cannot inflate a mobility claim.
+
+    Returns (None, None) when the list is empty.
+    """
+    best_element = None
+    best_distance = None
+    for element in candidate_elements:
+        if overlap_bp(gene["start"], gene["end"], element["start"], element["end"]) > 0:
+            distance = 0
+        else:
+            distance = gap_bp(gene["start"], gene["end"], element["start"], element["end"])
         if best_distance is None or distance < best_distance:
             best_distance = distance
             best_element = element
@@ -1224,7 +1352,17 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                   "gene cannot be placed against any mobile element")
         return row, audit_rows
 
-    gene = {"start": start, "end": end, "strand": amr["strand"]}
+    # The gene as the biology rules below see it. method and pct_coverage ride
+    # along because find_truncating_abutting_is needs to know whether
+    # AMRFinderPlus reported the WHOLE gene or only a surviving fragment - a
+    # fragment flush against an IS is what an IS-inactivated gene looks like.
+    gene = {
+        "start": start,
+        "end": end,
+        "strand": amr["strand"],
+        "method": amr["method"],
+        "pct_coverage": amr["pct_coverage"],
+    }
 
     # --- Step 1: where is the gene relative to the ends of its contig? ------
     contig_length = contig_lengths.get(contig)
@@ -1296,6 +1434,11 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     # --- Step 4: has an IS landed inside the gene? (inactivation, not mobility)
     disrupting_is, disruption_overlap, overlapping_is = \
         find_disrupting_is(gene, insertion_sequences)
+    # Second, independent signal for the same biology - see the long note on
+    # find_truncating_abutting_is. Only consulted when the overlap test found
+    # nothing, so the stronger evidence always wins.
+    abutting_is, abutting_gap, abutting_end = \
+        find_truncating_abutting_is(gene, insertion_sequences)
     row["is_amr_overlap_bp"] = str(disruption_overlap)
     if disrupting_is is not None:
         row["is_inside_amr_cds"] = "yes"
@@ -1306,6 +1449,23 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             "disrupted and the gene inactivated. Reported in is_inside_amr_cds and "
             "deliberately NOT counted as mobilisation.",
         )
+    elif abutting_is is not None:
+        # The IS-into-gene architecture as it actually appears in the data: a
+        # PARTIAL AMRFinderPlus hit sitting flush against an IS. Treated exactly
+        # like the overlap case - flagged as likely inactivation and deliberately
+        # NOT counted as mobilisation (spec §2.5's special case).
+        row["is_inside_amr_cds"] = "yes"
+        add_audit(
+            "evidence_rejected", "is_abuts_partial_amr_hit_likely_inactivation",
+            f"IS {abutting_is['id']} sits {abutting_gap} bp from the {abutting_end} of "
+            f"this hit, which AMRFinderPlus reported as partial "
+            f"(method={gene.get('method', 'NA')}, coverage={gene.get('pct_coverage', 'NA')}%). "
+            "That is what an IS landing INSIDE a resistance gene looks like: the "
+            "reported gene is the surviving fragment and its coordinates stop where "
+            "the IS starts, so the two barely overlap. Reported as likely "
+            "inactivation and deliberately NOT counted as mobilisation.",
+        )
+
     elif overlapping_is is not None:
         # An IS physically overlaps the gene, but by too little to call the CDS
         # disrupted. It is also excluded from every other test - find_nearest_is
@@ -1323,8 +1483,19 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
 
     # --- Step 5: nearest IS, and the tier-2 upstream-promoter test ----------
     nearest_is, nearest_distance = find_nearest_is(gene, insertion_sequences)
+    # An IS that has landed IN the gene must not then be read as an upstream
+    # promoter for it. The two calls are mutually exclusive biology: one says the
+    # reading frame is broken (the strain is probably susceptible), the other says
+    # the gene is intact and being over-expressed. Without this exclusion the
+    # abutting case above came out as tier 2 "expression modulation" - the
+    # opposite conclusion, from the same coordinates. Spec §2.5 keeps inactivation
+    # out of the mobilisation ladder entirely.
+    inactivating_is_ids = {element["id"] for element in (disrupting_is, abutting_is)
+                           if element is not None}
+    promoter_candidates = [element for element in insertion_sequences
+                           if element["id"] not in inactivating_is_ids]
     promoter_is, promoter_distance, near_miss_is, near_miss_distance = \
-        find_upstream_promoter_is(gene, insertion_sequences)
+        find_upstream_promoter_is(gene, promoter_candidates)
 
     flanking_left = [element for element in insertion_sequences
                      if element["end"] < gene["start"]
@@ -1367,6 +1538,23 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     ice_element = find_containing_element(gene, elements_on_contig, {"ice"})
     ime_element = find_containing_element(gene, elements_on_contig, {"ime"})
 
+    # Elements that describe a real neighbourhood but must not raise the tier
+    # (conjugative region, genomic island). Looked up here so the tier-1 branch
+    # can report them instead of claiming the gene has no context at all.
+    containing_context_element = find_containing_element(
+        gene, elements_on_contig, CONTEXT_ONLY_ELEMENT_TYPES)
+
+    # The nearest NON-IS element of any kind on this contig, with its measured
+    # distance. The nearest-IS search deliberately looks at insertion sequences
+    # only, which left a gene sitting 16 kb from a called IME reported as
+    # "intrinsic candidate, nothing nearby" - true of insertion sequences, and
+    # badly misleading about the genome.
+    nearest_context_element, nearest_context_distance = find_nearest_element(
+        gene,
+        [element for element in elements_on_contig
+         if element["element_type"] in {"ice", "ime"} | CONTEXT_ONLY_ELEMENT_TYPES],
+    )
+
     # --- Step 8: the ladder, applied once, from the top down ----------------
     # Highest applicable rung wins. The order below IS the ladder (spec §2.5);
     # a more specific, interval-level call (ICE) is preferred over a whole-
@@ -1407,7 +1595,35 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         row["mge_context"] = "plasmid"
         row["mge_id"] = row["replicon_id"]
         row["distance_bp"] = "0"
+        # NOT "high", and the asymmetry this fixes is worth spelling out.
+        #
+        # This branch's evidence is Platon's "# Conjugation" column, which is a
+        # count of HMM hits against conjugation proteins - not an assessment that
+        # a working mating apparatus is present. A conjugative system is a
+        # multi-protein machine (relaxase + coupling protein + a mating-pair
+        # apparatus of a dozen or so genes), so one hit does not evidence one.
+        #
+        # On the CHROMOSOME, the very same evidence is treated far more carefully:
+        # conjscan_to_ice.py refuses to call relaxase-plus-coupling-protein an ICE
+        # and downgrades it to an IME marked "machinery incomplete". The plasmid
+        # path applied no completeness test at all, so a single Platon hit reached
+        # the top of the ladder at high confidence with no audit line - a stronger
+        # claim, on weaker evidence, than the chromosome path would ever allow.
+        #
+        # The TIER stays 6: the plasmid genuinely carries conjugation evidence, and
+        # "is this acquired and potentially transferable" is the regulatory
+        # question. Only the certainty is capped. Raising it back to high needs the
+        # mating-pair apparatus actually verified on the plasmid contig, which
+        # would mean running a conjugation-machinery caller over plasmid contigs
+        # (today CONJscan is only asked about chromosomal ICEs).
         base_confidence = "high"
+        caps.append((
+            "medium", "plasmid_conjugation_from_hit_counts_only",
+            f"tier 6 here rests on Platon's conjugation gene count "
+            f"({row['mobility_evidence']}), which counts HMM hits rather than "
+            "checking that a complete mating apparatus is present; the mating-pair "
+            "apparatus was not verified on this contig",
+        ))
 
     elif ime_element is not None:
         # Tier 5: an integrative MOBILISABLE element - it has a relaxase but no
@@ -1567,6 +1783,55 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                 "context only, not as expression modulation",
                 tier=1, context="is_adjacent",
             )
+        elif containing_context_element is not None:
+            # No IS nearby, but the gene sits INSIDE a conjugative region or a
+            # genomic island. These deliberately do not raise the tier - a
+            # conjugative region with no integrase has no established boundaries,
+            # and an island carries no conjugation machinery - but calling such a
+            # gene an "intrinsic candidate" at high confidence is plainly wrong:
+            # something mobile-element-shaped is sitting on top of it. Report the
+            # context, cap the confidence, and say why.
+            row["mge_context"] = containing_context_element["element_type"]
+            row["mge_id"] = containing_context_element["id"]
+            row["mge_name"] = containing_context_element["name"] or "NA"
+            row["distance_bp"] = "0"
+            context_elements = [containing_context_element]
+            base_confidence = "medium"
+            caps.extend(element_quality_caps(containing_context_element))
+            add_audit(
+                "tier_not_raised", "inside_context_only_element",
+                f"the gene lies inside {containing_context_element['id']}, a "
+                f"{containing_context_element['element_type'].replace('_', ' ')}. That is "
+                "not enough to call it mobilisable - a conjugative region without an "
+                "integrase has no established boundaries, and an island carries no "
+                "conjugation machinery of its own - but it is not an intrinsic "
+                "chromosomal gene either",
+                tier=1, context=row["mge_context"],
+            )
+
+        elif nearest_context_element is not None and nearest_context_distance is not None \
+                and nearest_context_distance <= IS_ADJACENT_MAX_BP:
+            # An ICE/IME/region is CLOSE but does not contain the gene. Worth
+            # reporting with its measured distance: the intervals these elements
+            # carry are machinery spans, not resolved element boundaries (the ICE
+            # step writes boundary_method=none when it could not find att sites),
+            # so "just outside the span" does not mean "outside the element".
+            row["mge_context"] = "near_" + nearest_context_element["element_type"]
+            row["mge_id"] = nearest_context_element["id"]
+            row["mge_name"] = nearest_context_element["name"] or "NA"
+            row["distance_bp"] = str(nearest_context_distance)
+            base_confidence = "medium"
+            add_audit(
+                "tier_not_raised", "near_but_outside_element_machinery_span",
+                f"{nearest_context_element['id']} "
+                f"({nearest_context_element['element_type']}) lies "
+                f"{nearest_context_distance} bp away. The interval recorded for such an "
+                "element is the span of its machinery genes, not a resolved boundary, "
+                "so a gene just outside it may still be carried by the element - the "
+                "tier is not raised, but this is not a clean intrinsic call either",
+                tier=1, context=row["mge_context"],
+            )
+
         else:
             # Genuinely no context. Every such gene gets an explicit reason here -
             # this is the "no-call audit" the BacFlux convention requires.
@@ -1579,9 +1844,22 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                     tier=1, context="none",
                 )
             elif nearest_is is None:
+                # Say what was actually checked. This branch is reached from
+                # nearest_is, which looks at INSERTION SEQUENCES only, so claiming
+                # "no mobile element" was a wider statement than the evidence -
+                # a reader reconciling this line against {sample}_ice_candidates.tsv
+                # would find the two files contradicting each other.
                 add_audit(
-                    "no_mge_context", "no_mobile_element_on_this_contig",
-                    f"no mobile element was called anywhere on contig '{contig}'",
+                    "no_mge_context", "no_insertion_sequence_on_this_contig",
+                    f"no insertion sequence was called anywhere on contig '{contig}'"
+                    + (
+                        f"; the nearest non-IS element on this contig is "
+                        f"{nearest_context_element['id']} "
+                        f"({nearest_context_element['element_type']}), "
+                        f"{nearest_context_distance} bp away"
+                        if nearest_context_element is not None else
+                        " and no ICE/IME/region was called on it either"
+                    ),
                     tier=1, context="none",
                 )
             else:
@@ -1765,7 +2043,16 @@ def main(argv=None):
     replicons = parse_replicons(args.replicons)
     contig_lengths = parse_contig_lengths(args.contig_lengths)
 
-    is_table_supplied = bool(elements)
+    # Per-SOURCE, not pooled. --is-table is given twice (ISEScan's IS table and
+    # CONJscan's ICE/IME table), and this flag drives the "absence of context is
+    # absence of DATA" audit line and its confidence cap. Asking merely whether ANY
+    # row was parsed let one unrelated ICE row stand in as proof that IS detection
+    # had run: a genome where ISEScan legitimately found nothing then reported its
+    # AMR genes as "intrinsic candidate" at HIGH confidence, while the very same
+    # genome with both tables empty correctly reported medium. Same IS evidence
+    # (none), opposite claim. Count only what actually answers the question.
+    is_table_supplied = any(element["element_type"] == "insertion_sequence"
+                            for element in elements)
     replicon_table_supplied = bool(replicons)
 
     # Sample-level audit lines for whatever was not supplied, so a reader of the

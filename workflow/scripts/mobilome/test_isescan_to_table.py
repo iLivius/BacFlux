@@ -362,7 +362,11 @@ def test_no_is_at_all_gives_empty_but_wellformed_output(tmp_path):
     code, table, summary, audit = run_main(tmp_path, empty_isescan_dir, {"contig_1": 50000})
     assert code == 0
     assert table == []
-    assert audit == []
+    # The IS table is empty, so the audit file must say WHY it is empty — an
+    # empty audit file next to an empty table would leave the reader unable to
+    # tell a genome with no IS from a run that produced nothing.
+    assert len(audit) == 1
+    assert audit[0]["reason"] == "isescan_wrote_no_results_file"
     assert summary["n_is_total"] == "0"
     assert summary["n_is_complete"] == "0"
     assert summary["n_is_partial"] == "0"
@@ -407,6 +411,110 @@ def test_completely_empty_results_file_is_graceful(tmp_path):
     assert code == 0
     assert table == []
     assert summary["n_is_total"] == "0"
+
+
+# ── "The tool produced nothing" vs "the genome has nothing" ──────────────────
+# An empty IS table has two completely different meanings for anyone judging a
+# mobility call, so the audit file must always say which one applies (CLAUDE.md:
+# every such decision gets an audit row with a reason).
+
+def test_missing_results_file_and_empty_results_file_get_different_reasons(tmp_path):
+    # This is the whole point: the two situations must not look alike.
+    # (a) ISEScan's output directory exists but holds no results file — what a
+    #     genuinely IS-free genome looks like, and also what a crashed run looks
+    #     like, so the audit says both.
+    no_file_dir = tmp_path / "no_file" / "isescan"
+    no_file_dir.mkdir(parents=True)
+    code, table, summary, audit_no_file = run_main(
+        tmp_path / "no_file", no_file_dir, {"contig_1": 50000}
+    )
+    assert code == 0
+    assert table == []
+    assert len(audit_no_file) == 1
+    assert audit_no_file[0]["action"] == "input_missing"
+    assert audit_no_file[0]["reason"] == "isescan_wrote_no_results_file"
+    # It is a statement about the sample, not about one element.
+    assert audit_no_file[0]["sample"] == "S1"
+    assert audit_no_file[0]["contig"] == "NA"
+    assert audit_no_file[0]["start"] == "NA"
+    assert audit_no_file[0]["end"] == "NA"
+    # The reader is warned not to quote zero without checking the ISEScan log.
+    assert "log" in audit_no_file[0]["detail"]
+
+    # (b) ISEScan DID write a results file, it simply lists no IS. Only here is
+    #     the empty table a statement about the assembly.
+    (tmp_path / "empty").mkdir()
+    header_only = write_isescan_tsv(tmp_path / "empty" / "r.tsv", [])
+    code, table, summary, audit_empty_file = run_main(
+        tmp_path / "empty", header_only, {"contig_1": 50000}
+    )
+    assert code == 0
+    assert table == []
+    assert len(audit_empty_file) == 1
+    assert audit_empty_file[0]["action"] == "input_empty"
+    assert audit_empty_file[0]["reason"] == "isescan_results_file_has_no_rows"
+
+    assert audit_no_file[0]["reason"] != audit_empty_file[0]["reason"]
+
+
+def test_absent_isescan_path_gets_its_own_audit_reason(tmp_path):
+    # A path that is not there at all is a third case, and a different kind of
+    # problem: the isescan rule always creates its output directory, so this is
+    # broken wiring rather than anything about the genome. The script still exits
+    # 0 (nothing downstream should die over it), but it says so in the audit.
+    code, table, summary, audit = run_main(
+        tmp_path, tmp_path / "does_not_exist", {"contig_1": 50000}
+    )
+    assert code == 0
+    assert table == []
+    assert len(audit) == 1
+    assert audit[0]["action"] == "input_missing"
+    assert audit[0]["reason"] == "isescan_output_path_missing"
+    assert summary["isescan_results_file"] == "NONE"
+
+
+def test_sample_level_audit_row_is_not_counted_as_a_dropped_record(tmp_path):
+    # Nothing was filtered out — there was simply nothing to filter — so the
+    # dropped/flagged counters in the QC summary must stay at zero, otherwise the
+    # summary would suggest IS calls had been thrown away.
+    empty_isescan_dir = tmp_path / "isescan"
+    empty_isescan_dir.mkdir()
+    code, _, summary, audit = run_main(tmp_path, empty_isescan_dir, {"contig_1": 50000})
+    assert code == 0
+    assert len(audit) == 1
+    assert summary["n_records_dropped"] == "0"
+    assert summary["n_records_flagged"] == "0"
+    # The audit file keeps its declared schema, sample-level row included.
+    header, _ = read_tsv(tmp_path / "is_discarded.tsv")
+    assert header == it.AUDIT_COLUMNS
+
+
+def test_no_sample_level_row_when_isescan_reported_is(tmp_path):
+    # The explanation fires only when there is nothing to report. With real IS in
+    # the file the audit must carry per-record rows only — here, one dropped row —
+    # so the sample-level note never dilutes the record-level audit trail.
+    results = write_isescan_tsv(tmp_path / "r.tsv", [
+        isescan_row(isBegin="5000", isEnd="6200"),
+        isescan_row(isBegin="6200", isEnd="5000"),   # reversed -> dropped
+    ])
+    code, table, summary, audit = run_main(tmp_path, results, {"contig_1": 50000})
+    assert code == 0
+    assert len(table) == 1
+    assert [row["reason"] for row in audit] == ["invalid_coordinate_range"]
+    assert summary["n_records_dropped"] == "1"
+
+
+def test_all_records_dropped_is_not_reported_as_no_results(tmp_path):
+    # ISEScan DID report IS; we dropped them ourselves. That is already explained
+    # by the per-record audit rows, so no sample-level "nothing to report" row is
+    # added on top of them.
+    results = write_isescan_tsv(tmp_path / "r.tsv", [
+        isescan_row(seqID="contig_UNKNOWN", isBegin="100", isEnd="900"),
+    ])
+    code, table, _, audit = run_main(tmp_path, results, {"contig_1": 50000})
+    assert code == 0
+    assert table == []
+    assert [row["reason"] for row in audit] == ["contig_not_in_contig_lengths"]
 
 
 # ── Audit: everything dropped or flagged is written down with a reason ───────

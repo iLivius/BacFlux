@@ -104,10 +104,26 @@ if PHAGE_CALLER == "genomad":
     # DEFINED ONLY when BacFlux is the one downloading — mutually exclusive with
     # genomad_db_local below, same reasoning as checkv_db / virsorter2_db.
     #
-    # HEADS-UP: the download URL is hard-coded to portal.nersc.gov inside the
-    # geNomad package, the same host whose outages forced the CheckV Zenodo mirror.
-    # There is no --url option to point elsewhere, so if this rule fails with
-    # "No route to host", the fix is directories.genomad_db, not a retry.
+    # Two ways to get the database, chosen by whether links.genomad_link is set:
+    #
+    #   links.genomad_link SET (the shipped default) - we fetch the archive
+    #     ourselves from the mirror. geNomad's authors publish the same database on
+    #     Zenodo and link to it from their own README, so this is the same data,
+    #     just from a host that is actually up. The archive expands to a top-level
+    #     "genomad_db/" directory, which is exactly GENOMAD_DB_DIR, so it is
+    #     extracted into DIR_PHAGES (verified against the real archive).
+    #
+    #   links.genomad_link EMPTY - fall back to `genomad download-database`, whose
+    #     URL is hard-coded to portal.nersc.gov inside the package. That host is
+    #     frequently unreachable and there is no --url option, so if this branch
+    #     fails with "No route to host", set links.genomad_link (or
+    #     directories.genomad_db) rather than retrying.
+    #
+    # Integrity: Zenodo publishes an MD5 per file rather than the .sha256 sidecar
+    # the CheckV/dbCAN mirrors carry, so the expected hash comes from
+    # links.genomad_md5. A mismatch is fatal (same discipline as checkv_db and
+    # cazyme_db_download - a truncated archive must never reach `tar`). An empty
+    # hash downloads unverified and SAYS so in the log.
     if not GENOMADDB:
 
         rule genomad_db:
@@ -115,7 +131,12 @@ if PHAGE_CALLER == "genomad":
                 genomad_db = directory(GENOMAD_DB_DIR),
             params:
                 # geNomad appends "genomad_db" to this parent path; see GENOMAD_DB_DIR.
+                # The Zenodo archive also expands to genomad_db/, so both branches
+                # land in the same place.
                 parent = DIR_PHAGES,
+                link = GENOMAD_LINK,
+                md5 = GENOMAD_MD5,
+                tries = 5,
             conda:
                 "../../envs/genomad.yaml"
             log:
@@ -123,7 +144,43 @@ if PHAGE_CALLER == "genomad":
             priority: 9
             shell:
                 """
-                genomad download-database {params.parent} > {log} 2>&1
+                if [ -z "{params.link}" ]; then
+                    echo "No links.genomad_link set; using geNomad's own downloader (portal.nersc.gov)." > {log}
+                    genomad download-database {params.parent} >> {log} 2>&1
+                else
+                    mkdir -p {params.parent}
+                    TAR="{params.parent}/$(basename '{params.link}')"
+                    echo "Fetching the geNomad database from the configured mirror:" > {log}
+                    echo "  {params.link}" >> {log}
+                    wget --tries={params.tries} -c "{params.link}" -O "$TAR" >> {log} 2>&1
+
+                    if [ -n "{params.md5}" ]; then
+                        actual="$(md5sum "$TAR" | awk '{{print $1}}')"
+                        if [ "{params.md5}" != "$actual" ]; then
+                            echo "ERROR: checksum mismatch for $TAR" >> {log}
+                            echo "  expected (links.genomad_md5): {params.md5}" >> {log}
+                            echo "  actual:                       $actual" >> {log}
+                            echo "If you changed links.genomad_link, update links.genomad_md5" >> {log}
+                            echo "to match the new file (Zenodo shows the MD5 next to it), or" >> {log}
+                            echo "clear it to download without verification." >> {log}
+                            rm -f "$TAR"
+                            exit 1
+                        fi
+                        echo "Checksum OK ({params.md5})." >> {log}
+                    else
+                        echo "links.genomad_md5 is empty: extracting WITHOUT verifying the download." >> {log}
+                    fi
+
+                    # The archive's own top-level directory is genomad_db/, so this
+                    # produces {output.genomad_db}. --no-same-permissions keeps a
+                    # restrictive archive from producing a database the workflow
+                    # cannot read back (geNomad reads every file, including
+                    # version.txt).
+                    tar -xzf "$TAR" -C {params.parent} --no-same-permissions >> {log} 2>&1
+                    rm -f "$TAR"
+                    chmod -R a+rX {output.genomad_db} >> {log} 2>&1 || true
+                    echo "geNomad database ready at {output.genomad_db}." >> {log}
+                fi
                 """
 
     # ── Rule: genomad_db_local — use an already-downloaded geNomad database ───

@@ -420,6 +420,72 @@ def test_ime_is_integrase_plus_relaxase_without_mating_pair(tmp_path):
     assert element["confidence"] == "high"
 
 
+def test_accessory_virb4_in_a_mob_system_does_not_make_an_ice(tmp_path):
+    """A lone VirB4 inside a relaxase-only MOB system is not a mating bridge.
+
+    CONJscan's `MOB` model describes a relaxase-only system - DNA that another
+    element's machinery can pick up - and it lists VirB4 as an ACCESSORY gene.
+    So a MOB system can quite legitimately contain one VirB4 hit while the cell
+    has no mating-pair apparatus at all.
+
+    Counting that hit as an MPF would raise this element from tier 5 (mobilisable,
+    needs a helper) to tier 6 (predicted self-transmissible) on the strength of a
+    single accessory gene, which is the worst overcall this module could make.
+    The hit is not hidden - it is still reported in has_t4ss - but the class must
+    come from the SYSTEM's own type, and the audit file must say so.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/MOB"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/MOB",
+                     hit_gene_ref="T4SS_t4cp1", hit_status="accessory"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/MOB",
+                     hit_gene_ref="T4SS_virb4", hit_status="accessory"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    return_code, rows, audit, _ = run_main(tmp_path, conjscan, gff)
+
+    assert return_code == 0
+    assert len(rows) == 1
+    element = rows[0]
+    assert element["mge_class"] == "ime"
+    assert element["element_type"] == "ime"           # colocalise.py -> tier 5, not 6
+    assert element["mobility"] == "mobilisable (needs a helper)"
+    assert "self-transmissible" not in element["mobility"]
+    # The marker is reported, not suppressed; it simply does not carry the call.
+    assert element["has_t4ss"] == "TRUE"
+    assert element["mpf_typed_system"] == "FALSE"
+    assert element["mpf_type"] == "NA"                # the MOB model has no MPF type
+    # And the reason it was not counted is written down, per the audit rule.
+    assert "mpf_marker_without_typed_system" in audit_reasons(audit)
+
+
+def test_the_same_virb4_under_a_typed_t4ss_model_does_make_an_ice(tmp_path):
+    """The other side of the test above: same genes, same coordinates, but this
+    time CONJscan called a typed T4SS system, so the mating-pair apparatus IS
+    evidenced by the system itself and the ICE call is earned."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _return_code, rows, audit, _ = run_main(tmp_path, conjscan, gff)
+
+    element = rows[0]
+    assert element["mge_class"] == "ice"
+    assert element["mobility"] == "predicted self-transmissible"
+    assert element["mpf_typed_system"] == "TRUE"
+    assert "mpf_marker_without_typed_system" not in audit_reasons(audit)
+
+
 def test_integrase_only_cluster_is_dropped_not_reported(tmp_path):
     """A lone integrase is not an element.
 
@@ -483,10 +549,14 @@ def test_machinery_without_an_integrase_is_not_called_an_ice(tmp_path):
     assert element["has_integrase"] == "FALSE"
     assert "predicted self-transmissible" not in element["mobility"]
 
-    # And the downstream consumer must not treat it as an ICE either: an
-    # element_type it does not recognise is ignored (loudly, in its own audit).
+    # And the downstream consumer must not treat it as an ICE either. It DOES
+    # recognise the type now - being unrecognised used to mean the element was
+    # dropped from every test in colocalise, so an AMR gene sitting inside a
+    # predicted conjugative region came out as "intrinsic candidate" at high
+    # confidence. Recognised, but never tier-raising, is the correct handling.
     elements = co.parse_mobile_elements(out_table)
-    assert elements[0]["element_type"] is None
+    assert elements[0]["element_type"] == "conjugative_region"
+    assert elements[0]["element_type"] in co.CONTEXT_ONLY_ELEMENT_TYPES
 
 
 def test_transposase_with_an_integrase_domain_is_not_an_integrase_anchor(tmp_path):
@@ -588,6 +658,74 @@ def test_decayed_model_and_truncated_relaxase_also_count_as_degraded(tmp_path):
     assert "decayed_system_model" in element["degraded_reason"]
     assert "truncated_core_hit" in element["degraded_reason"]
     assert element["mobility"].endswith(" - machinery incomplete")
+
+
+def test_hit_is_virb4_knows_the_exchangeable_name_but_not_the_f_type_traU():
+    """VirB4 can reach us under two names, and only one look-alike must be refused.
+
+    Every CONJscan model lists `T4SS_I_traU` as an exchangeable profile for
+    `T4SS_virb4`, so a VirB4 hit can be reported under either name. `T4SS_F_traU`
+    is a different gene entirely - an F-type mating-pair component in its own
+    right - and must not be mistaken for the ATPase.
+    """
+    assert ci.hit_is_virb4({"gene_name": "T4SS_virb4", "hit_gene_ref": "T4SS_virb4"})
+    # Found through the exchangeable profile; the model's own gene is alongside it.
+    assert ci.hit_is_virb4({"gene_name": "T4SS_I_traU", "hit_gene_ref": "T4SS_virb4"})
+    # The same hit from an output that carries no hit_gene_ref column at all.
+    assert ci.hit_is_virb4({"gene_name": "T4SS_I_traU"})
+    assert not ci.hit_is_virb4({"gene_name": "T4SS_F_traU",
+                                "hit_gene_ref": "T4SS_F_traU"})
+    assert not ci.hit_is_virb4({"gene_name": "T4SS_MOBF", "hit_gene_ref": "T4SS_MOBB"})
+
+
+def test_real_output_shows_gene_name_differing_from_the_model_gene():
+    """Ground truth for why `hit_gene_ref` is read at all.
+
+    In sample 386's real best_solution.tsv the relaxases are reported as
+    T4SS_MOBP1 / T4SS_MOBF while the model's own gene is T4SS_MOBB: MacSyFinder
+    writes the profile that ACTUALLY matched in gene_name. The same mechanism
+    turns a VirB4 into a `T4SS_I_traU` row, which is what the truncation check
+    has to survive.
+    """
+    hits = ci.read_conjscan_hits(REAL_CONJSCAN_FIXTURE)
+    assert [hit["hit_gene_ref"] for hit in hits] == [
+        "T4SS_MOBB", "T4SS_t4cp1", "T4SS_t4cp1", "T4SS_MOBB"
+    ]
+    assert hits[0]["gene_name"] == "T4SS_MOBP1"       # not the model's own gene
+
+
+def test_truncated_virb4_under_its_exchangeable_name_is_still_flagged(tmp_path):
+    """A fragment of VirB4 builds no mating bridge, whatever it was called.
+
+    VirB4 is one of the two components the truncation check tests (the other is
+    the relaxase), because both have to WORK for transfer to happen. Here the
+    ATPase of a type I system was found through its exchangeable `T4SS_I_traU`
+    profile and aligns over only 30% of the HMM. The class is still ICE - a typed
+    T4SS system was called - but the machinery must be reported as degraded, in
+    the mobility sentence itself, not quietly as intact.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeI"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeI"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_I_traU",
+                     hit_gene_ref="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeI",
+                     hit_profile_cov="0.30"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    return_code, rows, audit, _ = run_main(tmp_path, conjscan, gff)
+
+    assert return_code == 0
+    assert len(rows) == 1
+    element = rows[0]
+    assert element["mge_class"] == "ice"
+    assert element["machinery_intact"] == "FALSE"
+    assert "truncated_core_hit" in element["degraded_reason"]
+    assert element["mobility"] == "predicted self-transmissible - machinery incomplete"
+    assert "machinery_degraded" in audit_reasons(audit)
 
 
 def test_cluster_shorter_than_minimum_is_dropped_with_a_reason(tmp_path):
@@ -935,8 +1073,13 @@ def test_element_type_values_are_the_ones_colocalise_knows():
     classes must deliberately NOT, so they cannot raise a gene's mobility tier."""
     assert co.ELEMENT_TYPE_SYNONYMS[ci.ELEMENT_TYPE_FOR_CLASS["ice"]] == "ice"
     assert co.ELEMENT_TYPE_SYNONYMS[ci.ELEMENT_TYPE_FOR_CLASS["ime"]] == "ime"
-    assert ci.ELEMENT_TYPE_FOR_CLASS["cime_or_island"] not in co.ELEMENT_TYPE_SYNONYMS
-    assert ci.ELEMENT_TYPE_FOR_CLASS["conjugative_region"] not in co.ELEMENT_TYPE_SYNONYMS
+    # The two non-mobile classes ARE recognised by colocalise (so they can set
+    # context and cap confidence) but must never map onto "ice" or "ime", which
+    # are the only values that raise the tier to 5 or 6.
+    for non_mobile_class in ("cime_or_island", "conjugative_region"):
+        element_type = ci.ELEMENT_TYPE_FOR_CLASS[non_mobile_class]
+        assert co.ELEMENT_TYPE_SYNONYMS[element_type] not in {"ice", "ime"}
+        assert co.ELEMENT_TYPE_SYNONYMS[element_type] in co.CONTEXT_ONLY_ELEMENT_TYPES
 
 
 def test_no_output_column_collides_with_colocalise_field_names():

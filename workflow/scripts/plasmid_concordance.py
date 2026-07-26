@@ -72,6 +72,18 @@ OUTPUT_COLUMNS = [
 VERIFIED_SUFFIX_HIT = " is a plasmid."
 VERIFIED_SUFFIX_NO_HIT = " was not verified by BLAST search."
 
+# What the plasmid_search rule writes into verified_plasmids.txt when Platon
+# itself exited non-zero (60_plasmid.smk): "{sample}: Platon exited with status
+# {rc}; see the log." That line is the ONLY reliable signal that Platon crashed.
+#
+# Note what is deliberately NOT treated as a failure: an empty Platon directory.
+# A completed, exit-0 Platon run legitimately writes almost nothing when every
+# contig is longer than its 500 kb size filter - which is the NORMAL case for a
+# closed genome, and true of several samples in this project's own validation
+# set. Reading "no output files" as "Platon failed" would therefore mislabel
+# exactly the assemblies we most want to be right about.
+PLATON_CRASH_MARKER = "Platon exited with status"
+
 
 def first_token(header_line):
     """Return the contig ID from a FASTA header line.
@@ -178,6 +190,29 @@ def parse_fasta_ids(path):
                 if contig_id:
                     chromosome_ids.add(contig_id)
     return chromosome_ids
+
+
+def platon_run_failed(verified_plasmids_path):
+    """Did Platon actually CRASH for this sample? -> True/False.
+
+    Input:  verified_plasmids.txt, written by the plasmid_search rule, which is
+            already an input to this script.
+    Does:   look for the one line that rule writes when Platon exits non-zero.
+    Output: True only for a real crash.
+
+    Why this signal and not "the Platon directory looks empty": an exit-0 Platon
+    run writes almost nothing when every contig exceeds its 500 kb size filter,
+    which is the ordinary outcome for a closed genome. Treating that as a failure
+    would flag the best assemblies in the set as unassessed. A crash is a
+    different thing, and the rule already records it explicitly.
+    """
+    if not verified_plasmids_path or not os.path.exists(verified_plasmids_path):
+        return False
+    with open(verified_plasmids_path, "r", encoding="utf-8") as handle:
+        for line in handle:
+            if PLATON_CRASH_MARKER in line:
+                return True
+    return False
 
 
 def parse_verified_plasmids(path):
@@ -287,6 +322,12 @@ def classify(platon_call, genomad_call):
     file's exact format. Nothing is discarded either way; only the tier label of
     that reverse case is conservative.
     """
+    # Platon crashed: there is no second opinion to agree or disagree with. Saying
+    # "genomad_only / medium" here would claim a two-tool comparison that never
+    # happened, so the failure is named instead.
+    if platon_call == "not_assessed":
+        return "platon_unavailable", "low"
+
     if platon_call == "plasmid" and genomad_call == "plasmid":
         return "both", "high"
     if platon_call == "plasmid" and genomad_call == "absent":
@@ -301,7 +342,8 @@ def classify(platon_call, genomad_call):
     return "undetermined", "low"
 
 
-def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_plasmids):
+def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_plasmids,
+               platon_assessed=True):
     """Assemble one output row per plasmid CANDIDATE contig.
 
     The candidate set is the UNION of Platon-plasmid and geNomad-plasmid contigs.
@@ -317,7 +359,13 @@ def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_pl
     rows = []
     for contig in sorted(plasmid_candidate_ids):
         # --- Platon side: plasmid, chromosome, or simply never called ---
-        if contig in platon_plasmids:
+        if not platon_assessed:
+            # Platon crashed for this sample, so it has no opinion on any contig.
+            # Calling this "not_called" would read as "Platon looked and passed
+            # over it", which is exactly the false two-tool claim being fixed.
+            platon_call = "not_assessed"
+            platon_rds = "NA"
+        elif contig in platon_plasmids:
             platon_call = "plasmid"
             platon_rds = platon_plasmids[contig]
         elif contig in chromosome_ids:
@@ -395,6 +443,7 @@ def main():
     platon_plasmids = parse_platon_tsv(args.platon_tsv)
     chromosome_ids = parse_fasta_ids(args.platon_chromosome)
     blast_states = parse_verified_plasmids(args.verified_plasmids)
+    platon_assessed = not platon_run_failed(args.verified_plasmids)
     genomad_plasmids = parse_genomad_plasmids(args.genomad_plasmid_summary)
 
     # Join-key audit — D9's whole agreement mechanism rests on byte-identical
@@ -416,8 +465,19 @@ def main():
         )
 
     # Join them into the confidence-tiered table and write it.
+    if not platon_assessed:
+        sys.stderr.write(
+            "[plasmid_concordance] WARNING: Platon exited non-zero for sample "
+            f"{args.sample} (see verified_plasmids.txt and the Platon log). This is "
+            "a FAILED two-tool comparison, NOT a 'Platon found no plasmids' result: "
+            "every row is reported platon_call=not_assessed / "
+            "agreement=platon_unavailable / confidence=low, and geNomad's calls "
+            "stand alone and unconfirmed.\n"
+        )
+
     rows = build_rows(
-        args.sample, platon_plasmids, chromosome_ids, blast_states, genomad_plasmids
+        args.sample, platon_plasmids, chromosome_ids, blast_states, genomad_plasmids,
+        platon_assessed=platon_assessed,
     )
     write_rows(args.output, rows)
 
@@ -426,7 +486,8 @@ def main():
     both = sum(1 for row in rows if row["agreement"] == "both")
     conflicts = sum(1 for row in rows if row["agreement"] == "conflict")
     print(
-        f"Sample {args.sample}: {len(rows)} plasmid candidate contig(s); "
+        f"Sample {args.sample}: {len(rows)} plasmid candidate contig(s)"
+        f"{'' if platon_assessed else ' [PLATON FAILED - single-tool evidence only]'}; "
         f"{both} high-confidence (both tools), {conflicts} flagged conflict(s); "
         f"{matched} geNomad-plasmid ID(s) matched a Platon contig ID."
     )
