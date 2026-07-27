@@ -195,7 +195,7 @@ analysing plasmid-rich clinical isolates, check that file before trusting a
 plasmid *absence*, and consider `mode: off` (or an explicit include list) if
 small mobile replicons matter to the question being asked.
 
-### 2. `genomad_fdr` is `NA`, and that is expected
+### 2. `genomad_fdr` is `NA`, and BacFlux deliberately leaves it that way
 
 Every row of `{sample}_plasmid_concordance.tsv` shows `genomad_fdr = NA`. This is
 not a parsing failure. From geNomad's own `summary.py`:
@@ -211,9 +211,43 @@ calibrated scores there is no calibrated error model, so geNomad writes `NA`
 rather than a number it cannot justify — and BacFlux passes that through
 unchanged instead of inventing one.
 
-Use `plasmid_score` for confidence instead; it is populated either way. On this
-genome all three surviving plasmids scored 0.9925–0.9943 and were independently
-called plasmid by Platon as well:
+**Why BacFlux does not simply switch calibration on.** It was tested on this
+genome, and for a bacterial isolate it makes the output worse, not better.
+Calibration converts scores into probabilities using an estimate of the sample's
+composition, and it needs enough sequences to estimate that composition. From
+`score_calibration.py`:
+
+```python
+if n_sequences < 1_000 and composition == "auto" and not force_auto:
+    ...  # "The 'metagenome' preset will be used instead."
+    composition = "metagenome"
+```
+
+Note this counts **sequences (contigs), not reads**. A finished bacterial isolate
+has a handful of contigs — this genome has four — so for BacFlux's use case that
+branch fires *every time*, silently substituting a preset whose assumed
+composition is `[0.84 chromosome, 0.05 plasmid, 0.11 virus]`. An isolate assembly
+contains essentially **no free viral sequences at all**, so the prior does not
+describe the sample.
+
+Running it anyway on this genome:
+
+| plasmid | uncalibrated (shipped default) | calibrated |
+|---|---|---|
+| pCuAs | score **0.9943**, fdr `NA` | score 0.9991, fdr 0.0009 |
+| pHg | score **0.9937**, fdr `NA` | score 0.9991, fdr 0.0009 |
+| pNDM-US | score **0.9925**, fdr `NA` | score 0.9991, fdr 0.0009 |
+
+Calibration collapsed three genuinely different scores into one identical value
+and returned the same FDR for all three. The number looks precise to four
+decimals and carries no discriminating power whatsoever — while destroying the
+real variation that was there. This is the same trap the spec already flags for
+PLSDB (§12.5): read the Mash *distance*, not the p-value, "which collapses to ~0
+for any real match".
+
+**So: leave calibration off, and use `plasmid_score`.** It is populated either
+way and it actually discriminates. On this genome all three surviving plasmids
+scored 0.9925–0.9943 and were independently called plasmid by Platon as well:
 
 ```
 contig         platon_call  platon_rds  genomad_call  genomad_score  agreement  confidence
@@ -224,6 +258,59 @@ NZ_CP006663.1  plasmid      27.1        plasmid       0.9943         both       
 
 Two methodologically independent callers agreeing at this strength is the best
 outcome that table can produce.
+
+---
+
+---
+
+## An ICE cannot sit on a plasmid — and the classifier knows it
+
+`{sample}_ice_candidates.tsv` reports elements on **every** replicon, chromosome
+and plasmid alike: CONJscan is run over the whole proteome, so nothing restricts
+it to the chromosome. On this genome it found three:
+
+```
+NZ_CP006659.2|ime-1979164:1994490                  chromosome  -> ime
+NZ_CP006659.2|conjugative_region-4610740:4644558   chromosome  -> conjugative_region
+NZ_CP006661.1|conjugative_region-57877:90473       PLASMID     -> conjugative_region
+```
+
+The plasmid one is typed `conjugative_region`, never `ice`, and that is a
+definitional point rather than a threshold: **ICE** stands for *Integrative and
+Conjugative Element* (spec §2.4 — "integrates into the **chromosome** and encodes
+conjugation machinery"). Something that is already its own replicon has nothing
+to integrate into; a conjugative element on a plasmid is simply a **conjugative
+plasmid**. The classifier enforces this through the integrase requirement:
+
+| integrase | relaxase | MPF | class |
+|:-:|:-:|:-:|---|
+| ✓ | ✓ | ✓ | **ICE** — predicted self-transmissible |
+| ✓ | ✓ | ✗ | **IME** — mobilisable, needs a helper |
+| ✓ | ✗ | ✗ | CIME / genomic island — passive |
+| ✗ | ✓ | ✓ | **conjugative region** — *report it, do not call it an ICE* |
+
+pNDM-US has a relaxase (MOBH), a coupling protein and a full typed F-type mating
+apparatus, but **no integrase**, so it lands in the last row — correctly.
+
+### A known gap this exposes
+
+That same plasmid row says `machinery_intact = TRUE`, `mpf_typed_system = TRUE`,
+`confidence = high`. geNomad independently agrees, listing `MOBH`, `t4cp1`,
+`virb4` and a full `F_tra*` set in its own `conjugation_genes` column.
+
+Yet `blaNDM-1`, which sits on that very contig, is capped at *medium* with the
+reason "the mating-pair apparatus was not verified on this contig". For this
+genome that sentence is **wrong**: the apparatus was verified twice,
+independently. The cap fires because `colocalise.py`'s tier-6 plasmid branch
+reads only Platon's hit counts and never consults the CONJscan evidence already
+sitting in the ICE table for the same contig.
+
+The cap is the right *default* — raw hit counts really do not verify an apparatus
+— but it is over-conservative whenever CONJscan has typed a complete system on
+that replicon. Wiring the two together would let a case like `blaNDM-1` keep tier
+6 at high confidence, with the machinery named as the evidence, and needs no new
+dependency: it uses output the pipeline already produces, on the default
+(non-geNomad) path. Recorded here as a known limitation until that is done.
 
 ---
 
