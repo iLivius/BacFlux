@@ -235,7 +235,7 @@ def test_gtdb_split_genus_still_matches_enterococcus_faecium():
     organism, reason = gao.map_classification(
         lineage("Enterococcus_B", "Enterococcus_B faecium"))
     assert organism == "Enterococcus_faecium"
-    assert reason.startswith("hand-checked GTDB/NCBI name difference")
+    assert reason.startswith("known GTDB/NCBI naming artefact")
     # The audit must quote the GTDB name as GTDB writes it, so the decision can
     # be re-checked against the taxonomy file later.
     assert "Enterococcus_B faecium" in reason
@@ -274,7 +274,7 @@ def test_suffixed_genus_not_in_the_exception_table_is_still_blocked():
     organism, reason = gao.map_classification(
         lineage("Klebsiella_A", "Klebsiella_A pneumoniae"))
     assert organism == ""
-    assert "GTDB_SPECIES_EQUIVALENCES" in reason
+    assert "gtdb_organism_equivalences.tsv" in reason
 
 
 def test_exception_table_maps_only_onto_real_amrfinder_organisms():
@@ -284,27 +284,33 @@ def test_exception_table_maps_only_onto_real_amrfinder_organisms():
         assert organism in gao.ALL_ORGANISMS, gtdb_name
 
 
-def test_exception_table_holds_only_genus_renames_not_species_splits():
-    # Structural guard on the table itself: every entry must be a GTDB genus
-    # rename (suffixed genus, plain epithet) whose epithet is unchanged from the
-    # AMRFinderPlus name. That is what makes the mapping safe; an entry with a
-    # suffixed or placeholder epithet would be mapping a different taxon.
-    # Entries whose EPITHET carries a suffix are admitted only case by case,
-    # with the evidence written next to them in the table. Listing them here as
-    # well means adding one silently is a test failure, not a quiet policy
-    # change - which is the whole point of a hand-checked table.
-    epithet_suffix_exceptions = {
-        "Campylobacter_D coli_A",
-        "Campylobacter_D coli_B",
-    }
+def test_exception_table_holds_only_same_species_naming_artefacts():
+    """Structural guard on the GENERATED table: every entry must be a NAMING
+    ARTEFACT for the SAME species AMRFinderPlus curates - GTDB moved a suffix
+    onto the genus, the epithet, or both - never a genuinely different species
+    that merely happens to share an NCBI label.
+
+    This table is now built by generate_gtdb_organism_table.py from a GTDB
+    release's own metadata, covering both patterns that pattern finds real
+    examples of: genus suffixed / epithet plain (Campylobacter_D jejuni is
+    C. jejuni) AND genus plain / epithet suffixed (Helicobacter pylori_C is
+    still H. pylori). This test does not re-derive the evidence behind either
+    pattern - that needs the multi-hundred-MB metadata file, which a fast unit
+    test must not require - it only checks the SHAPE every entry must have:
+    once every GTDB suffix is stripped from both tokens, the result must name
+    the exact organism the entry claims, not a look-alike.
+    """
     for gtdb_name, organism in gao.GTDB_SPECIES_EQUIVALENCES.items():
         gtdb_genus, gtdb_epithet = gtdb_name.split(" ")
-        _, genus_is_suffixed = gao.strip_gtdb_suffix(gtdb_genus)
+        genus_base, genus_is_suffixed = gao.strip_gtdb_suffix(gtdb_genus)
         epithet_base, epithet_is_suffixed = gao.strip_gtdb_suffix(gtdb_epithet)
-        assert genus_is_suffixed, gtdb_name
+
+        # The whole reason an entry is IN this table is that the plain rules
+        # (exact species match, or a safe genus rule) would not already have
+        # matched it without help - so it must carry a suffix somewhere.
+        assert genus_is_suffixed or epithet_is_suffixed, gtdb_name
         assert not gao.is_placeholder_species(gtdb_epithet), gtdb_name
-        if epithet_is_suffixed:
-            assert gtdb_name in epithet_suffix_exceptions, gtdb_name
+
         # The organism may be genus-level ("Campylobacter") or species-level
         # ("Enterococcus_faecium"); only the latter carries an epithet to check.
         if "_" in organism:
@@ -312,9 +318,9 @@ def test_exception_table_holds_only_genus_renames_not_species_splits():
             assert epithet_base == ncbi_epithet, gtdb_name
         else:
             ncbi_genus = organism
-        # The GTDB genus must be a suffixed form of the NCBI genus, not some
-        # other genus entirely.
-        assert gtdb_genus.startswith(ncbi_genus + "_"), gtdb_name
+        # Once stripped, the GTDB genus must equal the organism's own genus -
+        # not merely start with it, which would also accept a wrong relative.
+        assert genus_base == ncbi_genus, gtdb_name
 
 
 def test_placeholder_species_in_a_curated_genus():
@@ -690,7 +696,7 @@ def test_cli_writes_the_organism_for_a_gtdb_split_genus(tmp_path):
 
     _, row = read_audit(str(audit_file))
     assert row["matched_organism"] == "Enterococcus_faecium"
-    assert row["reason"].startswith("hand-checked GTDB/NCBI name difference")
+    assert row["reason"].startswith("known GTDB/NCBI naming artefact")
     assert "2 assemblies of this sample agree" in row["reason"]
 
 
