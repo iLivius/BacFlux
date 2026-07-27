@@ -1,0 +1,699 @@
+#!/usr/bin/env python3
+"""Find the attL/attR direct repeats that mark the real ends of an ICE.
+
+WHAT THIS IS FOR
+    CONJscan tells us WHERE the conjugation machinery is, but machinery genes are
+    not the edges of the element. An ICE is typically much larger than the cluster
+    of tra/relaxase genes that identify it, and everything between the true edges
+    - including any AMR gene sitting in the cargo - travels with it when it moves.
+    Reporting the machinery span as if it were the element would therefore
+    UNDERSTATE what is mobile, which for an AMR report is the dangerous direction.
+
+    This module recovers the real edges from the scar integration leaves behind.
+
+THE BIOLOGY, IN ONE PARAGRAPH
+    An ICE lives integrated in the host chromosome. It got there by site-specific
+    recombination between a short site on the element (attP) and a matching site
+    on the chromosome (attB), catalysed by its own integrase. Because the two
+    sites are nearly identical, recombination DUPLICATES them: one copy ends up at
+    each end of the integrated element, called attL (left) and attR (right). They
+    are DIRECT repeats - same sequence, same orientation - typically 15-25 bp.
+    Finding a matching pair that brackets the machinery is therefore direct
+    physical evidence of where the element starts and stops.
+
+    The favourite landing site is the 3' end of a tRNA gene. That is not an
+    accident: tRNA genes are short, highly conserved, and present in every
+    genome, so an element that targets one can integrate into essentially any
+    relative without disrupting anything - the recombination reconstitutes the
+    tRNA on one side and leaves the second copy as the scar on the other. This is
+    why Mode A below, which uses a nearby tRNA's 3' end as the probe, is much
+    more trustworthy than a blind repeat search: it is looking for the specific
+    thing the biology predicts, not for any repeat that happens to be there.
+
+TWO MODES, TRIED IN THAT ORDER
+    Mode A - tRNA-anchored (high precision). Take the last ~25 bp of a tRNA near
+        the element, then look for a second copy of it on the other side of the
+        machinery. A hit is strong evidence: we predicted the sequence in advance
+        from the biology and then found it in the right place.
+    Mode B - de novo (lower precision, better recall). No usable tRNA, so look for
+        ANY direct repeat shared between the left and right flanks, longest
+        first. This will occasionally find a repeat that has nothing to do with
+        integration, which is why it is only used when Mode A fails and why its
+        result is reported as boundary_method='denovo' so a reader can weight it
+        accordingly.
+
+    Neither works -> boundary_method='none' and the machinery span is kept, which
+    is the honest answer for a fragmented assembly where the flanks simply are
+    not present.
+
+THE FAILURE MODE THIS GUARDS AGAINST
+    Insertion sequences are themselves flanked by repeats - terminal inverted
+    repeats, plus the short direct repeat of target DNA they duplicate on
+    transposition. A genome region containing several IS copies is therefore FULL
+    of direct repeats that have nothing whatsoever to do with ICE integration. Run
+    the de novo scan over raw sequence and those repeats swamp every real signal.
+    So the flanks are MASKED against the ISEScan calls first (see mask_intervals);
+    the spec calls this out as the single most likely way to get this wrong.
+
+WHERE IT RUNS
+    Imported by conjscan_to_ice.py, which already has the candidate machinery
+    spans, the Bakta GFF3 (for tRNAs) and the genome. Pure text/sequence handling,
+    standard library only - a plain dict of k-mers is far faster than anything
+    these window sizes need, which is why no suffix-array tool (vmatch and
+    friends) has to be installed. Unit-testable with no tool or database present.
+
+COORDINATES
+    Everything crossing this module's boundary is 1-based inclusive, matching
+    GFF3 and every other BacFlux table. Python slicing is 0-based half-open, so
+    conversions happen at the edges of the helpers below and nowhere else.
+"""
+
+import argparse
+import csv
+import math
+import os
+import sys
+
+
+# ── Tunables ────────────────────────────────────────────────────────────────
+
+# How far beyond the machinery span to look for the element's real ends. An ICE
+# is usually a good deal larger than its tra cluster, but not unboundedly so;
+# 30 kb each side comfortably covers the realistic range while keeping the k-mer
+# index small enough to be instant.
+DEFAULT_FLANK_WINDOW_BP = 30_000
+
+# Length of the probe taken from a tRNA's 3' end in Mode A. att sites are
+# typically 15-25 bp, so 25 is the long end: long enough to be specific in a
+# megabase genome, short enough to sit inside a real att site.
+TRNA_PROBE_BP = 25
+
+# att sites are conserved but not always perfectly - one substitution between
+# attL and attR is common, because only one of the two copies is under selection
+# to keep the tRNA functional. More than one and we are no longer looking at a
+# recombination scar.
+MAX_PROBE_MISMATCHES = 1
+
+# Mode B tries progressively shorter repeats, starting here.
+DENOVO_MAX_REPEAT_BP = 25
+
+# Absolute floor, whatever the arithmetic below says. Real att sites are ~15-25 bp
+# and nothing shorter than this is worth reporting even in a tiny window.
+DENOVO_ABSOLUTE_MIN_REPEAT_BP = 12
+
+# How many chance matches we are willing to tolerate when choosing the shortest
+# acceptable repeat length. See minimum_informative_repeat_length: comparing two
+# 30 kb flanks, a 12 bp "repeat" is expected about FIFTY times purely by chance,
+# so a fixed 12 bp floor would report noise as an element boundary on essentially
+# every genome. This was caught by the unit tests below, which expected a random
+# sequence to yield no boundaries and got a confident de novo call instead.
+DENOVO_MAX_EXPECTED_CHANCE_MATCHES = 0.05
+
+# Sanity bounds on the element the boundaries imply. Defaults mirror the spec's
+# ice.min_element_bp / ice.max_element_bp; the caller passes the configured ones.
+DEFAULT_MIN_ELEMENT_BP = 8_000
+DEFAULT_MAX_ELEMENT_BP = 500_000
+
+COMPLEMENT = str.maketrans("ACGTNacgtn", "TGCANtgcan")
+
+
+# ── Sequence and annotation input ───────────────────────────────────────────
+
+def read_fasta(path):
+    """Read a FASTA into {sequence_id: sequence}, upper-cased.
+
+    Input:  any nucleotide FASTA - here the genome Bakta annotated, so the IDs
+            match the GFF3's seqids and every coordinate lines up.
+    Output: dict of id -> sequence string. The id is the first whitespace-
+            separated token of the header, the same convention the rest of
+            BacFlux uses, so 'NZ_CP006659.2 Klebsiella...' keys on
+            'NZ_CP006659.2'.
+
+    Upper-casing matters: some assemblers soft-mask repeats in lower case, and a
+    repeat search that treated 'acgt' and 'ACGT' as different would silently miss
+    exactly the repetitive regions this module is looking at.
+    """
+    sequences = {}
+    sequence_id = None
+    chunks = []
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                if sequence_id is not None:
+                    sequences[sequence_id] = "".join(chunks).upper()
+                sequence_id = line[1:].split()[0] if len(line) > 1 else ""
+                chunks = []
+            else:
+                chunks.append(line)
+    if sequence_id is not None:
+        sequences[sequence_id] = "".join(chunks).upper()
+    return sequences
+
+
+def parse_trna_features(gff3_path):
+    """Pull every tRNA gene out of a Bakta GFF3.
+
+    Input:  {sample}.gff3 as Bakta writes it. Bakta runs tRNAscan-SE and records
+            the results as `tRNA` features with a `product=tRNA-Glu(ttc)` style
+            attribute.
+    Output: list of {contig, start, end, strand, name} dicts, 1-based inclusive,
+            in file order.
+
+    Bakta appends its own FASTA after a `##FASTA` line; parsing stops there so
+    sequence lines are never mistaken for annotation. Anything malformed is
+    skipped rather than raising - a missing tRNA costs precision on one element,
+    while a crash costs the whole sample.
+    """
+    trnas = []
+    if not os.path.isfile(gff3_path):
+        return trnas
+
+    with open(gff3_path, encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.startswith("##FASTA"):
+                break
+            if line.startswith("#"):
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) < 9 or fields[2] != "tRNA":
+                continue
+            start = to_int(fields[3])
+            end = to_int(fields[4])
+            if start is None or end is None:
+                continue
+
+            # The human-readable tRNA name, for the report. Bakta writes both
+            # Name= and product=; either is fine, product= is the more reliable.
+            name = ""
+            for attribute in fields[8].split(";"):
+                key, _, value = attribute.partition("=")
+                if key.strip() in ("product", "Name") and value:
+                    name = value.strip()
+                    if key.strip() == "product":
+                        break
+
+            trnas.append({
+                "contig": fields[0],
+                "start": min(start, end),
+                "end": max(start, end),
+                "strand": fields[6],
+                "name": name or "tRNA",
+            })
+    return trnas
+
+
+def to_int(value):
+    """Parse an integer, or return None when the field is not one."""
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def reverse_complement(sequence):
+    """Reverse complement of a nucleotide string (N-safe)."""
+    return sequence.translate(COMPLEMENT)[::-1]
+
+
+# ── Masking out the insertion sequences ─────────────────────────────────────
+
+def mask_intervals(sequence, intervals):
+    """Blank out the given 1-based inclusive intervals with N.
+
+    Input:  a contig sequence, plus the intervals to hide - in practice every
+            insertion sequence ISEScan called on that contig.
+    Output: a new string of the same length with those stretches replaced by N.
+
+    Why this exists: IS elements carry terminal inverted repeats and leave short
+    direct repeats of target DNA behind when they transpose, so a region with a
+    few IS copies is densely repetitive for reasons that have nothing to do with
+    ICE integration. The de novo scan below skips any k-mer containing N, so
+    masking removes those decoys before they can outrank the real att site. The
+    spec names this as the most likely way to get att search wrong.
+
+    Masking deliberately does NOT shift coordinates - the string keeps its length
+    - so every position reported afterwards still refers to the real genome.
+    """
+    if not intervals:
+        return sequence
+
+    characters = list(sequence)
+    for start, end in intervals:
+        # Clamp into the sequence and convert 1-based inclusive -> 0-based slice.
+        first = max(1, min(start, end)) - 1
+        last = min(len(sequence), max(start, end))
+        for position in range(first, last):
+            characters[position] = "N"
+    return "".join(characters)
+
+
+# ── Approximate matching ────────────────────────────────────────────────────
+
+def count_mismatches(left, right, limit):
+    """Hamming distance between two equal-length strings, giving up past `limit`.
+
+    Returns the count, or `limit + 1` as soon as it is exceeded - the caller only
+    ever asks "is this within tolerance", so there is no point finishing a
+    comparison that has already failed. Any N counts as a mismatch: masked or
+    ambiguous sequence must never be allowed to satisfy a match.
+    """
+    mismatches = 0
+    for left_base, right_base in zip(left, right):
+        if left_base != right_base or left_base == "N":
+            mismatches += 1
+            if mismatches > limit:
+                return mismatches
+    return mismatches
+
+
+def find_probe_occurrences(sequence, probe, region_start, region_end,
+                           max_mismatches=MAX_PROBE_MISMATCHES):
+    """Every position in a region where `probe` matches within a mismatch budget.
+
+    Input:  the contig sequence, the probe, and the 1-based inclusive region to
+            search in.
+    Output: list of (start, end, mismatches) 1-based inclusive, in position order.
+
+    A plain sliding-window scan. For the window sizes here (tens of kb against a
+    25 bp probe) this is milliseconds, which is the whole reason no specialised
+    index or external tool is needed.
+    """
+    occurrences = []
+    probe_length = len(probe)
+    if probe_length == 0:
+        return occurrences
+    if "N" in probe:
+        return occurrences  # a probe drawn from masked sequence proves nothing
+
+    first = max(0, region_start - 1)
+    last = min(len(sequence), region_end)
+    for offset in range(first, last - probe_length + 1):
+        window = sequence[offset:offset + probe_length]
+        mismatches = count_mismatches(window, probe, max_mismatches)
+        if mismatches <= max_mismatches:
+            occurrences.append((offset + 1, offset + probe_length, mismatches))
+    return occurrences
+
+
+# ── Mode A: tRNA-anchored ───────────────────────────────────────────────────
+
+def trna_three_prime_probe(sequence, trna, probe_length=TRNA_PROBE_BP):
+    """The last `probe_length` bases of a tRNA gene, in the tRNA's own direction.
+
+    Input:  the contig sequence and one tRNA feature.
+    Output: the probe string, or "" when it cannot be taken cleanly.
+
+    Strand awareness is the whole point. A tRNA on the + strand is read left to
+    right, so its 3' end is the HIGHER coordinate; one on the - strand is read
+    right to left, so its 3' end is the LOWER coordinate and the sequence must be
+    reverse-complemented to be read in the gene's own direction. Integration
+    happens at the 3' end, so taking the wrong end - or the right end in the
+    wrong orientation - would search for a sequence that is simply not there.
+    """
+    start_index = trna["start"] - 1          # 0-based, inclusive
+    end_index = trna["end"]                  # 0-based, exclusive
+    if start_index < 0 or end_index > len(sequence) or end_index - start_index < probe_length:
+        return ""
+
+    gene_sequence = sequence[start_index:end_index]
+    if trna["strand"] == "-":
+        gene_sequence = reverse_complement(gene_sequence)
+    return gene_sequence[-probe_length:]
+
+
+def search_trna_anchored(sequence, element_start, element_end, trnas,
+                         flank_window_bp, min_element_bp, max_element_bp):
+    """Mode A - use a nearby tRNA's 3' end as the att probe.
+
+    Input:  contig sequence; the machinery span (1-based inclusive); the tRNAs on
+            THIS contig; and the search/size bounds.
+    Output: a result dict (see build_result) or None.
+
+    How it works, following the biology directly:
+      1. Consider each tRNA lying within the search region - the machinery span
+         plus a flank window each side. One of them may be the gene the element
+         integrated into.
+      2. Take its 3' end as the probe, in the tRNA's own reading direction.
+      3. Find every copy of that probe in the search region, in EITHER genomic
+         orientation, because a tRNA on the minus strand yields a probe whose
+         copies appear reverse-complemented in plus-strand coordinates. Both
+         copies must be in the SAME orientation as each other - attL and attR are
+         direct repeats.
+      4. Keep pairs that bracket the machinery: one copy at or left of the span's
+         start, the other at or right of its end. That bracketing is what makes
+         the pair a candidate boundary rather than an incidental repeat.
+      5. Of those, prefer the tightest element that still satisfies the size
+         bounds, and among equals the pair with the fewest mismatches. Tightest
+         wins because a longer interval is easy to manufacture by reaching for a
+         more distant copy, whereas the true attL/attR are the innermost pair
+         that still contain the machinery.
+    """
+    search_start = max(1, element_start - flank_window_bp)
+    search_end = min(len(sequence), element_end + flank_window_bp)
+
+    best = None
+    for trna in trnas:
+        # Only tRNAs inside the search region can plausibly be the landing site.
+        if trna["end"] < search_start or trna["start"] > search_end:
+            continue
+
+        probe = trna_three_prime_probe(sequence, trna)
+        if not probe:
+            continue
+
+        # Look for the probe in both orientations, but pair only like with like.
+        for orientation, oriented_probe in (("+", probe), ("-", reverse_complement(probe))):
+            occurrences = find_probe_occurrences(
+                sequence, oriented_probe, search_start, search_end)
+            if len(occurrences) < 2:
+                continue
+
+            left_copies = [o for o in occurrences if o[0] <= element_start]
+            right_copies = [o for o in occurrences if o[1] >= element_end]
+            for left_copy in left_copies:
+                for right_copy in right_copies:
+                    if right_copy[0] <= left_copy[0]:
+                        continue  # not a bracketing pair
+                    element_length = right_copy[1] - left_copy[0] + 1
+                    if not (min_element_bp <= element_length <= max_element_bp):
+                        continue
+                    total_mismatches = left_copy[2] + right_copy[2]
+                    candidate = (element_length, total_mismatches, left_copy,
+                                 right_copy, oriented_probe, trna, orientation)
+                    # Tightest element first, then fewest mismatches.
+                    if best is None or (element_length, total_mismatches) < (best[0], best[1]):
+                        best = candidate
+
+    if best is None:
+        return None
+
+    _length, mismatches, left_copy, right_copy, oriented_probe, trna, orientation = best
+    return build_result(
+        method="tRNA",
+        left_copy=left_copy,
+        right_copy=right_copy,
+        att_sequence=oriented_probe,
+        mismatches=mismatches,
+        trna_name=trna["name"],
+        trna_start=trna["start"],
+        trna_end=trna["end"],
+        repeat_orientation=orientation,
+    )
+
+
+# ── Mode B: de novo direct repeats ──────────────────────────────────────────
+
+def minimum_informative_repeat_length(left_flank_bp, right_flank_bp):
+    """Shortest repeat length worth believing when comparing two flanks.
+
+    The problem this solves: any two stretches of DNA share short "repeats" by
+    pure chance, and the shorter the k-mer the more of them there are. Comparing
+    two windows of L1 and L2 bases, the number of chance k-mer matches is roughly
+
+        L1 * L2 / 4**k
+
+    because there are L1 * L2 pairs of positions and each pair agrees over k
+    bases with probability 4**-k. For two 30 kb flanks that is ~54 expected
+    matches at k=12, ~0.2 at k=16, and effectively zero at k=20. Reporting the
+    best 12 bp match as an att site would therefore be reporting noise - and the
+    unit tests caught exactly that, with a purely random sequence yielding a
+    confident "denovo" boundary call.
+
+    So instead of a fixed floor, the shortest length accepted is the one at which
+    fewer than DENOVO_MAX_EXPECTED_CHANCE_MATCHES matches are expected by chance,
+    never below the absolute floor. A window the user widens automatically
+    demands a longer repeat, which is the correct behaviour and needs no extra
+    configuration.
+    """
+    pairs = max(1, left_flank_bp) * max(1, right_flank_bp)
+    # Smallest k with 4**k >= pairs / threshold.
+    required_k = math.log(pairs / DENOVO_MAX_EXPECTED_CHANCE_MATCHES, 4)
+    return max(DENOVO_ABSOLUTE_MIN_REPEAT_BP, int(math.ceil(required_k)))
+
+
+def search_denovo(sequence, element_start, element_end, flank_window_bp,
+                  min_element_bp, max_element_bp,
+                  max_repeat_bp=DENOVO_MAX_REPEAT_BP,
+                  min_repeat_bp=None):
+    """Mode B - look for any direct repeat shared by the two flanks.
+
+    Input:  the contig sequence, ALREADY MASKED against the IS calls; the
+            machinery span; and the search/size bounds.
+    Output: a result dict or None.
+
+    Used only when Mode A found nothing. Because it has no prior expectation
+    about what the att site should look like, it is more prone to picking up a
+    repeat that has nothing to do with integration - hence the guards:
+
+      * only the flanks are searched, never the element interior, so the repeat
+        genuinely brackets the machinery;
+      * the sequence is masked against IS calls first (the caller does this), so
+        transposon repeats cannot dominate;
+      * longest repeat wins - a 25 bp exact match between two specific 30 kb
+        windows is far less likely by chance than a short one, so k counts down
+        from the top and the first length that yields a valid pair is taken;
+      * and k never counts down past the point where chance matches become
+        likely, which minimum_informative_repeat_length works out from the actual
+        window sizes rather than guessing a fixed floor;
+      * ties are broken by SYMMETRY. A real att pair sits at comparable distances
+        either side of the machinery it brackets, because the machinery is
+        somewhere in the middle of the element; a lopsided pair is more likely
+        coincidence.
+    """
+    left_region_start = max(1, element_start - flank_window_bp)
+    left_region_end = element_start
+    right_region_start = element_end
+    right_region_end = min(len(sequence), element_end + flank_window_bp)
+
+    left_flank = sequence[left_region_start - 1:left_region_end]
+    right_flank = sequence[right_region_start - 1:right_region_end]
+    if not left_flank or not right_flank:
+        return None
+
+    # How short a repeat may get before it is indistinguishable from background
+    # similarity, derived from these flanks' actual sizes.
+    if min_repeat_bp is None:
+        min_repeat_bp = minimum_informative_repeat_length(len(left_flank), len(right_flank))
+    if max_repeat_bp < min_repeat_bp:
+        return None  # the window is so large that no repeat we allow is credible
+
+    for repeat_length in range(max_repeat_bp, min_repeat_bp - 1, -1):
+        # Index every k-mer of the left flank once, then stream the right flank
+        # past it. This is the "plain dict is fast enough" the spec relies on.
+        left_index = {}
+        for offset in range(len(left_flank) - repeat_length + 1):
+            kmer = left_flank[offset:offset + repeat_length]
+            if "N" in kmer:
+                continue  # masked-out IS sequence, or an assembly gap
+            left_index.setdefault(kmer, []).append(offset)
+
+        if not left_index:
+            continue
+
+        best = None
+        for offset in range(len(right_flank) - repeat_length + 1):
+            kmer = right_flank[offset:offset + repeat_length]
+            if "N" in kmer or kmer not in left_index:
+                continue
+            right_start = right_region_start + offset
+            right_end = right_start + repeat_length - 1
+            for left_offset in left_index[kmer]:
+                left_start = left_region_start + left_offset
+                left_end = left_start + repeat_length - 1
+                if right_start <= left_start:
+                    continue
+                element_length = right_end - left_start + 1
+                if not (min_element_bp <= element_length <= max_element_bp):
+                    continue
+                # Symmetry: how differently far the two copies sit from the
+                # machinery they bracket.
+                asymmetry = abs((element_start - left_end) - (right_start - element_end))
+                candidate = (asymmetry, element_length, left_start, left_end,
+                             right_start, right_end, kmer)
+                if best is None or candidate[:2] < best[:2]:
+                    best = candidate
+
+        if best is not None:
+            _asymmetry, _length, left_start, left_end, right_start, right_end, kmer = best
+            return build_result(
+                method="denovo",
+                left_copy=(left_start, left_end, 0),
+                right_copy=(right_start, right_end, 0),
+                att_sequence=kmer,
+                mismatches=0,
+                trna_name="",
+                trna_start=None,
+                trna_end=None,
+                repeat_orientation="+",
+            )
+
+    return None
+
+
+# ── Result shape ────────────────────────────────────────────────────────────
+
+def build_result(method, left_copy, right_copy, att_sequence, mismatches,
+                 trna_name, trna_start, trna_end, repeat_orientation):
+    """Package one att-site call into the dict conjscan_to_ice.py writes out.
+
+    Keys mirror the spec's Phase 3 output: attL, attR, att_seq, tRNA,
+    boundary_method - plus the refined element interval the boundaries imply and
+    the evidence (repeat length, mismatches) behind the call.
+    """
+    return {
+        "boundary_method": method,                       # tRNA | denovo
+        "att_left": "%d..%d" % (left_copy[0], left_copy[1]),
+        "att_right": "%d..%d" % (right_copy[0], right_copy[1]),
+        "att_sequence": att_sequence,
+        "att_length_bp": len(att_sequence),
+        "att_mismatches": mismatches,
+        "att_orientation": repeat_orientation,
+        "trna": trna_name or "NA",
+        "trna_start": trna_start,
+        "trna_end": trna_end,
+        # The element as the boundaries define it: from the START of attL to the
+        # END of attR, since both repeats are part of the integrated element.
+        "element_start": left_copy[0],
+        "element_end": right_copy[1],
+        "element_length_bp": right_copy[1] - left_copy[0] + 1,
+    }
+
+
+NO_BOUNDARY_RESULT = {
+    "boundary_method": "none",
+    "att_left": "NA",
+    "att_right": "NA",
+    "att_sequence": "NA",
+    "att_length_bp": 0,
+    "att_mismatches": 0,
+    "att_orientation": "NA",
+    "trna": "NA",
+    "trna_start": None,
+    "trna_end": None,
+    "element_start": None,
+    "element_end": None,
+    "element_length_bp": 0,
+}
+
+
+# ── The entry point conjscan_to_ice.py calls ────────────────────────────────
+
+def find_att_sites(sequence, element_start, element_end, trnas=(),
+                   mask=(), flank_window_bp=DEFAULT_FLANK_WINDOW_BP,
+                   min_element_bp=DEFAULT_MIN_ELEMENT_BP,
+                   max_element_bp=DEFAULT_MAX_ELEMENT_BP):
+    """Find the element's real ends, trying the precise method before the loose one.
+
+    Input:  the contig sequence; the machinery span (1-based inclusive) to
+            bracket; the tRNAs on this contig; the intervals to mask (the IS
+            calls); and the search/size bounds.
+    Output: always a dict of the shape above - NO_BOUNDARY_RESULT when nothing
+            was found, never None, so the caller can write the columns
+            unconditionally.
+
+    Order matters. Mode A is tried first and its answer preferred whenever it
+    exists, because a tRNA-anchored hit tested a specific prediction made in
+    advance from the biology, while a de novo hit merely found the best repeat
+    available. When neither succeeds the machinery span stands unchanged and the
+    report says boundary_method='none' - which is the correct answer for a
+    short-read assembly whose contig simply ends before the element does.
+
+    Masking is applied only to the DE NOVO search. Mode A's probe comes from an
+    annotated tRNA and is verified against the biology, so it should still be
+    found even if it happens to lie near an IS; blanking that region would throw
+    away the most reliable evidence available.
+    """
+    if not sequence or element_start is None or element_end is None:
+        return dict(NO_BOUNDARY_RESULT)
+    if element_start > element_end:
+        element_start, element_end = element_end, element_start
+
+    trna_hit = search_trna_anchored(
+        sequence, element_start, element_end, trnas,
+        flank_window_bp, min_element_bp, max_element_bp)
+    if trna_hit is not None:
+        return trna_hit
+
+    masked_sequence = mask_intervals(sequence, mask)
+    denovo_hit = search_denovo(
+        masked_sequence, element_start, element_end,
+        flank_window_bp, min_element_bp, max_element_bp)
+    if denovo_hit is not None:
+        return denovo_hit
+
+    return dict(NO_BOUNDARY_RESULT)
+
+
+def group_by_contig(records, contig_key="contig"):
+    """Bucket a list of dicts by contig, so per-contig lookups are not O(n) each."""
+    grouped = {}
+    for record in records:
+        grouped.setdefault(record[contig_key], []).append(record)
+    return grouped
+
+
+# ── Thin CLI, for checking one genome by hand ───────────────────────────────
+
+def main(argv=None):
+    """Run the att search over a TSV of intervals and print what it found.
+
+    Not used by the workflow - conjscan_to_ice.py imports the functions above
+    directly - but invaluable for testing a hypothesis against a real genome
+    without running Snakemake, and it keeps this module honestly executable.
+    """
+    parser = argparse.ArgumentParser(
+        description="Find attL/attR direct repeats bracketing an element.")
+    parser.add_argument("--genome", required=True,
+                        help="genome FASTA (the one Bakta annotated)")
+    parser.add_argument("--gff3", default="",
+                        help="Bakta GFF3, for tRNA-anchored (Mode A) search")
+    parser.add_argument("--intervals", required=True,
+                        help="TSV with contig/start/end columns - e.g. an ICE "
+                             "candidate table")
+    parser.add_argument("--is-table", default="",
+                        help="IS element table to mask before the de novo scan")
+    parser.add_argument("--flank-window", type=int, default=DEFAULT_FLANK_WINDOW_BP)
+    parser.add_argument("--min-element", type=int, default=DEFAULT_MIN_ELEMENT_BP)
+    parser.add_argument("--max-element", type=int, default=DEFAULT_MAX_ELEMENT_BP)
+    args = parser.parse_args(argv)
+
+    sequences = read_fasta(args.genome)
+    trnas_by_contig = group_by_contig(parse_trna_features(args.gff3)) if args.gff3 else {}
+
+    mask_by_contig = {}
+    if args.is_table:
+        with open(args.is_table, encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle, delimiter="\t"):
+                contig = row.get("contig")
+                start = to_int(row.get("start"))
+                end = to_int(row.get("end"))
+                if contig and start is not None and end is not None:
+                    mask_by_contig.setdefault(contig, []).append((start, end))
+
+    with open(args.intervals, encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle, delimiter="\t"):
+            contig = row.get("contig")
+            start = to_int(row.get("start"))
+            end = to_int(row.get("end"))
+            if not contig or start is None or end is None:
+                continue
+            sequence = sequences.get(contig, "")
+            result = find_att_sites(
+                sequence, start, end,
+                trnas=trnas_by_contig.get(contig, []),
+                mask=mask_by_contig.get(contig, []),
+                flank_window_bp=args.flank_window,
+                min_element_bp=args.min_element,
+                max_element_bp=args.max_element)
+            print("%s\t%s-%s\tmethod=%s\tattL=%s\tattR=%s\ttRNA=%s\tlen=%s"
+                  % (contig, start, end, result["boundary_method"],
+                     result["att_left"], result["att_right"], result["trna"],
+                     result["element_length_bp"]))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

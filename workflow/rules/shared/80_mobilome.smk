@@ -415,16 +415,35 @@ if MOBILOME_RUN:
 
     # ── Rule: conjscan_ice — turn machinery hits into ICE / IME candidates ───
     # Takes in: CONJscan's best_solution.tsv, Bakta's GFF3 (for the genomic
-    #           coordinates of each protein hit AND for integrase genes, found by
-    #           product regex), and the contig lengths.
-    # Does: spec §8 Phases 0-2 and 4 — collect anchors (relaxase, coupling
-    #       protein, T4SS, integrase), cluster them on one contig, and classify:
+    #           coordinates of each protein hit, for integrase genes found by
+    #           product regex, AND for the tRNAs the att search anchors on), the
+    #           genome itself, the IS table, and the contig lengths.
+    # Does: spec §8 Phases 0-4 — collect anchors (relaxase, coupling protein,
+    #       T4SS, integrase), cluster them on one contig, and classify:
     #         integrase + relaxase + T4SS -> ICE  (predicted self-transmissible)
     #         integrase + relaxase        -> IME  (mobilisable, needs a helper)
     #         integrase only              -> passive island
     #         relaxase + T4SS, no integrase -> conjugative region, NOT an ICE
-    #       Phase 3 (att-site boundaries) is deliberately NOT done here — it is
-    #       long-read work; the columns exist so BacFluxL can fill them later.
+    #       then Phase 3, the att-site search: look for the attL/attR direct
+    #       repeats that mark where the element really starts and stops, and
+    #       widen the interval to them when they are found.
+    #
+    # WHY THE att SEARCH RUNS IN EVERY MODE, not just long-read. The spec scoped
+    # Phase 3 to BacFluxL because of short-read FRAGMENTATION, and that reasoning
+    # is about assembly contiguity, not about the sequencer: a closed genome
+    # arriving through `contigs` mode has exactly the flanking sequence the search
+    # needs. So it is attempted always and degrades honestly — when the flanks are
+    # missing, or the element runs off the end of a contig, nothing is found and
+    # boundary_method stays 'none' with the machinery span reported unchanged.
+    # The existing spans_contigs / at_contig_boundary flags already cap confidence
+    # for exactly those cases.
+    #
+    # The IS table is an input because it is MASKED OUT before the de novo half of
+    # the search: insertion sequences carry terminal repeats and duplicate target
+    # DNA when they transpose, so an IS-rich neighbourhood is full of direct
+    # repeats that have nothing to do with ICE integration. The spec names this as
+    # the most likely way to get Phase 3 wrong.
+    #
     # Produces: the ICE/IME element table + its audit.
     # Consumed by: amr_mge_colocalisation, as a SECOND element source alongside
     #              the IS table.
@@ -433,6 +452,8 @@ if MOBILOME_RUN:
             conjscan_dir = CONJSCAN_DIR,
             bakta_dir = DIR_ANNOTATION + "/bakta/{sample}",
             lengths = CONTIG_LENGTHS,
+            genome = FINAL_CONTIGS,
+            is_table = IS_TABLE,
         output:
             table = ICE_TABLE,
             audit = ICE_AUDIT,
@@ -451,6 +472,8 @@ if MOBILOME_RUN:
               --conjscan-tsv {input.conjscan_dir}/best_solution.tsv \
               --bakta-gff {input.bakta_dir}/{wildcards.sample}.gff3 \
               --contig-lengths {input.lengths} \
+              --genome {input.genome} \
+              --is-table {input.is_table} \
               --out-table {output.table} \
               --out-audit {output.audit} > {log} 2>&1
             """

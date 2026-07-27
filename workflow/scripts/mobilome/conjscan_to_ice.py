@@ -140,6 +140,11 @@ import csv
 import os
 import re
 import sys
+
+# Phase 3 lives in its own module so the algorithm can be read and tested on
+# its own; this script supplies it with the candidates and the sequence.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import att_search
 from urllib.parse import unquote
 
 
@@ -428,9 +433,21 @@ OUTPUT_COLUMNS = [
     "sys_wholeness_min",          # lowest completeness among the contributing systems
     "machinery_intact",           # TRUE/FALSE - FALSE downgrades the mobility wording
     "degraded_reason",            # why machinery_intact is FALSE, or NA
-    "boundary_method",            # always 'none': Phase 3 (att search) is long-read only
-    "attL",                       # always NA here - kept so the schema matches BacFluxL
-    "attR",                       # always NA here
+    # Phase 3, the att-site search (att_search.py). When a flanking attL/attR
+    # pair is found, `start`/`end` above are REPLACED by the element those
+    # boundaries define, because that - not the machinery span - is what actually
+    # travels when the element moves, and it is what colocalise.py intersects
+    # against the AMR genes to decide the cargo. The machinery span is never lost:
+    # it is kept verbatim in machinery_start/machinery_end below.
+    "boundary_method",            # tRNA | denovo | none  (how start/end were derived)
+    "attL",                       # coordinates of the left repeat, or NA
+    "attR",                       # coordinates of the right repeat, or NA
+    "att_sequence",               # the repeat itself, so a reader can BLAST it
+    "att_length_bp",
+    "att_mismatches",             # 0 or 1 between the two copies; >1 is not accepted
+    "att_trna",                   # the tRNA the element integrated into, when known
+    "machinery_start",            # the CONJscan machinery span, always preserved
+    "machinery_end",
     "contig_length",
     "dist_to_contig_start",
     "dist_to_contig_end",
@@ -494,6 +511,16 @@ def _tsv_bool(value):
     if value is None:
         return "NA"
     return "TRUE" if value else "FALSE"
+
+
+def _reads_true(value):
+    """Read a TRUE/FALSE/NA cell back as a boolean.
+
+    The inverse of _tsv_bool, for the passes that re-read rows they already
+    wrote. Only the literal TRUE counts: NA means "could not tell", and treating
+    that as true would let an unknown quietly become a positive claim.
+    """
+    return str(value).strip().upper() == "TRUE"
 
 
 def _float_or_none(value):
@@ -1329,11 +1356,17 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             ),
             "machinery_intact": _tsv_bool(machinery_intact),
             "degraded_reason": ",".join(degraded_reasons) if degraded_reasons else "NA",
-            # Phase 3 is not implemented here (see the module docstring): the
-            # interval is the machinery span, not a boundary-resolved element.
+            # Phase 3 defaults. refine_candidate_boundaries() below overwrites
+            # these - and start/end - when it finds a flanking att pair.
             "boundary_method": "none",
             "attL": "NA",
             "attR": "NA",
+            "att_sequence": "NA",
+            "att_length_bp": "0",
+            "att_mismatches": "0",
+            "att_trna": "NA",
+            "machinery_start": str(start),
+            "machinery_end": str(end),
             "contig_length": _text_or_na(contig_length),
             "dist_to_contig_start": _text_or_na(dist_to_start),
             "dist_to_contig_end": _text_or_na(dist_to_end),
@@ -1345,6 +1378,164 @@ def build_candidates(sample, clusters, systems, contig_lengths,
 
     # Left-to-right along each contig: the same order a reader scans a genome in.
     rows.sort(key=lambda row: (row["contig"], int(row["start"]), int(row["end"])))
+    return rows, audit_rows
+
+
+def read_is_intervals(is_table_path):
+    """Read the IS element table into {contig: [(start, end), ...]} for masking.
+
+    Input:  {sample}_is_elements.tsv from isescan_table, or "" when the mobilome
+            module ran without it.
+    Output: dict of contig -> intervals. Empty dict when there is no table, which
+            simply means the de novo att scan runs unmasked.
+
+    Why the att search needs this at all: insertion sequences carry terminal
+    repeats and duplicate a few bases of target DNA when they transpose, so an
+    IS-rich neighbourhood is full of direct repeats that have nothing to do with
+    ICE integration. Blanking them first is what stops those decoys outranking a
+    real att site - the spec names it the most likely way to get Phase 3 wrong.
+    """
+    intervals_by_contig = {}
+    if not is_table_path or not os.path.isfile(is_table_path):
+        return intervals_by_contig
+
+    with open(is_table_path, encoding="utf-8", errors="replace", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for record in reader:
+            contig = (record.get("contig") or "").strip()
+            start = att_search.to_int(record.get("start"))
+            end = att_search.to_int(record.get("end"))
+            if contig and start is not None and end is not None:
+                intervals_by_contig.setdefault(contig, []).append((start, end))
+    return intervals_by_contig
+
+
+def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
+                                is_intervals_by_contig, flank_window_bp,
+                                min_element_bp, max_element_bp):
+    """Phase 3: replace each machinery span with the element's real ends.
+
+    Input:  the candidate rows from build_candidates; the genome Bakta
+            annotated; that GFF3 (for tRNAs); the IS intervals to mask, keyed by
+            contig; and the search/size bounds.
+    Does:   for every candidate, look for a flanking attL/attR pair
+            (att_search.find_att_sites). When one is found, the row's start/end
+            become the element those boundaries define and boundary_method
+            records how - while machinery_start/machinery_end keep the original
+            span, so nothing is lost and the two can always be compared.
+    Output: (rows, audit_rows). Rows are modified in place and returned for
+            convenience; every change, and every failure to find boundaries, is
+            audited.
+
+    Why replace start/end rather than only report the att sites: those columns
+    are what colocalise.py intersects against the AMR genes to decide which are
+    CARGO. An ICE is usually much larger than its tra cluster, so leaving the
+    machinery span in place would systematically understate what travels with the
+    element - the dangerous direction for an AMR report. The mge_id is
+    deliberately NOT rewritten: it is a join key other tables may already
+    reference, and silently repointing it would break them.
+
+    Everything here degrades quietly. A missing genome, an unreadable GFF3 or a
+    contig with no usable flanks simply leaves boundary_method='none' and the
+    machinery span standing, which is the honest answer on a fragmented assembly
+    where the element runs off the end of its contig.
+    """
+    audit_rows = []
+    if not rows:
+        return rows, audit_rows
+
+    if not genome_path or not os.path.isfile(genome_path):
+        audit_rows.append(audit_row(
+            sample, "input_missing", "no_genome_for_att_search",
+            "no genome FASTA was given, so element boundaries could not be "
+            "resolved; the reported interval is the machinery span "
+            "(boundary_method=none).",
+        ))
+        return rows, audit_rows
+
+    sequences = att_search.read_fasta(genome_path)
+    trnas_by_contig = att_search.group_by_contig(
+        att_search.parse_trna_features(gff3_path)) if gff3_path else {}
+
+    for row in rows:
+        # An att site is the SCAR left by integrase-mediated site-specific
+        # recombination: the element's attP and the host's attB recombine, and the
+        # site is duplicated to attL and attR. No integrase means the element never
+        # integrated, so there is no scar to find and any repeat the search turned
+        # up would be something else entirely - a leftover IS end, a genuine
+        # duplication, or noise. Searching anyway is not merely wasteful, it
+        # manufactures boundaries that do not exist.
+        #
+        # This was caught on the KPNIH1 positive control: the two elements the
+        # search "resolved" were both conjugative_region calls with no integrase
+        # (one of them on a plasmid, which does not integrate at all), while the
+        # one genuinely integrative element - the chromosomal IME - got nothing.
+        # Exactly backwards, until this gate was added.
+        if not _reads_true(row.get("has_integrase")):
+            audit_rows.append(audit_row(
+                sample, "not_applicable", "att_search_skipped_no_integrase",
+                f"{row['mge_id']}: no integrase, so this element cannot have "
+                "integrated and has no attL/attR scar to find. The reported "
+                "interval is the machinery span.",
+            ))
+            continue
+
+        contig = row["contig"]
+        sequence = sequences.get(contig, "")
+        if not sequence:
+            audit_rows.append(audit_row(
+                sample, "kept_flagged", "contig_not_in_genome_fasta",
+                f"{row['mge_id']}: contig '{contig}' was not found in the genome "
+                "FASTA, so no att search was possible.",
+            ))
+            continue
+
+        machinery_start = int(row["machinery_start"])
+        machinery_end = int(row["machinery_end"])
+        result = att_search.find_att_sites(
+            sequence, machinery_start, machinery_end,
+            trnas=trnas_by_contig.get(contig, []),
+            mask=is_intervals_by_contig.get(contig, []),
+            flank_window_bp=flank_window_bp,
+            min_element_bp=min_element_bp,
+            max_element_bp=max_element_bp,
+        )
+
+        row["boundary_method"] = result["boundary_method"]
+        row["attL"] = result["att_left"]
+        row["attR"] = result["att_right"]
+        row["att_sequence"] = result["att_sequence"]
+        row["att_length_bp"] = str(result["att_length_bp"])
+        row["att_mismatches"] = str(result["att_mismatches"])
+        row["att_trna"] = result["trna"]
+
+        if result["boundary_method"] == "none":
+            audit_rows.append(audit_row(
+                sample, "kept_flagged", "element_boundaries_not_resolved",
+                f"{row['mge_id']}: no flanking att pair was found, so the "
+                f"reported interval is the machinery span "
+                f"({machinery_start}-{machinery_end}). The real element is "
+                "probably larger; on a fragmented assembly the flanks are often "
+                "simply not present.",
+            ))
+            continue
+
+        # Boundaries found: widen the element to what actually travels.
+        row["start"] = str(result["element_start"])
+        row["end"] = str(result["element_end"])
+        row["length_bp"] = str(result["element_length_bp"])
+        added_bp = result["element_length_bp"] - (machinery_end - machinery_start + 1)
+        audit_rows.append(audit_row(
+            sample, "boundaries_resolved", f"att_pair_found_{result['boundary_method']}",
+            f"{row['mge_id']}: attL {result['att_left']} / attR "
+            f"{result['att_right']} ({result['att_length_bp']} bp repeat, "
+            f"{result['att_mismatches']} mismatch(es)"
+            + (f", at {result['trna']}" if result["trna"] not in ("", "NA") else "")
+            + f"). The element is {result['element_length_bp']} bp, "
+            f"{added_bp} bp more than the machinery span alone; the extra is "
+            "cargo that travels with it.",
+        ))
+
     return rows, audit_rows
 
 
@@ -1389,6 +1580,16 @@ def build_parser():
                         help=f"A candidate within this many bases of a contig end "
                              f"is flagged as probably truncated and capped at low "
                              f"confidence (default {DEFAULT_BOUNDARY_BP}).")
+    parser.add_argument("--genome", default="",
+                        help="genome FASTA Bakta annotated; enables the Phase 3 "
+                             "att-site search that resolves element boundaries")
+    parser.add_argument("--is-table", default="",
+                        help="IS element table, masked out before the de novo att "
+                             "scan so transposon repeats cannot masquerade as att sites")
+    parser.add_argument("--att-flank-window-bp", type=int,
+                        default=att_search.DEFAULT_FLANK_WINDOW_BP,
+                        help="how far beyond the machinery span to look for the "
+                             "element's real ends")
     parser.add_argument("--out-table", required=True,
                         help="Candidate element TSV (read by colocalise.py).")
     parser.add_argument("--out-audit", required=True,
@@ -1547,6 +1748,14 @@ def main(argv=None):
         args.min_element_bp, args.max_element_bp, args.boundary_bp,
     )
     audit_rows.extend(candidate_audit)
+
+    # --- Phase 3: resolve the real element boundaries -----------------------
+    is_intervals_by_contig = read_is_intervals(args.is_table)
+    rows, boundary_audit = refine_candidate_boundaries(
+        args.sample, rows, args.genome, args.bakta_gff, is_intervals_by_contig,
+        args.att_flank_window_bp, args.min_element_bp, args.max_element_bp,
+    )
+    audit_rows.extend(boundary_audit)
 
     return finish(0)
 

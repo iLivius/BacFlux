@@ -388,7 +388,11 @@ def test_ice_needs_all_three_anchor_classes(tmp_path):
     assert element["length_bp"] == "15501"
     assert element["integrase_products"] == "Phage integrase family protein"
     assert "S1_00010(integrase)" in element["anchor_ids"]
-    assert audit_reasons(audit) == set()             # nothing dropped, nothing capped
+    # Nothing dropped and nothing capped. The one audit line present is Phase 3
+    # reporting that it could not resolve the element's real ends, because these
+    # unit tests deliberately pass no genome FASTA - the att search needs
+    # sequence, and the real rule always supplies it.
+    assert audit_reasons(audit) == {"no_genome_for_att_search"}
 
 
 def test_ime_is_integrase_plus_relaxase_without_mating_pair(tmp_path):
@@ -1183,3 +1187,115 @@ def test_summary_line_names_each_class(tmp_path, capsys):
     assert "1 ICE (predicted self-transmissible)" in printed
     assert "0 IME" in printed
     assert "confidence high 1" in printed
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: att-site boundaries, and the biology that gates them.
+# ---------------------------------------------------------------------------
+
+
+def test_att_search_is_skipped_when_there_is_no_integrase(tmp_path):
+    """An att site is the scar of integrase-mediated recombination, so an element
+    with no integrase cannot have one.
+
+    This is the real KPNIH1 failure: without this gate the search "resolved"
+    boundaries for two conjugative_region calls that had no integrase at all -
+    one of them on a plasmid, which does not integrate - while the one genuinely
+    integrative element got nothing. Any repeat found in that situation is
+    something else (an IS end, a duplication, noise), and widening the element to
+    it would manufacture a boundary that does not exist.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF", sys_id="S1_T4SS_1"),
+    ])
+    # SCENE_CDS[0] is the integrase; integrase anchors are found by product regex
+    # from the GFF3, not from CONJscan, so it has to be left OUT of the
+    # annotation entirely for this element to have none.
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS[1:])
+    # A genome carrying a perfectly good direct repeat bracketing the machinery -
+    # which must still NOT be reported, because there is no integrase.
+    genome = tmp_path / "genome.fna"
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    import random as _random
+    generator = _random.Random(99)
+    sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
+    sequence = sequence[:39_999] + motif + sequence[40_000 + len(motif) - 1:]
+    sequence = sequence[:74_999] + motif + sequence[75_000 + len(motif) - 1:]
+    genome.write_text(">contig_1\n" + sequence + "\n")
+
+    _rc, rows, audit, _path = run_main(
+        tmp_path, conjscan=conjscan, gff=gff,
+        extra=["--genome", str(genome)])
+
+    assert len(rows) == 1
+    assert rows[0]["has_integrase"] == "FALSE"
+    assert rows[0]["boundary_method"] == "none"
+    assert rows[0]["start"] == rows[0]["machinery_start"]
+    assert "att_search_skipped_no_integrase" in audit_reasons(audit)
+
+
+def test_att_search_widens_an_integrative_element_to_its_real_ends(tmp_path):
+    """With an integrase present, a bracketing direct repeat IS an att candidate,
+    and the element is widened to it - because the cargo between attL and attR is
+    what actually travels when the element moves."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+    ])
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    genome = tmp_path / "genome.fna"
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    import random as _random
+    generator = _random.Random(98)
+    sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
+    # Bracket the machinery span (integrase 50000 .. relaxase 56600).
+    sequence = sequence[:39_999] + motif + sequence[40_000 + len(motif) - 1:]
+    sequence = sequence[:69_999] + motif + sequence[70_000 + len(motif) - 1:]
+    genome.write_text(">contig_1\n" + sequence + "\n")
+
+    _rc, rows, audit, _path = run_main(
+        tmp_path, conjscan=conjscan, gff=gff,
+        extra=["--genome", str(genome)])
+
+    assert len(rows) == 1
+    element = rows[0]
+    assert element["has_integrase"] == "TRUE"
+    assert element["boundary_method"] == "denovo"
+    assert element["attL"] == "40000..40024"
+    assert element["attR"] == "70000..70024"
+    # start/end are now the ELEMENT, not the machinery - and the machinery span
+    # is preserved rather than overwritten.
+    assert element["start"] == "40000"
+    assert element["end"] == "70024"
+    assert element["machinery_start"] == "50000"
+    assert int(element["length_bp"]) > (int(element["machinery_end"])
+                                        - int(element["machinery_start"]) + 1)
+    assert "att_pair_found_denovo" in audit_reasons(audit)
+
+
+def test_the_mge_id_is_not_repointed_when_boundaries_move(tmp_path):
+    """mge_id is a join key other tables reference, so widening the element must
+    not silently change what it points at."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+    ])
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS)
+    genome = tmp_path / "genome.fna"
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    import random as _random
+    generator = _random.Random(97)
+    sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
+    sequence = sequence[:39_999] + motif + sequence[40_000 + len(motif) - 1:]
+    sequence = sequence[:69_999] + motif + sequence[70_000 + len(motif) - 1:]
+    genome.write_text(">contig_1\n" + sequence + "\n")
+
+    _rc, rows, _audit, _path = run_main(
+        tmp_path, conjscan=conjscan, gff=gff, extra=["--genome", str(genome)])
+
+    # The id still names the machinery span it was minted from.
+    assert rows[0]["mge_id"] == "contig_1|ime-50000:58700"
+    assert rows[0]["start"] == "40000"
