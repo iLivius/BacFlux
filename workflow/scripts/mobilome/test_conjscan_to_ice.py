@@ -119,6 +119,32 @@ def gff_cds(contig, start, end, strand, locus_tag, product):
     return f"{contig}\tPyrodigal\tCDS\t{start}\t{end}\t.\t{strand}\t0\t{attributes}"
 
 
+def gff_trna(contig, start, end, strand="+", name="tRNA-Gly(gcc)"):
+    """Build one Bakta-shaped tRNA line.
+
+    Needed because only a tRNA-ANCHORED att pair is allowed to widen an element
+    (a de novo repeat is reported but not applied - see
+    refine_candidate_boundaries), so any fixture that tests widening has to plant
+    a real tRNA for the probe to come from.
+    """
+    attributes = f"ID={contig}_{start};Name={name};product={name}"
+    return f"{contig}\ttRNAscan-SE\ttRNA\t{start}\t{end}\t.\t{strand}\t.\t{attributes}"
+
+
+def plant_att_pair(sequence, motif, left_start, right_start):
+    """Put the same short motif at two 1-based positions in a sequence.
+
+    Used to build att fixtures: the left copy is the 3' end of a planted tRNA
+    (so it looks like a reconstituted integration site) and the right copy sits
+    in ordinary sequence, which is the one-in-one-out arrangement real
+    integration leaves behind.
+    """
+    for start in (left_start, right_start):
+        index = start - 1
+        sequence = sequence[:index] + motif + sequence[index + len(motif):]
+    return sequence
+
+
 def write_gff(path, contig_lengths, cds_lines, with_fasta=True):
     """Write a small Bakta-shaped GFF3, optionally with the trailing FASTA block."""
     lines = ["##gff-version 3", "# Annotated with Bakta"]
@@ -383,16 +409,25 @@ def test_ice_needs_all_three_anchor_classes(tmp_path):
     assert element["mpf_type"] == "F"
     assert element["mpf_typed_system"] == "TRUE"
     assert element["machinery_intact"] == "TRUE"
-    assert element["confidence"] == "high"
+    # Every anchor class is present and the machinery is intact, but no genome was
+    # given so Phase 3 never ran and the element's real ends are unknown. The spec
+    # (§8 Phase 6) makes tRNA-anchored boundaries a REQUIREMENT for high, so the
+    # best this evidence can earn is medium - the extent of the element, and hence
+    # what counts as its cargo, has not been established.
+    assert element["confidence"] == "medium"
     assert element["mge_id"] == "contig_1|ice-50000:65500"
     assert element["length_bp"] == "15501"
     assert element["integrase_products"] == "Phage integrase family protein"
     assert "S1_00010(integrase)" in element["anchor_ids"]
-    # Nothing dropped and nothing capped. The one audit line present is Phase 3
-    # reporting that it could not resolve the element's real ends, because these
-    # unit tests deliberately pass no genome FASTA - the att search needs
-    # sequence, and the real rule always supplies it.
-    assert audit_reasons(audit) == {"no_genome_for_att_search"}
+    # Nothing dropped. Two audit lines, both consequences of the same thing:
+    # these unit tests deliberately pass no genome FASTA, so Phase 3 could not
+    # look for the element's real ends (the att search needs sequence, and the
+    # real rule always supplies it), and the confidence is therefore settled at
+    # medium once that is known.
+    assert audit_reasons(audit) == {
+        "no_genome_for_att_search",
+        "confidence_settled_after_boundary_search",
+    }
 
 
 def test_ime_is_integrase_plus_relaxase_without_mating_pair(tmp_path):
@@ -421,7 +456,9 @@ def test_ime_is_integrase_plus_relaxase_without_mating_pair(tmp_path):
     assert element["mpf_type"] == "NA"               # the MOB model has no MPF type
     assert element["mpf_typed_system"] == "FALSE"
     assert element["n_anchor_classes"] == "3"
-    assert element["confidence"] == "high"
+    # medium, not high: no genome was given, so the element's boundaries were
+    # never resolved (see the note in test_ice_needs_all_three_anchor_classes).
+    assert element["confidence"] == "medium"
 
 
 def test_accessory_virb4_in_a_mob_system_does_not_make_an_ice(tmp_path):
@@ -1186,7 +1223,9 @@ def test_summary_line_names_each_class(tmp_path, capsys):
     assert "Sample S1:" in printed
     assert "1 ICE (predicted self-transmissible)" in printed
     assert "0 IME" in printed
-    assert "confidence high 1" in printed
+    # No genome here, so the boundary search never ran and the element cannot
+    # reach high confidence (see test_ice_needs_all_three_anchor_classes).
+    assert "confidence high 0, medium 1" in printed
 
 
 # ---------------------------------------------------------------------------
@@ -1237,9 +1276,57 @@ def test_att_search_is_skipped_when_there_is_no_integrase(tmp_path):
 
 
 def test_att_search_widens_an_integrative_element_to_its_real_ends(tmp_path):
-    """With an integrase present, a bracketing direct repeat IS an att candidate,
-    and the element is widened to it - because the cargo between attL and attR is
-    what actually travels when the element moves."""
+    """With an integrase present and a tRNA-anchored att pair bracketing the
+    machinery, the element is widened to it - because the cargo between attL and
+    attR is what actually travels when the element moves."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+    ])
+    # The tRNA ends at 40024, so its last 25 bp are 40000..40024 - which is where
+    # the left att copy is planted. Integration reconstitutes the host tRNA at one
+    # end, so exactly one copy lies inside a tRNA and the other does not.
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS,
+                    SCENE_CDS + [gff_trna("contig_1", 39_952, 40_024)])
+
+    genome = tmp_path / "genome.fna"
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    import random as _random
+    generator = _random.Random(98)
+    sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
+    # Bracket the machinery span (integrase 50000 .. relaxase 56600).
+    sequence = plant_att_pair(sequence, motif, 40_000, 70_000)
+    genome.write_text(">contig_1\n" + sequence + "\n")
+
+    _rc, rows, audit, _path = run_main(
+        tmp_path, conjscan=conjscan, gff=gff,
+        extra=["--genome", str(genome)])
+
+    assert len(rows) == 1
+    element = rows[0]
+    assert element["has_integrase"] == "TRUE"
+    assert element["boundary_method"] == "tRNA"
+    assert element["attL"] == "40000..40024"
+    assert element["attR"] == "70000..70024"
+    # start/end are now the ELEMENT, not the machinery - and the machinery span
+    # is preserved rather than overwritten.
+    assert element["start"] == "40000"
+    assert element["end"] == "70024"
+    assert element["machinery_start"] == "50000"
+    assert int(element["length_bp"]) > (int(element["machinery_end"])
+                                        - int(element["machinery_start"]) + 1)
+    assert "att_pair_found_tRNA" in audit_reasons(audit)
+
+
+def test_a_denovo_repeat_is_reported_but_never_moves_the_element(tmp_path):
+    """The restraint that keeps fabricated boundaries out of the AMR table.
+
+    Same fixture as above but with NO tRNA, so the bracketing repeat can only be
+    found de novo. On a real chromosome ~16% of arbitrary spans yield such a
+    repeat by chance, so it is reported for a human to follow up and the element
+    interval stays the machinery span - otherwise every gene in the invented
+    interval would be called cargo of a self-transmissible element.
+    """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
         conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
@@ -1251,29 +1338,23 @@ def test_att_search_widens_an_integrative_element_to_its_real_ends(tmp_path):
     import random as _random
     generator = _random.Random(98)
     sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
-    # Bracket the machinery span (integrase 50000 .. relaxase 56600).
-    sequence = sequence[:39_999] + motif + sequence[40_000 + len(motif) - 1:]
-    sequence = sequence[:69_999] + motif + sequence[70_000 + len(motif) - 1:]
+    sequence = plant_att_pair(sequence, motif, 40_000, 70_000)
     genome.write_text(">contig_1\n" + sequence + "\n")
 
     _rc, rows, audit, _path = run_main(
-        tmp_path, conjscan=conjscan, gff=gff,
-        extra=["--genome", str(genome)])
+        tmp_path, conjscan=conjscan, gff=gff, extra=["--genome", str(genome)])
 
-    assert len(rows) == 1
     element = rows[0]
-    assert element["has_integrase"] == "TRUE"
+    # The repeat IS found and IS reported...
     assert element["boundary_method"] == "denovo"
     assert element["attL"] == "40000..40024"
     assert element["attR"] == "70000..70024"
-    # start/end are now the ELEMENT, not the machinery - and the machinery span
-    # is preserved rather than overwritten.
-    assert element["start"] == "40000"
-    assert element["end"] == "70024"
-    assert element["machinery_start"] == "50000"
-    assert int(element["length_bp"]) > (int(element["machinery_end"])
-                                        - int(element["machinery_start"]) + 1)
-    assert "att_pair_found_denovo" in audit_reasons(audit)
+    # ...but the interval is still the machinery span, not the invented element.
+    assert element["start"] == element["machinery_start"]
+    assert element["end"] == element["machinery_end"]
+    assert "denovo_att_reported_not_applied" in audit_reasons(audit)
+    # And an unresolved boundary can never be reported at high confidence.
+    assert element["confidence"] != "high"
 
 
 def test_the_mge_id_is_not_repointed_when_boundaries_move(tmp_path):
@@ -1283,14 +1364,14 @@ def test_the_mge_id_is_not_repointed_when_boundaries_move(tmp_path):
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
         conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
     ])
-    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS)
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS,
+                    SCENE_CDS + [gff_trna("contig_1", 39_952, 40_024)])
     genome = tmp_path / "genome.fna"
     motif = "GGCTCGAACCCAGGACCTCTTGCAT"
     import random as _random
     generator = _random.Random(97)
     sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
-    sequence = sequence[:39_999] + motif + sequence[40_000 + len(motif) - 1:]
-    sequence = sequence[:69_999] + motif + sequence[70_000 + len(motif) - 1:]
+    sequence = plant_att_pair(sequence, motif, 40_000, 70_000)
     genome.write_text(">contig_1\n" + sequence + "\n")
 
     _rc, rows, _audit, _path = run_main(
@@ -1318,7 +1399,8 @@ def test_widening_recomputes_the_contig_distance_flags_and_confidence(tmp_path):
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
         conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
     ])
-    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS)
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS,
+                    SCENE_CDS + [gff_trna("contig_1", 39_952, 40_024)])
 
     # A 200 kb contig with the att pair placed so the element ends 100 bp from
     # the far end of the contig.
@@ -1327,8 +1409,7 @@ def test_widening_recomputes_the_contig_distance_flags_and_confidence(tmp_path):
     import random as _random
     generator = _random.Random(96)
     sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
-    sequence = sequence[:39_999] + motif + sequence[40_000 + len(motif) - 1:]
-    sequence = sequence[:199_875] + motif + sequence[199_876 + len(motif) - 1:]
+    sequence = plant_att_pair(sequence, motif, 40_000, 199_876)
     genome.write_text(">contig_1\n" + sequence + "\n")
 
     _rc, rows, audit, _path = run_main(
@@ -1336,13 +1417,13 @@ def test_widening_recomputes_the_contig_distance_flags_and_confidence(tmp_path):
         extra=["--genome", str(genome), "--att-flank-window-bp", "170000"])
 
     element = rows[0]
-    assert element["boundary_method"] == "denovo"
+    assert element["boundary_method"] == "tRNA"
     assert element["end"] == "199900"
     # The flags now describe the ELEMENT, not the machinery it grew from.
     assert element["dist_to_contig_end"] == "100"
     assert element["at_contig_boundary"] == "TRUE"
     assert element["confidence"] != "high"
-    assert "confidence_rescored_after_widening" in audit_reasons(audit)
+    assert "confidence_settled_after_boundary_search" in audit_reasons(audit)
 
 
 def test_widening_that_stays_clear_of_the_contig_ends_keeps_its_confidence(tmp_path):
@@ -1351,21 +1432,21 @@ def test_widening_that_stays_clear_of_the_contig_ends_keeps_its_confidence(tmp_p
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
         conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
     ])
-    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS)
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS,
+                    SCENE_CDS + [gff_trna("contig_1", 39_952, 40_024)])
     genome = tmp_path / "genome.fna"
     motif = "GGCTCGAACCCAGGACCTCTTGCAT"
     import random as _random
     generator = _random.Random(95)
     sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
-    sequence = sequence[:39_999] + motif + sequence[40_000 + len(motif) - 1:]
-    sequence = sequence[:69_999] + motif + sequence[70_000 + len(motif) - 1:]
+    sequence = plant_att_pair(sequence, motif, 40_000, 70_000)
     genome.write_text(">contig_1\n" + sequence + "\n")
 
     _rc, rows, audit, _path = run_main(
         tmp_path, conjscan=conjscan, gff=gff, extra=["--genome", str(genome)])
 
     element = rows[0]
-    assert element["boundary_method"] == "denovo"
+    assert element["boundary_method"] == "tRNA"
     assert element["at_contig_boundary"] == "FALSE"
     assert element["dist_to_contig_start"] == "39999"
-    assert "confidence_rescored_after_widening" not in audit_reasons(audit)
+    assert "confidence_settled_after_boundary_search" not in audit_reasons(audit)

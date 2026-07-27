@@ -275,8 +275,25 @@ def mpf_type_from_model(model_fqn):
 # "recombinase RecA" and it appears in every genome; RecA is the homologous-
 # recombination protein and has nothing to do with site-specific integration, so
 # only the "tyrosine recombinase" / "serine recombinase" phrasings match.
+#
+# WHY THE LIST IS LONGER THAN THE SPEC'S: the spec (§8 Phase 1) gives the pattern
+# in terms of protein FAMILY names, but Bakta writes UniRef product text, which
+# says the same thing several other ways. Checked against every distinct
+# integrase-like product in the KPNIH1 positive control; the two that the
+# spec-literal pattern missed are marked below, and missing them is not cosmetic
+# — "DNA integration/recombination/inversion protein" is how Bakta annotates
+# KPNIH1_04511, the integrase 5.7 kb from KPNIH1's conjugative region. Without it
+# that element scored as a bare "conjugative_region" (report, do not call an ICE)
+# instead of the ICE it is, so the positive control silently under-called its own
+# headline result.
 INTEGRASE_PRODUCT_PATTERN = re.compile(
-    r"tyrosine recombinase|phage[_ ]integrase|xerc|xerd|serine recombinase|integrase",
+    r"tyr(osine)? recombinase"          # "tyrosine recombinase XerC"; MISSED "Tyr recombinase domain-containing protein"
+    r"|phage[_ ]integrase"
+    r"|xerc|xerd"
+    r"|serine recombinase"
+    r"|site.specific recombinase"       # hyphen or space
+    r"|dna integration"                 # MISSED "DNA integration/recombination/inversion protein"
+    r"|integrase",                      # catches "Integrase", "Integrase family protein", "integron integrase IntI1"
     re.IGNORECASE,
 )
 
@@ -1067,20 +1084,26 @@ def keep_or_drop_cluster(cluster, min_element_bp, max_element_bp):
 CONFIDENCE_RANK = {"low": 1, "medium": 2, "high": 3}
 
 
-def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_contig_boundary):
+def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_contig_boundary,
+                      boundary_method="none"):
     """Give the candidate a confidence level, and say what lowered it.
 
     Returns (level, caps) where caps is a list of (level, reason, detail) - one
     per rule that fired, so the audit file can explain every "low" in the table.
 
-    A call is only HIGH when four things are all true at once:
+    A call is only HIGH when all of these are true at once:
       * at least three of the four anchor classes are present, so it does not
         rest on a single hit;
       * every hit is on ONE contig - see below;
       * the machinery is complete (no low system wholeness, no decayed model, no
         truncated relaxase/VirB4);
       * the machinery does not run into a contig end, where the rest of the
-        element would be invisible.
+        element would be invisible;
+      * the element's ENDS are actually known, i.e. a tRNA-anchored att pair was
+        found. The spec (§8 Phase 6) states this outright - "high = 4 anchor
+        classes + tRNA-anchored + single contig + intact" - and it was the one
+        clause the code did not implement, so an element whose extent was a guess
+        could still be reported at high confidence.
 
     The contig rule is absolute, exactly as the spec requires: anything spanning
     contigs is capped at LOW no matter how good the rest of the evidence looks.
@@ -1089,6 +1112,35 @@ def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_cont
     adjacent in the file.
     """
     caps = []
+
+    # Where the element STOPS is evidence in its own right, because everything
+    # downstream - which genes count as cargo, and therefore which AMR genes get
+    # called mobile - is read off the interval. 'none' means the interval is only
+    # the machinery span, and 'denovo' means a repeat was found but was not
+    # trusted enough to apply (see refine_candidate_boundaries). Neither deserves
+    # the top level; only a tRNA-anchored pair leaves 'high' available.
+    #
+    # boundary_method=None means NOT YET ASSESSED, and is what build_candidates
+    # passes: it runs before Phase 3, so at that point no boundary has been looked
+    # for. Judging it there would cap every element for a failure that has not
+    # happened yet, then have to undo the cap - leaving a contradictory
+    # "no att pair was found" line in the audit of an element whose att pair was
+    # found moments later. finalise_confidence settles it once, afterwards.
+    if boundary_method is None or boundary_method == "tRNA":
+        pass
+    elif boundary_method == "denovo":
+        caps.append(("medium", "boundary_denovo_only", (
+            "the only candidate boundary is a de novo direct repeat, which on a "
+            "real chromosome arises by chance often enough (~16% of arbitrary "
+            "spans) that it was reported but not applied; the element's true "
+            "extent is not established."
+        )))
+    else:
+        caps.append(("medium", "boundary_not_resolved", (
+            "no att pair was found, so the reported interval is the machinery "
+            "span rather than the element's real ends - a floor, not a "
+            "delimitation."
+        )))
 
     if n_anchor_classes < MIN_ANCHOR_CLASSES_FOR_HIGH:
         caps.append(("medium", "few_anchor_classes", (
@@ -1275,8 +1327,12 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             dist_to_nearest = min(dist_to_start, dist_to_end)
             at_boundary = dist_to_nearest <= boundary_bp
 
+        # No boundary_method here on purpose - Phase 3 has not run yet, so the
+        # element's ends are genuinely unknown at this point rather than
+        # unresolved. finalise_confidence applies that rule once Phase 3 is done.
         confidence, caps = assess_confidence(
-            len(present_classes), machinery_intact, spans_contigs, at_boundary
+            len(present_classes), machinery_intact, spans_contigs, at_boundary,
+            boundary_method=None,
         )
         for cap_level, cap_reason, cap_detail in caps:
             audit_rows.append(audit_row(
@@ -1520,7 +1576,48 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
             ))
             continue
 
-        # Boundaries found: widen the element to what actually travels.
+        # A DE NOVO boundary is REPORTED but never ACTED ON. This is the single
+        # most important restraint in Phase 3, so here is the measurement behind
+        # it, taken on the KPNIH1 chromosome (5.4 Mb) with the real IS mask:
+        #
+        #   300 randomly placed 15 kb spans, none of them an ICE
+        #   -> 22% came back with a confident de novo "boundary"
+        #   -> 16% still did after the repeat-family guard was added
+        #
+        # A one-in-six error rate is perfectly acceptable for a HYPOTHESIS and
+        # completely unacceptable for something that silently redefines the
+        # element. When start/end are widened, colocalise.py treats every AMR gene
+        # in the new interval as CARGO of the element, so a fabricated 50 kb
+        # boundary turns unrelated chromosomal genes into "predicted
+        # self-transmissible" - and the genes most often swallowed are exactly the
+        # ones that must never be called mobile: a gyrA point mutation is the
+        # textbook INTRINSIC determinant, and it sits on the chromosome where
+        # these spurious repeats live.
+        #
+        # Mode A (tRNA-anchored) is a different proposition: it starts from a
+        # position integrases are known to target and requires the probe to be the
+        # 3' end of an actual annotated tRNA, so it is specific enough to act on.
+        #
+        # The de novo columns stay in the output because they are a real lead for
+        # a human to follow - which is what the spec's boundary_method column is
+        # for. They just do not move the element.
+        if result["boundary_method"] == "denovo":
+            audit_rows.append(audit_row(
+                sample, "kept_flagged", "denovo_att_reported_not_applied",
+                f"{row['mge_id']}: a de novo direct repeat "
+                f"({result['att_length_bp']} bp) was found at "
+                f"{result['att_left']} / {result['att_right']}, implying an "
+                f"element of {result['element_length_bp']} bp. It is REPORTED but "
+                f"NOT used as the element boundary: on a real chromosome ~16% of "
+                f"arbitrary spans yield such a repeat by chance, so the interval "
+                f"stays the machinery span ({machinery_start}-{machinery_end}) "
+                "and cargo is not assigned from it. Treat the att columns as a "
+                "lead to check by hand, not as a delimitation.",
+            ))
+            continue
+
+        # Boundaries found by the tRNA-anchored mode: widen the element to what
+        # actually travels.
         row["start"] = str(result["element_start"])
         row["end"] = str(result["element_end"])
         row["length_bp"] = str(result["element_length_bp"])
@@ -1535,6 +1632,9 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
         # running off the end of its contig would keep a high confidence it no
         # longer deserves - the report claiming a complete element on evidence
         # that has just been truncated by the assembly.
+        #
+        # The CONFIDENCE that follows from these flags is settled later, in one
+        # pass, by finalise_confidence - see the note there.
         contig_length = att_search.to_int(row.get("contig_length"))
         if contig_length is not None:
             dist_to_start = result["element_start"] - 1
@@ -1545,27 +1645,6 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
             row["dist_to_contig_end"] = str(dist_to_end)
             row["dist_to_nearest_contig_end"] = str(dist_to_nearest)
             row["at_contig_boundary"] = _tsv_bool(at_boundary)
-
-            # Re-derive the confidence from the element's own footprint, using
-            # the same rule build_candidates applied, so the two can never
-            # disagree about the same row.
-            refreshed_confidence, refreshed_caps = assess_confidence(
-                att_search.to_int(row.get("n_anchor_classes")) or 0,
-                _reads_true(row.get("machinery_intact")),
-                _reads_true(row.get("spans_contigs")),
-                at_boundary,
-            )
-            if refreshed_confidence != row["confidence"]:
-                audit_rows.append(audit_row(
-                    sample, "kept_flagged", "confidence_rescored_after_widening",
-                    f"{row['mge_id']}: the element widened to "
-                    f"{result['element_start']}-{result['element_end']}, which "
-                    f"changes its distance to the contig ends, so its confidence "
-                    f"moves from {row['confidence']} to {refreshed_confidence}"
-                    + (": " + "; ".join(detail for _lvl, _reason, detail in refreshed_caps)
-                       if refreshed_caps else ""),
-                ))
-                row["confidence"] = refreshed_confidence
         audit_rows.append(audit_row(
             sample, "boundaries_resolved", f"att_pair_found_{result['boundary_method']}",
             f"{row['mge_id']}: attL {result['att_left']} / attR "
@@ -1580,6 +1659,54 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
     return rows, audit_rows
 
 
+def finalise_confidence(sample, rows):
+    """Settle every candidate's confidence ONCE, after Phase 3 has run.
+
+    WHY THIS IS A SEPARATE PASS
+        Confidence depends on how well the element's ENDS are known, and that is
+        only decided in Phase 3 - after build_candidates has already produced the
+        rows. Two orderings were possible and one of them is wrong:
+
+          * judge the boundary inside build_candidates, then correct it later.
+            That caps every element for a failure that has not happened yet and
+            writes "no att pair was found" into the audit of elements whose att
+            pair is found seconds later. The audit is the thing a reader trusts
+            to explain the table, so a contradictory line in it is worse than no
+            line at all.
+          * leave the boundary out of the first assessment (boundary_method=None)
+            and settle it here, once, when the answer is actually known.
+
+        This is the second one.
+
+    Takes in: the candidate rows, already widened (or not) by Phase 3, with
+              boundary_method and the contig-distance flags final.
+    Does:     re-runs assess_confidence with the real boundary_method and writes
+              one audit line per cap, so every non-high call has a stated reason.
+    Output:   (rows, audit_rows); rows are modified in place.
+    """
+    audit_rows = []
+    for row in rows:
+        confidence, caps = assess_confidence(
+            att_search.to_int(row.get("n_anchor_classes")) or 0,
+            _reads_true(row.get("machinery_intact")),
+            _reads_true(row.get("spans_contigs")),
+            _reads_true(row.get("at_contig_boundary")),
+            boundary_method=row.get("boundary_method") or "none",
+        )
+        if confidence != row["confidence"]:
+            audit_rows.append(audit_row(
+                sample, "kept_flagged", "confidence_settled_after_boundary_search",
+                f"{row['mge_id']}: confidence moves from {row['confidence']} to "
+                f"{confidence} now that the boundary search has run "
+                f"(boundary_method={row.get('boundary_method') or 'none'})"
+                + (": " + "; ".join(detail for _lvl, _reason, detail in caps)
+                   if caps else ""),
+                contig=row.get("contig"), start=row.get("start"), end=row.get("end"),
+            ))
+            row["confidence"] = confidence
+    return rows, audit_rows
+
+
 # ── The command-line interface ───────────────────────────────────────────────
 
 def build_parser():
@@ -1590,8 +1717,12 @@ def build_parser():
         description=(
             "Turn CONJscan machinery hits plus Bakta annotation into ICE/IME "
             "candidate rows for the mobilome co-localisation step. Implements "
-            "spec section 8 phases 0, 1, 2 and 4; att-site boundary detection "
-            "(phase 3) is long-read only and is not done here."
+            "spec section 8 phases 0, 1, 2, 3, 4 and 6. The att-site search "
+            "(phase 3) runs in every mode - the constraint is assembly "
+            "contiguity, not the sequencer - and degrades to "
+            "boundary_method=none when the flanks are absent. Only a "
+            "tRNA-anchored boundary is applied to the element interval; a de "
+            "novo repeat is reported but not acted on."
         )
     )
     parser.add_argument("--sample", required=True,
@@ -1798,6 +1929,10 @@ def main(argv=None):
         args.boundary_bp,
     )
     audit_rows.extend(boundary_audit)
+
+    # --- Phase 6: settle the confidence now the boundaries are known ---------
+    rows, confidence_audit = finalise_confidence(args.sample, rows)
+    audit_rows.extend(confidence_audit)
 
     return finish(0)
 

@@ -380,6 +380,27 @@ def search_trna_anchored(sequence, element_start, element_end, trnas,
                     element_length = right_copy[1] - left_copy[0] + 1
                     if not (min_element_bp <= element_length <= max_element_bp):
                         continue
+                    # EXACTLY ONE copy may sit inside an annotated tRNA, and this
+                    # is the test that makes Mode A trustworthy rather than merely
+                    # tRNA-flavoured.
+                    #
+                    # What integration actually leaves behind: the element crosses
+                    # over into the 3' end of a tRNA, and the recombination
+                    # RECONSTITUTES that tRNA at one end of the element while
+                    # placing a second copy of the same short sequence at the far
+                    # end, out in ordinary DNA. So one copy is in a tRNA and one is
+                    # not.
+                    #
+                    # If BOTH copies are inside annotated tRNAs, nothing was
+                    # integrated: these are two paralogous tRNA genes. Isoacceptor
+                    # tRNAs share their 3' ends by design - that is what the probe
+                    # is made of - and a genome carries dozens of them, so the
+                    # pattern is common and looks superb. It produced 9 spurious
+                    # "tRNA-anchored" boundaries in 300 random spans of the KPNIH1
+                    # chromosome, each labelled with the method this module treats
+                    # as its most precise.
+                    if overlaps_any_trna(left_copy, trnas) and overlaps_any_trna(right_copy, trnas):
+                        continue
                     total_mismatches = left_copy[2] + right_copy[2]
                     candidate = (element_length, total_mismatches, left_copy,
                                  right_copy, oriented_probe, trna, orientation)
@@ -404,6 +425,25 @@ def search_trna_anchored(sequence, element_start, element_end, trnas,
     )
 
 
+def overlaps_any_trna(copy, trnas):
+    """Does this att copy sit inside an annotated tRNA gene?
+
+    Takes in: one (start, end, mismatches) occurrence, and the contig's tRNA
+              features as parsed from the Bakta GFF3.
+    Returns:  True if the occurrence overlaps any tRNA at all.
+
+    Used to enforce the one-in-one-out rule in search_trna_anchored: a real
+    integration scar has one copy in the reconstituted host tRNA and the other in
+    ordinary sequence. Both inside tRNAs means we are looking at two paralogous
+    tRNA genes, not an element.
+    """
+    start, end = copy[0], copy[1]
+    for trna in trnas:
+        if start <= trna["end"] and end >= trna["start"]:
+            return True
+    return False
+
+
 # ── Mode B: de novo direct repeats ──────────────────────────────────────────
 
 def minimum_informative_repeat_length(left_flank_bp, right_flank_bp):
@@ -417,21 +457,99 @@ def minimum_informative_repeat_length(left_flank_bp, right_flank_bp):
 
     because there are L1 * L2 pairs of positions and each pair agrees over k
     bases with probability 4**-k. For two 30 kb flanks that is ~54 expected
-    matches at k=12, ~0.2 at k=16, and effectively zero at k=20. Reporting the
-    best 12 bp match as an att site would therefore be reporting noise - and the
-    unit tests caught exactly that, with a purely random sequence yielding a
-    confident "denovo" boundary call.
+    matches at k=12, ~0.2 at k=16, and effectively zero at k=20.
 
-    So instead of a fixed floor, the shortest length accepted is the one at which
-    fewer than DENOVO_MAX_EXPECTED_CHANCE_MATCHES matches are expected by chance,
-    never below the absolute floor. A window the user widens automatically
-    demands a longer repeat, which is the correct behaviour and needs no extra
-    configuration.
+    ⚠ THIS IS A FLOOR, NOT A FILTER — READ THIS BEFORE TRUSTING IT.
+    The formula above assumes DNA is a random string of four equally likely
+    letters. Real chromosomes are nothing of the sort: they carry rRNA operons
+    (7 copies in a typical enterobacterium), REP/BIME elements (hundreds of
+    copies), prophage remnants and paralogous gene families. Between two 30 kb
+    windows of a REAL genome an exact 18-25 bp direct repeat is COMMON.
+
+    Measured on the KPNIH1 chromosome, 300 randomly placed non-ICE spans:
+    this length threshold alone let 22% of them return a confident "denovo"
+    boundary, against the ~1.3% the formula predicts — wrong by ~17x. That is
+    why the length test is no longer the only guard; see is_credible_att_repeat,
+    which does the work this function was mistakenly assumed to do.
     """
     pairs = max(1, left_flank_bp) * max(1, right_flank_bp)
     # Smallest k with 4**k >= pairs / threshold.
     required_k = math.log(pairs / DENOVO_MAX_EXPECTED_CHANCE_MATCHES, 4)
     return max(DENOVO_ABSOLUTE_MIN_REPEAT_BP, int(math.ceil(required_k)))
+
+
+# A genuine attL/attR pair is the scar of ONE integration event, so the repeat
+# occurs exactly TWICE on the contig: once each side of the element. Anything
+# occurring more often is a repeat FAMILY (rRNA, REP/BIME, paralogues), which is
+# what actually generates the false boundaries measured above.
+DENOVO_MAX_CONTIG_COPIES = 2
+
+
+def count_repeat_copies(sequence, kmer):
+    """How many times this exact repeat occurs on the contig, both strands.
+
+    Both strands are counted because a repeat family can sit either way round
+    (rRNA operons certainly do), and a family member pointing the other way is
+    still evidence that the sequence is repetitive rather than a unique scar.
+
+    str.count is a C-level scan, so this is cheap enough to run per surviving
+    candidate. It counts NON-OVERLAPPING occurrences, which is exactly right
+    here: an att site that overlaps itself is a tandem repeat, not a scar.
+    """
+    copies = sequence.count(kmer)
+    reverse = reverse_complement(kmer)
+    if reverse != kmer:            # a palindrome would otherwise count twice
+        copies += sequence.count(reverse)
+    return copies
+
+
+# How many ranked candidates get the expensive whole-contig copy check before we
+# give up on this repeat length. Each check scans the contig, so an unbounded
+# loop would make the search crawl on a repeat-rich genome. Candidates are tested
+# best-first, so a real att pair is reached within the first few; a span where
+# dozens of candidates in a row are all repeat-family members is a span with no
+# credible boundary, and stopping early reaches that answer sooner.
+DENOVO_MAX_COPY_CHECKS = 25
+
+
+def is_locally_unique(left_occurrences, right_occurrences):
+    """Cheap first half of the credibility test: unique within each flank?
+
+    Free (the k-mer index already holds the counts), so it runs on every shared
+    k-mer. Kills tandem repeats and locally repeated sequence before anything
+    expensive happens. NOT sufficient on its own — see is_credible_att_repeat.
+    """
+    return left_occurrences == 1 and right_occurrences == 1
+
+
+def is_credible_att_repeat(sequence, kmer, left_occurrences, right_occurrences):
+    """Is this shared k-mer plausibly an integration scar, or just repetitive DNA?
+
+    This is the guard that does the real work, and the reasoning is biological
+    rather than statistical, which is why the chance-match formula above could
+    never have replaced it.
+
+    An att site is created ONCE, when the element recombines into the host: the
+    single attP/attB crossover leaves attL at one end and attR at the other. So
+    the repeat is expected exactly twice on the contig, full stop.
+
+    A 25 bp stretch of a 16S rRNA gene is also "an exact direct repeat shared by
+    the two flanks" — and it satisfies every length threshold — but it occurs
+    seven times, because the cell needs seven ribosomal RNA operons. The same
+    goes for the REP elements scattered in hundreds of copies through
+    enterobacterial intergenic space. Counting copies separates the two cases
+    cleanly, where measuring length cannot.
+
+    Two tests, cheap one first:
+      1. unique within each flank — kills tandem and locally repeated sequence;
+      2. no more than DENOVO_MAX_CONTIG_COPIES copies on the whole contig —
+         kills the dispersed families. Test 1 alone is NOT enough: two DIFFERENT
+         rRNA operons, one in each flank, are each unique in their own window and
+         sail through it. That was the exact false positive found on KPNIH1.
+    """
+    if not is_locally_unique(left_occurrences, right_occurrences):
+        return False
+    return count_repeat_copies(sequence, kmer) <= DENOVO_MAX_CONTIG_COPIES
 
 
 def search_denovo(sequence, element_start, element_end, flank_window_bp,
@@ -455,9 +573,14 @@ def search_denovo(sequence, element_start, element_end, flank_window_bp,
       * longest repeat wins - a 25 bp exact match between two specific 30 kb
         windows is far less likely by chance than a short one, so k counts down
         from the top and the first length that yields a valid pair is taken;
-      * and k never counts down past the point where chance matches become
-        likely, which minimum_informative_repeat_length works out from the actual
-        window sizes rather than guessing a fixed floor;
+      * k never counts down past the point where chance matches become likely,
+        which minimum_informative_repeat_length works out from the actual window
+        sizes rather than guessing a fixed floor. NOTE that this length rule
+        guards only against RANDOM background and is nowhere near sufficient on a
+        real chromosome;
+      * so the repeat must also be CREDIBLE as an integration scar, meaning it
+        occurs exactly twice on the contig - see is_credible_att_repeat. This,
+        not the length rule, is what keeps rRNA operons and REP elements out;
       * ties are broken by SYMMETRY. A real att pair sits at comparable distances
         either side of the machinery it brackets, because the machinery is
         somewhere in the middle of the element; a lopsided pair is more likely
@@ -493,31 +616,54 @@ def search_denovo(sequence, element_start, element_end, flank_window_bp,
         if not left_index:
             continue
 
-        best = None
+        # Index the right flank the same way, rather than streaming it past the
+        # left index. The extra dict is what makes the copy-number test possible:
+        # deciding whether a repeat is a scar or a family member needs to know how
+        # often it occurs on BOTH sides, which a one-pass stream cannot tell us.
+        right_index = {}
         for offset in range(len(right_flank) - repeat_length + 1):
             kmer = right_flank[offset:offset + repeat_length]
-            if "N" in kmer or kmer not in left_index:
+            if "N" in kmer:
                 continue
-            right_start = right_region_start + offset
-            right_end = right_start + repeat_length - 1
-            for left_offset in left_index[kmer]:
-                left_start = left_region_start + left_offset
-                left_end = left_start + repeat_length - 1
-                if right_start <= left_start:
-                    continue
-                element_length = right_end - left_start + 1
-                if not (min_element_bp <= element_length <= max_element_bp):
-                    continue
-                # Symmetry: how differently far the two copies sit from the
-                # machinery they bracket.
-                asymmetry = abs((element_start - left_end) - (right_start - element_end))
-                candidate = (asymmetry, element_length, left_start, left_end,
-                             right_start, right_end, kmer)
-                if best is None or candidate[:2] < best[:2]:
-                    best = candidate
+            right_index.setdefault(kmer, []).append(offset)
 
-        if best is not None:
-            _asymmetry, _length, left_start, left_end, right_start, right_end, kmer = best
+        # Gather every candidate that passes the FREE tests, then rank them, and
+        # only then spend a contig scan on the copy-number test. Doing it in that
+        # order matters: the copy test is the one that actually separates scars
+        # from repeat families, but it is also ~50x more expensive than
+        # everything else here, so it must not run on every shared k-mer.
+        candidates = []
+        for kmer, right_offsets in right_index.items():
+            left_offsets = left_index.get(kmer)
+            if left_offsets is None:
+                continue
+            if not is_locally_unique(len(left_offsets), len(right_offsets)):
+                continue
+            right_start = right_region_start + right_offsets[0]
+            right_end = right_start + repeat_length - 1
+            left_start = left_region_start + left_offsets[0]
+            left_end = left_start + repeat_length - 1
+            if right_start <= left_start:
+                continue
+            element_length = right_end - left_start + 1
+            if not (min_element_bp <= element_length <= max_element_bp):
+                continue
+            # Symmetry: how differently far the two copies sit from the
+            # machinery they bracket.
+            asymmetry = abs((element_start - left_end) - (right_start - element_end))
+            candidates.append((asymmetry, element_length, left_start, left_end,
+                               right_start, right_end, kmer))
+
+        # Best-first: most symmetric, then shortest element.
+        candidates.sort(key=lambda item: item[:2])
+
+        for candidate in candidates[:DENOVO_MAX_COPY_CHECKS]:
+            _asymmetry, _length, left_start, left_end, right_start, right_end, kmer = candidate
+            # THE guard against repeat families. Without it, ~22% of arbitrary
+            # spans on a real chromosome come back with a confident boundary
+            # built out of rRNA or REP sequence.
+            if count_repeat_copies(sequence, kmer) > DENOVO_MAX_CONTIG_COPIES:
+                continue
             return build_result(
                 method="denovo",
                 left_copy=(left_start, left_end, 0),

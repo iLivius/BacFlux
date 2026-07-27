@@ -405,3 +405,90 @@ def test_random_sequence_yields_no_boundaries_at_several_window_sizes():
                 sequence, element_start=50_000, element_end=60_000,
                 min_element_bp=8_000, flank_window_bp=window)
             assert result["boundary_method"] == "none", (seed, window)
+
+
+# ── Negative controls built from REAL genome structure ──────────────────────
+#
+# The tests above use i.i.d. uniform random DNA, which is exactly the assumption
+# the de novo chance model makes - so they can only ever confirm that model, never
+# challenge it. Measured on the KPNIH1 chromosome, 300 randomly placed non-ICE
+# spans produced a confident "denovo" boundary 22% of the time, against the ~1.3%
+# the model predicts. The difference is not noise: it is the repetitive structure
+# that every real chromosome has and random DNA does not.
+#
+# These tests plant that structure deliberately.
+
+def test_a_dispersed_repeat_family_is_not_an_att_site():
+    """An rRNA-operon-like repeat, present many times, must not become a boundary.
+
+    This is the KPNIH1 false positive in miniature. A 25 bp stretch of 16S rRNA
+    satisfies every length threshold and genuinely IS an exact direct repeat
+    shared by the two flanks - but the cell carries seven rRNA operons, so the
+    sequence occurs seven times. An integration scar occurs exactly twice, which
+    is what separates the two cases.
+    """
+    sequence = random_sequence(200_000, seed=404)
+    # Two copies bracket the machinery, as an att pair would...
+    for position in (30_000, 90_000):
+        sequence = plant(sequence, position, ATT_MOTIF)
+    # ...but five more copies elsewhere make it a FAMILY, not a scar.
+    for position in (5_000, 120_000, 140_000, 160_000, 180_000):
+        sequence = plant(sequence, position, ATT_MOTIF)
+
+    result = att.find_att_sites(
+        sequence, element_start=50_000, element_end=60_000,
+        min_element_bp=8_000, flank_window_bp=30_000)
+
+    assert result["boundary_method"] == "none"
+
+
+def test_a_repeat_present_exactly_twice_is_still_accepted():
+    """The counterpart, so the guard above cannot pass by rejecting everything."""
+    sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000, length=200_000, seed=404)
+
+    result = att.find_att_sites(
+        sequence, element_start=50_000, element_end=60_000,
+        min_element_bp=8_000, flank_window_bp=30_000)
+
+    assert result["boundary_method"] == "denovo"
+    assert result["att_left"] == "30000..30024"
+    assert result["att_right"] == "85000..85024"
+
+
+def test_two_paralogous_trnas_are_not_an_att_pair():
+    """Isoacceptor tRNAs share their 3' ends, and a genome carries dozens.
+
+    Mode A builds its probe FROM a tRNA 3' end, so a second tRNA of the same
+    species is guaranteed to match it - producing a beautifully bracketing pair
+    that is labelled 'tRNA', the method this module treats as its most precise.
+    Nine such pairs turned up in 300 random spans of the KPNIH1 chromosome.
+
+    Real integration reconstitutes the host tRNA at ONE end and leaves the second
+    copy out in ordinary sequence, so exactly one copy may sit in a tRNA.
+    """
+    sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000, length=200_000, seed=505)
+    both_in_trnas = [
+        trna_feature("contig_1", 29_952, 30_024, "+"),   # left copy is its 3' end
+        trna_feature("contig_1", 84_952, 85_024, "+"),   # so is the right copy
+    ]
+
+    result = att.find_att_sites(
+        sequence, element_start=50_000, element_end=60_000,
+        trnas=both_in_trnas, min_element_bp=8_000, flank_window_bp=30_000)
+
+    assert result["boundary_method"] != "tRNA"
+
+
+def test_one_copy_in_a_trna_is_the_real_integration_signature():
+    """Same sequence, but only the left copy is inside a tRNA - which is what
+    site-specific integration at a tRNA 3' end actually leaves behind."""
+    sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000, length=200_000, seed=505)
+    one_trna = [trna_feature("contig_1", 29_952, 30_024, "+")]
+
+    result = att.find_att_sites(
+        sequence, element_start=50_000, element_end=60_000,
+        trnas=one_trna, min_element_bp=8_000, flank_window_bp=30_000)
+
+    assert result["boundary_method"] == "tRNA"
+    assert result["att_left"] == "30000..30024"
+    assert result["att_right"] == "85000..85024"
