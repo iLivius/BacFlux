@@ -3,4 +3,9 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - gtdbtk=2.6.1
+  # 2.7.2, not 2.6.1: GTDB-Tk hard-pins itself to ONE compatible reference-data
+  # release (COMPATIBLE_REF_DATA_VERSIONS in its own source). 2.6.1 only accepts
+  # r220/r226; the move to the GTDB R232 database (config.directories.gtdbtk_db)
+  # requires 2.7.0+, which is also the first version able to read R232's
+  # pre-sketched skani database directly (see the taxonomic_assignment rule).
+  - gtdbtk=2.7.2

@@ -448,3 +448,45 @@ Bactopia, nf-core/funcscan and Bakta do not attempt it at all — Bakta never pa
   from the installed database at runtime — the union of `taxgroup.tsv`,
   `AMRProt-mutation.tsv` and `AMRProt-susceptible.tsv` — because NCBI's wiki table is out
   of sync with the shipped DB in both directions. Not implemented.
+
+---
+
+## 12. GTDB database moved from R226 to R232 (and GTDB-Tk 2.6.1 -> 2.7.2)
+
+**Status: DONE 2026-07-27.** README/config docs should say this plainly, since it
+touches the launch command's expected `gtdbtk_db` path and the pinned tool version.
+
+`gtdbtk_db` now points at GTDB R232 (a colleague placed the release directory on the
+NAS: `/data/x1hbrnas4/big_db/GTDB_R232/release232`). This was not a database-only
+swap: GTDB-Tk hard-pins itself to ONE compatible reference-data release
+(`COMPATIBLE_REF_DATA_VERSIONS` in its own source) — 2.6.1 only accepts r220/r226, so
+R232 requires GTDB-Tk **2.7.0+** (pinned to 2.7.2 in `workflow/envs/gtdbtk.yaml`).
+That version bump also changes the skani reference layout: 2.6.1 built its own sketch
+CACHE into the release directory the first time it ran (`--skani_sketch_dir`, ~57 GB);
+2.7.x reads a PRE-SKETCHED database GTDB now ships directly inside the release
+(`{gtdbtk_db}/skani/database/`), and the flag no longer exists in the CLI at all. Rule
+`taxonomic_assignment` (`workflow/rules/shared/30_taxonomy.smk`) had both the flag and
+its `mkdir` removed.
+
+**Verified, not assumed:** built the 2.7.2 env for real, ran `classify_wf` directly
+against R232 on two already-validated genomes (386 = *Arthrobacter*, 006 =
+*Pseudomonas_E*) and diffed the classification against the R226 baseline — identical
+lineage both times. The GTDB organism table (item 11 above) was regenerated from
+R232's own metadata; `check_gtdb_organism_table.py` reports it fully correct, and the
+Campylobacter/Enterococcus/Escherichia/Salmonella numbers moved only slightly
+(e.g. Campylobacter_D jejuni 97.3%->97.5%, n grew as the release grew) — the same
+entries hold, none were dropped, several new Helicobacter/Haemophilus/Vibrio entries
+were added.
+
+**What the README needs to say:**
+- `directories.gtdbtk_db` should point at an R232 release directory now; R226 no
+  longer works with the pinned GTDB-Tk version.
+- The GTDB-Tk env is pinned to 2.7.2, not 2.6.1.
+- If a user already holds an R226 (or older) database, they must download R232 fresh —
+  there is no in-place upgrade path, and old cached GTDB-Tk output should be
+  considered stale once `gtdbtk_db` changes (species boundaries do shift between
+  releases; PATCH_HERE if any real drift is found on the full validation set).
+- v1's README (root `README.md`) and `config/config.yaml` still document the OLD
+  R226 download recipe (`gtdbtk_r226_data.tar.gz`) — left untouched here, since v1
+  docs are explicitly deferred (migration plan Stage 5). Whoever writes the
+  consolidated v2 README should update those download instructions too.

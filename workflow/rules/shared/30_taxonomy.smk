@@ -69,8 +69,19 @@
 #     {threads} drives both flags: one knob. Thread count affects speed and
 #     memory only, not the classification.
 #
-# The skani sketch directory is created up front because GTDB-Tk writes its
-# sketches there on first use and will not create the directory itself.
+# VERIFIED 2026-07-27, moving from R226 to R232: GTDB-Tk's own
+# COMPATIBLE_REF_DATA_VERSIONS hard-pins ONE compatible reference release per
+# tool version - 2.6.1 only accepted r220/r226, so R232 needs gtdbtk>=2.7.0
+# (see workflow/envs/gtdbtk.yaml). That version bump also changes how the skani
+# reference is laid out: R226's release directory ships a raw skani reference
+# and GTDB-Tk built its OWN sketch CACHE the first time it ran (hence the
+# --skani_sketch_dir flag and the mkdir this rule used to do for it, 2.6.1
+# only). From R232 onward the release directory ships that sketch PRE-BUILT
+# (GTDB-Tk 2.7's release notes: "reduces the database storage footprint from
+# 198 GB down to 98 GB"), classify_wf reads it straight out of
+# {gtdbtk_db}/skani/ via GTDBTK_DATA_PATH, and --skani_sketch_dir no longer
+# exists in the CLI at all (confirmed against `gtdbtk classify_wf --help`) - so
+# there is nothing left for this rule to build or point at separately.
 #
 # (v1 message: "--- GTDB-Tk: Taxonomic assignment. ---")
 rule taxonomic_assignment:
@@ -89,9 +100,6 @@ rule taxonomic_assignment:
         gtdbtk_dir = directory(GTDBTK_DIR),
     params:
         gtdbtk_db = GTDBTKDB,
-        # Version-pinned sketch cache that ships with (or is built inside) the
-        # GTDB R226 release directory. Kept verbatim from v1.
-        skani_sketch_dir = f"{GTDBTKDB}/skani_sketches_r226_skani0.3.1",
     conda:
         "../../envs/gtdbtk.yaml"
     threads: capped_cpus(24)
@@ -100,16 +108,15 @@ rule taxonomic_assignment:
     priority: 5
     shell:
         # GTDBTK_DATA_PATH is how GTDB-Tk finds its reference release; :q quotes
-        # both database paths in case they contain spaces.
+        # the database path in case it contains spaces.
         """
-        mkdir -p {output.gtdbtk_dir} {params.skani_sketch_dir}
+        mkdir -p {output.gtdbtk_dir}
 
         GTDBTK_DATA_PATH={params.gtdbtk_db:q} \
         gtdbtk classify_wf \
           -x fasta \
           --genome_dir {input.genomes_dir} \
           --out_dir {output.gtdbtk_dir} \
-          --skani_sketch_dir {params.skani_sketch_dir:q} \
           --cpus {threads} \
           --pplacer_cpus {threads} > {log} 2>&1
         """

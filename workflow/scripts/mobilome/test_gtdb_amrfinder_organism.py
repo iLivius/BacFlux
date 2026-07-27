@@ -802,8 +802,14 @@ def test_real_gtdbtk_summary_gives_no_organism(tmp_path):
 
     organism, classification, reason = gao.decide_organism(REAL_SUMMARY, "006")
     assert organism == ""
-    assert "g__Pseudomonas_E" in classification
-    assert "Pseudomonas_E" in reason
+    # GTDB R232 (2026-07-27 move from R226) graduated this placeholder genus to
+    # a real published name: g__Pseudomonas_E in R226 is g__Aquipseudomonas in
+    # R232, the same genus GTDB simply renamed once it had a proper description
+    # - exactly the kind of release-to-release rename GTDB's own FAQ warns
+    # suffix letters are not guaranteed to survive. Either way there is nothing
+    # curated for this genus, so the organism stays empty.
+    assert "g__Aquipseudomonas" in classification
+    assert "Aquipseudomonas" in reason
     # Both hybrid rows were seen and agreed.
     assert "006_illumina" in reason and "006_ont" in reason
 
@@ -812,10 +818,11 @@ def test_real_gtdbtk_summary_gives_no_organism(tmp_path):
 
 # The exception table is only correct for as long as GTDB keeps these names, so
 # this checks it against the taxonomy file that ships inside the GTDB release
-# (the directory config key `gtdbtk_db` points at, R226 on this machine). If a
-# future release renames things, this test fails and the table gets revisited
-# instead of quietly mapping the wrong taxon. Skipped where the DB is absent.
-GTDB_TAXONOMY = ("/data/x1hbrnas4/big_db/GTDB_R226/release226/taxonomy/"
+# (the directory config key `gtdbtk_db` points at, R232 on this machine since
+# the 2026-07-27 move from R226). If a future release renames things, this test
+# fails and the table gets revisited instead of quietly mapping the wrong taxon.
+# Skipped where the DB is absent.
+GTDB_TAXONOMY = ("/data/x1hbrnas4/big_db/GTDB_R232/release232/taxonomy/"
                  "gtdb_taxonomy.tsv")
 
 
