@@ -1412,7 +1412,7 @@ def read_is_intervals(is_table_path):
 
 def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
                                 is_intervals_by_contig, flank_window_bp,
-                                min_element_bp, max_element_bp):
+                                min_element_bp, max_element_bp, boundary_bp):
     """Phase 3: replace each machinery span with the element's real ends.
 
     Input:  the candidate rows from build_candidates; the genome Bakta
@@ -1525,6 +1525,47 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
         row["end"] = str(result["element_end"])
         row["length_bp"] = str(result["element_length_bp"])
         added_bp = result["element_length_bp"] - (machinery_end - machinery_start + 1)
+
+        # Everything derived from the interval must be recomputed, or the row
+        # ends up describing two different elements at once. build_candidates
+        # worked these out from the MACHINERY span; the element is now wider, so
+        # it may reach a contig end the machinery did not come near. Leaving them
+        # stale would be quietly dangerous rather than merely untidy:
+        # at_contig_boundary feeds assess_confidence, so a widened element
+        # running off the end of its contig would keep a high confidence it no
+        # longer deserves - the report claiming a complete element on evidence
+        # that has just been truncated by the assembly.
+        contig_length = att_search.to_int(row.get("contig_length"))
+        if contig_length is not None:
+            dist_to_start = result["element_start"] - 1
+            dist_to_end = max(contig_length - result["element_end"], 0)
+            dist_to_nearest = min(dist_to_start, dist_to_end)
+            at_boundary = dist_to_nearest <= boundary_bp
+            row["dist_to_contig_start"] = str(dist_to_start)
+            row["dist_to_contig_end"] = str(dist_to_end)
+            row["dist_to_nearest_contig_end"] = str(dist_to_nearest)
+            row["at_contig_boundary"] = _tsv_bool(at_boundary)
+
+            # Re-derive the confidence from the element's own footprint, using
+            # the same rule build_candidates applied, so the two can never
+            # disagree about the same row.
+            refreshed_confidence, refreshed_caps = assess_confidence(
+                att_search.to_int(row.get("n_anchor_classes")) or 0,
+                _reads_true(row.get("machinery_intact")),
+                _reads_true(row.get("spans_contigs")),
+                at_boundary,
+            )
+            if refreshed_confidence != row["confidence"]:
+                audit_rows.append(audit_row(
+                    sample, "kept_flagged", "confidence_rescored_after_widening",
+                    f"{row['mge_id']}: the element widened to "
+                    f"{result['element_start']}-{result['element_end']}, which "
+                    f"changes its distance to the contig ends, so its confidence "
+                    f"moves from {row['confidence']} to {refreshed_confidence}"
+                    + (": " + "; ".join(detail for _lvl, _reason, detail in refreshed_caps)
+                       if refreshed_caps else ""),
+                ))
+                row["confidence"] = refreshed_confidence
         audit_rows.append(audit_row(
             sample, "boundaries_resolved", f"att_pair_found_{result['boundary_method']}",
             f"{row['mge_id']}: attL {result['att_left']} / attR "
@@ -1754,6 +1795,7 @@ def main(argv=None):
     rows, boundary_audit = refine_candidate_boundaries(
         args.sample, rows, args.genome, args.bakta_gff, is_intervals_by_contig,
         args.att_flank_window_bp, args.min_element_bp, args.max_element_bp,
+        args.boundary_bp,
     )
     audit_rows.extend(boundary_audit)
 

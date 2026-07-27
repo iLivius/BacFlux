@@ -1299,3 +1299,73 @@ def test_the_mge_id_is_not_repointed_when_boundaries_move(tmp_path):
     # The id still names the machinery span it was minted from.
     assert rows[0]["mge_id"] == "contig_1|ime-50000:58700"
     assert rows[0]["start"] == "40000"
+
+
+def test_widening_recomputes_the_contig_distance_flags_and_confidence(tmp_path):
+    """Everything derived from the interval must follow it when it moves.
+
+    build_candidates works out dist_to_contig_*, at_contig_boundary and the
+    confidence from the MACHINERY span. Phase 3 then widens the element, which
+    can carry it to a contig end the machinery never came near. Leaving those
+    fields stale is quietly dangerous rather than untidy: at_contig_boundary
+    feeds assess_confidence, so a widened element running off the end of its
+    contig would keep a high confidence it no longer deserves.
+
+    Here the element widens to within 200 bp of the contig end, well inside the
+    default boundary window, so the flag must flip and the confidence must drop.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+    ])
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    # A 200 kb contig with the att pair placed so the element ends 100 bp from
+    # the far end of the contig.
+    genome = tmp_path / "genome.fna"
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    import random as _random
+    generator = _random.Random(96)
+    sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
+    sequence = sequence[:39_999] + motif + sequence[40_000 + len(motif) - 1:]
+    sequence = sequence[:199_875] + motif + sequence[199_876 + len(motif) - 1:]
+    genome.write_text(">contig_1\n" + sequence + "\n")
+
+    _rc, rows, audit, _path = run_main(
+        tmp_path, conjscan=conjscan, gff=gff,
+        extra=["--genome", str(genome), "--att-flank-window-bp", "170000"])
+
+    element = rows[0]
+    assert element["boundary_method"] == "denovo"
+    assert element["end"] == "199900"
+    # The flags now describe the ELEMENT, not the machinery it grew from.
+    assert element["dist_to_contig_end"] == "100"
+    assert element["at_contig_boundary"] == "TRUE"
+    assert element["confidence"] != "high"
+    assert "confidence_rescored_after_widening" in audit_reasons(audit)
+
+
+def test_widening_that_stays_clear_of_the_contig_ends_keeps_its_confidence(tmp_path):
+    """The counterpart: rescoring must not fire when nothing actually changed."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+    ])
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS)
+    genome = tmp_path / "genome.fna"
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    import random as _random
+    generator = _random.Random(95)
+    sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
+    sequence = sequence[:39_999] + motif + sequence[40_000 + len(motif) - 1:]
+    sequence = sequence[:69_999] + motif + sequence[70_000 + len(motif) - 1:]
+    genome.write_text(">contig_1\n" + sequence + "\n")
+
+    _rc, rows, audit, _path = run_main(
+        tmp_path, conjscan=conjscan, gff=gff, extra=["--genome", str(genome)])
+
+    element = rows[0]
+    assert element["boundary_method"] == "denovo"
+    assert element["at_contig_boundary"] == "FALSE"
+    assert element["dist_to_contig_start"] == "39999"
+    assert "confidence_rescored_after_widening" not in audit_reasons(audit)
