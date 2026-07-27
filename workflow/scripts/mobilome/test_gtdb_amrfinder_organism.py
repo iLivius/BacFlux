@@ -81,7 +81,14 @@ def test_curated_list_has_31_organisms():
     # `amrfinder --list_organisms`, docs/mobilome_wpA_ground_truth.md).
     assert len(gao.ALL_ORGANISMS) == 31
     assert len(gao.SPECIES_ORGANISMS) == 28
-    assert len(gao.GENUS_ORGANISMS) == 3
+    # Two of the three genus-level organisms may be picked FROM THE GENUS alone.
+    # Campylobacter is the third and is deliberately not among them: GTDB's
+    # unsuffixed g__Campylobacter holds none of the species AMRFinderPlus curates
+    # for it, so it is reached only by name via GTDB_SPECIES_EQUIVALENCES. It is
+    # still a legal --organism value, hence NAME_ONLY_ORGANISMS.
+    assert len(gao.GENUS_ORGANISMS) == 2
+    assert gao.NAME_ONLY_ORGANISMS == {"Campylobacter"}
+    assert "Campylobacter" in gao.ALL_ORGANISMS
 
 
 def test_curated_genera_are_derived_from_the_species_list():
@@ -121,12 +128,14 @@ def test_exact_species_match_for_every_genus_with_two_curated_species():
         assert organism == expected, species
 
 
-def test_genus_level_match_for_the_three_genus_organisms():
-    # AMRFinderPlus curates these per genus, so any species in them qualifies.
+def test_genus_level_match_for_the_genus_organisms():
+    # AMRFinderPlus curates these per genus AND nearly everything GTDB files
+    # under the unsuffixed genus really is that organism (E. coli 98.3% of
+    # g__Escherichia, S. enterica 100% of g__Salmonella in R226), so matching on
+    # the genus alone is safe here.
     for genus, species in [
         ("Escherichia", "Escherichia coli"),
         ("Salmonella", "Salmonella enterica"),
-        ("Campylobacter", "Campylobacter jejuni"),
     ]:
         organism, reason = gao.map_classification(lineage(genus, species))
         assert organism == genus
@@ -280,15 +289,29 @@ def test_exception_table_holds_only_genus_renames_not_species_splits():
     # rename (suffixed genus, plain epithet) whose epithet is unchanged from the
     # AMRFinderPlus name. That is what makes the mapping safe; an entry with a
     # suffixed or placeholder epithet would be mapping a different taxon.
+    # Entries whose EPITHET carries a suffix are admitted only case by case,
+    # with the evidence written next to them in the table. Listing them here as
+    # well means adding one silently is a test failure, not a quiet policy
+    # change - which is the whole point of a hand-checked table.
+    epithet_suffix_exceptions = {
+        "Campylobacter_D coli_A",
+        "Campylobacter_D coli_B",
+    }
     for gtdb_name, organism in gao.GTDB_SPECIES_EQUIVALENCES.items():
         gtdb_genus, gtdb_epithet = gtdb_name.split(" ")
         _, genus_is_suffixed = gao.strip_gtdb_suffix(gtdb_genus)
-        _, epithet_is_suffixed = gao.strip_gtdb_suffix(gtdb_epithet)
+        epithet_base, epithet_is_suffixed = gao.strip_gtdb_suffix(gtdb_epithet)
         assert genus_is_suffixed, gtdb_name
-        assert not epithet_is_suffixed, gtdb_name
         assert not gao.is_placeholder_species(gtdb_epithet), gtdb_name
-        ncbi_genus, ncbi_epithet = organism.split("_", 1)
-        assert gtdb_epithet == ncbi_epithet, gtdb_name
+        if epithet_is_suffixed:
+            assert gtdb_name in epithet_suffix_exceptions, gtdb_name
+        # The organism may be genus-level ("Campylobacter") or species-level
+        # ("Enterococcus_faecium"); only the latter carries an epithet to check.
+        if "_" in organism:
+            ncbi_genus, ncbi_epithet = organism.split("_", 1)
+            assert epithet_base == ncbi_epithet, gtdb_name
+        else:
+            ncbi_genus = organism
         # The GTDB genus must be a suffixed form of the NCBI genus, not some
         # other genus entirely.
         assert gtdb_genus.startswith(ncbi_genus + "_"), gtdb_name
@@ -826,3 +849,68 @@ def test_gtdb_really_has_no_unsuffixed_enterococcus_faecium():
     for gtdb_name in gao.GTDB_SPECIES_EQUIVALENCES:
         genus = gtdb_name.split()[0]
         assert gtdb_name in gtdb_species_names_matching(genus), gtdb_name
+
+
+# ---------------------------------------------------------------------------
+# Campylobacter: the curated species live in a SUFFIXED genus, and the
+# unsuffixed genus holds only species AMRFinderPlus does not curate.
+#
+# GTDB assigns the genus suffix by where the genus TYPE SPECIES landed. The type
+# species of Campylobacter is C. fetus, which keeps g__Campylobacter, so jejuni
+# and coli were pushed into g__Campylobacter_D. Matching on the unsuffixed genus
+# therefore hits 403 genomes of the wrong species and none of the right ones.
+# ---------------------------------------------------------------------------
+
+
+def test_the_curated_campylobacter_species_are_matched_despite_the_genus_suffix():
+    """Verified against NCBI: both GTDB clusters are anchored on type material
+    (C. jejuni NCTC 11351 / C. coli LMG 9860), so they ARE the curated species."""
+    for species in ("Campylobacter_D jejuni", "Campylobacter_D coli"):
+        organism, reason = gao.map_classification(
+            lineage("Campylobacter_D", species))
+        assert organism == "Campylobacter", species
+        assert reason
+
+
+def test_the_unsuffixed_campylobacter_genus_no_longer_matches():
+    """C. fetus and friends must NOT get --organism Campylobacter.
+
+    AMRFinderPlus documents that taxgroup as covering C. jejuni / C. coli only,
+    and its mutation references are C. jejuni sequences. Screening C. fetus gyrA
+    against them is exactly the wrong-organism call the module docstring warns is
+    worse than no call at all.
+    """
+    for species in ("Campylobacter fetus", "Campylobacter hyointestinalis",
+                    "Campylobacter testudinum", "Campylobacter lanienae"):
+        organism, reason = gao.map_classification(lineage("Campylobacter", species))
+        assert organism == "", species
+        assert reason
+
+
+def test_well_evidenced_suffixed_epithets_are_admitted():
+    """coli_A and coli_B: n=90 and n=70, both 100% NCBI Campylobacter coli."""
+    for species in ("Campylobacter_D coli_A", "Campylobacter_D coli_B"):
+        organism, _reason = gao.map_classification(lineage("Campylobacter_D", species))
+        assert organism == "Campylobacter", species
+
+
+def test_thinly_evidenced_or_contradicted_suffixed_epithets_are_refused():
+    """The cases the >=99%-and->=20-genomes bar exists to exclude.
+
+    jejuni_C is the important one: only 55.6% of its cluster is NCBI C. jejuni
+    and the majority is C. LARI, so naive suffix-stripping would have called it
+    C. jejuni. jejuni_A/_B/_D are 100% but on 1-2 genomes, where a single
+    mislabelled genome would flip the vote.
+    """
+    for species in ("Campylobacter_D jejuni_A", "Campylobacter_D jejuni_B",
+                    "Campylobacter_D jejuni_C", "Campylobacter_D jejuni_D"):
+        organism, reason = gao.map_classification(lineage("Campylobacter_D", species))
+        assert organism == "", species
+        assert reason
+
+
+def test_every_organism_the_equivalence_table_emits_is_a_legal_amrfinder_value():
+    """AMRFinderPlus exits with an error on an unrecognised --organism, so an
+    entry pointing at a non-existent name would kill the rule, not degrade."""
+    for gtdb_name, organism in gao.GTDB_SPECIES_EQUIVALENCES.items():
+        assert organism in gao.ALL_ORGANISMS, gtdb_name

@@ -387,3 +387,64 @@ which reads identically to "no ICE present". One honest switch beats two confusi
 - Commercial users should either leave `mobilome.run: false` (the default) or obtain
   permission from the model authors. BacFlux's own code stays MIT either way.
 - Cite CONJscan/MacSyFinder (Abby et al. 2014; Néron et al. 2023) — already in CITATIONS.md.
+
+---
+
+## 11. The GTDB → AMRFinderPlus `--organism` mapping is OURS, not a standard — say so
+
+**Status: DECIDED and IMPLEMENTED 2026-07-27. Needs a README section, and is a good
+candidate for a longer docs/github.io page since the reasoning is genuinely interesting.**
+
+When the mobilome module runs AMRFinderPlus it passes `--organism` derived from the
+GTDB-Tk call, which unlocks curated POINT MUTATIONS — the intrinsic, chromosomal,
+non-transferable determinants that tier 1 of the mobility ladder rests on. Deciding which
+`--organism` to pass from a GTDB name is not a solved problem, and users should be told
+that plainly rather than left to assume BacFlux is following a standard.
+
+**There is no official convention.** The GTDB FAQ states "There is no direct translation
+from GTDB taxa to NCBI taxa", and NCBI has never been asked — searching the entire
+`ncbi/amr` wiki and issue tracker for GTDB returns zero hits. Other projects diverge
+widely: AllTheBacteria hard-codes an exact-match table on full GTDB strings and is very
+permissive (all 87 GTDB Campylobacter species → `Campylobacter`); PHAC's mikrokondo strips
+GTDB suffixes programmatically; MDU-PHL's abritamr makes the user choose manually; and
+Bactopia, nf-core/funcscan and Bakta do not attempt it at all — Bakta never passes
+`--organism`, so it never reports point mutations.
+
+**What the README needs to say:**
+- BacFlux uses a hand-checked, project-local table (`GTDB_SPECIES_EQUIVALENCES` in
+  `workflow/scripts/mobilome/gtdb_amrfinder_organism.py`). It is documented and audited,
+  not authoritative. Every decision, including every refusal, is written to
+  `{sample}_amrfinder_organism_audit.tsv` with its reason.
+- Explain the suffix rule once, because it is counter-intuitive and it is the whole
+  story: GTDB gives the UNSUFFIXED name to the cluster holding the nomenclatural type;
+  suffixed names are placeholders. The genus suffix is assigned by where the genus TYPE
+  SPECIES landed — *C. fetus* is the type species of *Campylobacter*, which is the only
+  reason *C. jejuni*/*C. coli* sit in `g__Campylobacter_D`. The same mechanism puts
+  *E. faecium* in `Enterococcus_B` (because *E. faecalis* is the type species).
+  So a genus suffix says nothing about species identity — verified against NCBI: each of
+  those GTDB clusters is anchored on an "assembly from type material".
+- A suffixed EPITHET is different: it means GTDB cannot say which cluster should carry the
+  name, so BacFlux refuses by default. Two exceptions are admitted on evidence
+  (`coli_A` n=90, `coli_B` n=70, both 100% NCBI *C. coli*). `jejuni_C` is refused because
+  its cluster is only 55.6% *C. jejuni* and the majority is *C. lari* — the case that
+  shows why suffix-stripping is not safe.
+- State the failure modes honestly: a wrong `--organism` is worse than none (the module
+  docstring says so), AMRFinderPlus errors out on an unrecognised value rather than
+  ignoring it, and passing one also applies an undocumented "alien organism" filter that
+  erases hits to other taxgroups' mutation references.
+- Tell users to re-check the table when they bump the GTDB release: GTDB states suffix
+  letters are best-effort and not guaranteed stable between releases. The re-check
+  material is GTDB's own `auxillary_files/gtdb_to_ncbi_r<release>_bacteria.xlsx`.
+
+**Known limitations to list, so nobody has to rediscover them:**
+- *Burkholderia*: AMRFinderPlus has separate `Burkholderia_mallei` (zero curated
+  mutations) and `Burkholderia_pseudomallei` (15), but GTDB folds *pseudomallei* genomes
+  into `s__Burkholderia mallei`. BacFlux deliberately maps neither — doing so would
+  assert a different taxon — so *B. pseudomallei* point mutations are never reported.
+- *Escherichia* is matched at genus level and is 98.3% *E. coli* in GTDB R226; the other
+  1.7% (*albertii*, *fergusonii*, *marmotae*, *ruysiae*, *whittamii*) also receive
+  `--organism Escherichia`. Close relatives under both taxonomies, but worth stating.
+- The valid organism list is currently hard-coded (31). It would be more robust to read it
+  from the installed database at runtime — the union of `taxgroup.tsv`,
+  `AMRProt-mutation.tsv` and `AMRProt-susceptible.tsv` — because NCBI's wiki table is out
+  of sync with the shipped DB in both directions. Not implemented.

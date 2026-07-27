@@ -118,29 +118,57 @@ SPECIES_ORGANISMS = {
     "Vibrio_vulnificus",
 }
 
-# Curated per GENUS: AMRFinderPlus's mutation list for these covers the whole
-# genus, so any species in it (named or not) is allowed to match.
-#   Campylobacter — the curated set is the thermophilic food-chain species
-#                   (C. jejuni / C. coli); GTDB keeps those in the unsuffixed
-#                   g__Campylobacter and puts other lineages in Campylobacter_A,
-#                   _B, _D ... which we deliberately do NOT match (see below).
-#   Escherichia   — AMRFinderPlus's "Escherichia" covers E. coli AND Shigella.
-#                   GTDB has already folded Shigella into g__Escherichia, so the
-#                   genus-level rule handles both without a special case.
-#   Salmonella    — one genus, effectively S. enterica.
+# Curated per GENUS: for these, matching on the GTDB genus alone is safe because
+# nearly everything GTDB files under that unsuffixed genus really is the curated
+# organism. Checked against GTDB R226 by counting genomes, not by assuming:
+#   Escherichia — 44,776 of 45,533 genomes in g__Escherichia are NCBI E. coli
+#                 (98.3%). AMRFinderPlus's "Escherichia" covers E. coli AND
+#                 Shigella, and GTDB has already folded Shigella into E. coli, so
+#                 one genus rule serves both. The 757 exceptions are albertii,
+#                 fergusonii, marmotae, ruysiae and whittamii - close relatives in
+#                 the same genus under BOTH taxonomies, so the over-application is
+#                 mild and is noted in the audit rather than special-cased.
+#   Salmonella  — 17,457 of 17,457 (100%). diarizonae, arizonae and houtenae all
+#                 map to NCBI Salmonella enterica: they are its subspecies IIIb,
+#                 IIIa and IV. S. bongori is the only genuinely separate species
+#                 and AMRFinderPlus curates the genus, so it is covered.
+#
+# Campylobacter is deliberately NOT here, although AMRFinderPlus curates it at
+# genus level. In GTDB R226 the unsuffixed g__Campylobacter holds NONE of the
+# curated species and 403 genomes of species AMRFinderPlus does not curate
+# (fetus, hyointestinalis, lanienae, testudinum, iguaniorum, ...). A genus rule
+# would therefore have been wrong for every genome it matched, while missing
+# every genome it was written for - jejuni and coli live in g__Campylobacter_D
+# and are handled by name in GTDB_SPECIES_EQUIVALENCES instead.
 GENUS_ORGANISMS = {
-    "Campylobacter",
     "Escherichia",
     "Salmonella",
+}
+
+# Organisms AMRFinderPlus accepts that we reach by NAME rather than by a genus
+# rule. Kept separate from GENUS_ORGANISMS because the two answer different
+# questions: this set is "is this a legal --organism value?", GENUS_ORGANISMS is
+# "may we pick this from the genus alone?".
+#
+# Campylobacter is legal, and is what GTDB_SPECIES_EQUIVALENCES emits for
+# jejuni/coli - but it must never be chosen from the genus, because GTDB's
+# unsuffixed g__Campylobacter contains none of the species it curates. Keeping it
+# out of GENUS_ORGANISMS while leaving it valid here is exactly that distinction.
+NAME_ONLY_ORGANISMS = {
+    "Campylobacter",
 }
 
 # Every genus AMRFinderPlus curates ANYTHING under. Used only to write a more
 # honest "no match" reason: for Klebsiella we can say "the species is a GTDB
 # placeholder", for Arthrobacter the truth is simply "nothing curated here".
-CURATED_GENERA = {name.split("_")[0] for name in SPECIES_ORGANISMS} | GENUS_ORGANISMS
+CURATED_GENERA = ({name.split("_")[0] for name in SPECIES_ORGANISMS}
+                  | GENUS_ORGANISMS | NAME_ONLY_ORGANISMS)
 
-# All 31 valid --organism strings, for the caller (and the tests) to check against.
-ALL_ORGANISMS = SPECIES_ORGANISMS | GENUS_ORGANISMS
+# All 31 valid --organism strings, for the caller (and the tests) to check
+# against. AMRFinderPlus matches this string EXACTLY (spaces become underscores)
+# and exits with an error on anything it does not recognise, so emitting a name
+# absent from this set would kill the amrfinderplus rule rather than degrade.
+ALL_ORGANISMS = SPECIES_ORGANISMS | GENUS_ORGANISMS | NAME_ONLY_ORGANISMS
 
 # Column names read from the GTDB-Tk summary. Stable across GTDB-Tk 2.x.
 GENOME_COLUMN = "user_genome"
@@ -211,6 +239,47 @@ GTDB_PLACEHOLDER_SPECIES = re.compile(r"^sp\d*$")
 GTDB_SPECIES_EQUIVALENCES = {
     # GTDB species name (the s__ value, minus the "s__")  ->  AMRFinderPlus organism
     "Enterococcus_B faecium": "Enterococcus_faecium",
+
+    # ── Campylobacter: the food-chain species AMRFinderPlus actually curates ──
+    # GTDB R226 puts BOTH curated species in g__Campylobacter_D. The genus suffix
+    # is not a statement about the species: GTDB assigns it by where the genus
+    # TYPE SPECIES landed, and the type species of Campylobacter is C. fetus,
+    # which keeps the unsuffixed g__Campylobacter. That is the only reason
+    # jejuni and coli were pushed into _D. (Exactly the same mechanism as
+    # Enterococcus above: E. faecalis is the type species, so faecium got _B.)
+    #
+    # The epithets here are UNSUFFIXED, which by GTDB's own rule means these are
+    # the clusters holding the nomenclatural type. Verified against NCBI rather
+    # than assumed - each GTDB species representative is flagged "assembly from
+    # type material":
+    #     s__Campylobacter_D jejuni -> GCF_001457695.1 = C. jejuni NCTC 11351
+    #     s__Campylobacter_D coli   -> GCF_000254135.1 = C. coli LMG 9860
+    # NCBI documents --organism Campylobacter as covering exactly C. jejuni and
+    # C. coli, so this mapping matches their intended scope, and the taxgroup is
+    # genus-level (there is no Campylobacter_jejuni option) so one entry serves
+    # both. It unlocks 40 protein + 11 nucleotide mutations, including gyrA T86I.
+    "Campylobacter_D jejuni": "Campylobacter",
+    "Campylobacter_D coli": "Campylobacter",
+
+    # The two SUFFIXED-epithet exceptions, admitted deliberately and narrowly.
+    # A suffixed epithet normally means GTDB cannot say which cluster should bear
+    # the name (usually the type strain was never sequenced), and that is exactly
+    # when we refuse to guess. These two are admitted because the evidence is
+    # unambiguous: in GTDB's own GTDB<->NCBI correspondence for R226, every
+    # genome in both clusters carries the NCBI name Campylobacter coli.
+    #     Campylobacter_D coli_A  n=90  100.0% NCBI Campylobacter coli
+    #     Campylobacter_D coli_B  n=70  100.0% NCBI Campylobacter coli
+    # The bar for admitting a suffixed epithet is >=99% agreement AND a cluster
+    # big enough for that number to mean something (>=20 genomes). Cases that
+    # fail it, and are therefore deliberately absent:
+    #     jejuni_A n=1, jejuni_B n=1, jejuni_D n=2 - 100%, but one mislabelled
+    #         genome would flip the whole vote, so the figure carries no weight
+    #     jejuni_C n=9 - only 55.6%, and the majority is C. LARI, not C. jejuni;
+    #         naive suffix-stripping would have called this C. jejuni
+    # Re-check these counts whenever the GTDB release is bumped: GTDB states
+    # suffix letters are best-effort and not guaranteed stable between releases.
+    "Campylobacter_D coli_A": "Campylobacter",
+    "Campylobacter_D coli_B": "Campylobacter",
 }
 
 
