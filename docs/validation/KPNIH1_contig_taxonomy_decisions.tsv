@@ -1,0 +1,6 @@
+contig	assigned_genus	action	reason
+NZ_CP006659.2	Klebsiella	keep	auto_genus:Klebsiella
+NZ_CP006663.1	Klebsiella	keep	auto_genus:Klebsiella
+NZ_CP006662.2	Klebsiella	keep	auto_genus:Klebsiella
+NZ_CP006660.1	Escherichia	remove	not_auto_genus:Klebsiella
+NZ_CP006661.1	Klebsiella	keep	auto_genus:Klebsiella

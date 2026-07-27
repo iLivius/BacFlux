@@ -490,3 +490,30 @@ were added.
   R226 download recipe (`gtdbtk_r226_data.tar.gz`) — left untouched here, since v1
   docs are explicitly deferred (migration plan Stage 5). Whoever writes the
   consolidated v2 README should update those download instructions too.
+
+---
+
+## 13. `decontamination.mode: auto` can drop a genuine small plasmid — one line in the README
+
+**Status: CONFIRMED with a real example 2026-07-27. Default stays `auto`; this is a
+caveat to state, not a behaviour to change.**
+
+The full worked example lives in `docs/mobilome_worked_example.md` (destined for the
+MkDocs site — too long for the README). The README itself only needs a short heads-up
+next to the `decontamination` config block, roughly:
+
+> `auto` mode keeps contigs whose assigned genus matches the sample's dominant genus.
+> This is right for the common case, but note that a small **broad-host-range plasmid can
+> be removed as if it were contamination**, precisely because it is mobile and its closest
+> database relatives sit in another genus. Every decision is recorded in
+> `contig_taxonomy_decisions.tsv` — check it before trusting the *absence* of a plasmid.
+> If small mobile replicons matter to your question, consider `mode: off` or an explicit
+> include list. The same limitation applies in reverse: a genuine contaminant of the
+> *same* genus but a different species cannot be caught by a genus-level rule at all.
+
+The real case, for whoever writes that section: *K. pneumoniae* ATCC BAA-2146 plasmid
+pMYS (`NZ_CP006660.1`, 2,014 bp) was removed as `Escherichia`. Its single best BLAST hit
+was *K. pneumoniae* at 100% identity over the full length — the correct answer — but
+`blobtools view --taxrule bestsum` sums bitscores per taxon across all 95 hits, and
+because *E. coli* is hugely over-represented in `nt`, Escherichia summed to 58,709 vs
+Klebsiella's 16,253. The assignment followed database composition rather than biology.

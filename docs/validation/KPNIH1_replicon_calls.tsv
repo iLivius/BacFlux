@@ -1,0 +1,5 @@
+contig	replicon	replicon_id	plasmid_mobility	mobility_evidence
+NZ_CP006659.2	chromosome	NZ_CP006659.2	NA	chromosomal contig; Platon does not assess chromosomal mobility
+NZ_CP006661.1	plasmid	NZ_CP006661.1	conjugative	conjugation=8;mobilization=1;oriT=1;inc=1
+NZ_CP006662.2	plasmid	NZ_CP006662.2	mobilisable	mobilization=1;inc=2
+NZ_CP006663.1	plasmid	NZ_CP006663.1	non-mobilisable	inc=2

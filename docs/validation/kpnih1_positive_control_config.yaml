@@ -1,0 +1,62 @@
+# BacFlux v2.0.0 — mobilome positive-control validation
+#
+# WHY THIS RUN EXISTS: every real sample screened so far (006, 015, 386,
+# CDRTa11) is an environmental/low-resistance isolate, so the mobilome module
+# has only ever been proven on tier 1 (intrinsic) and one degraded IME. It has
+# never watched tiers 3/5/6 fire on a genome with a REAL acquired AMR gene on a
+# real plasmid, where independent published literature gives external ground
+# truth to check the tool's answer against.
+#
+# GENOME: Klebsiella pneumoniae ATCC BAA-2146 (KPNIH1), GCF_000364385.3. The
+# NIH Clinical Center 2011 KPC-outbreak reference strain (Mathers et al., mBio
+# 2015 and related CDC/NIH publications). Complete assembly: one chromosome +
+# four named plasmids (pKpQIL-IT-like KPC vehicle, pNDM-US carrying a SECOND,
+# independent carbapenemase). Klebsiella_pneumoniae is itself one of
+# AMRFinderPlus's 31 curated organisms, so this run also exercises the
+# GTDB->--organism point-mutation path in the same genome.
+mode: contigs
+input:
+  contigs_dir: /media/data/antonielli_dir/BacFlux_v2_validation/kpnih1_positive_control/input_dir
+directories:
+  output_dir: /media/data/antonielli_dir/BacFlux_v2_validation/kpnih1_positive_control/output_dir
+  bakta_db: /data/x1hbrnas4/big_db/bakta_6.0/db
+  blast_db: /data/x1hbrnas4/big_db/NCBI_nt_core_2026.07.13
+  eggnog_db: /data/x1hbrnas4/big_db/eggnog
+  gtdbtk_db: /data/x1hbrnas4/big_db/GTDB_R232/release232
+  platon_db: /data/x1hbrnas4/big_db/platon/db
+  checkv_db: /data/x1hbrnas4/big_db/checkv/
+  # Reuse already-downloaded shared databases rather than re-fetching ~25 GB for
+  # a run that has nothing biologically to do with those samples.
+  vs2_db: /media/data/antonielli_dir/BacFlux_v2_validation/hybrid_screen_batch1/output_dir/07.phages/vs2_db
+  antismash_db: /media/data/antonielli_dir/BacFlux_v2_validation/hybrid_screen_batch1/output_dir/04.annotation/antismash/databases
+  dbcan_db: /media/data/antonielli_dir/BacFlux_v2_validation/hybrid_screen_batch1/output_dir/04.annotation/dbcan/dbcan_db_v5.1.2
+links:
+  dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
+  checkv_link: https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz
+  # This validation config does NOT inherit config_v2.yaml's defaults - Snakemake
+  # just loads whatever --configfile is given - so the Zenodo mirror has to be
+  # named here explicitly or GENOMAD_LINK resolves empty and falls back to
+  # geNomad's own NERSC downloader.
+  genomad_link: https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz
+  genomad_md5:  67244b528bb8bed464d1ca147136d33e
+resources:
+  threads: 24
+  ram_gb: 256
+parameters:
+  nt_version: core_nt
+  decontamination:
+    mode: auto
+    discard_no_hit: true
+phage:
+  # Switched from virsorter2 to genomad for a second-opinion plasmid caller (D9
+  # concordance against Platon) on this genome's real plasmids. This trades away
+  # the virsorter2-based virus/CheckV result already produced (CheckV re-runs
+  # against geNomad's virus calls instead) but reuses everything else already
+  # computed for this sample (Bakta, GTDB-Tk, decontam, AMR, ISEScan, CONJscan,
+  # mobilome), since none of those rules depend on the phage caller.
+  # directories.genomad_db is deliberately left UNSET so genomad_db downloads
+  # for real via links.genomad_link (the Zenodo mirror) rather than reusing a
+  # cached copy - re-confirming that path against a real biological sample.
+  caller: genomad
+mobilome:
+  run: true
