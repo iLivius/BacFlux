@@ -491,11 +491,31 @@ if MOBILOME_RUN:
         input:
             platon_dir = PLATON_DIR,
             contigs = FINAL_CONTIGS,
+            # geNomad's plasmid calls, as a SECOND OPINION on Platon's.
+            #
+            # Present only when the user opted in to geNomad: rule
+            # plasmid_concordance lives under `if PHAGE_CALLER == "genomad"` in
+            # 60_plasmid.smk, because geNomad is academic/non-commercial licensed
+            # and so cannot be BacFlux's default (spec section 3.1). Unpacking a
+            # dict keeps the input list valid in both configurations.
+            #
+            # Why it matters here: Platon decides tiers 5 and 6 on its own, and a
+            # plasmid it misses becomes "chromosomal, intrinsic candidate" for
+            # every AMR gene on it - the one error direction that HIDES
+            # transferability. The concordance table already knew better; until
+            # now nothing read it.
+            **({"concordance": PLASMID_CONCORDANCE} if PHAGE_CALLER == "genomad" else {}),
         output:
             replicons = MOBILOME_REPLICONS,
         params:
             script = REPLICONS_MOBILOME_SCRIPT,
             prefix = GENOMAD_PREFIX,
+            # Empty string when geNomad was not run, so the script simply behaves
+            # as it did before (Platon alone).
+            genomad_flag = lambda w: (
+                "--genomad-concordance " + PLASMID_CONCORDANCE.format(sample=w.sample)
+                if PHAGE_CALLER == "genomad" else ""
+            ),
         log:
             LOGS + "/mobilome_replicons_{sample}.log"
         priority: 3
@@ -506,6 +526,7 @@ if MOBILOME_RUN:
               --platon-dir {input.platon_dir} \
               --prefix {params.prefix} \
               --contigs {input.contigs} \
+              {params.genomad_flag} \
               --out {output.replicons} > {log} 2>&1
             """
 

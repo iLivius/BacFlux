@@ -93,6 +93,55 @@ def read_platon_table(path):
     return rows
 
 
+def read_genomad_concordance(path):
+    """Read geNomad's second opinion about which contigs are plasmids.
+
+    WHERE IT COMES FROM
+        rule plasmid_concordance (60_plasmid.smk) compares Platon's plasmid call
+        with geNomad's and writes `{sample}_plasmid_concordance.tsv`. Its rows are
+        the UNION of the two tools' plasmid calls, so a contig appears here if
+        EITHER tool thought it was a plasmid — which is exactly the set of contigs
+        where a second opinion can change our mind.
+
+    WHY THE MOBILITY LADDER CARES
+        Platon alone decides tiers 5 and 6, and it can miss a plasmid. When it
+        does, every AMR gene on that contig is reported as "chromosomal, intrinsic
+        candidate" (tier 1) — the module's worst possible error, because it is the
+        direction that hides transferability from the reader.
+
+    NOTE ON OPTIONALITY
+        geNomad is opt-in (it is academic/non-commercial licensed, so it cannot be
+        BacFlux's default — see the spec §3.1 licensing note). When it was not run
+        this file does not exist, and that is a normal, silent no-op: the caller
+        simply gets an empty dict and Platon decides alone, exactly as before.
+
+    Returns: {contig: {"call": ..., "agreement": ..., "score": ...}}, empty when
+             the file is absent, empty or header-only.
+    """
+    calls = {}
+    if not path or not os.path.exists(path):
+        return calls
+
+    with open(path) as handle:
+        lines = [line.rstrip("\n") for line in handle if line.strip()]
+    if len(lines) < 2:
+        # Header-only is normal and means "no plasmid candidate from either tool".
+        return calls
+
+    header = lines[0].split("\t")
+    for line in lines[1:]:
+        record = dict(zip(header, line.split("\t")))
+        contig = (record.get("contig") or "").strip()
+        if not contig:
+            continue
+        calls[contig] = {
+            "call": (record.get("genomad_call") or "").strip().lower(),
+            "agreement": (record.get("agreement") or "").strip().lower(),
+            "score": (record.get("genomad_score") or "NA").strip(),
+        }
+    return calls
+
+
 def count_from(record, column):
     """Read one of Platon's count columns as an integer, tolerantly.
 
@@ -167,27 +216,53 @@ DEFAULT_MIN_CHROMOSOME_BP = 2000000
 
 
 def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
-               min_chromosome_bp=DEFAULT_MIN_CHROMOSOME_BP):
+               min_chromosome_bp=DEFAULT_MIN_CHROMOSOME_BP, genomad_calls=None):
     """Join Platon's three outputs into one row per contig.
 
     Takes in: the Platon output directory and the file prefix Platon used (which
               is the input genome's basename, so BacFlux passes it in rather
               than guessing), plus any contig IDs seen elsewhere (from the
-              assembly) so contigs Platon never mentioned are still listed.
+              assembly) so contigs Platon never mentioned are still listed, plus
+              geNomad's second opinion when it was run.
     Produces: a list of dicts ready to write, one per contig, sorted by name so
               the output is stable between runs.
     """
     chromosome_ids = read_fasta_ids(os.path.join(platon_dir, f"{prefix}.chromosome.fasta"))
     plasmid_ids = read_fasta_ids(os.path.join(platon_dir, f"{prefix}.plasmid.fasta"))
     table = read_platon_table(os.path.join(platon_dir, f"{prefix}.tsv"))
+    genomad_calls = genomad_calls or {}
 
     all_contigs = set(chromosome_ids) | set(plasmid_ids) | set(table) | set(extra_contigs)
 
     rows = []
     for contig in sorted(all_contigs):
+        genomad = genomad_calls.get(contig, {})
+        genomad_says_plasmid = genomad.get("call") == "plasmid"
+
         if contig in plasmid_ids:
             replicon = "plasmid"
             mobility, evidence = classify_plasmid_mobility(table.get(contig, {}))
+        elif contig in chromosome_ids and genomad_says_plasmid:
+            # BOTH tools looked and DISAGREED. Platon positively called this
+            # chromosome; geNomad positively called it plasmid.
+            #
+            # The call is NOT flipped. Platon is BacFlux's default replicon
+            # caller and made an active call, and quietly overriding it on a
+            # disagreement would be the same overclaim this module exists to
+            # avoid. But the disagreement is recorded in the evidence text and
+            # the source is marked 'conflict', which caps confidence downstream -
+            # because reporting "chromosomal, intrinsic candidate" at full
+            # confidence when a second tool says plasmid would be the most
+            # misleading thing this table could say.
+            replicon = "chromosome"
+            mobility = "NA"
+            evidence = (
+                f"CONFLICT: Platon called this contig chromosomal but geNomad "
+                f"called it a plasmid (score {genomad.get('score', 'NA')}). The "
+                "Platon call is kept because it is the default caller, but the "
+                "two tools disagree - check this contig by hand before treating "
+                "genes on it as intrinsic."
+            )
         elif contig in chromosome_ids:
             replicon = "chromosome"
             # Platon says nothing about chromosomal mobility, and pretending it
@@ -195,6 +270,35 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
             # CONJscan's question, answered separately.
             mobility = "NA"
             evidence = "chromosomal contig; Platon does not assess chromosomal mobility"
+        elif genomad_says_plasmid:
+            # Platon made NO call about this contig, and geNomad calls it a
+            # plasmid. Nothing is being overridden here - this is the only
+            # opinion there is, so using it is not a promotion but simply reading
+            # the available evidence.
+            #
+            # WHY THIS CASE EXISTS AND WHY IT MATTERS: without it, such a contig
+            # falls through to 'unknown' below, and every AMR gene on it is
+            # reported as tier 1, "chromosomal, intrinsic candidate". That is the
+            # worst error the ladder can make, because it is the direction that
+            # HIDES transferability: an acquired, mobile resistance gene reported
+            # as an intrinsic species trait.
+            #
+            # The mobility is left unknown on purpose. geNomad's plasmid summary
+            # counts conjugation genes, but Platon's per-contig mobility columns
+            # are what classify_plasmid_mobility reads and they are absent here.
+            # CONJscan runs over the whole proteome independently, so
+            # colocalise.py can still find a typed conjugative system on this
+            # contig and resolve tier 5 vs 6 from that - which is better evidence
+            # than a gene count anyway.
+            replicon = "plasmid"
+            mobility = "unknown"
+            evidence = (
+                f"geNomad called this contig a plasmid (score "
+                f"{genomad.get('score', 'NA')}); Platon did not classify it at "
+                "all. Mobility is not typed - Platon's conjugation/mobilization "
+                "counts are what types it and they are absent, so tier 5 vs 6 "
+                "rests on whether CONJscan finds machinery on this contig."
+            )
         else:
             # Seen in the assembly but absent from BOTH Platon FASTAs. The usual
             # cause is Platon's size filter: it skips anything over 500 kb, so on
@@ -227,12 +331,30 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
                 mobility = "NA"
                 evidence = "contig not classified by Platon"
 
+        # WHO decided this, so downstream can weight it. A one-tool call is real
+        # evidence but weaker than two tools agreeing, and a conflict is weaker
+        # still - colocalise.py caps confidence accordingly rather than treating
+        # every replicon call as equally certain.
+        if not genomad_calls:
+            call_source = "platon"          # geNomad was not run at all
+        elif replicon == "plasmid" and contig in plasmid_ids and genomad_says_plasmid:
+            call_source = "both"
+        elif replicon == "plasmid" and contig in plasmid_ids:
+            call_source = "platon"
+        elif replicon == "plasmid":
+            call_source = "genomad"         # the rescue case above
+        elif contig in chromosome_ids and genomad_says_plasmid:
+            call_source = "conflict"
+        else:
+            call_source = "platon"
+
         rows.append({
             "contig": contig,
             "replicon": replicon,
             "replicon_id": contig,
             "plasmid_mobility": mobility,
             "mobility_evidence": evidence,
+            "replicon_call_source": call_source,
         })
     return rows
 
@@ -276,15 +398,27 @@ def main(argv=None):
                              "the chromosome (Platon skips anything over 500 kb, and "
                              "megaplasmids can reach ~2 Mb). Default "
                              f"{DEFAULT_MIN_CHROMOSOME_BP}.")
+    parser.add_argument("--genomad-concordance", default="",
+                        help="Optional {sample}_plasmid_concordance.tsv from the "
+                             "plasmid_concordance rule. When geNomad was run, its "
+                             "plasmid calls are used as a second opinion: a contig "
+                             "Platon never classified but geNomad calls a plasmid "
+                             "is reported as a plasmid rather than falling through "
+                             "to 'unknown' (and thence to a wrong 'intrinsic' "
+                             "call), and a straight disagreement is flagged. "
+                             "Absent file = geNomad was not run = no-op.")
     parser.add_argument("--out", required=True, help="Destination TSV.")
     args = parser.parse_args(argv)
 
     contig_lengths = read_contig_lengths(args.contigs) if args.contigs else {}
+    genomad_calls = read_genomad_concordance(args.genomad_concordance)
     rows = build_rows(args.platon_dir, args.prefix, sorted(contig_lengths),
                       contig_lengths=contig_lengths,
-                      min_chromosome_bp=args.min_chromosome_bp)
+                      min_chromosome_bp=args.min_chromosome_bp,
+                      genomad_calls=genomad_calls)
 
-    columns = ["contig", "replicon", "replicon_id", "plasmid_mobility", "mobility_evidence"]
+    columns = ["contig", "replicon", "replicon_id", "plasmid_mobility",
+               "mobility_evidence", "replicon_call_source"]
     with open(args.out, "w") as handle:
         handle.write("\t".join(columns) + "\n")
         for row in rows:

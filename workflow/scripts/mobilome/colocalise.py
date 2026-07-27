@@ -908,6 +908,11 @@ def parse_replicons(path):
     replicon_id_index = find_column(header, ["replicon_id", "plasmid_id", "mge_id"])
     mobility_index = find_column(header, ["plasmid_mobility", "mobility", "mob_class"])
     evidence_index = find_column(header, ["mobility_evidence", "evidence", "mob_evidence"])
+    # Which tool(s) decided this contig's replicon: platon | genomad | both |
+    # conflict. Optional, because the column only exists once geNomad has been
+    # wired in and older tables predate it; missing means "Platon alone", which
+    # is what the table meant before the column existed.
+    source_index = find_column(header, ["replicon_call_source", "call_source"])
 
     replicons = {}
     for line_number, row in enumerate(data_rows, start=2):
@@ -937,6 +942,7 @@ def parse_replicons(path):
             "replicon_id": cell(row, replicon_id_index, default="") or contig,
             "plasmid_mobility": mobility,
             "mobility_evidence": cell(row, evidence_index, default="NA"),
+            "replicon_call_source": cell(row, source_index, default="platon").lower() or "platon",
         }
     return replicons
 
@@ -1559,6 +1565,28 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             caps.append((
                 "medium", "replicon_call_unavailable",
                 f"contig '{contig}' is listed but not classified as chromosome or plasmid",
+            ))
+
+        # How much agreement is behind the replicon call. This decides tiers 5
+        # and 6, so a call resting on one tool - or on two tools that disagree -
+        # must not be reported as confidently as one both tools made.
+        call_source = replicon_call.get("replicon_call_source", "platon")
+        if call_source == "genomad":
+            caps.append((
+                "medium", "plasmid_called_by_genomad_only",
+                f"contig '{contig}' is called a plasmid by geNomad alone - Platon "
+                "did not classify it. Without that second opinion the gene would "
+                "have been reported as chromosomal and intrinsic, so the call is "
+                "kept, but it rests on one tool.",
+            ))
+        elif call_source == "conflict":
+            caps.append((
+                "low", "replicon_call_tools_disagree",
+                f"Platon called contig '{contig}' chromosomal and geNomad called "
+                "it a plasmid. The chromosomal call is reported because Platon is "
+                "the default caller, but if geNomad is right this gene is on a "
+                "plasmid and is NOT an intrinsic determinant - check this contig "
+                "before relying on the tier.",
             ))
 
     # --- Step 3: split the elements on this contig by what they are ---------
