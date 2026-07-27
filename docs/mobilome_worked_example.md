@@ -292,25 +292,62 @@ plasmid**. The classifier enforces this through the integrase requirement:
 pNDM-US has a relaxase (MOBH), a coupling protein and a full typed F-type mating
 apparatus, but **no integrase**, so it lands in the last row — correctly.
 
-### A known gap this exposes
+### Platon counts genes; CONJscan types the machinery
 
 That same plasmid row says `machinery_intact = TRUE`, `mpf_typed_system = TRUE`,
 `confidence = high`. geNomad independently agrees, listing `MOBH`, `t4cp1`,
 `virb4` and a full `F_tra*` set in its own `conjugation_genes` column.
 
-Yet `blaNDM-1`, which sits on that very contig, is capped at *medium* with the
-reason "the mating-pair apparatus was not verified on this contig". For this
-genome that sentence is **wrong**: the apparatus was verified twice,
-independently. The cap fires because `colocalise.py`'s tier-6 plasmid branch
-reads only Platon's hit counts and never consults the CONJscan evidence already
-sitting in the ICE table for the same contig.
+The two tools answer genuinely different questions about the same replicon:
 
-The cap is the right *default* — raw hit counts really do not verify an apparatus
-— but it is over-conservative whenever CONJscan has typed a complete system on
-that replicon. Wiring the two together would let a case like `blaNDM-1` keep tier
-6 at high confidence, with the machinery named as the evidence, and needs no new
-dependency: it uses output the pipeline already produces, on the default
-(non-geNomad) path. Recorded here as a known limitation until that is done.
+- **Platon** *counts* hits to conjugation-related genes. Cheap, always available,
+  but a count is not proof of a working machine.
+- **CONJscan** asks whether a **complete, typed** mating-pair system is present,
+  and `conjscan_to_ice.py` writes that verdict out — for every replicon, plasmids
+  included, because CONJscan runs over the whole proteome.
+
+So Platon sets the **tier** (it is the replicon-level mobility call) and CONJscan
+**corroborates or contradicts** it, which moves the **confidence** and gets named
+in the row. Three outcomes:
+
+| Platon | CONJscan | result |
+|---|---|---|
+| conjugative | complete typed system | tier 6, **high** — audit `plasmid_conjugation_machinery_verified` |
+| conjugative | nothing / relaxase only / degraded | tier 6, **medium** — audit `plasmid_conjugation_from_hit_counts_only` |
+| *not* conjugative | complete typed system | tier **unchanged**, confidence dropped — audit `conjscan_typed_system_but_platon_did_not` |
+
+That third row is deliberate: a disagreement is **not** silently promoted to
+"predicted self-transmissible". The tier follows Platon's replicon-level call,
+the conflict is stated plainly, and a human decides.
+
+On this genome the effect is visible on the one call that matters most:
+
+```
+blaNDM-1   before:  tier=6  predicted_self_transmissible  conf=medium
+           after:   tier=6  predicted_self_transmissible  conf=high
+                    relaxase=MOBH  mpf=F  intact=yes
+                    machinery_source=same_replicon:NZ_CP006661.1|conjugative_region-57877:90473
+```
+
+and it is discriminating rather than blanket — pHg (relaxase `MOBC` only) and
+pCuAs (no machinery) are untouched, still `NA` in the machinery columns.
+
+### The machinery columns
+
+`relaxase_type`, `mpf_type`, `machinery_intact` and `boundary_method` / `attL` /
+`attR` are in the deliverable (spec §9), so the evidence behind a transferability
+claim is readable without opening the ICE table. `machinery_source` says where it
+came from, and the distinction matters:
+
+- `containing_element:<id>` — the gene sits **inside** that ICE/IME.
+- `same_replicon:<id>` — the machinery is **elsewhere on the same plasmid**. Still
+  the right evidence (a mating apparatus makes the whole replicon transferable,
+  and with it every gene on it), but it is not wrapped around this gene, and the
+  row says so rather than implying containment.
+
+`boundary_method` is normally `none` and `attL`/`attR` `NA` on short reads:
+BacFlux does not run the att-site search (spec §8 Phase 3 is BacFluxL work). The
+columns exist so the schema is stable when it does.
 
 ---
 

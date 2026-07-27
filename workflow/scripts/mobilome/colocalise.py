@@ -231,6 +231,21 @@ OUTPUT_COLUMNS = [
     "is_amr_overlap_bp",
     "plasmid_mobility",          # conjugative | mobilisable | non_mobilisable | unknown | NA
     "mobility_evidence",         # free text passed through from CONJscan, if given
+    # The typed conjugation machinery behind a tier 5/6 call (spec §9). Filled
+    # from the ICE/IME table - either the element containing the gene, or, for a
+    # plasmid, any conjugative system found elsewhere on the same replicon, since
+    # that is what makes the whole plasmid transferable.
+    "relaxase_type",             # e.g. MOBH, MOBF - NA when none was found
+    "mpf_type",                  # mating-pair apparatus type, e.g. F, T - NA if none
+    "machinery_intact",          # yes | no | NA  (no = truncated/degraded)
+    "machinery_source",          # which element supplied the three fields above
+    # Element boundaries, when the ICE step could establish them. BacFlux
+    # (short-read) does not run the att-site search, so boundary_method is
+    # normally "none" and attL/attR are NA; the columns exist because spec §9
+    # lists them and BacFluxL will populate them.
+    "boundary_method",           # tRNA | denovo | none | NA
+    "attL",
+    "attR",
     "contig_length",
     "dist_to_contig_end",
     "is_at_contig_boundary",     # yes | no | NA
@@ -586,6 +601,21 @@ def parse_mobile_elements(path):
     mobility_label_index = find_column(header, ["mobility"])
     degraded_reason_index = find_column(header, ["degraded_reason"])
 
+    # The conjugation MACHINERY itself, as CONJscan typed it. Spec §9 asks for
+    # relaxase_type / mpf_type / machinery_intact in the deliverable, and these
+    # are also what lets a plasmid's mobility be corroborated (or contradicted)
+    # against Platon's much cruder gene COUNTS - see
+    # find_conjugative_machinery_on_contig.
+    has_relaxase_index = find_column(header, ["has_relaxase"])
+    has_t4ss_index = find_column(header, ["has_t4ss"])
+    has_t4cp_index = find_column(header, ["has_t4cp"])
+    relaxase_type_index = find_column(header, ["relaxase_type"])
+    mpf_type_index = find_column(header, ["mpf_type"])
+    mpf_typed_system_index = find_column(header, ["mpf_typed_system"])
+    boundary_method_index = find_column(header, ["boundary_method"])
+    att_left_index = find_column(header, ["attL", "att_left"])
+    att_right_index = find_column(header, ["attR", "att_right"])
+
     elements = []
     for line_number, row in enumerate(data_rows, start=2):
         contig = cell(row, contig_index, default="")
@@ -625,8 +655,124 @@ def parse_mobile_elements(path):
             "own_confidence": cell(row, element_confidence_index, default=""),
             "mobility_label": cell(row, mobility_label_index, default=""),
             "degraded_reason": cell(row, degraded_reason_index, default=""),
+            # The typed conjugation machinery (ICE/IME table only).
+            "has_relaxase": cell(row, has_relaxase_index, default=""),
+            "has_t4ss": cell(row, has_t4ss_index, default=""),
+            "has_t4cp": cell(row, has_t4cp_index, default=""),
+            "relaxase_type": cell(row, relaxase_type_index, default=""),
+            "mpf_type": cell(row, mpf_type_index, default=""),
+            "mpf_typed_system": cell(row, mpf_typed_system_index, default=""),
+            "boundary_method": cell(row, boundary_method_index, default=""),
+            "att_left": cell(row, att_left_index, default=""),
+            "att_right": cell(row, att_right_index, default=""),
         })
     return elements
+
+
+def element_says_true(value):
+    """Is this element-table cell an explicit TRUE?
+
+    conjscan_to_ice.py writes TRUE/FALSE; a loader elsewhere might write yes/1.
+    Anything else - including the empty string an IS row leaves behind, since the
+    IS table has no such column - is "not stated", never True. Absence of
+    evidence must not read as evidence.
+    """
+    return str(value).strip().lower() in {"true", "yes", "1"}
+
+
+def find_conjugative_machinery_on_contig(elements_on_contig):
+    """The best-evidenced conjugation system CONJscan called on this contig.
+
+    Biology: Platon decides whether a contig is a plasmid and guesses how mobile
+    it is by COUNTING hits to conjugation-related genes. CONJscan asks a much
+    harder question - does this replicon carry a complete, TYPED mating-pair
+    system? - and conjscan_to_ice.py has already written that answer out. For a
+    plasmid the two are independent opinions about the same thing, so the second
+    one can corroborate or contradict the first.
+
+    Input:  every element called on ONE contig (ICE-table rows and IS rows mixed;
+            IS rows simply have none of the machinery columns and are ignored).
+    Output: the element dict carrying the most complete machinery, or None.
+            "Most complete" = relaxase + typed MPF beats relaxase alone beats
+            nothing, and among equals an intact one beats a degraded one.
+
+    Note this deliberately does NOT require the element to CONTAIN the AMR gene.
+    A conjugative system anywhere on the same plasmid is what makes that plasmid
+    transferable, and with it every gene it carries - which is the whole point of
+    ladder tier 6.
+    """
+    best_element = None
+    best_rank = -1
+    for element in elements_on_contig:
+        has_relaxase = element_says_true(element.get("has_relaxase"))
+        has_typed_mpf = element_says_true(element.get("mpf_typed_system"))
+        if not has_relaxase and not has_typed_mpf:
+            continue  # an IS row, or an element with no machinery at all
+
+        # Rank the completeness of the machinery, then prefer intact over degraded.
+        if has_relaxase and has_typed_mpf:
+            rank = 4                      # a full conjugative system
+        elif has_typed_mpf:
+            rank = 2                      # mating apparatus, no relaxase found
+        else:
+            rank = 1                      # relaxase only -> mobilisable at best
+        if not element_says_false(element.get("machinery_intact")):
+            rank += 1                     # intact beats degraded at the same shape
+
+        if rank > best_rank:
+            best_rank = rank
+            best_element = element
+    return best_element
+
+
+def describe_machinery(element):
+    """One short human-readable phrase naming what machinery an element carries.
+
+    Used in audit lines so a reader sees the actual evidence ("relaxase MOBH +
+    MPF type F, intact") instead of a bare "machinery verified". Returns
+    "no typed machinery" when there is nothing worth naming.
+    """
+    if element is None:
+        return "no typed machinery"
+    parts = []
+    relaxase_type = str(element.get("relaxase_type", "")).strip()
+    mpf_type = str(element.get("mpf_type", "")).strip()
+    if element_says_true(element.get("has_relaxase")):
+        parts.append(f"relaxase {relaxase_type}" if relaxase_type and relaxase_type != "NA"
+                     else "relaxase")
+    if element_says_true(element.get("mpf_typed_system")):
+        parts.append(f"MPF type {mpf_type}" if mpf_type and mpf_type != "NA"
+                     else "typed mating-pair system")
+    if element_says_true(element.get("has_t4cp")):
+        parts.append("coupling protein")
+    if not parts:
+        return "no typed machinery"
+    if element_says_false(element.get("machinery_intact")):
+        degraded_reason = str(element.get("degraded_reason", "")).strip()
+        parts.append(f"but DEGRADED ({degraded_reason})" if degraded_reason
+                     and degraded_reason != "NA" else "but DEGRADED")
+    else:
+        parts.append("intact")
+    return ", ".join(parts)
+
+
+def machinery_is_complete(element):
+    """Does this element carry a COMPLETE, intact, typed conjugative system?
+
+    That means all three of: a relaxase (to nick and pilot the DNA), a typed
+    mating-pair apparatus (to build the bridge), and no truncation flag from the
+    ICE step. A coupling protein is reported but deliberately not required here,
+    for the same reason classify_cluster does not require it: on its own it
+    neither nicks DNA nor forms a bridge.
+
+    This is the evidence that justifies calling a plasmid genuinely
+    self-transmissible rather than merely "Platon counted some conjugation hits".
+    """
+    if element is None:
+        return False
+    return (element_says_true(element.get("has_relaxase"))
+            and element_says_true(element.get("mpf_typed_system"))
+            and not element_says_false(element.get("machinery_intact")))
 
 
 def element_says_false(value):
@@ -1538,6 +1684,13 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     ice_element = find_containing_element(gene, elements_on_contig, {"ice"})
     ime_element = find_containing_element(gene, elements_on_contig, {"ime"})
 
+    # The best conjugation machinery CONJscan typed ANYWHERE on this contig -
+    # not necessarily around this gene. On a plasmid that is the right question:
+    # a mating apparatus at one end of the replicon makes the whole replicon
+    # transferable, and with it every gene the plasmid carries. Used below to
+    # corroborate (or contradict) Platon's much cruder count-based call.
+    contig_machinery = find_conjugative_machinery_on_contig(elements_on_contig)
+
     # Elements that describe a real neighbourhood but must not raise the tier
     # (conjugative region, genomic island). Looked up here so the tier-1 branch
     # can report them instead of claiming the gene has no context at all.
@@ -1610,20 +1763,39 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         # the top of the ladder at high confidence with no audit line - a stronger
         # claim, on weaker evidence, than the chromosome path would ever allow.
         #
-        # The TIER stays 6: the plasmid genuinely carries conjugation evidence, and
-        # "is this acquired and potentially transferable" is the regulatory
-        # question. Only the certainty is capped. Raising it back to high needs the
-        # mating-pair apparatus actually verified on the plasmid contig, which
-        # would mean running a conjugation-machinery caller over plasmid contigs
-        # (today CONJscan is only asked about chromosomal ICEs).
+        # The TIER stays 6 either way: the plasmid genuinely carries conjugation
+        # evidence, and "is this acquired and potentially transferable" is the
+        # regulatory question. What changes is the CERTAINTY, and that depends on
+        # whether anything actually verified the machinery.
+        #
+        # CONJscan runs over the whole proteome, plasmids included, so
+        # conjscan_to_ice.py has usually already asked the harder question: is
+        # there a complete, TYPED mating-pair system on this replicon? When the
+        # answer is yes, the count-based caveat below simply does not apply - the
+        # apparatus WAS verified, and saying otherwise in the audit would be
+        # false. When there is no such evidence, the cap stands.
         base_confidence = "high"
-        caps.append((
-            "medium", "plasmid_conjugation_from_hit_counts_only",
-            f"tier 6 here rests on Platon's conjugation gene count "
-            f"({row['mobility_evidence']}), which counts HMM hits rather than "
-            "checking that a complete mating apparatus is present; the mating-pair "
-            "apparatus was not verified on this contig",
-        ))
+        if machinery_is_complete(contig_machinery):
+            add_audit(
+                "evidence_corroborated", "plasmid_conjugation_machinery_verified",
+                f"Platon called this plasmid conjugative from gene counts "
+                f"({row['mobility_evidence']}), and CONJscan independently typed a "
+                f"complete conjugative system on the same contig "
+                f"({describe_machinery(contig_machinery)}) via "
+                f"{contig_machinery['id']}. Two independent methods agree, so tier 6 "
+                "is not capped for lack of apparatus evidence.",
+                tier=6, context="plasmid",
+            )
+        else:
+            caps.append((
+                "medium", "plasmid_conjugation_from_hit_counts_only",
+                f"tier 6 here rests on Platon's conjugation gene count "
+                f"({row['mobility_evidence']}), which counts HMM hits rather than "
+                "checking that a complete mating apparatus is present; CONJscan did "
+                "not type a complete conjugative system on this contig"
+                + (f" (best it found: {describe_machinery(contig_machinery)})"
+                   if contig_machinery is not None else ""),
+            ))
 
     elif ime_element is not None:
         # Tier 5: an integrative MOBILISABLE element - it has a relaxase but no
@@ -1647,6 +1819,34 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         row["mge_context"] = "plasmid"
         row["mge_id"] = row["replicon_id"]
         row["distance_bp"] = "0"
+
+        # DISAGREEMENT between the two independent opinions about this replicon.
+        # Platon's counts did not reach "conjugative", but CONJscan typed a
+        # complete conjugative system on the very same contig. The tier is NOT
+        # raised on that alone - Platon's replicon-level call decides the tier,
+        # and quietly promoting a gene to "predicted self-transmissible" on a
+        # disagreement is exactly the overclaim this module exists to avoid - but
+        # the conflict is flagged loudly and the certainty drops, because one of
+        # the two tools is wrong and we cannot say which. A reader who sees this
+        # line has everything needed to check it by hand.
+        if machinery_is_complete(contig_machinery):
+            add_audit(
+                "tools_disagree", "conjscan_typed_system_but_platon_did_not",
+                f"Platon typed this plasmid '{plasmid_mobility or 'unknown'}' from its "
+                f"gene counts ({row['mobility_evidence']}), but CONJscan typed a "
+                f"COMPLETE conjugative system on the same contig "
+                f"({describe_machinery(contig_machinery)}) via {contig_machinery['id']}. "
+                "The tier follows Platon's replicon-level call and is NOT raised, but "
+                "the two methods disagree about whether this plasmid can transfer "
+                "itself - check before relying on the tier.",
+                tier=5, context="plasmid",
+            )
+            caps.append((
+                "medium", "plasmid_mobility_tools_disagree",
+                "Platon and CONJscan disagree about this plasmid's ability to "
+                "self-transfer (see the tools_disagree line)",
+            ))
+
         if plasmid_mobility == "mobilisable":
             base_confidence = "high"
         elif plasmid_mobility == "non_mobilisable":
@@ -1924,6 +2124,44 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                     f"{max(element_end_distance, 0)} bp from a contig end and is probably "
                     "truncated by the assembly",
                 ))
+
+    # --- Step 9b: name the conjugation machinery behind a tier 5/6 call ------
+    # Spec §9 asks for relaxase_type / mpf_type / machinery_intact in the
+    # deliverable, so a reader can see WHICH machinery justifies a transferability
+    # claim without opening the ICE table. Two possible sources, in order:
+    #   1. the element that actually set the context (an ICE or IME containing
+    #      the gene) - the most specific answer;
+    #   2. otherwise, for a gene on a plasmid, any conjugative system typed
+    #      elsewhere on the same replicon, because that is what makes the whole
+    #      plasmid - and therefore this gene - transferable.
+    # machinery_source records which of the two it was, so the row is never
+    # ambiguous about whether the machinery surrounds the gene or merely shares
+    # its replicon.
+    machinery_element = None
+    machinery_source = ""
+    for context_element in context_elements:
+        if (element_says_true(context_element.get("has_relaxase"))
+                or element_says_true(context_element.get("mpf_typed_system"))):
+            machinery_element = context_element
+            machinery_source = "containing_element"
+            break
+    if machinery_element is None and row["replicon"] == "plasmid" and contig_machinery is not None:
+        machinery_element = contig_machinery
+        machinery_source = "same_replicon"
+
+    if machinery_element is not None:
+        relaxase_type = str(machinery_element.get("relaxase_type", "")).strip()
+        mpf_type = str(machinery_element.get("mpf_type", "")).strip()
+        row["relaxase_type"] = relaxase_type or "NA"
+        row["mpf_type"] = mpf_type or "NA"
+        row["machinery_intact"] = (
+            "no" if element_says_false(machinery_element.get("machinery_intact")) else "yes")
+        row["machinery_source"] = "%s:%s" % (machinery_source, machinery_element["id"])
+        # Element boundaries travel with it when the ICE step established any.
+        boundary_method = str(machinery_element.get("boundary_method", "")).strip()
+        row["boundary_method"] = boundary_method or "NA"
+        row["attL"] = str(machinery_element.get("att_left", "")).strip() or "NA"
+        row["attR"] = str(machinery_element.get("att_right", "")).strip() or "NA"
 
     # --- Step 10: final confidence, and an audit line per cap that fired ----
     row["mobility_tier_label"] = tier_label_override or MOBILITY_TIER_LABELS[row["mobility_tier"]]

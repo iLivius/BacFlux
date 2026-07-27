@@ -98,17 +98,28 @@ LENGTH_HEADER = ["contig", "length"]
 # inherit - they do not exist in the IS table.
 ICE_HEADER = ["contig", "start", "end", "strand", "mge_id", "mge_name",
               "element_type", "mobility", "machinery_intact", "degraded_reason",
-              "spans_contigs", "confidence"]
+              "spans_contigs", "confidence",
+              # The typed machinery columns conjscan_to_ice.py also writes. These
+              # are what let a plasmid's mobility be corroborated against Platon's
+              # counts, and what fills relaxase_type/mpf_type in the deliverable.
+              "has_relaxase", "has_t4ss", "has_t4cp", "relaxase_type",
+              "mpf_type", "mpf_typed_system", "boundary_method", "attL", "attR"]
 
 
 def ice_row(contig="contig_1", start=5000, end=25000, strand=".",
             mge_id="ICE_1", mge_name="ICEEc2-like", element_type="ice",
             mobility="self-transmissible", machinery_intact="TRUE",
-            degraded_reason="NA", spans_contigs="FALSE", confidence="high"):
-    """One ICE/IME candidate row; defaults describe a clean, intact ICE."""
+            degraded_reason="NA", spans_contigs="FALSE", confidence="high",
+            has_relaxase="TRUE", has_t4ss="TRUE", has_t4cp="TRUE",
+            relaxase_type="MOBF", mpf_type="T", mpf_typed_system="TRUE",
+            boundary_method="none", att_left="NA", att_right="NA"):
+    """One ICE/IME candidate row; defaults describe a clean, intact ICE with a
+    complete typed conjugative system."""
     return [contig, str(start), str(end), strand, mge_id, mge_name,
             element_type, mobility, machinery_intact, degraded_reason,
-            spans_contigs, confidence]
+            spans_contigs, confidence,
+            has_relaxase, has_t4ss, has_t4cp, relaxase_type,
+            mpf_type, mpf_typed_system, boundary_method, att_left, att_right]
 
 
 def run_colocalise(tmp_path, amr_rows, is_rows=None, replicon_rows=None,
@@ -1348,3 +1359,167 @@ def test_a_complete_gene_next_to_an_is_is_still_ordinary_context(tmp_path):
     row = report[0]
     assert row["is_inside_amr_cds"] == "no"
     assert "is_abuts_partial_amr_hit_likely_inactivation" not in audit_reasons(audit)
+
+
+# ---------------------------------------------------------------------------
+# Plasmid mobility: Platon COUNTS genes, CONJscan TYPES the machinery.
+#
+# Platon decides the tier (it is the replicon-level call). CONJscan corroborates
+# or contradicts it, which moves the CONFIDENCE and gets named in the row. The
+# motivating real case: K. pneumoniae ATCC BAA-2146 plasmid pNDM-US, where
+# Platon counted 8 conjugation hits and CONJscan independently typed a complete
+# F-type system with a MOBH relaxase - yet blaNDM-1 was still reported at medium
+# confidence with an audit line claiming the apparatus "was not verified".
+# ---------------------------------------------------------------------------
+
+
+def test_verified_machinery_lets_a_conjugative_plasmid_keep_high_confidence(tmp_path):
+    """The blaNDM-1 case: Platon says conjugative AND CONJscan typed a complete
+    system on the same contig, so the count-based caveat does not apply."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(contig="contig_7", symbol="blaNDM-1", start=3000, stop=4000)],
+        ice_rows=[ice_row(contig="contig_7", start=40000, end=70000,
+                          mge_id="REGION_1", element_type="conjugative_region",
+                          relaxase_type="MOBH", mpf_type="F",
+                          has_relaxase="TRUE", mpf_typed_system="TRUE",
+                          machinery_intact="TRUE")],
+        replicon_rows=[["contig_7", "plasmid", "pNDM", "conjugative",
+                        "conjugation=8;mobilization=1;oriT=1"]],
+        length_rows=(("contig_7", 140000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "6"
+    assert row["mobility_tier_label"] == "predicted_self_transmissible"
+    assert row["confidence"] == "high"
+    assert "plasmid_conjugation_machinery_verified" in audit_reasons(audit)
+    # And the old, now-false caveat must NOT be emitted.
+    assert "plasmid_conjugation_from_hit_counts_only" not in audit_reasons(audit)
+
+
+def test_the_machinery_is_named_in_the_deliverable(tmp_path):
+    """Spec §9 asks for relaxase_type / mpf_type / machinery_intact in the table,
+    so a reader can see WHICH machinery justifies the claim without opening the
+    ICE file. machinery_source says whether it surrounds the gene or merely
+    shares the replicon."""
+    report, _audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(contig="contig_7", symbol="blaNDM-1", start=3000, stop=4000)],
+        ice_rows=[ice_row(contig="contig_7", start=40000, end=70000,
+                          mge_id="REGION_1", element_type="conjugative_region",
+                          relaxase_type="MOBH", mpf_type="F")],
+        replicon_rows=[["contig_7", "plasmid", "pNDM", "conjugative", "conjugation=8"]],
+        length_rows=(("contig_7", 140000),),
+    )
+    row = report[0]
+    assert row["relaxase_type"] == "MOBH"
+    assert row["mpf_type"] == "F"
+    assert row["machinery_intact"] == "yes"
+    # The gene is NOT inside the element - the machinery is elsewhere on the
+    # same plasmid - and the row must say so rather than imply containment.
+    assert row["machinery_source"].startswith("same_replicon:")
+
+
+def test_no_typed_machinery_keeps_the_count_based_cap(tmp_path):
+    """Platon says conjugative but CONJscan typed nothing: the original caveat is
+    still correct and must still fire."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(contig="contig_7", symbol="blaKPC-3", start=3000, stop=4000)],
+        replicon_rows=[["contig_7", "plasmid", "pKPC", "conjugative", "conjugation=1"]],
+        length_rows=(("contig_7", 90000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "6"
+    assert row["confidence"] == "medium"
+    assert "plasmid_conjugation_from_hit_counts_only" in audit_reasons(audit)
+    assert row["relaxase_type"] == "NA"
+
+
+def test_degraded_machinery_does_not_count_as_verified(tmp_path):
+    """A truncated system is exactly what the ICE step flags as degraded; it must
+    not be accepted as proof of a working apparatus."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(contig="contig_7", symbol="blaNDM-1", start=3000, stop=4000)],
+        ice_rows=[ice_row(contig="contig_7", start=40000, end=70000,
+                          mge_id="REGION_1", element_type="conjugative_region",
+                          machinery_intact="FALSE", degraded_reason="truncated_core_hit")],
+        replicon_rows=[["contig_7", "plasmid", "pNDM", "conjugative", "conjugation=8"]],
+        length_rows=(("contig_7", 140000),),
+    )
+    row = report[0]
+    assert row["confidence"] == "medium"
+    assert "plasmid_conjugation_from_hit_counts_only" in audit_reasons(audit)
+    assert row["machinery_intact"] == "no"
+
+
+def test_relaxase_only_is_not_a_complete_system(tmp_path):
+    """MOBC alone (the real pHg case) is a relaxase with no mating apparatus -
+    mobilisable at best, and certainly not proof of self-transmissibility."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(contig="contig_7", symbol="blaOXA-1", start=3000, stop=4000)],
+        ice_rows=[ice_row(contig="contig_7", start=40000, end=70000,
+                          mge_id="REGION_1", element_type="conjugative_region",
+                          has_relaxase="TRUE", relaxase_type="MOBC",
+                          has_t4ss="FALSE", mpf_typed_system="FALSE", mpf_type="NA")],
+        replicon_rows=[["contig_7", "plasmid", "pHg", "conjugative", "conjugation=2"]],
+        length_rows=(("contig_7", 90000),),
+    )
+    row = report[0]
+    assert row["confidence"] == "medium"
+    assert "plasmid_conjugation_from_hit_counts_only" in audit_reasons(audit)
+
+
+def test_tools_disagreeing_about_plasmid_mobility_is_flagged_not_promoted(tmp_path):
+    """CONJscan typed a complete system but Platon did not call the plasmid
+    conjugative. The tier follows Platon and is NOT quietly promoted, but the
+    conflict is reported and the confidence drops - one of the two is wrong and
+    we cannot say which."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(contig="contig_7", symbol="blaCTX-M-15", start=3000, stop=4000)],
+        ice_rows=[ice_row(contig="contig_7", start=40000, end=70000,
+                          mge_id="REGION_1", element_type="conjugative_region",
+                          relaxase_type="MOBH", mpf_type="F")],
+        replicon_rows=[["contig_7", "plasmid", "pX", "mobilisable", "mobilization=1"]],
+        length_rows=(("contig_7", 90000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "5"          # NOT promoted to 6
+    assert row["confidence"] != "high"
+    assert "conjscan_typed_system_but_platon_did_not" in audit_reasons(audit)
+
+
+def test_a_containing_ice_supplies_the_machinery_fields_directly(tmp_path):
+    """When the gene sits INSIDE an ICE, that element is the more specific
+    source and must be preferred over anything else on the replicon."""
+    report, _audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(symbol="tetM", start=10000, stop=11000)],
+        ice_rows=[ice_row(start=5000, end=25000, mge_id="ICE_1",
+                          relaxase_type="MOBQ", mpf_type="T")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "6"
+    assert row["relaxase_type"] == "MOBQ"
+    assert row["mpf_type"] == "T"
+    assert row["machinery_source"].startswith("containing_element:")
+
+
+def test_machinery_columns_stay_NA_when_there_is_no_machinery(tmp_path):
+    """An ordinary chromosomal gene must not acquire machinery fields from
+    nowhere - absence of evidence has to look like absence."""
+    report, _audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000)],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+    )
+    row = report[0]
+    assert row["relaxase_type"] == "NA"
+    assert row["mpf_type"] == "NA"
+    assert row["machinery_intact"] == "NA"
+    assert row["machinery_source"] == "NA"
