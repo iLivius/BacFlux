@@ -1189,6 +1189,150 @@ def cluster_anchors(anchors, window_bp):
     return clusters
 
 
+def merge_clusters_sharing_a_system(clusters, max_element_bp):
+    """Re-join clusters that distance-clustering cut out of ONE CONJscan system.
+
+    THE PROBLEM THIS FIXES. cluster_anchors groups anchors purely on how far
+    apart they sit, so a conjugation system whose genes are spread a little wider
+    than --window-bp gets reported as two or more separate elements. On the
+    Phase 7 benchmark that was not an edge case: R391 was split into an 'ice' of
+    56.6 kb plus a stray 'conjugative_region', because the gap between the two
+    halves measured 15,010 bp against a 15,000 bp window - a TEN base pair
+    margin on a threshold the spec itself calls convention rather than biology.
+    Five of the eight genomes with calls showed the same signature: two rows,
+    one sys_id.
+
+    Two things go wrong when it happens. The element count is inflated, and -
+    worse - the reported element is truncated, because `start`/`end` come from
+    the surviving cluster alone. Merging R391's two halves takes the recovered
+    span from 64% of the curated element to 94%.
+
+    WHY MERGING IS SAFE RATHER THAN A LOOSER THRESHOLD. MacSyFinder has already
+    decided these genes form one system, using its own co-localisation rules
+    (counted in GENES between components, not in base pairs). Honouring that
+    decision is not us relaxing a cutoff - it is us stopping overriding a
+    judgement made with better information. Widening --window-bp instead would
+    merge genuinely unrelated neighbours too.
+
+    Input:  the distance-based clusters, each a list of anchors carrying sys_id.
+    Does:   joins clusters that share any non-empty sys_id ON THE SAME CONTIG.
+    Output: (merged clusters, audit rows describing every merge).
+
+    Two deliberate restrictions:
+      - anchors with an EMPTY sys_id (integrases found by Bakta product text,
+        which belong to no CONJscan system) never cause a merge, or every
+        unrelated integrase would pull the whole contig into one blob;
+      - clusters on DIFFERENT contigs are never merged even when they share a
+        sys_id. On a fragmented assembly MacSyFinder treats the proteome as one
+        pseudo-replicon and can group hits across contigs; merging those would
+        invent an interval spanning sequence that was never contiguous. That
+        case is already reported through the spans_contigs flag.
+
+    AND ONE SIZE GUARD, learned the hard way on the benchmark. A sys_id is not a
+    promise of proximity: on the 10.1 Mb Streptomyces scabiei chromosome
+    MacSyFinder put hits 2.19 Mb apart into one system, and merging them
+    produced a 2,185,966 bp "element" that then blew past --max-element-bp and
+    was DROPPED - turning a partial detection into a total miss. So a merge that
+    would exceed max_element_bp is REFUSED and the original clusters are kept.
+    The merge exists to repair an artefact of an arbitrary bp threshold, not to
+    override the biological limit on how large an element can be.
+    """
+    # Group cluster indices by (contig, sys_id). A cluster carrying two system
+    # IDs links both groups, which is why this needs a proper union rather than
+    # a single pass.
+    parent = list(range(len(clusters)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i, j):
+        root_i, root_j = find(i), find(j)
+        if root_i != root_j:
+            parent[max(root_i, root_j)] = min(root_i, root_j)
+
+    first_cluster_with_key = {}
+    for index, cluster in enumerate(clusters):
+        contig = cluster[0]["contig"]
+        for anchor in cluster:
+            sys_id = (anchor.get("sys_id") or "").strip()
+            if not sys_id:
+                continue
+            key = (contig, sys_id)
+            if key in first_cluster_with_key:
+                union(first_cluster_with_key[key], index)
+            else:
+                first_cluster_with_key[key] = index
+
+    groups = {}
+    for index in range(len(clusters)):
+        groups.setdefault(find(index), []).append(index)
+
+    merged = []
+    audit_rows = []
+    for root in sorted(groups):
+        members = groups[root]
+        joined = []
+        for index in members:
+            joined.extend(clusters[index])
+        joined.sort(key=lambda a: (a["start"], a["end"]))
+
+        # The size guard. Refuse a merge that would produce something larger than
+        # any real element, and keep the pieces instead - a truncated call is far
+        # more useful than an element dropped for being impossibly long.
+        merged_span = max(a["end"] for a in joined) - min(a["start"] for a in joined) + 1
+        if len(members) > 1 and merged_span > max_element_bp:
+            shared = sorted({(a.get("sys_id") or "").strip()
+                             for index in members for a in clusters[index]
+                             if (a.get("sys_id") or "").strip()})
+            audit_rows.append(audit_row(
+                "NA",
+                "evidence_recorded",
+                "system_merge_refused_too_long",
+                f"{len(members)} anchor clusters share the CONJscan system(s) "
+                f"{', '.join(shared)} but merging them would span {merged_span} bp, "
+                f"above the --max-element-bp threshold of {max_element_bp} bp. "
+                "MacSyFinder can group hits that sit megabases apart on a large "
+                "replicon; they are kept as separate clusters rather than joined "
+                "into one implausible element.",
+                contig=joined[0]["contig"],
+                start=min(a["start"] for a in joined),
+                end=max(a["end"] for a in joined),
+            ))
+            for index in sorted(members):
+                merged.append(clusters[index])
+            continue
+
+        merged.append(joined)
+
+        if len(members) > 1:
+            shared = sorted({(a.get("sys_id") or "").strip()
+                             for index in members for a in clusters[index]
+                             if (a.get("sys_id") or "").strip()})
+            spans = ", ".join(
+                f"{min(a['start'] for a in clusters[i])}-{max(a['end'] for a in clusters[i])}"
+                for i in sorted(members))
+            audit_rows.append(audit_row(
+                # `sample` is filled in by the caller, exactly as it is for the
+                # integrase-attachment audit rows.
+                "NA",
+                "evidence_recorded",
+                "clusters_merged_same_conjscan_system",
+                f"{len(members)} anchor clusters ({spans}) were farther apart than "
+                f"the clustering window but MacSyFinder assigned them to the same "
+                f"system ({', '.join(shared)}), so they are reported as ONE element. "
+                "Splitting them would both inflate the element count and truncate "
+                "the element's reported span.",
+                contig=joined[0]["contig"],
+                start=min(a["start"] for a in joined),
+                end=max(a["end"] for a in joined),
+            ))
+
+    return merged, audit_rows
+
+
 def cluster_has_class(cluster, anchor_class):
     """True when at least one anchor in the cluster is of that class."""
     return any(anchor["anchor_class"] == anchor_class for anchor in cluster)
@@ -2133,6 +2277,14 @@ def main(argv=None):
     # see attach_nearby_integrases for why the two anchor types need different
     # windows, and what it cost us when they shared one.
     clusters = cluster_anchors(machinery_anchors, args.window_bp)
+    # Undo any split that distance-clustering made THROUGH a single CONJscan
+    # system. Runs before integrases are attached, because integrases carry no
+    # sys_id and so must not influence which clusters belong together.
+    clusters, merge_audit = merge_clusters_sharing_a_system(
+        clusters, args.max_element_bp)
+    for row in merge_audit:
+        row["sample"] = args.sample
+    audit_rows.extend(merge_audit)
     clusters, integrase_attach_audit = attach_nearby_integrases(
         clusters, integrase_anchors, args.integrase_window_bp)
     for row in integrase_attach_audit:

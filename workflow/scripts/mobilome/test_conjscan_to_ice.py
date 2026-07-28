@@ -1166,9 +1166,20 @@ def test_anchors_further_apart_than_the_window_form_separate_clusters(tmp_path):
     assert all(row["mge_class"] == "ice" for row in rows)
 
 
-def test_window_is_configurable(tmp_path):
-    """Shrinking --window-bp splits a cluster; the threshold is a convention, not
-    biology, so it has to be adjustable."""
+def test_window_does_not_split_one_conjscan_system(tmp_path):
+    """A narrow --window-bp must NOT cut a single CONJscan system into pieces.
+
+    This is the Phase 7 benchmark's clearest finding. Distance clustering used to
+    be the only thing deciding what belonged together, so a system whose genes
+    were spread slightly wider than the window came out as several "elements".
+    On R391 the two halves were 15,010 bp apart against a 15,000 bp window - a
+    ten base pair margin - and the reported element lost a third of its length.
+
+    MacSyFinder has already decided these hits form one system, using gene-count
+    co-localisation rules rather than base pairs. That decision now wins:
+    --window-bp still governs how MACHINERY of DIFFERENT systems is grouped (see
+    the next test), but it can no longer split a system apart.
+    """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
                      model_fqn="CONJScan/Chromosome/T4SS_typeF"),
@@ -1179,30 +1190,98 @@ def test_window_is_configurable(tmp_path):
     ])
     gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
 
-    # 3 kb window: the integrase (ends 51200) is 3799 bp from the relaxase and the
-    # VirB4 (starts 63000) is 4299 bp from the coupling protein, so the single ICE
-    # falls apart into two machinery fragments and neither can be called an ICE.
+    # 3 kb window: VirB4 (starts 63000) is 4299 bp from the coupling protein
+    # (ends 58700), so distance clustering alone would break the machinery in two.
+    # All three hits carry the same sys_id, so the split is undone.
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, conjscan, gff, extra=["--window-bp", "3000", "--min-element-bp", "1000"]
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    # One element with the complete machinery, spanning relaxase to VirB4 - not
+    # two fragments, one of which would have been a spurious passive island.
+    assert row["mge_class"] == "ice"
+    assert row["has_relaxase"] == "TRUE"
+    assert row["has_t4cp"] == "TRUE"
+    assert row["has_t4ss"] == "TRUE"
+    assert row["has_integrase"] == "TRUE"
+    # 50000 rather than the relaxase's 55000: the attached integrase at
+    # 50000-51200 is part of the element, and the span runs from the first anchor
+    # to the last. 65500 is VirB4's end - the half that used to be cut off.
+    assert int(row["machinery_start"]) == 50000
+    assert int(row["machinery_end"]) == 65500
+
+    # The merge is a filtering decision, so it is audited with its reason.
+    merge_reasons = [entry["reason"] for entry in audit]
+    assert "clusters_merged_same_conjscan_system" in merge_reasons
+
+
+def test_system_merge_refused_when_it_would_exceed_max_element(tmp_path):
+    """Sharing a sys_id does not license an impossibly large element.
+
+    Caught on the Phase 7 benchmark: on the 10.1 Mb Streptomyces scabiei
+    chromosome MacSyFinder assigned hits 2.19 Mb apart to one system. Merging
+    them honestly produced a 2,185,966 bp span, which then exceeded
+    --max-element-bp and was dropped altogether - so a partial detection became
+    a total miss. Refusing the merge keeps the pieces, which is strictly better.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        # Same sys_id (the fixture default), but far away down the contig.
+        conjscan_row(hit_id="S1_00090", gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    contigs = {"contig_1": 400000}
+    cds = list(SCENE_CDS) + [
+        gff_cds("contig_1", 350000, 352000, "+", "S1_00090",
+                "conjugal transfer protein TraB"),
+    ]
+    gff = write_gff(tmp_path / "S1.gff3", contigs, cds)
+
+    # A 100 kb ceiling: relaxase at 55000 to the distant VirB4 end at 352000 is
+    # ~297 kb, so the merge must be refused.
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, conjscan, gff,
+        extra=["--max-element-bp", "100000", "--min-element-bp", "1000"],
+    )
+    reasons = [entry["reason"] for entry in audit]
+    assert "system_merge_refused_too_long" in reasons
+    # The nearby machinery still yields an element rather than nothing at all.
+    assert rows
+    assert all(int(row["length_bp"]) <= 100000 for row in rows)
+
+
+def test_window_still_separates_distinct_systems(tmp_path):
+    """--window-bp remains meaningful for machinery of DIFFERENT systems.
+
+    The merge above keys on sys_id, so it must not quietly glue together two
+    genuinely separate conjugative systems that happen to sit on one contig.
+    Here the relaxase belongs to one system and the distant VirB4 to another;
+    they stay apart, and only the one with the full complement is called an ICE.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF",
+                     sys_id="S1_MOB_1"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF",
+                     sys_id="S1_MOB_1"),
+        # A second, unrelated system further along the contig.
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeT",
+                     sys_id="S1_MOB_2"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
     _return_code, rows, _audit, _ = run_main(
         tmp_path, conjscan, gff, extra=["--window-bp", "3000", "--min-element-bp", "1000"]
     )
     assert len(rows) == 2
-    # --window-bp no longer governs integrase attachment: machinery clusters at
-    # --window-bp, then --integrase-window-bp (much wider, default 50 kb) decides
-    # which integrase belongs to which cluster. Narrowing --window-bp therefore
-    # splits the MACHINERY without orphaning the integrase, which is the point -
-    # on real ICEKp the integrase sits 33 kb from the machinery.
-    # Both split clusters lie within --integrase-window-bp of the same integrase,
-    # so both are anchored by it. That is the intended behaviour: the integrase
-    # marks the element boundary, and a machinery window narrow enough to split
-    # one operon does not mean there are two elements.
-    assert sum(row["has_integrase"] == "TRUE" for row in rows) == 2
-    # Both fragments now carry the integrase, so neither is an "unbounded
-    # conjugative region" any more - which is what this rework was for. They
-    # classify differently from each other because splitting the machinery leaves
-    # a full system in one fragment (-> ice) and only the integrase in the other
-    # (-> passive island). What --window-bp still controls is how many CLUSTERS
-    # the machinery forms, which is what this test exists to check.
-    assert {row["mge_class"] for row in rows} == {"ice", "cime_or_island"}
+    systems = {row["conjscan_systems"] for row in rows}
+    assert systems == {"S1_MOB_1", "S1_MOB_2"}
 
 
 def test_gff_parsing_reads_coordinates_products_and_lengths(tmp_path):
