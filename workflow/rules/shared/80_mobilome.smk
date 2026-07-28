@@ -454,6 +454,12 @@ if MOBILOME_RUN:
             lengths = CONTIG_LENGTHS,
             genome = FINAL_CONTIGS,
             is_table = IS_TABLE,
+            # Which contigs are plasmids. An ICE is by definition an element that
+            # integrates into the CHROMOSOME (spec section 2.4), so conjugation
+            # machinery sitting on a plasmid is a conjugative plasmid, not an ICE.
+            # Without this the classifier cannot tell the two apart and reports
+            # every self-transmissible plasmid as a predicted ICE.
+            replicons = MOBILOME_REPLICONS,
         output:
             table = ICE_TABLE,
             audit = ICE_AUDIT,
@@ -480,6 +486,7 @@ if MOBILOME_RUN:
               --contig-lengths {input.lengths} \
               --genome {input.genome} \
               --is-table {input.is_table} \
+              --replicons {input.replicons} \
               {params.strict_boundary} \
               --out-table {output.table} \
               --out-audit {output.audit} > {log} 2>&1
