@@ -223,6 +223,44 @@ mobilome:
                                #   on short reads a low value usually means the element
                                #   is split across contigs.
 
+  # ── Naming layer: which ICE is it? ────────────────────────────────────────
+  # Leave `urls` empty and this is skipped. Independent of the TnCentral layer
+  # above: that one CREATES elements and so makes tier 4 reachable, this one only
+  # LABELS the ICE/IME candidates CONJscan already found. Turning it on cannot
+  # change any gene's tier — it changes "predicted self-transmissible element"
+  # into "ICEKpnATCCBAA-2146-1", which is what lets you look the thing up.
+  #
+  # It also reveals how far our boundaries fall short. On KPNIH1 the ICE call
+  # spans 40,486 bp while ICEberg's record for the same element spans 58,048 bp,
+  # and the audit says so — a concrete illustration of why an interval with
+  # boundary_method=none is a floor rather than a delimitation.
+  #
+  # LICENCE. ICEberg 3.0 (Jun 2023) publishes NO licence or terms-of-use
+  # statement; every page carries only "Copyright © 2023 All Rights Reserved by
+  # Microbial Bioinformatics Group in MML, SJTU." As with TnCentral, BacFlux
+  # ships none of this data — setting a URL means you fetch it yourself. Cite
+  # Wang et al. 2024 (NAR) if you use it.
+  iceberg:
+    urls: []                   # e.g.
+                               #   - https://tool2-mml.sjtu.edu.cn/ICEberg3/data/download/ICE_seq_all.fas
+                               #   - https://tool2-mml.sjtu.edu.cn/ICEberg3/data/download/IME_seq_all.fas
+                               #   Concatenated into one BLAST database. NOTE the host:
+                               #   the older bioinfo-mml.sjtu.edu.cn path 404s for
+                               #   ICEberg 3.0 (it still serves ICEberg 2.0).
+                               #   ICE_seq_all.fas is ~100 MB and the server is slow.
+    dir: ""                    # OPTIONAL — a directory of .fas files you already hold.
+                               #   Takes precedence over `urls`; nothing is fetched.
+    min_identity: 80.0         # identity floor for a name. Below this the elements are
+                               #   related but not the same, and the name would mislead.
+    min_overlap_fraction: 0.5  # how much of OUR candidate the curated element must
+                               #   cover before the two are treated as the same thing.
+                               #   Deliberately lenient next to the transposon cascade:
+                               #   ICEs are mosaic and their cargo varies between
+                               #   strains, so demanding near-completeness would refuse
+                               #   to name exactly the divergent elements a name helps
+                               #   with most. Below 80% of the REFERENCE the name is
+                               #   suffixed "-like".
+
   require_trna_boundary_for_high: false
                                # How strict to be before an ICE/IME candidate may be
                                #   labelled HIGH confidence.

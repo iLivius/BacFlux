@@ -339,6 +339,7 @@ CONJSCAN_ICE_SCRIPT    = os.path.join(MOBILOME_SCRIPTS_DIR, "conjscan_to_ice.py"
 # entirely different jobs.
 REPLICONS_MOBILOME_SCRIPT = os.path.join(MOBILOME_SCRIPTS_DIR, "platon_replicons.py")
 NAME_TRANSPOSONS_SCRIPT   = os.path.join(MOBILOME_SCRIPTS_DIR, "name_transposons.py")
+NAME_ICE_SCRIPT           = os.path.join(MOBILOME_SCRIPTS_DIR, "name_ice_elements.py")
 
 
 # ───────────────────────── 3a. Resource accessors ───────────────────────────
@@ -429,6 +430,13 @@ TNCENTRAL_BLAST_DB       = TNCENTRAL_DB_DIR + "/tncentral_v5"   # a PREFIX, not 
 TNCENTRAL_BLAST_HITS     = MOBILOME_DIR + "/{sample}_tncentral_blast.tsv"
 NAMED_ELEMENTS_TABLE     = MOBILOME_DIR + "/{sample}_named_elements.tsv"
 NAMED_ELEMENTS_AUDIT     = MOBILOME_DIR + "/{sample}_named_elements_discarded.tsv"
+# ICEberg names the ICE/IME candidates CONJscan found. It does NOT add elements:
+# conjscan_to_ice.py decides what is an ICE, and this only says which one.
+ICEBERG_DB_DIR           = DIR_MOBILOME + "/iceberg_db"          # a DIRECTORY (rule iceberg_db)
+ICEBERG_BLAST_DB         = ICEBERG_DB_DIR + "/iceberg_v5"        # a PREFIX, not a file
+ICEBERG_BLAST_HITS       = MOBILOME_DIR + "/{sample}_iceberg_blast.tsv"
+ICE_TABLE_NAMED          = MOBILOME_DIR + "/{sample}_ice_candidates_named.tsv"
+ICE_NAMING_AUDIT         = MOBILOME_DIR + "/{sample}_ice_naming.tsv"
 MOBILOME_REPLICONS       = MOBILOME_DIR + "/{sample}_replicon_calls.tsv"
 MOBILITY_TABLE           = MOBILOME_DIR + "/{sample}_amr_mobility.tsv"   # THE deliverable
 MOBILITY_AUDIT           = MOBILOME_DIR + "/{sample}_amr_mobility_audit.tsv"
@@ -1021,6 +1029,23 @@ TNCENTRAL_MIN_IDENTITY = float(_tncentral_cfg.get("min_identity", 90.0))
 TNCENTRAL_MIN_COVERAGE = float(_tncentral_cfg.get("min_reference_coverage", 0.80))
 
 MOBILOME_NAME_ELEMENTS = MOBILOME_RUN and bool(TNCENTRAL_URL or TNCENTRAL_LOCAL)
+
+# ── The ICEberg naming layer (names ICE/IME candidates) ──────────────────────
+# Independent of the TnCentral layer above: that one CREATES elements (and so
+# makes tier 4 reachable), this one only labels elements CONJscan already found.
+# Turning it on cannot change any gene's tier.
+_iceberg_cfg = _mobilome_cfg.get("iceberg") or {}
+ICEBERG_URLS = [str(u).strip() for u in (_iceberg_cfg.get("urls") or []) if str(u).strip()]
+ICEBERG_LOCAL = str(_iceberg_cfg.get("dir") or "").strip()
+ICEBERG_MIN_IDENTITY = float(_iceberg_cfg.get("min_identity", 80.0))
+ICEBERG_MIN_OVERLAP = float(_iceberg_cfg.get("min_overlap_fraction", 0.50))
+
+MOBILOME_NAME_ICE = MOBILOME_RUN and bool(ICEBERG_URLS or ICEBERG_LOCAL)
+
+# Which ICE table the co-localisation step should read: the named copy when the
+# ICEberg layer is on, the raw one otherwise. Resolved here so the rule body does
+# not have to branch.
+ICE_TABLE_FOR_COLOCALISE = ICE_TABLE_NAMED if MOBILOME_NAME_ICE else ICE_TABLE
 
 if MOBILOME_RUN:
     print(

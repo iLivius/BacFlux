@@ -653,6 +653,146 @@ if MOBILOME_RUN:
                   --out-audit {output.audit} > {log} 2>&1
                 """
 
+    # ══ The ICEberg naming layer (which ICE is it?) ══════════════════════════
+    # Only exists when the user configured an ICEberg source. This layer adds NO
+    # elements and can change NO tier: conjscan_to_ice.py decides what is an ICE,
+    # and this only says which one.
+    if MOBILOME_NAME_ICE:
+
+        # ── Rule: iceberg_db — fetch and index the curated ICE catalogue ─────
+        # Takes in: nothing from the workflow — URLs from the config, or a
+        #           directory the user already holds.
+        # Does: fetch each .fas, concatenate, index as a v5 BLAST database, and
+        #       record provenance (ICEberg is versioned - 3.0, June 2023 - but the
+        #       download URLs are not, so the fetch date is worth keeping).
+        # Produces: ICEBERG_BLAST_DB (a prefix) + PROVENANCE.txt.
+        rule iceberg_db:
+            output:
+                db_dir = directory(ICEBERG_DB_DIR),
+            params:
+                urls = " ".join(ICEBERG_URLS),
+                local_dir = ICEBERG_LOCAL,
+                user_agent = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                              "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"),
+            conda:
+                "../../envs/tncentral.yaml"
+            log:
+                LOGS + "/mobilome_iceberg_db.log"
+            priority: 4
+            shell:
+                """
+                exec > {log} 2>&1
+                set -euo pipefail
+                mkdir -p {output.db_dir}
+
+                if [ -n "{params.local_dir}" ]; then
+                    echo "Using the local ICEberg directory '{params.local_dir}'. Nothing will be downloaded."
+                    cat "{params.local_dir}"/*.fas > {output.db_dir}/iceberg.fa
+                    SOURCE="local:{params.local_dir}"
+                else
+                    : > {output.db_dir}/iceberg.fa
+                    for url in {params.urls}; do
+                        echo "Fetching $url"
+                        # ICE_seq_all.fas is ~100 MB and the server is slow, so allow
+                        # resuming rather than restarting a part-finished transfer.
+                        curl -sSL -C - -A "{params.user_agent}" -o {output.db_dir}/part.fas "$url"
+                        # A FASTA starts with '>'. An error page does not, and would
+                        # otherwise be indexed as an empty database that silently
+                        # names nothing.
+                        if [ "$(head -c 1 {output.db_dir}/part.fas)" != ">" ]; then
+                            echo "ERROR: $url did not return FASTA. First bytes:" >&2
+                            head -c 200 {output.db_dir}/part.fas >&2
+                            exit 1
+                        fi
+                        cat {output.db_dir}/part.fas >> {output.db_dir}/iceberg.fa
+                        rm -f {output.db_dir}/part.fas
+                    done
+                    SOURCE="{params.urls}"
+                fi
+
+                makeblastdb -in {output.db_dir}/iceberg.fa -dbtype nucl \
+                  -out {output.db_dir}/iceberg_v5 -blastdb_version 5
+
+                N_SEQ=$(grep -c '^>' {output.db_dir}/iceberg.fa)
+                {{
+                  echo "source:      $SOURCE"
+                  echo "fetched:     $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  echo "fasta_sha256: $(sha256sum {output.db_dir}/iceberg.fa | cut -d' ' -f1)"
+                  echo "sequences:   $N_SEQ"
+                  echo ""
+                  echo "ICEberg 3.0 (released June 2023) publishes no licence or terms of"
+                  echo "use; its pages carry only 'Copyright (c) 2023 All Rights Reserved by"
+                  echo "Microbial Bioinformatics Group in MML, SJTU.'  BacFlux ships no"
+                  echo "ICEberg data, only these URLs. Cite Wang et al. 2024, NAR."
+                }} > {output.db_dir}/PROVENANCE.txt
+
+                echo "ICEberg ready: $N_SEQ sequences."
+                """
+
+        # ── Rule: iceberg_blast — where do curated ICEs match this genome? ───
+        # The whole genome is searched, not the ICE intervals, so a curated
+        # element that OVERHANGS our interval still shows up - which is how the
+        # naming step can report that our boundaries fall short.
+        rule iceberg_blast:
+            input:
+                contigs = FINAL_CONTIGS,
+                db_dir = ICEBERG_DB_DIR,
+            output:
+                hits = ICEBERG_BLAST_HITS,
+            params:
+                db = lambda w, input: os.path.join(input.db_dir, "iceberg_v5"),
+                evalue = "1e-50",
+                # ICEs of one species are near-identical across strains, so a
+                # single element matches many entries. Keep enough of them that
+                # the naming step can report how ambiguous the name really is.
+                max_targets = 50,
+            conda:
+                "../../envs/tncentral.yaml"
+            threads: capped_cpus(8)
+            log:
+                LOGS + "/mobilome_iceberg_blast_{sample}.log"
+            priority: 3
+            shell:
+                """
+                blastn \
+                  -query {input.contigs} \
+                  -db {params.db} \
+                  -outfmt "6 qseqid sseqid pident length qstart qend sstart send evalue bitscore slen qlen" \
+                  -evalue {params.evalue} \
+                  -max_target_seqs {params.max_targets} \
+                  -num_threads {threads} \
+                  -out {output.hits} > {log} 2>&1
+                """
+
+        # ── Rule: name_ice_elements — put the curated name on the candidate ──
+        # Produces ICE_TABLE_NAMED, which amr_mge_colocalisation reads instead of
+        # ICE_TABLE when this layer is on (see ICE_TABLE_FOR_COLOCALISE).
+        rule name_ice_elements:
+            input:
+                ice_table = ICE_TABLE,
+                hits = ICEBERG_BLAST_HITS,
+            output:
+                table = ICE_TABLE_NAMED,
+                audit = ICE_NAMING_AUDIT,
+            params:
+                script = NAME_ICE_SCRIPT,
+                min_identity = ICEBERG_MIN_IDENTITY,
+                min_overlap = ICEBERG_MIN_OVERLAP,
+            log:
+                LOGS + "/mobilome_name_ice_{sample}.log"
+            priority: 3
+            shell:
+                """
+                python {params.script} \
+                  --sample {wildcards.sample} \
+                  --ice-table {input.ice_table} \
+                  --blast {input.hits} \
+                  --min-identity {params.min_identity} \
+                  --min-overlap-fraction {params.min_overlap} \
+                  --out-table {output.table} \
+                  --out-audit {output.audit} > {log} 2>&1
+                """
+
     # ── Rule: mobilome_replicons — is each contig chromosome or plasmid? ─────
     # Takes in: the Platon directory this sample's plasmid stage already produced,
     #           plus the genome (so contigs Platon skipped are still listed).
@@ -727,7 +867,7 @@ if MOBILOME_RUN:
         input:
             amrfinder = AMRFINDER_TSV,
             is_table = IS_TABLE,
-            ice_table = ICE_TABLE,
+            ice_table = ICE_TABLE_FOR_COLOCALISE,
             # Curated transposons/integrons, present only when a TnCentral source
             # was configured. Unpacking a dict keeps the input list valid either
             # way; without it tier 4 is simply never awarded.
