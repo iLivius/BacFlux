@@ -32,8 +32,9 @@ def hsp(contig="contig_1", subject="Tn4401b-JX560992", pident="99.9",
     }
 
 
-def build(hits, sample="S1", min_identity=90.0, min_coverage=0.80):
-    return nt.build_elements(sample, hits, min_identity, min_coverage)
+def build(hits, sample="S1", min_identity=90.0, min_coverage=0.80, skipped=None):
+    return nt.build_elements(sample, hits, min_identity, min_coverage,
+                             skipped_lines=skipped)
 
 
 def reasons(audit_rows):
@@ -213,8 +214,31 @@ def test_no_hits_is_a_normal_result_not_an_error():
 
 
 def test_a_missing_blast_file_is_not_fatal():
-    assert nt.read_blast_hits("/nonexistent/path.tsv") == []
-    assert nt.read_blast_hits("") == []
+    assert nt.read_blast_hits("/nonexistent/path.tsv") == ([], [])
+    assert nt.read_blast_hits("") == ([], [])
+
+
+def test_unparsable_blast_lines_are_audited_not_swallowed():
+    """A truncated BLAST file would otherwise yield "no curated transposon found"
+    with complete confidence."""
+    _elements, audit = build([hsp()], skipped=[7, 42])
+    assert "blast_line_unparsable" in reasons(audit)
+
+
+def test_identity_describes_the_whole_copy_not_its_best_fragment():
+    """A copy made of a 3 kb HSP at 99.9% and a 2 kb HSP at 85% is not a 99.9%
+    match; reporting it as one lets sequence that would never pass the naming
+    threshold ride along inside an element labelled almost perfect."""
+    hits = [
+        hsp(qstart=10_000, qend=13_000, sstart=1, send=3_000,
+            length=3_000, pident="99.9", slen=5_000),
+        hsp(qstart=13_100, qend=15_100, sstart=3_001, send=5_000,
+            length=2_000, pident="85.0", slen=5_000),
+    ]
+    elements, _audit = build(hits)
+    assert len(elements) == 1
+    # (3000*99.9 + 2000*85.0) / 5000 = 93.94
+    assert abs(float(elements[0]["identity"]) - 93.9) < 0.2
 
 
 # ── Regressions from the adversarial review ─────────────────────────────────

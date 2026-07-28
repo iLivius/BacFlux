@@ -288,7 +288,26 @@ def name_elements(sample, element_rows, hits,
 
         name, accession = parse_iceberg_name(best["sseqid"])
         reference_length = to_int(best["slen"])
-        reference_covered = (to_int(best["length"]) / reference_length) if reference_length else 0.0
+
+        # Measure the reference coverage over the part of the hit that is
+        # actually INSIDE our element, not over the whole genome-wide HSP.
+        #
+        # The whole genome is blasted, so a curated element can match far beyond
+        # our interval - on KPNIH1 the ICEberg record runs 17.5 kb past our call.
+        # Judging "-like" on the full HSP therefore answers "how much of the
+        # curated element exists anywhere on this contig?" when the question is
+        # "how much of it is in the thing we are naming?". The first reading
+        # awards a bare, confident name to an element we have only partly found.
+        #
+        # The clip is proportional: alignments here are near-collinear, so the
+        # fraction of the HSP inside the element is a fair proxy for the fraction
+        # of reference bases inside it.
+        hit_start = min(to_int(best["qstart"]), to_int(best["qend"]))
+        hit_end = max(to_int(best["qstart"]), to_int(best["qend"]))
+        hit_span = max(1, hit_end - hit_start + 1)
+        inside_bp = overlap_bp(start, end, hit_start, hit_end)
+        aligned_inside = to_int(best["length"]) * (inside_bp / hit_span)
+        reference_covered = (aligned_inside / reference_length) if reference_length else 0.0
 
         # "-like" when only part of the curated element is present. The element is
         # clearly related, but calling a 55% match by the bare name would claim an

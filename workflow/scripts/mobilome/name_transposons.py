@@ -134,22 +134,31 @@ def read_blast_hits(path):
     A missing or empty file is NOT an error: a genome with no curated transposon
     on it is a perfectly ordinary result, and the module degrades gracefully
     rather than hard-failing (a standing BacFlux convention).
+
+    Returns (hits, skipped_line_numbers) so the caller can audit anything it
+    could not parse instead of losing it silently.
     """
     hits = []
+    skipped = []
     if not path or not os.path.isfile(path):
-        return hits
+        return hits, skipped
 
     with open(path, encoding="utf-8", errors="replace") as handle:
-        for line in handle:
+        for line_number, line in enumerate(handle, start=1):
             line = line.rstrip("\n")
             if not line.strip() or line.startswith("#"):
                 continue
             fields = line.split("\t")
             if len(fields) < len(BLAST_COLUMNS):
-                continue          # truncated line; skip rather than crash
-            record = dict(zip(BLAST_COLUMNS, fields))
-            hits.append(record)
-    return hits
+                # Skipping is right - one bad line must not lose the sample - but
+                # it has to be VISIBLE. blastn does not write short lines, so if
+                # this fires the file was truncated or the column list here and
+                # the -outfmt in the rule have drifted apart, and the run would
+                # otherwise report "no curated transposon" with total confidence.
+                skipped.append(line_number)
+                continue
+            hits.append(dict(zip(BLAST_COLUMNS, fields)))
+    return hits, skipped
 
 
 def to_float(value, default=0.0):
@@ -178,6 +187,21 @@ def subject_coverage(hit):
     if slen <= 0:
         return 0.0
     return min(1.0, to_int(hit.get("length")) / slen)
+
+
+def weighted_identity(hsps):
+    """Percent identity over a whole copy, weighted by how much each HSP covers.
+
+    BLAST reports identity per HSP. Taking the best one flatters the copy: the
+    number then describes its most conserved fragment rather than the element as
+    a whole. Weighting by alignment length gives "how similar is this copy to the
+    reference, base for base", which is what the naming threshold is meant to ask.
+    """
+    total_length = sum(to_int(h["length"]) for h in hsps)
+    if total_length <= 0:
+        return 0.0
+    weighted = sum(to_int(h["length"]) * to_float(h["pident"]) for h in hsps)
+    return weighted / total_length
 
 
 def merge_span(intervals):
@@ -335,7 +359,13 @@ def merge_hits_per_element(hits):
                 "end": max(query_positions),
                 "aligned_bp": aligned_bp,
                 "aligned_fraction": (aligned_bp / span_bp) if span_bp > 0 else 0.0,
-                "identity": to_float(best["pident"]),
+                # Length-weighted identity across the pieces of THIS copy, not
+                # the identity of its best fragment. A copy made of a 3 kb HSP at
+                # 99.9% and a 2 kb HSP at 85% is not a 99.9% match to the
+                # reference, and reporting it as one lets sequence that would
+                # never have passed the naming threshold on its own ride along
+                # inside an element labelled almost perfect.
+                "identity": weighted_identity(copy_hsps),
                 "bitscore": to_float(best["bitscore"]),
                 "evalue": best.get("evalue", "NA"),
                 "subject_length": slen,
@@ -412,7 +442,7 @@ ELEMENT_COLUMNS = [
 AUDIT_COLUMNS = ["sample", "contig", "start", "end", "action", "reason", "detail"]
 
 
-def build_elements(sample, hits, min_identity, min_coverage):
+def build_elements(sample, hits, min_identity, min_coverage, skipped_lines=None):
     """Turn BLAST hits into named element rows, auditing everything dropped.
 
     Takes in: raw BLAST rows of contigs vs TnCentral.
@@ -422,6 +452,19 @@ def build_elements(sample, hits, min_identity, min_coverage):
     Returns:  (element_rows, audit_rows).
     """
     audit_rows = []
+
+    # Unparsable lines are skipped rather than fatal, but never silently: a
+    # truncated BLAST file would otherwise produce "no curated transposon found"
+    # with complete confidence.
+    if skipped_lines:
+        audit_rows.append(audit_row(
+            sample, "discarded", "blast_line_unparsable",
+            f"{len(skipped_lines)} BLAST line(s) had fewer than "
+            f"{len(BLAST_COLUMNS)} columns and were skipped (first at line "
+            f"{skipped_lines[0]}). blastn does not write short lines, so this "
+            "means the file was truncated or the -outfmt in the rule no longer "
+            "matches BLAST_COLUMNS here - the naming result is incomplete."))
+
     if not hits:
         audit_rows.append(audit_row(
             sample, "not_applicable", "no_tncentral_hits",
@@ -616,9 +659,10 @@ def main(argv=None):
                         help="Decision trail: a reason for every hit not kept.")
     args = parser.parse_args(argv)
 
-    hits = read_blast_hits(args.blast)
+    hits, skipped = read_blast_hits(args.blast)
     elements, audit = build_elements(
-        args.sample, hits, args.min_identity, args.min_coverage)
+        args.sample, hits, args.min_identity, args.min_coverage,
+        skipped_lines=skipped)
 
     write_tsv(args.out_table, ELEMENT_COLUMNS, elements)
     write_tsv(args.out_audit, AUDIT_COLUMNS, audit)

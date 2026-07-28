@@ -176,3 +176,18 @@ def test_no_blast_hits_leaves_everything_unnamed_but_intact():
 
 def test_a_missing_blast_file_is_not_fatal():
     assert ni.read_blast_hits("/nonexistent.tsv") == []
+
+
+def test_like_is_judged_on_the_part_inside_the_element():
+    """The whole genome is blasted, so a curated element can match well beyond our
+    interval. Judging "-like" on the full HSP answers "how much of the curated
+    element is anywhere on this contig?" when the question is "how much of it is
+    in the thing we are naming?" - and the first reading hands a bare, confident
+    name to an element we have only partly found."""
+    row = ice_row(start=100_000, end=110_000)          # our call: 10 kb
+    # The curated element matches 50 kb of contig, only 10 kb of it inside us.
+    hit = iceberg_hit(qstart=100_000, qend=150_000, length=50_000,
+                      sstart=1, send=50_000, slen=50_000)
+    rows, _audit = ni.name_elements("S1", [row], [hit])
+    assert rows[0]["mge_name"] == "ICEKp1-like"
+    assert float(rows[0]["iceberg_reference_coverage"]) < 0.3

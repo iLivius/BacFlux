@@ -132,7 +132,7 @@ mge_context         unit_transposon
 mge_name            TnEcp1.1
 mobility_tier       4          named_element_mobilisable
 confidence          high
-identity            100.0      over 87% of the 3,417 bp reference
+identity             99.9      over 87% of the 3,417 bp reference
 ```
 
 Tier 4 needs the **TnCentral naming layer** (`mobilome.tncentral.url`). Without
@@ -295,15 +295,16 @@ it to the chromosome. On this genome it found three:
 
 ```
 NZ_CP006659.2|ime-1979164:1994490                  chromosome  -> ime
-NZ_CP006659.2|ice-4604073:4644558                  chromosome  -> ice   ICEKpnATCCBAA-2146-1
+NZ_CP006659.2|ice-4604073:4644558                  chromosome  -> ice   ICEKpnATCCBAA-2146-1-like
 NZ_CP006661.1|conjugative_region-57877:90473       PLASMID     -> conjugative_region
 ```
 
 That name comes from the **ICEberg naming layer** (`mobilome.iceberg.urls`), and
 the audit line behind it is a small lesson in reading this module:
 
-> named `ICEKpnATCCBAA-2146-1` (100.00% identity, covering 100% of our interval
-> and 100% of the 58,048 bp curated element, accession CP006659.2). **30 other
+> named `ICEKpnATCCBAA-2146-1-like` (100.00% identity, covering 100% of our
+> interval but only **70%** of the 58,048 bp curated element, accession
+> CP006659.2). **30 other
 > curated element(s) fit about as well**, so treat the exact name as one of a
 > near-identical group. **NOTE** the curated element is 58,048 bp while our
 > interval is 40,486 bp: our boundaries are a floor, not the element's true ends.
@@ -315,7 +316,9 @@ near-identical across strains, so a single real element matches dozens of
 entries; the name is a group label, not a unique identification. Third, and most
 useful: the curated record is **17.5 kb longer** than our call. With
 `boundary_method = none` our interval is the machinery span — a floor — and here
-is exactly how much we are missing.
+is exactly how much we are missing. That shortfall is also why the name carries
+a **`-like`** suffix: we have 70% of the curated element, not all of it, and the
+suffix is the module refusing to claim the bare name for a partial match.
 
 > **A worked example of how this table gets things wrong, and how it was caught.**
 > The middle row used to read `conjugative_region-4610740:4644558` — the same
