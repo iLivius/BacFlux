@@ -459,6 +459,12 @@ if MOBILOME_RUN:
             audit = ICE_AUDIT,
         params:
             script = CONJSCAN_ICE_SCRIPT,
+            # Empty unless the user opted in to the strict spec §8 Phase 6 rule
+            # (mobilome.require_trna_boundary_for_high). Off by default so that a
+            # well-evidenced ICE is not capped at medium merely because a
+            # short-read assembly could not show us where it ends.
+            strict_boundary = ("--require-trna-boundary-for-high"
+                               if MOBILOME_REQUIRE_TRNA_BOUNDARY else ""),
         log:
             LOGS + "/mobilome_conjscan_ice_{sample}.log"
         priority: 3
@@ -474,6 +480,7 @@ if MOBILOME_RUN:
               --contig-lengths {input.lengths} \
               --genome {input.genome} \
               --is-table {input.is_table} \
+              {params.strict_boundary} \
               --out-table {output.table} \
               --out-audit {output.audit} > {log} 2>&1
             """

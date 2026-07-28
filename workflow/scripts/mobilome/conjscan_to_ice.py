@@ -540,6 +540,25 @@ def _reads_true(value):
     return str(value).strip().upper() == "TRUE"
 
 
+def _reads_tristate(value):
+    """Read a TRUE/FALSE/NA cell back as True / False / None.
+
+    The three-way counterpart of _reads_true, and the distinction is not
+    pedantic. assess_confidence treats at_contig_boundary=None ("no contig length
+    is known, so we cannot tell whether the element runs off the end") as a
+    reason to cap confidence, while False ("checked, and it does not") is not.
+    Collapsing NA to False therefore turns "we did not know" into "we checked and
+    it was fine" - an unknown silently becoming a positive claim, which is the
+    one direction this module must never drift in.
+    """
+    text = str(value).strip().upper()
+    if text == "TRUE":
+        return True
+    if text == "FALSE":
+        return False
+    return None
+
+
 def _float_or_none(value):
     """Parse a numeric field, returning None instead of raising.
 
@@ -1085,7 +1104,7 @@ CONFIDENCE_RANK = {"low": 1, "medium": 2, "high": 3}
 
 
 def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_contig_boundary,
-                      boundary_method="none"):
+                      boundary_method="none", require_trna_boundary=False):
     """Give the candidate a confidence level, and say what lowered it.
 
     Returns (level, caps) where caps is a list of (level, reason, detail) - one
@@ -1099,11 +1118,34 @@ def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_cont
         truncated relaxase/VirB4);
       * the machinery does not run into a contig end, where the rest of the
         element would be invisible;
-      * the element's ENDS are actually known, i.e. a tRNA-anchored att pair was
-        found. The spec (§8 Phase 6) states this outright - "high = 4 anchor
-        classes + tRNA-anchored + single contig + intact" - and it was the one
-        clause the code did not implement, so an element whose extent was a guess
-        could still be reported at high confidence.
+      * and, ONLY IF require_trna_boundary is on, the element's ends are known
+        from a tRNA-anchored att pair.
+
+    WHY THE BOUNDARY RULE IS OPTIONAL AND OFF BY DEFAULT
+        The spec (§8 Phase 6) writes the rule as "high = 4 anchor classes +
+        tRNA-anchored + single contig + intact", which folds two different
+        questions into one number:
+
+          1. how sure are we this IS an ICE?   (anchors, machinery, one contig)
+          2. how sure are we WHERE IT ENDS?    (boundary_method)
+
+        On a short-read assembly the second question usually has no answer - the
+        flanks are simply not in the contig - so requiring a tRNA-anchored att
+        pair makes `high` almost unreachable and drags down calls whose
+        CLASSIFICATION is not in doubt. That is a poor trade: the module's main
+        claim is "this AMR gene sits in a self-transmissible element", and that
+        claim rests on question 1.
+
+        So by default the boundary only informs, and the two facts are read side
+        by side - confidence for the classification, boundary_method for the
+        extent. Set require_trna_boundary to get the strict spec reading, which
+        is the right choice on closed long-read assemblies where an unresolved
+        boundary really is a warning sign rather than the norm.
+
+        Note this is ONLY about the confidence label. Cargo assignment is
+        unaffected either way: a de novo repeat never widens an element (see
+        refine_candidate_boundaries), so an unresolved boundary always means the
+        interval is the machinery span - a floor, never an invention.
 
     The contig rule is absolute, exactly as the spec requires: anything spanning
     contigs is capped at LOW no matter how good the rest of the evidence looks.
@@ -1113,34 +1155,26 @@ def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_cont
     """
     caps = []
 
-    # Where the element STOPS is evidence in its own right, because everything
-    # downstream - which genes count as cargo, and therefore which AMR genes get
-    # called mobile - is read off the interval. 'none' means the interval is only
-    # the machinery span, and 'denovo' means a repeat was found but was not
-    # trusted enough to apply (see refine_candidate_boundaries). Neither deserves
-    # the top level; only a tRNA-anchored pair leaves 'high' available.
-    #
     # boundary_method=None means NOT YET ASSESSED, and is what build_candidates
     # passes: it runs before Phase 3, so at that point no boundary has been looked
     # for. Judging it there would cap every element for a failure that has not
     # happened yet, then have to undo the cap - leaving a contradictory
     # "no att pair was found" line in the audit of an element whose att pair was
     # found moments later. finalise_confidence settles it once, afterwards.
-    if boundary_method is None or boundary_method == "tRNA":
-        pass
-    elif boundary_method == "denovo":
-        caps.append(("medium", "boundary_denovo_only", (
-            "the only candidate boundary is a de novo direct repeat, which on a "
-            "real chromosome arises by chance often enough (~16% of arbitrary "
-            "spans) that it was reported but not applied; the element's true "
-            "extent is not established."
-        )))
-    else:
-        caps.append(("medium", "boundary_not_resolved", (
-            "no att pair was found, so the reported interval is the machinery "
-            "span rather than the element's real ends - a floor, not a "
-            "delimitation."
-        )))
+    if require_trna_boundary and boundary_method is not None and boundary_method != "tRNA":
+        if boundary_method == "denovo":
+            caps.append(("medium", "boundary_denovo_only", (
+                "the only candidate boundary is a de novo direct repeat, which on "
+                "a real chromosome arises by chance often enough (~16% of "
+                "arbitrary spans) that it was reported but not applied; the "
+                "element's true extent is not established."
+            )))
+        else:
+            caps.append(("medium", "boundary_not_resolved", (
+                "no att pair was found, so the reported interval is the machinery "
+                "span rather than the element's real ends - a floor, not a "
+                "delimitation."
+            )))
 
     if n_anchor_classes < MIN_ANCHOR_CLASSES_FOR_HIGH:
         caps.append(("medium", "few_anchor_classes", (
@@ -1659,7 +1693,7 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
     return rows, audit_rows
 
 
-def finalise_confidence(sample, rows):
+def finalise_confidence(sample, rows, require_trna_boundary=False):
     """Settle every candidate's confidence ONCE, after Phase 3 has run.
 
     WHY THIS IS A SEPARATE PASS
@@ -1690,8 +1724,11 @@ def finalise_confidence(sample, rows):
             att_search.to_int(row.get("n_anchor_classes")) or 0,
             _reads_true(row.get("machinery_intact")),
             _reads_true(row.get("spans_contigs")),
-            _reads_true(row.get("at_contig_boundary")),
+            # Tri-state on purpose: NA here means "no contig length was known",
+            # which caps confidence, and is NOT the same as FALSE.
+            _reads_tristate(row.get("at_contig_boundary")),
             boundary_method=row.get("boundary_method") or "none",
+            require_trna_boundary=require_trna_boundary,
         )
         if confidence != row["confidence"]:
             audit_rows.append(audit_row(
@@ -1762,6 +1799,19 @@ def build_parser():
                         default=att_search.DEFAULT_FLANK_WINDOW_BP,
                         help="how far beyond the machinery span to look for the "
                              "element's real ends")
+    parser.add_argument("--require-trna-boundary-for-high", action="store_true",
+                        help="Apply the spec's strict §8 Phase 6 rule: an element "
+                             "may only reach HIGH confidence if a tRNA-anchored "
+                             "att pair fixed its ends. OFF by default, because on "
+                             "a fragmented short-read assembly the flanks are "
+                             "usually absent, so the rule would cap almost every "
+                             "call regardless of how good the machinery evidence "
+                             "is - it conflates 'is this an ICE?' with 'where "
+                             "does it end?'. Worth turning ON for closed "
+                             "long-read assemblies, where an unresolved boundary "
+                             "is genuinely a warning rather than the norm. Either "
+                             "way boundary_method is reported, and cargo is never "
+                             "assigned from an unresolved boundary.")
     parser.add_argument("--out-table", required=True,
                         help="Candidate element TSV (read by colocalise.py).")
     parser.add_argument("--out-audit", required=True,
@@ -1931,7 +1981,8 @@ def main(argv=None):
     audit_rows.extend(boundary_audit)
 
     # --- Phase 6: settle the confidence now the boundaries are known ---------
-    rows, confidence_audit = finalise_confidence(args.sample, rows)
+    rows, confidence_audit = finalise_confidence(
+        args.sample, rows, require_trna_boundary=args.require_trna_boundary_for_high)
     audit_rows.extend(confidence_audit)
 
     return finish(0)

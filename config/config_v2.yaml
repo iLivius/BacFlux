@@ -172,6 +172,29 @@ mobilome:
   max_composite_span_bp: 20000 # two IS copies further apart than this are not called one
                                #   composite transposon. A CONVENTION, not biology — the
                                #   measured distance is always reported next to the call.
+  require_trna_boundary_for_high: false
+                               # How strict to be before an ICE/IME candidate may be
+                               #   labelled HIGH confidence.
+                               #   false (default): confidence answers "how sure are we
+                               #     this IS an ICE?" — from the number of anchor classes
+                               #     (integrase / relaxase / coupling protein / T4SS),
+                               #     whether the machinery is intact, and whether it all
+                               #     sits on one contig. Where the element ENDS is
+                               #     reported separately, in boundary_method.
+                               #   true: also demand that a tRNA-anchored att pair fixed
+                               #     the element's ends (the strict reading of spec §8
+                               #     Phase 6). On a fragmented short-read assembly the
+                               #     flanking sequence is usually missing, so this caps
+                               #     nearly every call at medium no matter how good the
+                               #     machinery evidence is — it conflates "is this an
+                               #     ICE?" with "where does it stop?". Sensible on CLOSED
+                               #     long-read assemblies, where an unresolved boundary
+                               #     really is a warning sign rather than the norm.
+                               #   EITHER WAY: cargo is never assigned from an unresolved
+                               #   boundary. A de novo direct repeat is reported but never
+                               #   widens an element (~16% of arbitrary spans on a real
+                               #   chromosome throw one up by chance), so the interval
+                               #   stays the machinery span — a floor, never an invention.
   contig_boundary_bp: 100      # how close to a contig end counts as "at the boundary"
                                #   when FLAGGING an IS call (columns at_contig_boundary
                                #   and fraction_at_contig_boundary in the IS summary).

@@ -975,6 +975,22 @@ MOBILOME_MAX_COMPOSITE_SPAN = int(_mobilome_cfg.get("max_composite_span_bp", 200
 # and is capped at low confidence.
 MOBILOME_BOUNDARY_BP = int(_mobilome_cfg.get("contig_boundary_bp", 100))
 
+# Whether an ICE/IME candidate must have tRNA-anchored att boundaries before it may
+# be called HIGH confidence (the strict reading of spec §8 Phase 6).
+#
+# Default FALSE, and the reasoning is worth keeping next to the switch: confidence
+# and boundary resolution answer two different questions. "Is this an ICE?" rests
+# on the anchor classes, the machinery being intact and everything sitting on one
+# contig. "Where does it end?" rests on finding an att pair, which on a fragmented
+# short-read assembly usually cannot be answered at all because the flanks are not
+# in the contig. Folding the second into the first makes `high` unreachable and
+# hides good classifications behind a limitation of the assembly.
+#
+# Cargo assignment does not depend on this switch: an unresolved boundary always
+# leaves the interval at the machinery span, so nothing is ever invented either way.
+MOBILOME_REQUIRE_TRNA_BOUNDARY = _config_bool(
+    _mobilome_cfg.get("require_trna_boundary_for_high"), False)
+
 if MOBILOME_RUN:
     print(
         "Mobilome module: ON (stage 08.mobilome). For each AMR gene it reports the "

@@ -409,12 +409,11 @@ def test_ice_needs_all_three_anchor_classes(tmp_path):
     assert element["mpf_type"] == "F"
     assert element["mpf_typed_system"] == "TRUE"
     assert element["machinery_intact"] == "TRUE"
-    # Every anchor class is present and the machinery is intact, but no genome was
-    # given so Phase 3 never ran and the element's real ends are unknown. The spec
-    # (§8 Phase 6) makes tRNA-anchored boundaries a REQUIREMENT for high, so the
-    # best this evidence can earn is medium - the extent of the element, and hence
-    # what counts as its cargo, has not been established.
-    assert element["confidence"] == "medium"
+    # High: every anchor class present, machinery intact, one contig. No genome was
+    # given so the element's ENDS are unknown, but by default that is reported in
+    # boundary_method rather than folded into the confidence - the two answer
+    # different questions. See test_strict_mode_requires_a_trna_boundary_for_high.
+    assert element["confidence"] == "high"
     assert element["mge_id"] == "contig_1|ice-50000:65500"
     assert element["length_bp"] == "15501"
     assert element["integrase_products"] == "Phage integrase family protein"
@@ -424,10 +423,7 @@ def test_ice_needs_all_three_anchor_classes(tmp_path):
     # look for the element's real ends (the att search needs sequence, and the
     # real rule always supplies it), and the confidence is therefore settled at
     # medium once that is known.
-    assert audit_reasons(audit) == {
-        "no_genome_for_att_search",
-        "confidence_settled_after_boundary_search",
-    }
+    assert audit_reasons(audit) == {"no_genome_for_att_search"}
 
 
 def test_ime_is_integrase_plus_relaxase_without_mating_pair(tmp_path):
@@ -456,9 +452,7 @@ def test_ime_is_integrase_plus_relaxase_without_mating_pair(tmp_path):
     assert element["mpf_type"] == "NA"               # the MOB model has no MPF type
     assert element["mpf_typed_system"] == "FALSE"
     assert element["n_anchor_classes"] == "3"
-    # medium, not high: no genome was given, so the element's boundaries were
-    # never resolved (see the note in test_ice_needs_all_three_anchor_classes).
-    assert element["confidence"] == "medium"
+    assert element["confidence"] == "high"
 
 
 def test_accessory_virb4_in_a_mob_system_does_not_make_an_ice(tmp_path):
@@ -1223,9 +1217,7 @@ def test_summary_line_names_each_class(tmp_path, capsys):
     assert "Sample S1:" in printed
     assert "1 ICE (predicted self-transmissible)" in printed
     assert "0 IME" in printed
-    # No genome here, so the boundary search never ran and the element cannot
-    # reach high confidence (see test_ice_needs_all_three_anchor_classes).
-    assert "confidence high 0, medium 1" in printed
+    assert "confidence high 1" in printed
 
 
 # ---------------------------------------------------------------------------
@@ -1353,8 +1345,6 @@ def test_a_denovo_repeat_is_reported_but_never_moves_the_element(tmp_path):
     assert element["start"] == element["machinery_start"]
     assert element["end"] == element["machinery_end"]
     assert "denovo_att_reported_not_applied" in audit_reasons(audit)
-    # And an unresolved boundary can never be reported at high confidence.
-    assert element["confidence"] != "high"
 
 
 def test_the_mge_id_is_not_repointed_when_boundaries_move(tmp_path):
@@ -1450,3 +1440,93 @@ def test_widening_that_stays_clear_of_the_contig_ends_keeps_its_confidence(tmp_p
     assert element["at_contig_boundary"] == "FALSE"
     assert element["dist_to_contig_start"] == "39999"
     assert "confidence_settled_after_boundary_search" not in audit_reasons(audit)
+
+
+# ── The strict spec §8 Phase 6 rule, as an opt-in ───────────────────────────
+
+def test_strict_mode_requires_a_trna_boundary_for_high(tmp_path):
+    """--require-trna-boundary-for-high applies the spec's literal Phase 6 rule.
+
+    Same evidence as test_ice_needs_all_three_anchor_classes - all four anchor
+    classes, intact machinery, one contig - but no genome, so the element's ends
+    were never resolved. By default that is reported in boundary_method and the
+    call stays high; in strict mode it caps the call at medium.
+
+    The switch exists because the two facts answer different questions ("is this
+    an ICE?" vs "where does it stop?"), and on a fragmented short-read assembly
+    the second usually cannot be answered at all.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _rc, lenient_rows, _audit, _path = run_main(tmp_path, conjscan, gff)
+    assert lenient_rows[0]["confidence"] == "high"
+    assert lenient_rows[0]["boundary_method"] == "none"
+
+    _rc, strict_rows, strict_audit, _path = run_main(
+        tmp_path, conjscan, gff, extra=["--require-trna-boundary-for-high"])
+    assert strict_rows[0]["confidence"] == "medium"
+    # The downgrade is explained in the audit rather than left bare.
+    settled = [row for row in strict_audit
+               if row["reason"] == "confidence_settled_after_boundary_search"]
+    assert settled, "the strict downgrade must be audited"
+    assert "no att pair was found" in settled[0]["detail"]
+    # The element itself is identical either way - only the label changed.
+    assert strict_rows[0]["start"] == lenient_rows[0]["start"]
+    assert strict_rows[0]["end"] == lenient_rows[0]["end"]
+
+
+def test_strict_mode_still_allows_high_when_a_trna_boundary_was_found(tmp_path):
+    """Strict mode is a requirement, not a blanket downgrade: an element whose
+    ends really were fixed by a tRNA-anchored att pair keeps its high call."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS,
+                    SCENE_CDS + [gff_trna("contig_1", 39_952, 40_024)])
+    genome = tmp_path / "genome.fna"
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    import random as _random
+    generator = _random.Random(94)
+    sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
+    sequence = plant_att_pair(sequence, motif, 40_000, 70_000)
+    genome.write_text(">contig_1\n" + sequence + "\n")
+
+    _rc, rows, _audit, _path = run_main(
+        tmp_path, conjscan=conjscan, gff=gff,
+        extra=["--genome", str(genome), "--require-trna-boundary-for-high"])
+
+    assert rows[0]["boundary_method"] == "tRNA"
+    assert rows[0]["confidence"] == "high"
+
+
+def test_an_unknown_contig_length_is_not_read_as_not_at_the_boundary(tmp_path):
+    """NA must stay NA through the final confidence pass.
+
+    finalise_confidence re-reads at_contig_boundary from the row it wrote
+    earlier. Reading that cell with a plain TRUE/not-TRUE test collapses NA
+    ("no contig length was known, so we could not check") into FALSE ("we
+    checked and the element is clear of the ends") - an unknown quietly becoming
+    a positive claim, which is the one direction this module must not drift in.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    # No sequence-region lines -> no contig length is known.
+    gff = write_gff(tmp_path / "S1.gff3", {}, SCENE_CDS)
+
+    _rc, rows, _audit, _path = run_main(tmp_path, conjscan, gff)
+
+    assert rows[0]["at_contig_boundary"] == "NA"
+    assert rows[0]["confidence"] == "medium"
