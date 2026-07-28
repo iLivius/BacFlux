@@ -247,12 +247,58 @@ mobilome:
 - The `thanhleviet/ISfinder-sequences` GitHub scrape must **not** be used — unofficial, ~2018 vintage, unauthorised redistribution.
 
 ### 5.3 BLAST DB handling
+
+> ✅ **IMPLEMENTED 2026-07-28** as rules `tncentral_db` and `iceberg_db`
+> (`80_mobilome.smk`). The paragraph below was written from the TnCentral web
+> page and is **wrong about the format** — corrected inline. Everything here was
+> re-established by actually fetching the endpoints; see §5.5.
+
 TnCentral DBs are built with makeblastdb 2.6.0+ (**v4 format**) and the endpoints are **undated**. Always:
 ```bash
 blastdbcmd -db <db> -entry all -out <db>.fasta
 makeblastdb -in <db>.fasta -dbtype nucl -out <db>_v5 -blastdb_version 5
 sha256sum <db>.fasta > <db>.sha256      # record checksum + fetch date in provenance
 ```
+
+**Correction:** the `nc/tn` endpoint does not serve a bare BLAST database. It
+serves a **ZIP** containing `tncentral.fa` (a plain FASTA) *plus* a v4 index
+alongside it. So no `blastdbcmd` round-trip is needed — unzip, discard the
+shipped `.n*` index files, and `makeblastdb` the FASTA directly as v5. The ZIP
+members are dated (2025-05-16 in the release fetched), which is a better
+provenance anchor than the spec assumed existed.
+
+### 5.5 Endpoint ground truth (established 2026-07-28 by fetching them)
+
+The spec's URLs were **not blocked by licensing** — they were stale or
+mislabelled, which is why this layer sat unbuilt for so long.
+
+| Claim in this spec | Reality |
+|---|---|
+| TnCentral endpoint returns 403 | **Bot block on curl's default user-agent.** With a browser UA it serves 5.47 MB. The download rules set one. |
+| TnCentral is a BLAST v4 database | **ZIP holding `tncentral.fa`**, 512 sequences, plus a v4 index |
+| Three TnCentral endpoints | **Six.** `nc/tn` = TnCentral only (the safe default, and the one wired in); `nc/tn_in` adds Integrall; the `*_is` variants add ISfinder content and its terms |
+| ICEberg at `bioinfo-mml.sjtu.edu.cn` | **404.** ICEberg 3.0 lives at `tool2-mml.sjtu.edu.cn/ICEberg3/`; the old host still serves ICEberg **2.0**, which is how the stale URL kept looking plausible |
+
+**Deflines** — the parsers are written against these, so they are recorded verbatim:
+
+```
+TnCentral   >Tn4401b-JX560992              <NAME>-<ACCESSION>, split on the LAST hyphen
+            >IS1133_Tn10_IS903B-CP000602.1  (names contain hyphens and underscores)
+            >Tn7246-                        (accession may be empty)
+
+ICEberg     >ICEberg|1174|ICEKpnATCCBAA-2146-1|GenBank|CP006659.2|4603840..4661887 ...
+            pipe-delimited; field 2 = element name, field 4 = source accession
+```
+
+**Licensing, re-checked verbatim (still: never vendor, URL only):**
+- TnCentral: *"© TnCentral 2024 - All Rights Reserved"*. There is **no terms page at all**, so §5.2's "commercial use is unverified" is not merely unresolved — the site does not address it. The citation request is Ross *et al.* 2021, mBio.
+- ICEberg 3.0 (released 2023-06-01): **no licence, terms or reuse statement anywhere.** Every page carries only *"Copyright © 2023 All Rights Reserved by Microbial Bioinformatics Group in MML, SJTU."*
+- ISOSDB: the pseudoR repo is **MIT**, confirming §5.2. `ISOSDB.V3.fna.zip` (22,713 sequences) and `IS_fam_annot.txt` (family per element) are fetchable straight from the repo.
+
+Both naming layers are therefore **off unless a URL is configured**, and each
+writes a `PROVENANCE.txt` recording source, fetch date, checksum and sequence
+count — because neither endpoint is versioned, and without that there is no way
+to say later which release a result came from.
 The dumped FASTA is also the input for minimap2/diamond legs.
 
 ### 5.4 Which DB for which operation

@@ -124,14 +124,38 @@ Eight conjugation-gene hits is a strong signal, and the tier is not lowered. But
 a carbapenemase, so it is not asserted at high confidence without a verified
 mating-pair apparatus. Always read the tier **and** the confidence together.
 
-### Tier 4 — not currently reachable
+### Tier 4 — `blaCTX-M-15`, inside Tn*Ecp1.1*
 
-Tier 4 (*inside a named unit transposon or integron cassette*) is implemented in
-`colocalise.py` but nothing upstream produces a `unit_transposon`/`integron`
-typed element yet: that needs the TnCentral naming cascade, which is not built.
-Genes that are biologically in a named transposon therefore surface at tier 3
-(pattern-based composite) or tier 5 (plasmid) instead. Not a bug, but worth
-knowing before reading a report.
+```
+amr_gene            blaCTX-M-15
+mge_context         unit_transposon
+mge_name            TnEcp1.1
+mobility_tier       4          named_element_mobilisable
+confidence          high
+identity            100.0      over 87% of the 3,417 bp reference
+```
+
+Tier 4 needs the **TnCentral naming layer** (`mobilome.tncentral.url`). Without
+it nothing produces a `unit_transposon` element and this gene falls back to
+**tier 2** — "an IS is adjacent, so expression may change" — which is true but
+sells the situation short.
+
+The difference is worth dwelling on, because it is the whole argument for the
+naming layer. Tier 2/3 calls are **inferences** from IS positions: two copies of
+one family, the right distance apart, a gene between them. That reasoning has a
+famous blind spot — IS*26* forms translocatable units with its copies in *direct*
+orientation, breaking the same-orientation rule the pattern depends on. A
+TnCentral hit is not an inference at all: it matches an element somebody
+characterised, named and deposited, whose architecture is already known.
+
+And here the curated answer is the biologically right one. `blaCTX-M-15` is the
+most prevalent ESBL in the world, and IS*Ecp1* does not merely sit beside it
+providing a hybrid promoter — IS*Ecp1* **mobilises** it, capturing the gene and
+moving it as a unit. Tn*Ecp1.1* is that unit. Reporting "expression modulation,
+not mobilisation" would have been precisely backwards.
+
+This is why spec §7 says a curated hit should **override** the pattern-based
+call rather than merely agree with it.
 
 ---
 
@@ -271,9 +295,27 @@ it to the chromosome. On this genome it found three:
 
 ```
 NZ_CP006659.2|ime-1979164:1994490                  chromosome  -> ime
-NZ_CP006659.2|ice-4604073:4644558                  chromosome  -> ice
+NZ_CP006659.2|ice-4604073:4644558                  chromosome  -> ice   ICEKpnATCCBAA-2146-1
 NZ_CP006661.1|conjugative_region-57877:90473       PLASMID     -> conjugative_region
 ```
+
+That name comes from the **ICEberg naming layer** (`mobilome.iceberg.urls`), and
+the audit line behind it is a small lesson in reading this module:
+
+> named `ICEKpnATCCBAA-2146-1` (100.00% identity, covering 100% of our interval
+> and 100% of the 58,048 bp curated element, accession CP006659.2). **30 other
+> curated element(s) fit about as well**, so treat the exact name as one of a
+> near-identical group. **NOTE** the curated element is 58,048 bp while our
+> interval is 40,486 bp: our boundaries are a floor, not the element's true ends.
+
+Three things to take from that. First, `CP006659.2` *is* KPNIH1's own chromosome
+accession — ICEberg catalogued this ICE **from this genome**, so 100% identity is
+a self-match and not independent confirmation. Second, ICEs of one species are
+near-identical across strains, so a single real element matches dozens of
+entries; the name is a group label, not a unique identification. Third, and most
+useful: the curated record is **17.5 kb longer** than our call. With
+`boundary_method = none` our interval is the machinery span — a floor — and here
+is exactly how much we are missing.
 
 > **A worked example of how this table gets things wrong, and how it was caught.**
 > The middle row used to read `conjugative_region-4610740:4644558` — the same
@@ -400,6 +442,8 @@ unresolved boundary is a warning sign rather than the norm.
 - IS-adjacent genes are called expression modulation, **not** mobilisation (tier 2).
 - A class 1 integron's 3′ conserved segment is recovered as a composite (tier 3).
 - Plasmid mobility is typed, and non-mobilisable plasmids are labelled honestly (tier 5).
+- A curated TnCentral hit puts blaCTX-M-15 in TnEcp1.1 (tier 4), overriding the
+  weaker IS-adjacency inference — and ICEberg names the chromosomal ICE.
 - A carbapenemase on a conjugative plasmid reaches tier 6 — at *medium* confidence,
   because the mating apparatus was not verified.
 - Every rejection carries its evidence in an audit file.
