@@ -340,6 +340,7 @@ CONJSCAN_ICE_SCRIPT    = os.path.join(MOBILOME_SCRIPTS_DIR, "conjscan_to_ice.py"
 REPLICONS_MOBILOME_SCRIPT = os.path.join(MOBILOME_SCRIPTS_DIR, "platon_replicons.py")
 NAME_TRANSPOSONS_SCRIPT   = os.path.join(MOBILOME_SCRIPTS_DIR, "name_transposons.py")
 NAME_ICE_SCRIPT           = os.path.join(MOBILOME_SCRIPTS_DIR, "name_ice_elements.py")
+ISOSDB_COPY_SCRIPT        = os.path.join(MOBILOME_SCRIPTS_DIR, "isosdb_copy_number.py")
 
 
 # ───────────────────────── 3a. Resource accessors ───────────────────────────
@@ -437,6 +438,17 @@ ICEBERG_BLAST_DB         = ICEBERG_DB_DIR + "/iceberg_v5"        # a PREFIX, not
 ICEBERG_BLAST_HITS       = MOBILOME_DIR + "/{sample}_iceberg_blast.tsv"
 ICE_TABLE_NAMED          = MOBILOME_DIR + "/{sample}_ice_candidates_named.tsv"
 ICE_NAMING_AUDIT         = MOBILOME_DIR + "/{sample}_ice_naming.tsv"
+# The read-based IS copy-number leg (spec WP-C). Reads are immune to assembly
+# collapse, so they can say how many IS copies the assembly LOST - which turns the
+# module's standing "the located IS count is a floor" warning into a number.
+# Short-read modes only: there is nothing to map otherwise.
+ISOSDB_DB_DIR            = DIR_MOBILOME + "/isosdb_db"          # a DIRECTORY (rule isosdb_db)
+ISOSDB_FASTA             = ISOSDB_DB_DIR + "/ISOSDB.V3.fna"
+ISOSDB_FAMILY_MAP        = ISOSDB_DB_DIR + "/IS_fam_annot.txt"
+ISOSDB_COVSTATS          = MOBILOME_DIR + "/{sample}_isosdb_covstats.tsv"
+ASSEMBLY_COVSTATS        = MOBILOME_DIR + "/{sample}_assembly_covstats.tsv"
+IS_COPY_NUMBER           = MOBILOME_DIR + "/{sample}_is_copy_number.tsv"
+IS_COPY_NUMBER_AUDIT     = MOBILOME_DIR + "/{sample}_is_copy_number_audit.tsv"
 MOBILOME_REPLICONS       = MOBILOME_DIR + "/{sample}_replicon_calls.tsv"
 MOBILITY_TABLE           = MOBILOME_DIR + "/{sample}_amr_mobility.tsv"   # THE deliverable
 MOBILITY_AUDIT           = MOBILOME_DIR + "/{sample}_amr_mobility_audit.tsv"
@@ -1046,6 +1058,23 @@ MOBILOME_NAME_ICE = MOBILOME_RUN and bool(ICEBERG_URLS or ICEBERG_LOCAL)
 # ICEberg layer is on, the raw one otherwise. Resolved here so the rule body does
 # not have to branch.
 ICE_TABLE_FOR_COLOCALISE = ICE_TABLE_NAMED if MOBILOME_NAME_ICE else ICE_TABLE
+
+# ── The IS copy-number leg (spec WP-C) ───────────────────────────────────────
+# Needs READS, so it is confined to the modes that have them. Unlike the naming
+# layers this changes no AMR gene's tier: it is a quality metric on the IS
+# inventory, quantifying how many copies the assembler collapsed.
+# ISOSDB comes from the pseudoR repository, which is MIT licensed - the one
+# mobilome database that carries no redistribution question at all.
+_isosdb_cfg = _mobilome_cfg.get("isosdb") or {}
+ISOSDB_FASTA_URL = str(_isosdb_cfg.get("fasta_url") or "").strip()
+ISOSDB_FAMILY_URL = str(_isosdb_cfg.get("family_map_url") or "").strip()
+ISOSDB_LOCAL = str(_isosdb_cfg.get("dir") or "").strip()
+ISOSDB_MIN_COVERED = float(_isosdb_cfg.get("min_covered_percent", 90.0))
+ISOSDB_MIN_COPIES = float(_isosdb_cfg.get("min_copy_number", 0.5))
+
+MOBILOME_COPY_NUMBER = (
+    MOBILOME_RUN and HAS_SHORT_READS and bool(ISOSDB_FASTA_URL or ISOSDB_LOCAL)
+)
 
 if MOBILOME_RUN:
     print(
@@ -1699,6 +1728,19 @@ def _downstream_targets():
             *expand(MOBILITY_TABLE, sample=SAMPLES),
             *expand(IS_SUMMARY, sample=SAMPLES),
         ]
+        # The read-based copy-number estimate is a leaf: nothing consumes it, so
+        # without an explicit target its rules would never run. It is the
+        # quantified form of the "located IS count is a floor" warning that the
+        # IS summary above only states qualitatively.
+        if MOBILOME_COPY_NUMBER:
+            targets += [*expand(IS_COPY_NUMBER, sample=SAMPLES)]
+        # Same for the naming audits - the named elements themselves are pulled in
+        # transitively by the mobility table, but their discard trails are not, and
+        # the project rule is that every filtering decision stays visible.
+        if MOBILOME_NAME_ELEMENTS:
+            targets += [*expand(NAMED_ELEMENTS_AUDIT, sample=SAMPLES)]
+        if MOBILOME_NAME_ICE:
+            targets += [*expand(ICE_NAMING_AUDIT, sample=SAMPLES)]
     return targets
 
 

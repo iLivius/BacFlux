@@ -261,6 +261,48 @@ mobilome:
                                #   with most. Below 80% of the REFERENCE the name is
                                #   suffixed "-like".
 
+  # ── How many IS copies did the assembly LOSE? (spec WP-C) ─────────────────
+  # ILLUMINA AND HYBRID ONLY — it needs reads. Leave the URLs empty to skip it.
+  #
+  # Everywhere else this module says "on a fragmented assembly the located IS
+  # count is a FLOOR, not a count". True, but unquantified: you cannot tell
+  # whether the floor is 2 short or 40 short. This leg puts a number on it.
+  #
+  # Reads are immune to assembly collapse — every copy of an IS contributes its
+  # own reads whether or not the assembler kept them apart — so an IS present in
+  # five copies attracts about five times the read depth of the single-copy
+  # chromosome. Divide the two and you have the copy number:
+  #
+  #     copy number  ~=  depth over the IS  /  depth over the genome
+  #
+  # It changes NO AMR gene's tier, and must not: it says nothing about WHERE the
+  # extra copies are, only that they exist. It is a quality metric on the IS
+  # inventory and the honest companion to the "floor" warning.
+  #
+  # LICENCE. ISOSDB ships in the pseudoR repository under the MIT licence — the
+  # one mobilome database with no redistribution question attached at all.
+  # Cite Kirsch et al. 2024, Cell Host & Microbe.
+  isosdb:
+    fasta_url: ""              # e.g. https://raw.githubusercontent.com/joshuakirsch/pseudoR/main/ISOSDB.V3.fna.zip
+                               #   ~9.9 MB zipped, 22,713 IS nucleotide sequences,
+                               #   already dereplicated at 95% identity by CD-HIT.
+    family_map_url: ""         # e.g. https://raw.githubusercontent.com/joshuakirsch/pseudoR/main/IS_fam_annot.txt
+                               #   entry -> IS family (IS3, IS5, IS110 ...). Results are
+                               #   reported per FAMILY as well as per entry, because the
+                               #   family total is robust to which near-identical entry an
+                               #   ambiguous read happened to land on and the per-entry
+                               #   split is not.
+    dir: ""                    # OPTIONAL — a directory already holding both files.
+                               #   Takes precedence over the URLs; nothing is fetched.
+    min_covered_percent: 90.0  # a database entry must be covered end to end before its
+                               #   depth is believed. A partially covered entry is usually
+                               #   a conserved domain shared with another family, and
+                               #   averaging it in would inflate every estimate.
+    min_copy_number: 0.5       # below this multiple of the genome baseline, the element is
+                               #   treated as absent. Deliberately under 1.0: a real
+                               #   single-copy IS sits near 1x, and sampling noise plus
+                               #   mapping loss routinely pushes it to 0.6-0.8x.
+
   require_trna_boundary_for_high: false
                                # How strict to be before an ICE/IME candidate may be
                                #   labelled HIGH confidence.

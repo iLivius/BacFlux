@@ -793,6 +793,173 @@ if MOBILOME_RUN:
                   --out-audit {output.audit} > {log} 2>&1
                 """
 
+    # ══ How many IS copies did the assembly lose? (spec WP-C) ═══════════════
+    # Short-read modes only - it needs reads - and only when an ISOSDB source is
+    # configured. Changes no AMR gene's tier: this is a quality metric on the IS
+    # inventory, quantifying the collapse the module warns about everywhere else.
+    if MOBILOME_COPY_NUMBER:
+
+        # ── Rule: isosdb_db — fetch the openly licensed IS sequence set ──────
+        # ISOSDB lives in the pseudoR repository under the MIT licence, which
+        # makes it the one mobilome database with no redistribution question. It
+        # is still fetched rather than vendored, to keep one rule for all of them.
+        rule isosdb_db:
+            output:
+                db_dir = directory(ISOSDB_DB_DIR),
+            params:
+                fasta_url = ISOSDB_FASTA_URL,
+                family_url = ISOSDB_FAMILY_URL,
+                local_dir = ISOSDB_LOCAL,
+            conda:
+                "../../envs/tncentral.yaml"
+            log:
+                LOGS + "/mobilome_isosdb_db.log"
+            priority: 4
+            shell:
+                """
+                exec > {log} 2>&1
+                set -euo pipefail
+                mkdir -p {output.db_dir}
+
+                if [ -n "{params.local_dir}" ]; then
+                    echo "Using the local ISOSDB directory '{params.local_dir}'."
+                    cp "{params.local_dir}"/ISOSDB.V3.fna {output.db_dir}/ISOSDB.V3.fna
+                    cp "{params.local_dir}"/IS_fam_annot.txt {output.db_dir}/IS_fam_annot.txt
+                    SOURCE="local:{params.local_dir}"
+                else
+                    curl -sSL -o {output.db_dir}/isosdb.zip "{params.fasta_url}"
+                    if ! unzip -t {output.db_dir}/isosdb.zip > /dev/null 2>&1; then
+                        echo "ERROR: the ISOSDB download is not a ZIP archive. First bytes:" >&2
+                        head -c 200 {output.db_dir}/isosdb.zip >&2
+                        exit 1
+                    fi
+                    unzip -o -q -j {output.db_dir}/isosdb.zip -d {output.db_dir}
+                    rm -f {output.db_dir}/isosdb.zip
+                    curl -sSL -o {output.db_dir}/IS_fam_annot.txt "{params.family_url}"
+                    SOURCE="{params.fasta_url}"
+                fi
+
+                # An IS family map that did not download leaves every element
+                # "unassigned", which looks like a real result rather than a
+                # missing file. Fail instead.
+                if [ ! -s {output.db_dir}/IS_fam_annot.txt ]; then
+                    echo "ERROR: IS_fam_annot.txt is missing or empty; families could not be" >&2
+                    echo "       assigned and the summary would silently be meaningless." >&2
+                    exit 1
+                fi
+
+                N_SEQ=$(grep -c '^>' {output.db_dir}/ISOSDB.V3.fna)
+                {{
+                  echo "source:      $SOURCE"
+                  echo "fetched:     $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  echo "fasta_sha256: $(sha256sum {output.db_dir}/ISOSDB.V3.fna | cut -d' ' -f1)"
+                  echo "sequences:   $N_SEQ"
+                  echo ""
+                  echo "ISOSDB is distributed in the pseudoR repository under the MIT licence."
+                  echo "Cite Kirsch et al. 2024, Cell Host & Microbe."
+                }} > {output.db_dir}/PROVENANCE.txt
+
+                echo "ISOSDB ready: $N_SEQ sequences."
+                """
+
+        # ── Rule: assembly_depth — what does single-copy look like? ──────────
+        # The denominator. Mapping the same reads to the sample's OWN assembly
+        # gives the depth of ordinary single-copy sequence, which is what the IS
+        # depths are divided by. Without it a raw IS depth means nothing, because
+        # it scales with how deeply the sample happened to be sequenced.
+        rule assembly_depth:
+            input:
+                contigs = FINAL_CONTIGS,
+                r1 = TRIM_R1,
+                r2 = TRIM_R2,
+            output:
+                covstats = ASSEMBLY_COVSTATS,
+                ref_dir = temp(directory(MOBILOME_DIR + "/assembly_depth_ref")),
+            params:
+                max_ram = min(RAM, 32),
+            conda:
+                "../../envs/bbmap.yaml"
+            threads: capped_cpus(16)
+            log:
+                LOGS + "/mobilome_assembly_depth_{sample}.log"
+            priority: 3
+            shell:
+                """
+                bbmap.sh \
+                  -in={input.r1} -in2={input.r2} \
+                  ref={input.contigs} path={output.ref_dir} \
+                  -Xmx{params.max_ram}g threads={threads} \
+                  ambiguous=best secondary=f \
+                  covstats={output.covstats} > {log} 2>&1
+                """
+
+        # ── Rule: isosdb_map — how deep are the IS elements? ─────────────────
+        # Same reads, same settings, against ISOSDB. ambiguous=best on purpose:
+        # ISOSDB is dereplicated at 95% but families remain similar, and letting
+        # one read count for every near-identical entry would multiply the totals.
+        # The cost is that the split BETWEEN near-identical entries is arbitrary,
+        # which is why the script reports the FAMILY sum as the headline.
+        rule isosdb_map:
+            input:
+                db_dir = ISOSDB_DB_DIR,
+                r1 = TRIM_R1,
+                r2 = TRIM_R2,
+            output:
+                covstats = ISOSDB_COVSTATS,
+                ref_dir = temp(directory(MOBILOME_DIR + "/isosdb_ref")),
+            params:
+                max_ram = min(RAM, 32),
+                fasta = lambda w, input: os.path.join(input.db_dir, "ISOSDB.V3.fna"),
+            conda:
+                "../../envs/bbmap.yaml"
+            threads: capped_cpus(16)
+            log:
+                LOGS + "/mobilome_isosdb_map_{sample}.log"
+            priority: 3
+            shell:
+                """
+                bbmap.sh \
+                  -in={input.r1} -in2={input.r2} \
+                  ref={params.fasta} path={output.ref_dir} \
+                  -Xmx{params.max_ram}g threads={threads} \
+                  ambiguous=best secondary=f \
+                  covstats={output.covstats} > {log} 2>&1
+                """
+
+        # ── Rule: is_copy_number — located vs implied ────────────────────────
+        # Produces the comparison that is the point of the whole leg: what
+        # ISEScan found on the contigs, next to what the reads say was there.
+        rule is_copy_number:
+            input:
+                isosdb_covstats = ISOSDB_COVSTATS,
+                assembly_covstats = ASSEMBLY_COVSTATS,
+                db_dir = ISOSDB_DB_DIR,
+                is_table = IS_TABLE,
+            output:
+                table = IS_COPY_NUMBER,
+                audit = IS_COPY_NUMBER_AUDIT,
+            params:
+                script = ISOSDB_COPY_SCRIPT,
+                family_map = lambda w, input: os.path.join(input.db_dir, "IS_fam_annot.txt"),
+                min_covered = ISOSDB_MIN_COVERED,
+                min_copies = ISOSDB_MIN_COPIES,
+            log:
+                LOGS + "/mobilome_is_copy_number_{sample}.log"
+            priority: 3
+            shell:
+                """
+                python {params.script} \
+                  --sample {wildcards.sample} \
+                  --isosdb-covstats {input.isosdb_covstats} \
+                  --assembly-covstats {input.assembly_covstats} \
+                  --family-map {params.family_map} \
+                  --is-table {input.is_table} \
+                  --min-covered-percent {params.min_covered} \
+                  --min-copy-number {params.min_copies} \
+                  --out-table {output.table} \
+                  --out-audit {output.audit} > {log} 2>&1
+                """
+
     # ── Rule: mobilome_replicons — is each contig chromosome or plasmid? ─────
     # Takes in: the Platon directory this sample's plasmid stage already produced,
     #           plus the genome (so contigs Platon skipped are still listed).
