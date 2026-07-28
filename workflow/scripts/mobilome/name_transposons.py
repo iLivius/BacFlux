@@ -203,20 +203,46 @@ def merge_span(intervals):
 
 
 # How far apart two HSPs against the SAME reference element may sit on the contig
-# and still be treated as one copy of it, expressed as a multiple of that
-# element's own length. Transposons carry internal indels and mosaic insertions,
-# so the pieces of one genuine copy are not perfectly contiguous - but they are
-# bounded by roughly the element's own size. Anything further apart is a
-# DIFFERENT COPY of the same transposon, which is extremely common: that is what
-# transposons do.
-SAME_COPY_GAP_MULTIPLE = 1.0
+# and still be treated as one copy of it, as a multiple of that element's length.
+#
+# This was 1.0 - a whole element length - and that was far too generous. Two
+# genuine copies of a transposon sitting less than one length apart were merged
+# into one element spanning both of them PLUS the chromosome in between, and
+# every gene in that gap became tier-4 cargo.
+#
+# Measured on the KPNIH1 control: every genuine copy has a largest internal HSP
+# gap of <= 140 bp, because what separates the pieces of ONE copy is an indel or
+# a small internal insertion. The gaps that marked a wrongly merged pair were
+# thousands of bp. So the allowance is now sized to internal indels, which is
+# what it was always meant to model, with a floor for very short references.
+SAME_COPY_GAP_MULTIPLE = 0.10
+SAME_COPY_GAP_FLOOR_BP = 500
 
-# A final sanity bound on the reported element. An instance of a 7 kb transposon
-# occupies about 7 kb; if the span we are about to report is wildly larger than
-# the reference, the HSP clustering has joined things it should not have and the
-# row would hand colocalise.py a huge interval whose every AMR gene becomes
-# "inside a named transposon". Belt and braces behind the clustering above.
-MAX_SPAN_MULTIPLE_OF_REFERENCE = 3.0
+# The fraction of the reported interval that must actually be ALIGNED to the
+# reference. This is the guard the span check below could never be.
+#
+# Real case from the KPNIH1 control. Tn3000 (3,235 bp) matched NZ_CP006662.2 with
+# two tiny terminal inverted-repeat HSPs (84 bp and 146 bp) at ~27,200 belonging
+# to a NEIGHBOURING element, plus the real copy at 29,785-32,882. The IRs pulled
+# the reported interval out to 27,185-32,882, and 2,454 bp of that 5,698 bp span
+# - 43% - has no alignment to Tn3000 at all; Bakta annotates it as a complete,
+# unrelated IS66-family element. Terminal inverted repeats are SHARED between
+# related transposons, so this is a systematic trap rather than bad luck.
+#
+# Measured over the whole control: five of the six reported elements have an
+# aligned fraction of 1.00 and only the spurious Tn3000 falls to 0.57, so this
+# threshold removes exactly the wrong one and keeps every right one.
+MIN_ALIGNED_FRACTION = 0.70
+
+# A final sanity bound on the reported element, as a multiple of the reference.
+#
+# Was 3.0, which was mathematically incapable of catching the case it was written
+# for: with the old gap allowance two copies could sit one length apart, giving a
+# span of at most 2L + L = 3L, so the guard never fired on a two-copy merge. It
+# only triggered at three or more copies, where it then discarded all of them.
+# With the tightened gap above, one genuine copy spans about L even with internal
+# indels, so a bound just above that can actually do some work.
+MAX_SPAN_MULTIPLE_OF_REFERENCE = 2.0
 
 
 def cluster_hsps_by_position(group, reference_length):
@@ -243,7 +269,7 @@ def cluster_hsps_by_position(group, reference_length):
     if not group:
         return []
 
-    max_gap = max(1000, int(reference_length * SAME_COPY_GAP_MULTIPLE))
+    max_gap = max(SAME_COPY_GAP_FLOOR_BP, int(reference_length * SAME_COPY_GAP_MULTIPLE))
     ordered = sorted(group, key=lambda h: min(to_int(h["qstart"]), to_int(h["qend"])))
 
     clusters = [[ordered[0]]]
@@ -292,11 +318,23 @@ def merge_hits_per_element(hits):
             covered_bp = merge_span(subject_intervals)
             best = max(copy_hsps, key=lambda h: to_float(h["bitscore"]))
 
+            # How much of the interval we are about to report is actually
+            # ALIGNED. Terminal inverted repeats are shared between related
+            # transposons, so a couple of short IR hits belonging to a
+            # NEIGHBOURING element can stretch the interval far past the real
+            # copy - see MIN_ALIGNED_FRACTION. Measuring it here is what makes
+            # that detectable at all.
+            query_intervals = [(to_int(h["qstart"]), to_int(h["qend"])) for h in copy_hsps]
+            aligned_bp = merge_span(query_intervals)
+            span_bp = max(query_positions) - min(query_positions) + 1
+
             merged.append({
                 "contig": contig,
                 "subject": subject,
                 "start": min(query_positions),
                 "end": max(query_positions),
+                "aligned_bp": aligned_bp,
+                "aligned_fraction": (aligned_bp / span_bp) if span_bp > 0 else 0.0,
                 "identity": to_float(best["pident"]),
                 "bitscore": to_float(best["bitscore"]),
                 "evalue": best.get("evalue", "NA"),
@@ -366,7 +404,8 @@ def audit_row(sample, action, reason, detail, contig="NA", start="NA", end="NA")
 ELEMENT_COLUMNS = [
     "sample", "contig", "start", "end", "strand",
     "element_type", "mge_id", "mge_name",
-    "identity", "subject_coverage", "reference_accession", "reference_length_bp",
+    "identity", "subject_coverage", "aligned_fraction",
+    "reference_accession", "reference_length_bp",
     "n_hsps", "confidence",
 ]
 
@@ -430,6 +469,28 @@ def build_elements(sample, hits, min_identity, min_coverage):
                 contig=candidate["contig"], start=candidate["start"], end=candidate["end"]))
             continue
 
+        # THE INTERVAL MUST ACTUALLY BE THE ELEMENT. Terminal inverted repeats
+        # are shared between related transposons, so short IR hits belonging to a
+        # NEIGHBOURING element cluster with the real copy and drag the reported
+        # interval across DNA that has nothing to do with this transposon. On the
+        # KPNIH1 control that put 2,454 bp of an unrelated IS66 element inside a
+        # "Tn3000" interval - and colocalise.py would call any AMR gene in there
+        # cargo of Tn3000, at high confidence, with no audit line to explain it.
+        # Neither the identity, coverage nor span checks can see this: the
+        # aligned parts match perfectly, there just are not enough of them.
+        if candidate["aligned_fraction"] < MIN_ALIGNED_FRACTION:
+            audit_rows.append(audit_row(
+                sample, "discarded", "interval_mostly_unaligned",
+                f"{name}: only {100 * candidate['aligned_fraction']:.0f}% of the "
+                f"{candidate['end'] - candidate['start'] + 1} bp interval aligns to "
+                f"the reference (needs {100 * MIN_ALIGNED_FRACTION:.0f}%). Short "
+                "terminal inverted repeats shared with a neighbouring element "
+                "stretch the interval over DNA that is not part of this "
+                "transposon, so naming it would put unrelated genes inside a "
+                "named element.",
+                contig=candidate["contig"], start=candidate["start"], end=candidate["end"]))
+            continue
+
         # A copy of a 7 kb transposon should occupy about 7 kb of contig. If the
         # span is wildly larger, the HSPs were clustered into one copy when they
         # belong to several, and passing that interval on would make every AMR
@@ -466,7 +527,7 @@ def build_elements(sample, hits, min_identity, min_coverage):
     kept, redundant = drop_redundant_overlaps(passing)
     for candidate in redundant:
         audit_rows.append(audit_row(
-            sample, "kept_flagged", "nested_or_overlapping_tncentral_hit",
+            sample, "discarded", "nested_or_overlapping_tncentral_hit",
             f"{candidate['name']} overlaps the better-scoring "
             f"{candidate['superseded_by']} on the same contig and is not listed "
             "separately. TnCentral entries are deliberately nested (a large "
@@ -492,6 +553,9 @@ def build_elements(sample, hits, min_identity, min_coverage):
             "mge_name": candidate["name"],
             "identity": f"{candidate['identity']:.1f}",
             "subject_coverage": f"{candidate['coverage']:.3f}",
+            # How much of the reported interval is really aligned. 1.000 is the
+            # normal, healthy value; anything lower means the interval is padded.
+            "aligned_fraction": f"{candidate['aligned_fraction']:.3f}",
             "reference_accession": candidate["accession"] or "NA",
             "reference_length_bp": str(candidate["subject_length"]),
             "n_hsps": str(candidate["n_hsps"]),

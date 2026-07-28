@@ -220,6 +220,8 @@ OUTPUT_COLUMNS = [
     "mge_context",               # none|is_adjacent|composite|unit_transposon|integron|ice|ime|plasmid
     "mge_id",
     "mge_name",                  # curated name when a naming cascade supplied one
+    "named_element",             # curated transposon/integron CONTAINING the gene, if any
+    "named_element_type",        # unit_transposon | integron | NA
     "distance_bp",               # measured bp between gene and the context element
     "orientation",               # same | opposite | unknown | NA  (IS vs gene strand)
     "is_family",
@@ -2190,6 +2192,36 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         row["boundary_method"] = boundary_method or "NA"
         row["attL"] = str(machinery_element.get("att_left", "")).strip() or "NA"
         row["attR"] = str(machinery_element.get("att_right", "")).strip() or "NA"
+
+    # --- Step 9b: keep the curated name even when a higher rung won ---------
+    # The ladder is ordered so that being on a plasmid (tier 5/6) outranks being
+    # in a named transposon (tier 4), and that ordering is right: a plasmid can
+    # cross into another cell, a transposon on its own cannot.
+    #
+    # But the ordering was also DISCARDING the name. A gene sitting inside
+    # Tn1696.1 on a plasmid came out as plain "tier 5, on a plasmid", with the
+    # curated architecture that we had successfully identified appearing nowhere
+    # in the table OR the audit. On the KPNIH1 control that silently threw away
+    # six of the seven named elements, because they are on plasmids.
+    #
+    # So the tier still follows the ladder, and the name rides alongside it in
+    # its own columns. mge_name is deliberately NOT overwritten: it names the
+    # element that DECIDED the tier, and confusing those two would make the
+    # headline column mean different things on different rows.
+    if named_element is not None:
+        row["named_element"] = named_element.get("name") or named_element["id"]
+        row["named_element_type"] = named_element.get("element_type") or "NA"
+        if row["mobility_tier"] != 4:
+            add_audit(
+                "evidence_recorded", "inside_named_element_but_higher_tier_applies",
+                f"This gene is inside {row['named_element']} "
+                f"({row['named_element_type']}), which on its own would be tier 4. "
+                f"The reported tier is {row['mobility_tier']} because "
+                f"{row['mge_context']} outranks it - a plasmid can cross into "
+                "another cell, a transposon on its own cannot. The curated name is "
+                "kept in named_element because it says HOW the gene is packaged, "
+                "which is what you would look up in the literature.",
+                tier=row["mobility_tier"], context=row["mge_context"])
 
     # --- Step 10: final confidence, and an audit line per cap that fired ----
     row["mobility_tier_label"] = tier_label_override or MOBILITY_TIER_LABELS[row["mobility_tier"]]

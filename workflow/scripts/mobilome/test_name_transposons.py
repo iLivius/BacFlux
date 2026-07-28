@@ -215,3 +215,77 @@ def test_no_hits_is_a_normal_result_not_an_error():
 def test_a_missing_blast_file_is_not_fatal():
     assert nt.read_blast_hits("/nonexistent/path.tsv") == []
     assert nt.read_blast_hits("") == []
+
+
+# ── Regressions from the adversarial review ─────────────────────────────────
+
+def test_a_neighbours_inverted_repeats_do_not_stretch_the_interval():
+    """The Tn3000 failure from the KPNIH1 control, reduced.
+
+    Terminal inverted repeats are SHARED between related transposons, so two
+    short IR hits belonging to a NEIGHBOURING element cluster with the real copy
+    and drag the reported interval across DNA that has nothing to do with this
+    transposon. Identity and coverage cannot see it - the aligned parts match
+    perfectly, there just are not enough of them.
+    """
+    hits = [
+        hsp(qstart=27_185, qend=27_268, sstart=1, send=84, length=84,
+            bitscore="150", slen=3_235),                     # neighbour's IR
+        hsp(qstart=27_185, qend=27_330, sstart=3_235, send=3_091, length=146,
+            bitscore="260", slen=3_235),                     # neighbour's other IR
+        hsp(qstart=29_785, qend=32_882, sstart=3_098, send=1, length=3_098,
+            bitscore="5694", slen=3_235),                    # the REAL copy
+    ]
+    elements, audit = build(hits)
+
+    assert len(elements) == 1
+    # The real copy only - not 27,185-32,882.
+    assert elements[0]["start"] == "29785"
+    assert elements[0]["end"] == "32882"
+    assert float(elements[0]["aligned_fraction"]) > 0.95
+
+
+def test_a_mostly_unaligned_interval_is_rejected_with_a_reason():
+    """Direct test of the guard, for a cluster that survives to the check."""
+    # Two short HSPs close enough to cluster (gap 450 < the 500 bp floor) but
+    # leaving most of the interval between them unaligned.
+    hits = [
+        hsp(qstart=10_000, qend=10_100, sstart=1, send=101, length=101,
+            bitscore="200", slen=1_000),
+        hsp(qstart=10_551, qend=10_650, sstart=900, send=1_000, length=101,
+            bitscore="200", slen=1_000),
+    ]
+    elements, audit = build(hits, min_coverage=0.1)
+    assert elements == []
+    assert "interval_mostly_unaligned" in reasons(audit)
+
+
+def test_two_copies_a_kilobase_apart_are_not_merged():
+    """The old gap allowance was a whole reference length, so two genuine copies
+    less than one length apart merged into one element spanning the chromosome
+    between them. The allowance now models an internal indel, which is what it
+    was always meant to be."""
+    hits = [
+        hsp(qstart=10_000, qend=15_000, slen=5_000),
+        hsp(qstart=19_001, qend=24_001, slen=5_000),   # 4 kb gap, under the OLD 5 kb
+    ]
+    elements, _audit = build(hits)
+    assert len(elements) == 2
+    for element in elements:
+        span = int(element["end"]) - int(element["start"]) + 1
+        assert span == 5001
+
+
+def test_the_overlap_dedup_records_rows_as_discarded_not_kept():
+    """'kept_flagged' means kept, and these rows are not in the output. The audit
+    vocabulary is shared across the mobilome scripts, so it has to mean one thing."""
+    hits = [
+        hsp(subject="Tn4401b-JX560992", qstart=10_000, qend=15_000, bitscore="9000"),
+        hsp(subject="Tn2-AY123456", qstart=11_000, qend=14_000, bitscore="5000",
+            length=3_000, sstart=1, send=3_000, slen=3_000),
+    ]
+    _elements, audit = build(hits)
+    superseded = [a for a in audit
+                  if a["reason"] == "nested_or_overlapping_tncentral_hit"]
+    assert superseded
+    assert superseded[0]["action"] == "discarded"

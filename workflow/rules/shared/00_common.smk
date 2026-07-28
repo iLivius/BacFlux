@@ -1047,7 +1047,13 @@ MOBILOME_NAME_ELEMENTS = MOBILOME_RUN and bool(TNCENTRAL_URL or TNCENTRAL_LOCAL)
 # makes tier 4 reachable), this one only labels elements CONJscan already found.
 # Turning it on cannot change any gene's tier.
 _iceberg_cfg = _mobilome_cfg.get("iceberg") or {}
-ICEBERG_URLS = [str(u).strip() for u in (_iceberg_cfg.get("urls") or []) if str(u).strip()]
+# A single URL is naturally written without a leading dash, which YAML gives us
+# as a plain string - and iterating a string yields its CHARACTERS, so the list
+# would silently become one "URL" per letter. Accept both shapes.
+_iceberg_urls = _iceberg_cfg.get("urls") or []
+if isinstance(_iceberg_urls, str):
+    _iceberg_urls = [_iceberg_urls]
+ICEBERG_URLS = [str(u).strip() for u in _iceberg_urls if str(u).strip()]
 ICEBERG_LOCAL = str(_iceberg_cfg.get("dir") or "").strip()
 ICEBERG_MIN_IDENTITY = float(_iceberg_cfg.get("min_identity", 80.0))
 ICEBERG_MIN_OVERLAP = float(_iceberg_cfg.get("min_overlap_fraction", 0.50))

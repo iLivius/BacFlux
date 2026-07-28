@@ -1,0 +1,2 @@
+sample	contig	start	end	strand	element_type	mge_id	mge_name	identity	subject_coverage	reference_accession	reference_length_bp	n_hsps	confidence
+SYN	c1	3000	4999	.	unit_transposon	c1|unit_transposon-3000:4999	TnSmall	100.0	1.000	BB2	2000	1	high

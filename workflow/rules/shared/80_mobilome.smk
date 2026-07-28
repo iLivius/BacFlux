@@ -728,10 +728,13 @@ if MOBILOME_RUN:
                         # ICE_seq_all.fas is ~100 MB and the server is slow, so allow
                         # resuming rather than restarting a part-finished transfer.
                         curl -sSL -C - -A "{params.user_agent}" -o {output.db_dir}/part.fas "$url"
-                        # A FASTA starts with '>'. An error page does not, and would
-                        # otherwise be indexed as an empty database that silently
-                        # names nothing.
-                        if [ "$(head -c 1 {output.db_dir}/part.fas)" != ">" ]; then
+                        # Reject an HTML error page, which would otherwise be
+                        # indexed as an empty database that silently names nothing.
+                        # Test that a defline appears near the START of the file
+                        # rather than that byte 0 is '>': the real ICE_seq_all.fas
+                        # begins with a newline, and the stricter test rejected it,
+                        # which meant this layer could never build at all.
+                        if ! head -c 4096 {output.db_dir}/part.fas | grep -q '^>'; then
                             echo "ERROR: $url did not return FASTA. First bytes:" >&2
                             head -c 200 {output.db_dir}/part.fas >&2
                             exit 1
