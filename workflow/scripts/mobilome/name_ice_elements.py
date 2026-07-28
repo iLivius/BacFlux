@@ -192,16 +192,32 @@ def best_match_for_element(element_start, element_end, contig_hits,
     best_score, best_shared, best_hit = candidates[0]
 
     # How many OTHER curated elements explain this candidate about as well.
-    # Compared on bitscore, within 1%, and counted per distinct element name so
-    # several HSPs of one reference do not inflate it.
+    #
+    # Banded on IDENTITY and overlap, not on bitscore. Bitscore scales with
+    # alignment LENGTH, so a 1% band on it is a different question depending on
+    # how long the hit is: a short, perfect match to a small element scores far
+    # below a long, slightly worse match to a big one, and would not be counted
+    # as comparable even though it explains our element just as well. Since the
+    # point of this number is to warn that the name is one of a near-identical
+    # group, the comparison has to be length-independent.
+    #
+    # Counted per distinct element NAME so several HSPs of one reference do not
+    # inflate it.
     winner_name, _ = parse_iceberg_name(best_hit["sseqid"])
+    winner_identity = to_float(best_hit["pident"])
+    winner_overlap = best_shared
     comparable_names = set()
-    for score, _shared, hit in candidates[1:]:
-        if best_score > 0 and score < best_score * 0.99:
-            continue
+    for _score, shared, hit in candidates[1:]:
         name, _ = parse_iceberg_name(hit["sseqid"])
-        if name != winner_name:
-            comparable_names.add(name)
+        if name == winner_name:
+            continue
+        # Within half a percentage point of identity, and covering a comparable
+        # amount of our element (within 10%).
+        if abs(to_float(hit["pident"]) - winner_identity) > 0.5:
+            continue
+        if winner_overlap > 0 and abs(shared - winner_overlap) / winner_overlap > 0.10:
+            continue
+        comparable_names.add(name)
 
     best_hit = dict(best_hit)
     best_hit["_overlap_bp"] = best_shared

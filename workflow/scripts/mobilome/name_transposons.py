@@ -339,6 +339,11 @@ def merge_hits_per_element(hits):
             subject_intervals = [(to_int(h["sstart"]), to_int(h["send"])) for h in copy_hsps]
             query_positions = [to_int(h["qstart"]) for h in copy_hsps] + \
                               [to_int(h["qend"]) for h in copy_hsps]
+            # merge_span counts overlapping subject intervals ONCE, so two HSPs
+            # hitting the same part of the reference cannot add up to look like
+            # two different parts of it. That is what keeps the summed coverage
+            # honest: it measures how much of the reference is present, not how
+            # many times we matched it.
             covered_bp = merge_span(subject_intervals)
             best = max(copy_hsps, key=lambda h: to_float(h["bitscore"]))
 
