@@ -130,16 +130,37 @@ def test_a_noisy_single_copy_still_counts():
 
 # ── Reporting ────────────────────────────────────────────────────────────────
 
-def test_a_family_found_only_by_isescan_is_still_listed():
-    """A family ISEScan located but the reads did not support belongs in the
-    table showing zero, not missing from it - absence of a row reads as 'not
-    looked at' rather than 'looked at and not found'."""
-    summary, _audit = run(
+def test_a_family_absent_from_isosdb_reports_NA_not_a_negative_delta():
+    """The failure the first real run exposed, and the most important test here.
+
+    ISEScan finds IS elements by profile HMM, which recognises a FAMILY. This leg
+    needs nucleotide identity to a specific catalogued element. For an organism
+    ISOSDB does not cover - the normal case for an environmental isolate - no
+    entry attracts reads, the estimate is zero and the delta goes NEGATIVE.
+
+    Read naively that says "the assembly collapsed nothing, we over-called", when
+    the truth is "this database has nothing to say about this organism". Measured
+    on hybrid sample 006 (Aquipseudomonas): 17 IS located, 1 of 22,713 ISOSDB
+    entries covered end to end. Absence of a nucleotide match is not evidence of
+    absence of copies, so it must report NA.
+    """
+    summary, audit = run(
         [], [contig(50, 5_000_000)], families={}, located={"IS110": 3})
     row = by_family(summary)["IS110"]
     assert row["located_copies"] == "3"
-    assert row["estimated_copies"] == "0.0"
-    assert row["collapse_delta"] == "-3.0"
+    assert row["estimated_copies"] == "NA"
+    assert row["collapse_delta"] == "NA"
+    assert row["db_informative"] == "FALSE"
+    assert "family_absent_from_isosdb" in reasons(audit)
+
+
+def test_a_sample_ISOSDB_cannot_speak_to_at_all_says_so_once():
+    """When no family is covered the whole leg produced nothing, and the located
+    count remains an UNQUANTIFIED floor. That has to be stated, or a reader sees
+    a table of NAs and no explanation."""
+    _summary, audit = run(
+        [], [contig(50, 5_000_000)], families={}, located={"IS3": 9, "IS110": 2})
+    assert "isosdb_does_not_cover_this_organism" in reasons(audit)
 
 
 def test_entries_without_a_family_are_reported_not_dropped():

@@ -211,8 +211,9 @@ AUDIT_COLUMNS = ["sample", "element", "action", "reason", "detail"]
 SUMMARY_COLUMNS = [
     "sample", "is_family",
     "located_copies",          # what ISEScan found on the contigs
-    "estimated_copies",        # what the read depth implies
-    "collapse_delta",          # estimated - located; how much the assembly lost
+    "estimated_copies",        # what the read depth implies (NA if undetectable)
+    "collapse_delta",          # estimated - located, or NA - see db_informative
+    "db_informative",          # did ISOSDB contain this family at all?
     "n_db_entries_detected",   # how many ISOSDB entries contributed
     "max_entry_copy_number",   # the deepest single entry, for context
     "genome_baseline_depth",
@@ -289,27 +290,103 @@ def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
         bucket = per_family.get(family, {"copies": 0.0, "entries": 0, "max": 0.0})
         located = located_counts.get(family, 0)
         estimated = bucket["copies"]
+
+        # THE CHECK THIS LEG CANNOT WORK WITHOUT.
+        #
+        # ISEScan finds IS elements by profile HMM, which recognises a FAMILY.
+        # This leg maps reads to ISOSDB, which requires nucleotide identity to a
+        # specific catalogued element. Those are not the same sensitivity, and
+        # the spec (§2.2) quantifies the gap from the ISOSDB paper itself: 97.5%
+        # of its transposases have protein homologs in ISfinder but only 37.9%
+        # have nucleotide ones.
+        #
+        # So for an organism ISOSDB does not cover - which for a non-clinical,
+        # environmental isolate is the NORMAL case - no entry attracts reads, the
+        # estimate comes out at zero, and the delta goes NEGATIVE. Reported
+        # naively that reads as "the assembly did not collapse anything, we
+        # over-called", when the truth is "this database has nothing to say about
+        # this organism". Measured on hybrid sample 006 (Aquipseudomonas): 17 IS
+        # located by ISEScan, 1 of 22,713 ISOSDB entries covered end to end,
+        # delta -7.3 on the IS3 family alone.
+        #
+        # Absence of a nucleotide match is not evidence of absence of copies, so
+        # when nothing was detected the estimate is reported as NA rather than as
+        # a number that looks like a measurement.
+        # A NEGATIVE delta is never evidence of anything except incomplete
+        # database coverage, so it is never reported as a delta.
+        #
+        # This leg can only ever say "there are AT LEAST this many more copies
+        # than you located". It cannot say "there are fewer", because ISEScan's
+        # profile HMMs are strictly more sensitive than nucleotide mapping to a
+        # specific catalogued element - so estimated < located always means
+        # ISOSDB missed some, never that ISEScan over-called. On sample 006 the
+        # IS3 family had 9 elements located and exactly ONE ISOSDB entry
+        # detected: db_informative is technically true, but a delta of -7.3
+        # measures the database, not the assembly.
+        informative = bucket["entries"] > 0 and estimated >= located
         summary_rows.append({
             "sample": sample,
             "is_family": family,
             "located_copies": str(located),
-            "estimated_copies": f"{estimated:.1f}",
-            "collapse_delta": f"{estimated - located:.1f}",
+            # The estimate itself is still worth showing when anything was
+            # detected - it is the delta that must not be over-read.
+            "estimated_copies": f"{estimated:.1f}" if bucket["entries"] else "NA",
+            "collapse_delta": f"{estimated - located:.1f}" if informative else "NA",
+            "db_informative": "TRUE" if informative else "FALSE",
             "n_db_entries_detected": str(bucket["entries"]),
             "max_entry_copy_number": f"{bucket['max']:.2f}",
             "genome_baseline_depth": f"{baseline:.1f}",
         })
 
+        if bucket["entries"] and not informative:
+            audit_rows.append(audit_row(
+                sample, "not_applicable", "isosdb_detected_fewer_than_located",
+                f"{family}: ISEScan located {located} element(s) but ISOSDB "
+                f"read depth accounts for only {estimated:.1f}, from "
+                f"{bucket['entries']} database entry/entries. No collapse "
+                "estimate is reported. This leg can only ever say 'at least this "
+                "many MORE copies than you located' - ISEScan's profile HMMs are "
+                "strictly more sensitive than nucleotide mapping to a specific "
+                "catalogued element, so a shortfall always means the database "
+                "missed some, never that ISEScan over-called."))
+
+        if not bucket["entries"]:
+            audit_rows.append(audit_row(
+                sample, "not_applicable", "family_absent_from_isosdb",
+                f"{family}: ISEScan located {located} element(s) of this family, "
+                "but no ISOSDB entry for it was covered by reads, so no copy "
+                "number can be estimated. This says the database does not hold "
+                "this organism's version of the family at nucleotide identity - "
+                "NOT that the assembly collapsed nothing. Reported as NA rather "
+                "than as a negative delta, which would read like a measurement."))
+
     total_located = sum(located_counts.values())
     total_estimated = sum(b["copies"] for b in per_family.values())
+    families_informative = sum(1 for b in per_family.values() if b["entries"] > 0)
+    families_total = len(set(per_family) | set(located_counts))
+
     audit_rows.append(audit_row(
         sample, "summary", "copy_number_estimate_complete",
         f"Genome baseline depth {baseline:.1f}x. ISEScan located "
-        f"{total_located} IS element(s) on the contigs; read depth against ISOSDB "
-        f"implies about {total_estimated:.1f}. A positive difference is the "
-        "assembly collapse this module warns about - identical IS copies merged "
-        "into one contig node - and is why the located count is reported as a "
-        "floor. The estimate cannot say WHERE the extra copies are."))
+        f"{total_located} IS element(s) on the contigs. ISOSDB could speak to "
+        f"{families_informative} of {families_total} IS family/families; where it "
+        f"could, read depth implies about {total_estimated:.1f} copies. A POSITIVE "
+        "difference is the assembly collapse this module warns about - identical "
+        "IS copies merged into one contig node - and is why the located count is "
+        "reported as a floor; the estimate cannot say WHERE the extra copies are. "
+        + ("A family ISOSDB does not cover is reported NA, never as a negative "
+           "delta: no nucleotide match means the database is silent about this "
+           "organism, not that nothing collapsed."
+           if families_informative < families_total else "")))
+
+    if families_informative == 0:
+        audit_rows.append(audit_row(
+            sample, "not_applicable", "isosdb_does_not_cover_this_organism",
+            f"No ISOSDB entry was covered by reads for any of the {families_total} "
+            "IS family/families ISEScan found, so this leg produced no estimate at "
+            "all. Expected for isolates outside ISOSDB's sampling - it is built "
+            "largely from human-associated metagenomes - and it means the located "
+            "IS count remains an UNQUANTIFIED floor for this sample."))
 
     return summary_rows, audit_rows
 
@@ -365,11 +442,20 @@ def main(argv=None):
 
     total_located = sum(to_int(r["located_copies"]) for r in summary)
     total_estimated = sum(to_float(r["estimated_copies"]) for r in summary)
-    print(
-        f"Sample {args.sample}: {len(summary)} IS family/families; "
-        f"{total_located} located on contigs, ~{total_estimated:.0f} implied by "
-        f"read depth (difference = assembly collapse; see {args.out_audit})."
-    )
+    n_informative = sum(1 for r in summary if r["db_informative"] == "TRUE")
+    if n_informative:
+        print(
+            f"Sample {args.sample}: {len(summary)} IS family/families; "
+            f"{total_located} located on contigs. ISOSDB could quantify collapse "
+            f"for {n_informative} of them (see {args.out_table})."
+        )
+    else:
+        print(
+            f"Sample {args.sample}: {len(summary)} IS family/families, "
+            f"{total_located} element(s) located on contigs, but ISOSDB could not "
+            f"quantify collapse for ANY of them - the located count stays an "
+            f"unquantified floor. Reasons in {args.out_audit}."
+        )
     return 0
 
 
