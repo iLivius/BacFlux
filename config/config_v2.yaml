@@ -172,6 +172,57 @@ mobilome:
   max_composite_span_bp: 20000 # two IS copies further apart than this are not called one
                                #   composite transposon. A CONVENTION, not biology — the
                                #   measured distance is always reported next to the call.
+  # ── Naming layer: curated transposons and integrons (ladder tier 4) ────────
+  # Leave `url` and `dir` both empty and this whole layer is simply skipped —
+  # the module runs exactly as before, and tier 4 stays unreachable.
+  #
+  # WHAT IT BUYS YOU. Tier 3 is an INFERENCE: two IS copies of one family, the
+  # right distance apart, a gene between them, so we call it a composite
+  # transposon. That inference has known blind spots — IS26 forms translocatable
+  # units with its copies in DIRECT orientation, breaking the same-orientation
+  # rule the pattern depends on. A TnCentral hit is not an inference: it matches
+  # an element somebody characterised, named and deposited, whose architecture is
+  # already known, so it gets IS26 right for free. On the KPNIH1 positive control
+  # this moves blaCTX-M-15 from tier 2 ("an IS is next to it, so expression may
+  # change") to tier 4, inside TnEcp1.1 — which is the truth: ISEcp1 does not
+  # merely modulate blaCTX-M-15, it mobilises it.
+  #
+  # LICENCE. BacFlux never ships this data. Setting a URL means YOU fetch it,
+  # under your own agreement with the licensor — the same arrangement as
+  # bakta_db, gtdbtk_db and the CARD link. TnCentral carries an "All Rights
+  # Reserved" notice and its terms for commercial use are not stated; check
+  # before relying on it outside academic work. The `nc/tn` endpoint below is the
+  # transposon set only. TnCentral's other endpoints (tn_in_is, prot/tn_is)
+  # additionally carry ISfinder terms, which require written authorisation and
+  # forbid redistribution — they are deliberately NOT wired in here.
+  tncentral:
+    url: ""                    # e.g. https://tncentral.ncc.unesp.br/api/download_blast/nc/tn
+                               #   A ZIP holding tncentral.fa (~4.3 MB, ~512 curated
+                               #   transposons, integrons and IS). The server rejects
+                               #   the default curl user-agent, so the download rule
+                               #   sends a browser one; if that stops working the rule
+                               #   fails loudly rather than producing an empty database.
+    sha256: ""                 # OPTIONAL but recommended. The endpoint is unversioned,
+                               #   so this is the only way to know which release you
+                               #   analysed with. Leave empty to skip the check; the
+                               #   rule records the observed checksum either way, in
+                               #   tncentral_db/PROVENANCE.txt.
+    dir: ""                    # OPTIONAL — a directory holding tncentral.fa you already
+                               #   have. Takes precedence over `url`; nothing is fetched.
+    min_identity: 90.0         # percent identity a BLAST hit needs before it may confer
+                               #   a curated NAME. Below this the sequence may well be a
+                               #   RELATIVE of the element, but calling it by that name
+                               #   would claim more than the data shows.
+    min_reference_coverage: 0.8
+                               # fraction of the REFERENCE element that must be present.
+                               #   Measured against the reference, not your contig: the
+                               #   question is "is the whole of this known transposon
+                               #   here?", and a 7 kb element inside a 300 kb contig
+                               #   covers 2% of the contig and 100% of itself. A
+                               #   fragment of a transposon is not that transposon —
+                               #   on short reads a low value usually means the element
+                               #   is split across contigs.
+
   require_trna_boundary_for_high: false
                                # How strict to be before an ICE/IME candidate may be
                                #   labelled HIGH confidence.

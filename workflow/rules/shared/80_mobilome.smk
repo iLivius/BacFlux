@@ -485,6 +485,174 @@ if MOBILOME_RUN:
               --out-audit {output.audit} > {log} 2>&1
             """
 
+    # ══ The TnCentral naming layer (ladder tier 4) ═══════════════════════════
+    # Only exists when the user configured a TnCentral source. Without it the
+    # module behaves exactly as before and tier 4 stays unreachable.
+    if MOBILOME_NAME_ELEMENTS:
+
+        # ── Rule: tncentral_db — fetch and index the curated transposon set ──
+        # Biology: TnCentral catalogues transposons and integrons that people have
+        #          characterised and named. Matching one is qualitatively different
+        #          from inferring a composite from two IS copies: the architecture
+        #          is already known, so it gets awkward cases like IS26 right for
+        #          free (spec §7).
+        # Takes in: nothing from the workflow — a URL from the config, or a
+        #           directory the user already holds.
+        # Does: download, verify, unpack, and rebuild the BLAST database.
+        #       The shipped index is BLAST v4; we dump to FASTA and rebuild as v5
+        #       so it works with current blast+ (spec §5.3), and record what was
+        #       actually fetched in PROVENANCE.txt because the endpoint is
+        #       unversioned and otherwise there is no way to say later WHICH
+        #       release a result came from.
+        # Produces: TNCENTRAL_BLAST_DB (a prefix) + PROVENANCE.txt.
+        # Consumed by: tncentral_blast.
+        rule tncentral_db:
+            output:
+                db_dir = directory(TNCENTRAL_DB_DIR),
+            params:
+                url = TNCENTRAL_URL,
+                sha256 = TNCENTRAL_SHA256,
+                local_dir = TNCENTRAL_LOCAL,
+                # TnCentral's server 403s the default curl user-agent. This is a
+                # bot block rather than a wall, so we identify as a browser. If
+                # they tighten it the rule fails loudly - it never leaves an empty
+                # database behind that would silently produce zero named elements.
+                user_agent = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                              "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"),
+            conda:
+                "../../envs/tncentral.yaml"
+            log:
+                LOGS + "/mobilome_tncentral_db.log"
+            priority: 4
+            shell:
+                """
+                exec > {log} 2>&1
+                set -euo pipefail
+                mkdir -p {output.db_dir}
+
+                if [ -n "{params.local_dir}" ]; then
+                    echo "Using the local TnCentral directory '{params.local_dir}'. Nothing will be downloaded."
+                    cp "{params.local_dir}"/tncentral.fa {output.db_dir}/tncentral.fa
+                    SOURCE="local:{params.local_dir}"
+                else
+                    echo "Fetching TnCentral from {params.url}"
+                    curl -sSL -A "{params.user_agent}" -o {output.db_dir}/tncentral.zip "{params.url}"
+
+                    # A bot block or an error page returns HTML with a 200, which
+                    # would otherwise unzip-fail confusingly or, worse, produce an
+                    # empty database and zero named elements with no complaint.
+                    if ! unzip -t {output.db_dir}/tncentral.zip > /dev/null 2>&1; then
+                        echo "ERROR: the download is not a ZIP archive. The server may have" >&2
+                        echo "       blocked the request or changed its API. First bytes:" >&2
+                        head -c 200 {output.db_dir}/tncentral.zip >&2
+                        exit 1
+                    fi
+
+                    OBSERVED=$(sha256sum {output.db_dir}/tncentral.zip | cut -d' ' -f1)
+                    if [ -n "{params.sha256}" ] && [ "$OBSERVED" != "{params.sha256}" ]; then
+                        echo "ERROR: TnCentral checksum mismatch." >&2
+                        echo "       expected {params.sha256}" >&2
+                        echo "       observed $OBSERVED" >&2
+                        echo "       The endpoint is unversioned, so this means the upstream" >&2
+                        echo "       data changed. Update mobilome.tncentral.sha256 once you" >&2
+                        echo "       have decided the new release is the one you want." >&2
+                        exit 1
+                    fi
+
+                    unzip -o -q -j {output.db_dir}/tncentral.zip -d {output.db_dir}
+                    SOURCE="{params.url} (sha256 $OBSERVED)"
+                    rm -f {output.db_dir}/tncentral.zip
+                fi
+
+                # The archive ships a BLAST v4 index. Rebuild as v5 so it works
+                # with current blast+ (spec §5.3), and drop the shipped index files
+                # so there is no chance of the old one being picked up instead.
+                rm -f {output.db_dir}/tncentral.fa.n*
+                makeblastdb -in {output.db_dir}/tncentral.fa -dbtype nucl \
+                  -out {output.db_dir}/tncentral_v5 -blastdb_version 5
+
+                N_SEQ=$(grep -c '^>' {output.db_dir}/tncentral.fa)
+                {{
+                  echo "source:      $SOURCE"
+                  echo "fetched:     $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  echo "fasta_sha256: $(sha256sum {output.db_dir}/tncentral.fa | cut -d' ' -f1)"
+                  echo "sequences:   $N_SEQ"
+                  echo ""
+                  echo "The TnCentral download endpoint is UNVERSIONED, so this file is the"
+                  echo "only record of which release was used. Quote it in a methods section."
+                  echo "TnCentral carries an 'All Rights Reserved' notice; BacFlux ships no"
+                  echo "TnCentral data, only this URL. See config mobilome.tncentral."
+                }} > {output.db_dir}/PROVENANCE.txt
+
+                echo "TnCentral ready: $N_SEQ sequences."
+                """
+
+        # ── Rule: tncentral_blast — where are the curated elements? ──────────
+        # Takes in: this sample's contigs + the v5 database above.
+        # Does: blastn the whole assembly against the curated set. The whole
+        #       assembly rather than the ISEScan calls, because a transposon is
+        #       bigger than the IS that bounds it and would be clipped otherwise.
+        # Produces: TNCENTRAL_BLAST_HITS, tabular, with the exact columns
+        #           name_transposons.py expects (BLAST_COLUMNS there).
+        rule tncentral_blast:
+            input:
+                contigs = FINAL_CONTIGS,
+                db_dir = TNCENTRAL_DB_DIR,
+            output:
+                hits = TNCENTRAL_BLAST_HITS,
+            params:
+                db = lambda w, input: os.path.join(input.db_dir, "tncentral_v5"),
+                # Loose enough that the naming thresholds in the script - not the
+                # search - decide what counts, so every near miss is auditable.
+                evalue = "1e-20",
+            conda:
+                "../../envs/tncentral.yaml"
+            threads: capped_cpus(8)
+            log:
+                LOGS + "/mobilome_tncentral_blast_{sample}.log"
+            priority: 3
+            shell:
+                """
+                blastn \
+                  -query {input.contigs} \
+                  -db {params.db} \
+                  -outfmt "6 qseqid sseqid pident length qstart qend sstart send evalue bitscore slen qlen" \
+                  -evalue {params.evalue} \
+                  -num_threads {threads} \
+                  -out {output.hits} > {log} 2>&1
+                """
+
+        # ── Rule: name_elements — turn BLAST hits into named elements ────────
+        # Does: merge HSPs into element COPIES (separate copies of one transposon
+        #       must not be joined - see the script), apply the naming thresholds,
+        #       drop plain IS entries that ISEScan already covers, and write the
+        #       result in the element-table shape colocalise.py consumes.
+        # Produces: NAMED_ELEMENTS_TABLE + its discard audit.
+        # Consumed by: amr_mge_colocalisation, as a third --is-table.
+        rule name_elements:
+            input:
+                hits = TNCENTRAL_BLAST_HITS,
+            output:
+                table = NAMED_ELEMENTS_TABLE,
+                audit = NAMED_ELEMENTS_AUDIT,
+            params:
+                script = NAME_TRANSPOSONS_SCRIPT,
+                min_identity = TNCENTRAL_MIN_IDENTITY,
+                min_coverage = TNCENTRAL_MIN_COVERAGE,
+            log:
+                LOGS + "/mobilome_name_elements_{sample}.log"
+            priority: 3
+            shell:
+                """
+                python {params.script} \
+                  --sample {wildcards.sample} \
+                  --blast {input.hits} \
+                  --min-identity {params.min_identity} \
+                  --min-coverage {params.min_coverage} \
+                  --out-table {output.table} \
+                  --out-audit {output.audit} > {log} 2>&1
+                """
+
     # ── Rule: mobilome_replicons — is each contig chromosome or plasmid? ─────
     # Takes in: the Platon directory this sample's plasmid stage already produced,
     #           plus the genome (so contigs Platon skipped are still listed).
@@ -560,6 +728,10 @@ if MOBILOME_RUN:
             amrfinder = AMRFINDER_TSV,
             is_table = IS_TABLE,
             ice_table = ICE_TABLE,
+            # Curated transposons/integrons, present only when a TnCentral source
+            # was configured. Unpacking a dict keeps the input list valid either
+            # way; without it tier 4 is simply never awarded.
+            **({"named_table": NAMED_ELEMENTS_TABLE} if MOBILOME_NAME_ELEMENTS else {}),
             replicons = MOBILOME_REPLICONS,
             lengths = CONTIG_LENGTHS,
         output:
@@ -568,6 +740,12 @@ if MOBILOME_RUN:
         params:
             script = COLOCALISE_SCRIPT,
             max_span = MOBILOME_MAX_COMPOSITE_SPAN,
+            # Third element table, empty unless the TnCentral naming layer is on.
+            # --is-table is `action="append"`, so extra tables just add elements.
+            named_flag = lambda w: (
+                "--is-table " + NAMED_ELEMENTS_TABLE.format(sample=w.sample)
+                if MOBILOME_NAME_ELEMENTS else ""
+            ),
         log:
             LOGS + "/mobilome_colocalisation_{sample}.log"
         priority: 3
@@ -578,6 +756,7 @@ if MOBILOME_RUN:
               --amrfinder {input.amrfinder} \
               --is-table {input.is_table} \
               --is-table {input.ice_table} \
+              {params.named_flag} \
               --replicons {input.replicons} \
               --contig-lengths {input.lengths} \
               --max-composite-span {params.max_span} \

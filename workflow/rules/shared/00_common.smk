@@ -338,6 +338,7 @@ CONJSCAN_ICE_SCRIPT    = os.path.join(MOBILOME_SCRIPTS_DIR, "conjscan_to_ice.py"
 # exists for the Bakta --replicons table in the long-read modes, and the two do
 # entirely different jobs.
 REPLICONS_MOBILOME_SCRIPT = os.path.join(MOBILOME_SCRIPTS_DIR, "platon_replicons.py")
+NAME_TRANSPOSONS_SCRIPT   = os.path.join(MOBILOME_SCRIPTS_DIR, "name_transposons.py")
 
 
 # ───────────────────────── 3a. Resource accessors ───────────────────────────
@@ -417,6 +418,17 @@ CONJSCAN_MODELS_DIR      = DIR_MOBILOME + "/conjscan_models"   # a DIRECTORY (ru
 # co-localisation step, which accepts --is-table more than once.
 ICE_TABLE                = MOBILOME_DIR + "/{sample}_ice_candidates.tsv"
 ICE_AUDIT                = MOBILOME_DIR + "/{sample}_ice_discarded.tsv"
+# THIRD source of mobile elements: curated transposons and integrons named by
+# BLAST against TnCentral. This is what makes ladder tier 4 ("inside a NAMED unit
+# transposon or integron") reachable at all - colocalise.py has always known how
+# to award it, but nothing produced an element of the right type until now.
+# Fetched once and shared by every sample, like the CONJscan models.
+TNCENTRAL_DB_DIR         = DIR_MOBILOME + "/tncentral_db"       # a DIRECTORY (rule tncentral_db)
+TNCENTRAL_FASTA          = TNCENTRAL_DB_DIR + "/tncentral.fa"
+TNCENTRAL_BLAST_DB       = TNCENTRAL_DB_DIR + "/tncentral_v5"   # a PREFIX, not a file
+TNCENTRAL_BLAST_HITS     = MOBILOME_DIR + "/{sample}_tncentral_blast.tsv"
+NAMED_ELEMENTS_TABLE     = MOBILOME_DIR + "/{sample}_named_elements.tsv"
+NAMED_ELEMENTS_AUDIT     = MOBILOME_DIR + "/{sample}_named_elements_discarded.tsv"
 MOBILOME_REPLICONS       = MOBILOME_DIR + "/{sample}_replicon_calls.tsv"
 MOBILITY_TABLE           = MOBILOME_DIR + "/{sample}_amr_mobility.tsv"   # THE deliverable
 MOBILITY_AUDIT           = MOBILOME_DIR + "/{sample}_amr_mobility_audit.tsv"
@@ -990,6 +1002,25 @@ MOBILOME_BOUNDARY_BP = int(_mobilome_cfg.get("contig_boundary_bp", 100))
 # leaves the interval at the machinery span, so nothing is ever invented either way.
 MOBILOME_REQUIRE_TRNA_BOUNDARY = _config_bool(
     _mobilome_cfg.get("require_trna_boundary_for_high"), False)
+
+# ── The TnCentral naming layer (ladder tier 4) ───────────────────────────────
+# Optional, and OFF unless a URL is configured, because it is the only part of
+# the mobilome module that fetches a third-party sequence database at run time.
+# BacFlux never ships the data: the workflow distributes a URL, and the user
+# downloads under their own agreement with the licensor - the same pattern as
+# bakta_db, gtdbtk_db and the CARD link (spec §5.2, §11).
+_tncentral_cfg = _mobilome_cfg.get("tncentral") or {}
+TNCENTRAL_URL = str(_tncentral_cfg.get("url") or "").strip()
+TNCENTRAL_SHA256 = str(_tncentral_cfg.get("sha256") or "").strip()
+# A local copy the user already holds takes precedence over downloading, exactly
+# as directories.* beats links.* everywhere else in this config.
+TNCENTRAL_LOCAL = str(_tncentral_cfg.get("dir") or "").strip()
+# The naming cascade's thresholds (spec §5.4). Exposed because they are
+# conventions, not biology, and the measured values are reported alongside the call.
+TNCENTRAL_MIN_IDENTITY = float(_tncentral_cfg.get("min_identity", 90.0))
+TNCENTRAL_MIN_COVERAGE = float(_tncentral_cfg.get("min_reference_coverage", 0.80))
+
+MOBILOME_NAME_ELEMENTS = MOBILOME_RUN and bool(TNCENTRAL_URL or TNCENTRAL_LOCAL)
 
 if MOBILOME_RUN:
     print(

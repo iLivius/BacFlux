@@ -1,0 +1,22 @@
+# Environment for the TnCentral naming layer (mobilome tier 4).
+#
+# Separate from blast.yaml on purpose: that env is shared with the contig BLAST
+# used by decontamination, and adding fetch utilities to it would force every
+# user to rebuild an env they already have for a rule they may never run.
+#
+# blast   - makeblastdb, to rebuild TnCentral's shipped v4 index as v5 (spec
+#           §5.3), and blastn to search the contigs against it.
+# curl    - TnCentral is fetched over HTTPS and its server rejects the default
+#           user-agent, so the rule sets a browser one.
+# unzip   - the download is a ZIP holding tncentral.fa.
+#
+# The same convention as workflow/envs/checkv.yaml, which likewise lists wget
+# next to its scientific tool rather than assuming the host provides one.
+name: tncentral
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - blast=2.16.0
+  - curl
+  - unzip
