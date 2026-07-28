@@ -271,9 +271,20 @@ it to the chromosome. On this genome it found three:
 
 ```
 NZ_CP006659.2|ime-1979164:1994490                  chromosome  -> ime
-NZ_CP006659.2|conjugative_region-4610740:4644558   chromosome  -> conjugative_region
+NZ_CP006659.2|ice-4604073:4644558                  chromosome  -> ice
 NZ_CP006661.1|conjugative_region-57877:90473       PLASMID     -> conjugative_region
 ```
+
+> **A worked example of how this table gets things wrong, and how it was caught.**
+> The middle row used to read `conjugative_region-4610740:4644558` — the same
+> machinery, but no integrase found, so it fell into the last row of the table
+> below instead of the first. The integrase was there all along: Bakta annotates
+> it `DNA integration/recombination/inversion protein` at 4,604,073–4,605,020,
+> 5.7 kb away and comfortably inside the 15 kb clustering window, and the product
+> regex simply did not match that wording. The element was being under-called on
+> the very genome used to validate the module. Worth remembering when reading any
+> `conjugative_region` row: the class turns on **one** annotation, and an
+> annotation is a string match.
 
 The plasmid one is typed `conjugative_region`, never `ice`, and that is a
 definitional point rather than a threshold: **ICE** stands for *Integrative and
@@ -345,9 +356,41 @@ came from, and the distinction matters:
   and with it every gene on it), but it is not wrapped around this gene, and the
   row says so rather than implying containment.
 
-`boundary_method` is normally `none` and `attL`/`attR` `NA` on short reads:
-BacFlux does not run the att-site search (spec §8 Phase 3 is BacFluxL work). The
-columns exist so the schema is stable when it does.
+### `boundary_method`, and why it is not folded into the confidence
+
+The att-site search (spec §8 Phase 3) **does** run, in every mode — the constraint
+is assembly contiguity, not the sequencer. `boundary_method` says how the
+element's ends were established, and it takes three values:
+
+| value | meaning | does it move the element? |
+|---|---|---|
+| `tRNA` | attL/attR found at an annotated tRNA 3′ end — the site integrases actually target | **yes** |
+| `denovo` | a bracketing direct repeat was found, with no tRNA behind it | **no** — reported only |
+| `none` | no att pair; the interval is the machinery span | no |
+
+**A de novo repeat never moves an element, and the reason is worth knowing.**
+Measured on this genome's chromosome, 300 randomly placed 15 kb non-ICE spans
+produced a confident de novo "boundary" **22%** of the time. Real chromosomes are
+full of rRNA operons, REP elements and paralogues, so an exact 18–25 bp direct
+repeat between two 30 kb windows is ordinary rather than remarkable. Requiring the
+repeat to occur exactly twice — an integration scar is created once; an rRNA
+operon exists seven times — cut that to 16%, and refusing to *act* on a de novo
+repeat at all cuts the rate that can reach the AMR table to **1%**.
+
+That restraint matters because widening an element makes every gene inside it
+*cargo*. A fabricated 50 kb boundary would turn a `gyrA` point mutation — the
+textbook intrinsic, non-transferable determinant — into "predicted
+self-transmissible". So an unresolved boundary always leaves the interval at the
+machinery span: a floor, never an invention.
+
+**Confidence answers a different question.** `confidence` is about *is this an
+ICE?* — anchor classes, intact machinery, one contig. `boundary_method` is about
+*where does it stop?* On a fragmented short-read assembly the second usually has
+no answer, so by default the two are read side by side rather than multiplied
+together. Set `mobilome.require_trna_boundary_for_high: true` to apply the strict
+spec §8 Phase 6 reading, which demands a tRNA-anchored boundary before any element
+may be called `high` — sensible on **closed long-read assemblies**, where an
+unresolved boundary is a warning sign rather than the norm.
 
 ---
 
