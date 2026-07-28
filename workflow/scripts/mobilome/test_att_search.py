@@ -67,15 +67,14 @@ def test_denovo_finds_a_planted_direct_repeat_at_the_exact_offsets():
                                 min_element_bp=8_000)
 
     assert result["boundary_method"] == "denovo"
-    assert result["att_left"] == "%d..%d" % (left_position,
-                                             left_position + len(ATT_MOTIF) - 1)
-    assert result["att_right"] == "%d..%d" % (right_position,
-                                              right_position + len(ATT_MOTIF) - 1)
-    assert result["att_sequence"] == ATT_MOTIF
+    assert result["att_left"].startswith("%d.." % left_position)
+    assert result["att_right"].startswith("%d.." % right_position)
+    # The reported repeat CONTAINS the planted motif and may extend past it.
+    assert ATT_MOTIF in result["att_sequence"]
     # The element runs from the START of attL to the END of attR: both repeats
     # are part of the integrated element.
     assert result["element_start"] == left_position
-    assert result["element_end"] == right_position + len(ATT_MOTIF) - 1
+    assert result["element_end"] >= right_position + len(ATT_MOTIF) - 1
     assert result["element_length_bp"] == result["element_end"] - result["element_start"] + 1
 
 
@@ -238,7 +237,7 @@ def test_trna_probe_is_strand_aware():
     assert plus_probe == sequence[1_075 - 25:1_075]
 
 
-def test_trna_anchored_tolerates_a_single_mismatch():
+def _retired_test_trna_anchored_tolerates_a_single_mismatch():
     """attL and attR often differ by one base, because only the copy that
     reconstitutes the tRNA is under selection. One mismatch must still match."""
     sequence = random_sequence(80_000, seed=9)
@@ -257,7 +256,7 @@ def test_trna_anchored_tolerates_a_single_mismatch():
     assert result["att_mismatches"] >= 1
 
 
-def test_two_mismatches_are_rejected():
+def _retired_test_two_mismatches_are_rejected():
     """Beyond one substitution this is no longer a recombination scar."""
     sequence = random_sequence(80_000, seed=10)
     trna_start, trna_end = 20_000, 20_075
@@ -451,8 +450,9 @@ def test_a_repeat_present_exactly_twice_is_still_accepted():
         min_element_bp=8_000, flank_window_bp=30_000)
 
     assert result["boundary_method"] == "denovo"
-    assert result["att_left"] == "30000..30024"
-    assert result["att_right"] == "85000..85024"
+    # Maximal repeats extend past the planted motif where the flanks agree.
+    assert result["att_left"].startswith("30000..")
+    assert result["att_right"].startswith("85000..")
 
 
 def test_two_paralogous_trnas_are_not_an_att_pair():
@@ -490,5 +490,75 @@ def test_one_copy_in_a_trna_is_the_real_integration_signature():
         trnas=one_trna, min_element_bp=8_000, flank_window_bp=30_000)
 
     assert result["boundary_method"] == "tRNA"
-    assert result["att_left"] == "30000..30024"
-    assert result["att_right"] == "85000..85024"
+    # Maximal repeats extend past the planted motif where the flanks agree.
+    assert result["att_left"].startswith("30000..")
+    assert result["att_right"].startswith("85000..")
+
+
+# ── The exact-match contract, replacing the two retired mismatch tests ───────
+#
+# The old design took a fixed probe and allowed up to one mismatch against it.
+# The search is now EXACT maximal repeats - `vmatch -l` semantics, which is what
+# ICEfinder2 actually uses - so mismatch tolerance no longer exists. That is a
+# deliberate trade, and the honest limitation is recorded here rather than
+# hidden: BLAST (the DEPhT route) would absorb mismatches and indels, but needs
+# a subprocess dependency this module does not have. See
+# docs/methods_att_and_small_plasmids.md.
+#
+# The two retired tests above are kept, renamed, as a record of what changed.
+
+def test_the_search_is_exact_so_a_mismatched_copy_is_not_a_pair():
+    """A second copy carrying a substitution is no longer found as one repeat.
+
+    It is still found as the two EXACT sub-repeats either side of the mismatch,
+    which is why this asserts on the reported length rather than on absence: a
+    23 bp site with a mismatch in the middle yields an ~11 bp maximal repeat,
+    below every floor, so nothing is reported.
+    """
+    motif = ATT_MOTIF
+    broken = motif[:12] + ("A" if motif[12] != "A" else "C") + motif[13:]
+    sequence = random_sequence(200_000, seed=717)
+    sequence = plant(sequence, 30_000, motif)
+    sequence = plant(sequence, 85_000, broken)
+
+    result = att.find_att_sites(
+        sequence, element_start=50_000, element_end=60_000,
+        min_element_bp=8_000, flank_window_bp=30_000)
+
+    assert result["boundary_method"] == "none"
+
+
+def test_an_exact_pair_is_still_found_after_the_change():
+    """The counterpart, so the test above cannot pass by finding nothing ever."""
+    sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000,
+                                     length=200_000, seed=717)
+    result = att.find_att_sites(
+        sequence, element_start=50_000, element_end=60_000,
+        min_element_bp=8_000, flank_window_bp=30_000)
+    assert result["boundary_method"] == "denovo"
+    assert int(result["att_length_bp"]) >= len(ATT_MOTIF)
+
+
+def test_a_trna_derived_repeat_survives_its_own_paralogues():
+    """THE regression that prompted the tRNA-aware copy guard.
+
+    ICEKp integrates at tRNA-Asn, so its att core is a piece of a tRNA 3' end -
+    and a genome with five tRNA-Asn genes contains that sequence five times
+    whether or not an ICE is present. The old "occurs at most twice" rule
+    therefore threw away the real, published ICEKp att site. Copies INSIDE tRNAs
+    are now not counted, because tRNA paralogy explains them.
+    """
+    sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000,
+                                     length=200_000, seed=818)
+    # three more copies of the same motif, each inside its own tRNA - the
+    # paralogous tRNA genes that defeated the old rule
+    trnas = [trna_feature("contig_1", 29_952, 30_024, "+")]
+    for position in (120_000, 150_000, 175_000):
+        sequence = plant(sequence, position, ATT_MOTIF)
+        trnas.append(trna_feature("contig_1", position - 48, position + 24, "+"))
+
+    result = att.find_att_sites(
+        sequence, element_start=50_000, element_end=60_000,
+        trnas=trnas, min_element_bp=8_000, flank_window_bp=30_000)
+
+    assert result["boundary_method"] == "tRNA"

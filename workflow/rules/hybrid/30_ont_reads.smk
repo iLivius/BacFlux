@@ -182,10 +182,14 @@ rule filter_long_reads:
     output:
         filt_long = FILT_LONG,
     params:
-        min_length = 1000,
+        min_length = FILTLONG_MIN_LENGTH,
         split = 1000,
-        keep_percent = 90,
-        length_weight = 10,
+        keep_percent = FILTLONG_KEEP_PERCENT,
+        # Was hard-coded to 10 - ten times filtlong's default - which destroyed
+        # 85% of the ONT reads belonging to a 5.6 kb plasmid on the KPNIH-class
+        # clinical isolates. See the note on FILTLONG_LENGTH_WEIGHT in
+        # 00_common.smk for the measurement.
+        length_weight = FILTLONG_LENGTH_WEIGHT,
     conda:
         "../../envs/filtlong.yaml"
     log:

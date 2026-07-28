@@ -102,8 +102,8 @@ rule filter_long_reads:
     output:
         filt_long = FILT_LONG,
     params:
-        min_length = 1000,
-        keep_percent = 90,
+        min_length = FILTLONG_MIN_LENGTH,
+        keep_percent = FILTLONG_KEEP_PERCENT,
         target_bases = 500000000,
     conda:
         "../../envs/filtlong.yaml"

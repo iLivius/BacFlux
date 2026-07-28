@@ -993,6 +993,29 @@ def _config_bool(value, default=False):
 # once here so the rules never re-read the config. Placed in this section because
 # it needs _config_bool, defined just above.
 _mobilome_cfg = config.get("mobilome", {}) or {}
+# ── Long-read QC: how aggressively to subset ONT reads ───────────────────────
+# These decide which ONT reads reach the assembler, and they are the single
+# biggest lever on SMALL PLASMID recovery. Measured on K. pneumoniae TUM24772,
+# whose 5,596 bp Col plasmid we lost entirely:
+#
+#   614 raw ONT reads map to that plasmid
+#    93 survive at length_weight 10  (the old hard-coded value) - 85% destroyed
+#   602 survive at length_weight 1   (filtlong's own default)   - 98% recovered
+#
+# Filtlong scores a read as (Length^lw x MeanQ^mqw)^(1/(lw+mqw)) x WindowQ, so
+# raising length_weight makes length dominate the ranking. A 5.6 kb plasmid
+# cannot produce reads longer than 5.6 kb, so its reads sit at the bottom of a
+# length-dominated ranking and are the first discarded by --keep_percent.
+# Ryan Wick's Feb 2026 read-QC benchmark reports the same effect independently:
+# length-weighted filtlong wiped out sub-10 kb plasmids in 3 of 5 test genomes
+# and produced MORE structural errors as a result.
+# https://rrwick.github.io/2026/02/05/read_qc_testing.html
+_lrqc = (config.get("parameters", {}) or {}).get("long_read_qc", {}) or {}
+FILTLONG_MIN_LENGTH    = int(_lrqc.get("min_length", 1000))
+FILTLONG_KEEP_PERCENT  = _lrqc.get("keep_percent", 95)
+# Default 1 = filtlong's own default = do not let length dominate quality.
+FILTLONG_LENGTH_WEIGHT = float(_lrqc.get("length_weight", 1))
+
 MOBILOME_RUN = _config_bool(_mobilome_cfg.get("run"), False)
 
 # The composite-transposon span limit. A CONVENTION, not biology: two IS copies

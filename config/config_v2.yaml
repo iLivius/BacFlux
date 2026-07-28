@@ -113,7 +113,85 @@ parameters:
   # Decontamination policy — SHARED across all four modes. After BlobTools
   # assigns each contig a genus, the selector keeps/discards contigs per this
   # policy and writes an audit TSV of every decision.
+  # ── Long-read QC — the biggest lever on SMALL PLASMID recovery ─────────────
+  # Read this before changing it, and read it again if a plasmid goes missing.
+  #
+  # WHAT WENT WRONG BEFORE THESE BECAME SETTINGS. length_weight was hard-coded to
+  # 10 — ten times filtlong's own default. Filtlong ranks reads by
+  #     (Length^length_weight x MeanQuality^mean_q_weight)^(1/(lw+mqw)) x WindowQ
+  # so at 10 the ranking is dominated by length, and --keep_percent then discards
+  # the bottom of that ranking. A small plasmid CANNOT produce reads longer than
+  # itself, so its reads sit at the bottom by construction and are deleted first.
+  #
+  # Measured on clinical K. pneumoniae TUM24772, whose 5,596 bp Col plasmid was
+  # missing from our assembly while sitting complete in the Illumina data:
+  #     614 raw ONT reads map to that plasmid
+  #      93 survive at length_weight 10   -> Flye never had enough to assemble it
+  #     602 survive at length_weight 1    -> 98% recovered
+  # Independently confirmed: Wick's Feb 2026 read-QC benchmark found
+  # length-weighted filtlong wiped out sub-10 kb plasmids in 3 of 5 genomes and
+  # produced MORE structural errors as a result.
+  # https://rrwick.github.io/2026/02/05/read_qc_testing.html
+  #
+  # Raising these is rarely worth it. Total bases barely move (208 -> 227 Mb in
+  # our test), so you are not gaining depth, only changing WHICH reads survive.
+  long_read_qc:
+    min_length: 1000       # discard ONT reads shorter than this outright.
+                           #   Lower it (e.g. 500) if you expect plasmids under
+                           #   ~2 kb; there is no filtlong default, so this is
+                           #   entirely our choice.
+    keep_percent: 95       # keep the best N% of BASES by the score above.
+                           #   Was 90. At typical bacterial ONT depth you are not
+                           #   short of data, so being selective costs more than
+                           #   it gains. Set to a blank value to disable
+                           #   subsetting entirely and keep everything above
+                           #   min_length — the safest setting for plasmids.
+    length_weight: 1       # HOW MUCH LENGTH DOMINATES THE RANKING.
+                           #   1 = filtlong's default = length and quality
+                           #   weighted comparably. Was 10.
+                           #   Only raise it if you are deliberately trading small
+                           #   replicons for chromosome contiguity, and say so in
+                           #   your methods if you do.
+
   decontamination:
+    # ⚠ A TRAP WORTH KNOWING, especially in HYBRID mode: dropping a contig here
+    # can silently delete the ONT reads for it too, so the sequence disappears
+    # from the assembly rather than merely from the taxonomy table.
+    #
+    # The chain: decontamination selects contigs by assigned genus -> only the
+    # Illumina reads mapping to the SELECTED contigs become SEL_R1/SEL_R2 ->
+    # filtlong is given SEL_R1/SEL_R2 as its short-read reference and scores ONT
+    # reads by how well they are covered by it. Sequence absent from that
+    # reference scores as low quality and is discarded before Flye ever sees it.
+    #
+    # WHEN THIS BITES: a plasmid whose best BLAST hit is a DIFFERENT GENUS from
+    # the host. That is not exotic — plasmids cross genus boundaries constantly,
+    # which is the entire reason this module exists, and the reference databases
+    # are dense with near neighbours. `auto` mode uses BLAST bestsum, which
+    # follows database composition rather than biology: on K. pneumoniae KPNIH1
+    # it dropped a genuine plasmid because E. coli entries outnumbered Klebsiella
+    # ones 58,709 to 16,253.
+    #
+    # HOW TO CHECK, in this order:
+    #   1. Read 02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv
+    #      and look for any DISCARDED contig of plausible plasmid size (~2-200 kb)
+    #      whose assigned_genus differs from the sample's GTDB genus.
+    #   2. Compare the replicon count in 06.plasmids against what you expect.
+    #   3. If a plasmid is missing from the ASSEMBLY rather than merely from the
+    #      plasmid call, this chain — not the assembler — is the likely cause.
+    #
+    # HOW TO FIX, then re-run:
+    #   * mode: include with include_genera listing BOTH the host genus and the
+    #     genus the plasmid was assigned to; or
+    #   * mode: off to keep everything (fine for a clean clinical isolate, and
+    #     the safest choice when a plasmid is what you are after); or
+    #   * discard_no_hit: false, if the contig was dropped for having no hit
+    #     rather than the wrong one; or
+    #   * sample_overrides / include_genera_by_sample for a single awkward isolate.
+    # Snakemake will redo only the affected steps.
+    #
+    # Note this is INDEPENDENT of parameters.long_read_qc above. Both can delete a
+    # plasmid's ONT reads, for different reasons, and both must be ruled out.
     mode: auto                 # Options: auto | include | exclude | off
     discard_no_hit: true       # discard contigs with no taxonomic hit
     include_genera:            # null | "GenusA;GenusB" | [GenusA, GenusB]   (inline genus list to KEEP)

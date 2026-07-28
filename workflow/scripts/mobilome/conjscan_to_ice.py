@@ -293,7 +293,29 @@ INTEGRASE_PRODUCT_PATTERN = re.compile(
     r"|serine recombinase"
     r"|site.specific recombinase"       # hyphen or space
     r"|dna integration"                 # MISSED "DNA integration/recombination/inversion protein"
-    r"|integrase",                      # catches "Integrase", "Integrase family protein", "integron integrase IntI1"
+    r"|integrase"                       # catches "Integrase", "Integrase family protein", "integron integrase IntI1"
+    # ── Domain-name spellings, added 2026-07-28 ──────────────────────────────
+    # Bakta often names a tyrosine integrase by its DOMAIN rather than by the
+    # word "integrase", and when it does, none of the patterns above fire.
+    #
+    # This is not hypothetical: it cost us the actual ICEKp on BOTH clinical
+    # K. pneumoniae isolates. The integrase of TUM24772's ICEKp is annotated
+    # "DUF4102 domain-containing protein" at 1,929,249-1,930,511 - 162 bp from a
+    # tRNA-Asn, immediately downstream of the yersiniabactin genes (salicylate
+    # synthase Irp9 at 1,927,751-1,929,055), which is exactly where ICEKp's P4-type
+    # integrase is documented to sit. With no integrase anchor the element was
+    # classified "conjugative_region" ("report it, do not call it an ICE") instead
+    # of the ICE it is - so the genuine, publishable finding was demoted, and the
+    # ICE label landed on a DIFFERENT element 1.1 Mb away.
+    #
+    # DUF4102 = Pfam PF13356 = the arm-type DNA-binding domain of phage/P4-family
+    # tyrosine recombinases. It is specific to that family, which is why it is safe
+    # to match on while a blanket "domain-containing protein" would not be: the
+    # same genomes also carry BON, DUF554, HTH-luxR, VTT and Rho
+    # "domain-containing" products, none of them integrases.
+    r"|duf4102"
+    r"|arm[- ]dna[- ]binding"
+    r"|arm[- ]type dna[- ]binding",
     re.IGNORECASE,
 )
 
@@ -305,6 +327,41 @@ INTEGRASE_PRODUCT_PATTERN = re.compile(
 # is not used as an anchor; the count is written to the audit file so the
 # exclusion is never invisible.
 TRANSPOSASE_PRODUCT_PATTERN = re.compile(r"transposase", re.IGNORECASE)
+
+
+
+def read_replicon_calls(path):
+    """contig -> 'chromosome' | 'plasmid' | 'unknown', from the replicon table.
+
+    WHERE IT COMES FROM: rule mobilome_replicons, which combines Platon's
+    chromosome/plasmid split and RDS score with geNomad's independent call via
+    the D9 concordance. That is far better evidence than any single marker gene:
+    plenty of real plasmids carry no recognisable repA, which is exactly why
+    dnaapler reported "No_MMseqs2_hits" for the two Col plasmids on these
+    isolates.
+
+    A missing file yields an empty dict and every contig is treated as unknown,
+    which leaves behaviour unchanged - the module degrades rather than failing.
+    """
+    calls = {}
+    if not path or not os.path.isfile(path):
+        return calls
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        lines = [line.rstrip("\n") for line in handle if line.strip()]
+    if len(lines) < 2:
+        return calls
+    header = lines[0].split("\t")
+    try:
+        contig_index = header.index("contig")
+        call_index = header.index("replicon")
+    except ValueError:
+        return calls
+    for line in lines[1:]:
+        fields = line.split("\t")
+        if max(contig_index, call_index) >= len(fields):
+            continue
+        calls[fields[contig_index].strip()] = fields[call_index].strip().lower()
+    return calls
 
 
 # ── Classification (spec §8 Phase 4) ─────────────────────────────────────────
@@ -991,6 +1048,98 @@ def find_integrase_anchors(sample, cds_features):
 
 
 # ── Phase 2: candidate seeding ───────────────────────────────────────────────
+
+
+# How far from a machinery cluster an INTEGRASE may sit and still belong to the
+# same element. Deliberately much larger than DEFAULT_WINDOW_BP, because the two
+# anchor types have different geometry:
+#
+#   * conjugation machinery is an OPERON - relaxase, coupling protein and the
+#     mating-pair genes sit within a few kb of each other, so 15 kb clusters them
+#     correctly and a wider window would wrongly merge separate systems;
+#   * the integrase sits at the ELEMENT BOUNDARY, next to the tRNA the element
+#     integrated into. For a 50-100 kb ICE that is tens of kb from the machinery.
+#
+# Measured: on BOTH clinical K. pneumoniae isolates the ICEKp integrase (a
+# DUF4102/P4-family protein abutting a tRNA-Asn) sits 33,361 bp from the
+# machinery cluster. At a shared 15 kb window it was never attached, so the
+# element came out as "conjugative_region" - relaxase and T4SS but no integrase,
+# i.e. "report it, do not call it an ICE" - and the genuine ICEKp was missed on
+# both genomes while the ICE label landed on a different element 1.1 Mb away.
+#
+# This is a known failure mode, not a local quirk: icefinder-opt's README records
+# the same fix upstream - "the tRNA search window was too limited to reliably
+# identify ICE boundaries in many cases", widened in their 2025 release.
+DEFAULT_INTEGRASE_WINDOW_BP = 50000
+
+
+def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp):
+    """Give each machinery cluster the integrase that belongs to it, if any.
+
+    Takes in: clusters built from MACHINERY anchors only, plus every integrase
+              anchor found in Phase 1.
+    Does:     for each cluster with no integrase, looks for the closest integrase
+              on the same contig within integrase_window_bp of the cluster's
+              bounds, and attaches it.
+    Returns:  (clusters, audit_rows) - clusters modified in place.
+
+    Only the CLOSEST integrase is attached, and only when the cluster has none.
+    An element has one integrase; attaching every integrase within 50 kb would
+    manufacture anchor classes on a chromosome that is full of prophage
+    integrases.
+    """
+    audit_rows = []
+    attached_ids = set()
+    for cluster in clusters:
+        if any(a["anchor_class"] == ANCHOR_INTEGRASE for a in cluster):
+            continue
+        contig = cluster[0]["contig"]
+        lo = min(a["start"] for a in cluster)
+        hi = max(a["end"] for a in cluster)
+
+        best = None
+        for anchor in integrase_anchors:
+            if anchor["contig"] != contig:
+                continue
+            if anchor["start"] > hi:
+                gap = anchor["start"] - hi
+            elif anchor["end"] < lo:
+                gap = lo - anchor["end"]
+            else:
+                gap = 0
+            if gap <= integrase_window_bp and (best is None or gap < best[0]):
+                best = (gap, anchor)
+
+        if best is not None:
+            gap, anchor = best
+            cluster.append(anchor)
+            attached_ids.add(id(anchor))
+            audit_rows.append(audit_row(
+                "", "evidence_recorded", "integrase_attached_beyond_cluster_window",
+                f"{contig}:{lo}-{hi}: an integrase at {anchor['start']}-{anchor['end']} "
+                f"({anchor.get('label','')}) sits {gap} bp away - beyond the "
+                f"machinery clustering window but within the {integrase_window_bp} bp "
+                "integrase window. Attached: conjugation machinery is an operon and "
+                "clusters tightly, whereas the integrase sits at the element "
+                "boundary, tens of kb away on a large ICE.",
+                contig=contig, start=lo, end=hi))
+
+    # Integrases belonging to NO machinery cluster. Under the old shared-window
+    # design these formed integrase-only clusters that were then dropped with a
+    # stated reason; clustering machinery alone means they never form one, so the
+    # reason has to be recorded here or the decision becomes invisible - and every
+    # filtering decision in this module carries a reason.
+    orphans = [a for a in integrase_anchors if id(a) not in attached_ids]
+    if orphans:
+        audit_rows.append(audit_row(
+            "", "not_applicable", "integrase_without_conjugation_machinery",
+            f"{len(orphans)} integrase(s) were found with no conjugation "
+            f"machinery within {integrase_window_bp} bp, so they anchor no "
+            "element. An integrase alone is not an ICE - chromosomes carry many, "
+            "mostly from prophages. Examples: "
+            + "; ".join(f"{a['contig']}:{a['start']}-{a['end']}" for a in orphans[:3])))
+    return clusters, audit_rows
+
 
 def cluster_anchors(anchors, window_bp):
     """Group anchors that sit close together on the SAME contig.
@@ -1812,6 +1961,22 @@ def build_parser():
                              "is genuinely a warning rather than the norm. Either "
                              "way boundary_method is reported, and cargo is never "
                              "assigned from an unresolved boundary.")
+    parser.add_argument("--replicons", default="",
+                        help="Per-contig replicon table from rule "
+                             "mobilome_replicons. Used for one definitional "
+                             "check: an ICE integrates into a CHROMOSOME, so an "
+                             "element with full machinery on a PLASMID contig is "
+                             "a conjugative plasmid region, not an ICE. Optional "
+                             "- without it that check is skipped and the call is "
+                             "left as it was.")
+    parser.add_argument("--integrase-window-bp", type=int,
+                        default=DEFAULT_INTEGRASE_WINDOW_BP,
+                        help="How far from a machinery cluster an integrase may "
+                             "sit and still belong to the same element. Much "
+                             "larger than --window-bp on purpose: machinery is an "
+                             "operon and clusters tightly, while the integrase "
+                             "sits at the element boundary. Default "
+                             f"{DEFAULT_INTEGRASE_WINDOW_BP}.")
     parser.add_argument("--out-table", required=True,
                         help="Candidate element TSV (read by colocalise.py).")
     parser.add_argument("--out-audit", required=True,
@@ -1964,7 +2129,15 @@ def main(argv=None):
         return finish(0)
 
     # --- Phase 2 + Phase 4 --------------------------------------------------
-    clusters = cluster_anchors(machinery_anchors + integrase_anchors, args.window_bp)
+    # Cluster the MACHINERY only, then attach integrases with a wider radius -
+    # see attach_nearby_integrases for why the two anchor types need different
+    # windows, and what it cost us when they shared one.
+    clusters = cluster_anchors(machinery_anchors, args.window_bp)
+    clusters, integrase_attach_audit = attach_nearby_integrases(
+        clusters, integrase_anchors, args.integrase_window_bp)
+    for row in integrase_attach_audit:
+        row["sample"] = args.sample
+    audit_rows.extend(integrase_attach_audit)
     rows, candidate_audit = build_candidates(
         args.sample, clusters, systems, contig_lengths,
         args.min_element_bp, args.max_element_bp, args.boundary_bp,
@@ -1979,6 +2152,50 @@ def main(argv=None):
         args.boundary_bp,
     )
     audit_rows.extend(boundary_audit)
+
+    # --- Phase 4b: an ICE cannot live on a plasmid ---------------------------
+    # Spec §2.4 is definitional: an ICE INTEGRATES INTO THE CHROMOSOME and encodes
+    # conjugation machinery. A plasmid is already its own replicon - it has
+    # nothing to integrate into - so a plasmid carrying an integrase, a relaxase
+    # and a mating apparatus is a CONJUGATIVE PLASMID that happens to have an
+    # integrase, not an ICE.
+    #
+    # The classifier never knew about replicons; it only appeared to, because
+    # plasmid elements happened to lack a clustered integrase. Widening the
+    # integrase search window removed that accident and promoted two genuine
+    # plasmid elements to "ICE" on these isolates, which is what this pass fixes.
+    #
+    # The evidence is NOT discarded: the element keeps its anchors and is
+    # reported as a conjugative region, with the reason recorded.
+    replicon_calls = read_replicon_calls(args.replicons)
+    if replicon_calls:
+        for row in rows:
+            if row.get("element_type") != "ice":
+                continue
+            call = replicon_calls.get(row.get("contig", ""), "unknown")
+            if call == "plasmid":
+                row["element_type"] = "conjugative_region"
+                row["mge_class"] = "conjugative_region"
+                row["mobility"] = "conjugative plasmid region, not an ICE"
+                row["mge_id"] = row["mge_id"].replace("|ice-", "|conjugative_region-")
+                audit_rows.append(audit_row(
+                    args.sample, "kept_flagged", "ice_demoted_on_plasmid_replicon",
+                    f"{row['mge_id']}: integrase, relaxase and mating apparatus are "
+                    "all present, but this contig is called a PLASMID. An ICE "
+                    "integrates into the chromosome (spec §2.4); a plasmid has "
+                    "nothing to integrate into, so this is a conjugative plasmid "
+                    "carrying an integrase, not an ICE. The anchors are unchanged - "
+                    "only the class.",
+                    contig=row.get("contig"), start=row.get("start"), end=row.get("end")))
+            elif call != "chromosome":
+                audit_rows.append(audit_row(
+                    args.sample, "kept_flagged", "ice_on_unclassified_replicon",
+                    f"{row['mge_id']}: called an ICE, but this contig is not "
+                    "classified as chromosome or plasmid, so the definitional "
+                    "check (an ICE integrates into a chromosome) could not be "
+                    "applied. The call stands; treat it with the caution any "
+                    "unknown replicon deserves.",
+                    contig=row.get("contig"), start=row.get("start"), end=row.get("end")))
 
     # --- Phase 6: settle the confidence now the boundaries are known ---------
     rows, confidence_audit = finalise_confidence(

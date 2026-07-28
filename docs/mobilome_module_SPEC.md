@@ -161,7 +161,7 @@ EFSA does not literally require "report the replicon and flanking IS". It requir
 | MGEfinder specifically | only detects insertions *absent* from the reference → F1 = 0.01 on *S. sonnei* benchmark |
 | pseudoR | built for fragmented metagenome assemblies; on clonal isolates it measures within-population heterogeneity, not inventory. Heavy R+Bowtie2+blastn+mosdepth stack. **Still needed as the ISOSDB download source** |
 | mobileOG-db | protein-level MGE context only; duplicates Bakta; manual DB download |
-| ICEfinder 2.0 / icefinder-opt | no installation section, no conda recipe, hard-coded `config.ini` paths, CentOS 7. **vmatch** dependency is not on bioconda and is licence-restricted → cannot be containerised for public distribution |
+| ICEfinder 2.0 / icefinder-opt | no installation section, no conda recipe, hard-coded `config.ini` paths, CentOS 7. **vmatch** dependency has an UNVERIFIABLE licence → cannot be redistributed with an MIT workflow. ⚠ **Corrected 2026-07-28:** the earlier claim that vmatch "is not on bioconda" was WRONG — `bioconda/vmatch 2.3.1` exists (linux-64, osx-64). The rejection stands on the licence alone: the recipe declares `license: Unknown / OTHER` and vmatch.de is unreachable, so its terms cannot be established, which §11 makes a blocker. See `docs/methods_att_and_small_plasmids.md`. NOTE ICEfinder2 is CC BY-NC-SA 4.0 — its source may be READ to establish an algorithm (§11 permits this) but never copied. |
 | EBI mobilome-annotation-pipeline as a dependency | Nextflow, metagenome-oriented, currently does not run AMRFinderPlus. **Use as escape hatch / design reference only** |
 
 ---
@@ -397,6 +397,16 @@ Design principle: **build an evidence integrator, not an ICE finder.** Only genu
 
 **Phase 3 — att-site detection (3–4 d).** The only real algorithm.
 - *Mode A, tRNA-anchored (high precision):* ICEs integrate at tRNA 3′ ends. Probe = last 15–25 bp of a nearby tRNA (strand-aware); search for a second copy (≤1 mismatch) on the opposite side within window → attL/attR.
+  > ⚠ **SUPERSEDED 2026-07-28 — a FIXED probe length cannot work.** The ICE*Kp*
+  > direct repeat is **17 bp** (Lam *et al.* 2018), so a 25 bp probe is
+  > structurally incapable of finding it; measured on two clinical *K. pneumoniae*
+  > isolates, nothing was found at 25 bp and pairs appeared at 18. Bacterial ICE
+  > repeats span ~10–60 bp, so no single length is defensible. Every reference
+  > tool uses a variable-length search: ICEfinder2 runs `vmatch -l 15`, DEPhT and
+  > DBSCAN-SWA BLAST the two flanks against each other. BacFlux now does the
+  > latter (`blastn -task blastn-short -dust no`, ≥15 bp, ranked by bitscore),
+  > with tRNA proximity demoted to a scoring bonus. Full evidence, parameters and
+  > citations: `docs/methods_att_and_small_plasmids.md`.
 - *Mode B, de novo:* k-mer dict of the left flank window (k=25 stepping down to 12), scan right flank for same-orientation matches; rank by length desc, resulting interval within [min,max]_element_bp, symmetry of flank distance.
 - Use `pyfaidx`/Biopython; a plain dict k-mer index is fast enough at these window sizes — **this is why vmatch is not needed**.
 - **Critical:** mask the interval against ISEScan calls before the de novo scan, or IS terminal repeats flood the candidate pairs. This is the most likely failure mode.
