@@ -279,6 +279,43 @@ mislabelled, which is why this layer sat unbuilt for so long.
 | Three TnCentral endpoints | **Six.** `nc/tn` = TnCentral only (the safe default, and the one wired in); `nc/tn_in` adds Integrall; the `*_is` variants add ISfinder content and its terms |
 | ICEberg at `bioinfo-mml.sjtu.edu.cn` | **404.** ICEberg 3.0 lives at `tool2-mml.sjtu.edu.cn/ICEberg3/`; the old host still serves ICEberg **2.0**, which is how the stale URL kept looking plausible |
 
+**⚠ Both nucleotide FASTAs are MALFORMED and must be repaired before indexing.**
+Some deflines are glued onto the *end* of a sequence line instead of starting
+their own:
+
+```
+...gtgcagccgtcttctgaaaacgaca>In1223-KX784502
+```
+
+| | records at line start | `>` characters | broken |
+|---|---|---|---|
+| TnCentral `nc/tn` (2025-05-16) | 512 | 533 | **21** |
+| ICEberg `ICE_seq_all` + `IME_seq_all` (2023-06-01) | 1773 | 1774 | **1** |
+| ISOSDB V3 | 22713 | 22713 | clean |
+
+The damage runs **both ways**, and the second direction is the dangerous one:
+
+- the affected elements are **invisible** to `makeblastdb` — for TnCentral that
+  includes Tn*7* itself and eleven integrons, the very class tier 4 exists to name;
+- and the records they were glued to become **chimeric**, absorbing the defline
+  text plus the next element's sequence. `In_Tn6162` measured **41,492 bp instead
+  of 8,911** — 4.7× its true length. Because the naming cascade tests coverage as
+  `alignment / slen`, an inflated `slen` makes those elements almost impossible
+  to name, and it fails *silently*.
+
+The shipped v4 index has the same 21 records missing, since it was built from the
+unrepaired file — an independent reason to rebuild rather than reuse it. Both
+`download_db` rules now split embedded deflines onto their own lines and then
+**assert** that every `>` begins a line, failing rather than indexing a file whose
+shape they do not understand. Repairing TnCentral recovered `In781_p` on the
+KPNIH1 positive control (99.8% identity, 82% coverage) — a real integron that the
+unrepaired database could not see.
+
+(The `download_full/fa` endpoint ships 513 well-formed per-element files and is a
+possible alternative source, but it is a year older — 2024-05-16 versus
+2025-05-16 — and carries 20 fewer elements, so repairing the newer file is
+preferred.)
+
 **Deflines** — the parsers are written against these, so they are recorded verbatim:
 
 ```

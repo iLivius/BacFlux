@@ -564,14 +564,46 @@ if MOBILOME_RUN:
                     rm -f {output.db_dir}/tncentral.zip
                 fi
 
+                # REPAIR MALFORMED RECORDS BEFORE INDEXING. The upstream FASTA has
+                # deflines glued onto the END of a sequence line instead of
+                # starting their own, e.g.
+                #     ...gtgcagccgtcttctgaaaacgaca>In1223-KX784502
+                # In the release checked (2025-05-16) 21 of 533 records were like
+                # this, and the damage runs BOTH ways:
+                #   * those 21 elements are invisible to makeblastdb - among them
+                #     Tn7 itself and eleven integrons, the very class tier 4 exists
+                #     to name;
+                #   * and the 16 records they were glued to became CHIMERIC,
+                #     absorbing the defline text plus the next element's sequence.
+                #     In_Tn6162 measured 41,492 bp instead of 8,911 - 4.7x its real
+                #     length. Since the naming cascade tests coverage as
+                #     alignment/slen, an inflated slen makes those elements almost
+                #     impossible to name, silently.
+                # Splitting on '>' is safe here because these deflines carry no
+                # free-text description in which a '>' could legitimately appear.
+                awk '{{ if (substr($0,1,1) != ">") gsub(/>/, "\\n>"); print }}' \
+                  {output.db_dir}/tncentral.fa > {output.db_dir}/tncentral.repaired.fa
+                mv {output.db_dir}/tncentral.repaired.fa {output.db_dir}/tncentral.fa
+
+                # Every '>' must now begin a line. If not, the file has a shape we
+                # did not anticipate and indexing it would silently lose or merge
+                # records - fail instead of producing a quietly wrong database.
+                N_SEQ=$(grep -c '^>' {output.db_dir}/tncentral.fa)
+                N_MARK=$(grep -o '>' {output.db_dir}/tncentral.fa | wc -l)
+                if [ "$N_SEQ" != "$N_MARK" ]; then
+                    echo "ERROR: $N_MARK '>' characters but only $N_SEQ deflines start a line." >&2
+                    echo "       The FASTA is malformed in a way this rule does not handle." >&2
+                    exit 1
+                fi
+
                 # The archive ships a BLAST v4 index. Rebuild as v5 so it works
                 # with current blast+ (spec §5.3), and drop the shipped index files
                 # so there is no chance of the old one being picked up instead.
+                # NOTE the shipped index was built from the UNREPAIRED FASTA and is
+                # therefore missing those 21 elements - another reason to rebuild.
                 rm -f {output.db_dir}/tncentral.fa.n*
                 makeblastdb -in {output.db_dir}/tncentral.fa -dbtype nucl \
                   -out {output.db_dir}/tncentral_v5 -blastdb_version 5
-
-                N_SEQ=$(grep -c '^>' {output.db_dir}/tncentral.fa)
                 {{
                   echo "source:      $SOURCE"
                   echo "fetched:     $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -710,10 +742,24 @@ if MOBILOME_RUN:
                     SOURCE="{params.urls}"
                 fi
 
-                makeblastdb -in {output.db_dir}/iceberg.fa -dbtype nucl \
-                  -out {output.db_dir}/iceberg_v5 -blastdb_version 5
+                # Same defect as TnCentral, and repaired the same way: the ICEberg
+                # release checked (2023-06-01) had one defline glued onto the end
+                # of a sequence line, losing an IME and leaving the record before
+                # it chimeric. One in 1,774 is rarer than TnCentral's 21 in 533,
+                # but a silently merged reference is exactly as wrong.
+                awk '{{ if (substr($0,1,1) != ">") gsub(/>/, "\\n>"); print }}' \
+                  {output.db_dir}/iceberg.fa > {output.db_dir}/iceberg.repaired.fa
+                mv {output.db_dir}/iceberg.repaired.fa {output.db_dir}/iceberg.fa
 
                 N_SEQ=$(grep -c '^>' {output.db_dir}/iceberg.fa)
+                N_MARK=$(grep -o '>' {output.db_dir}/iceberg.fa | wc -l)
+                if [ "$N_SEQ" != "$N_MARK" ]; then
+                    echo "ERROR: $N_MARK '>' characters but only $N_SEQ deflines start a line." >&2
+                    exit 1
+                fi
+
+                makeblastdb -in {output.db_dir}/iceberg.fa -dbtype nucl \
+                  -out {output.db_dir}/iceberg_v5 -blastdb_version 5
                 {{
                   echo "source:      $SOURCE"
                   echo "fetched:     $(date -u +%Y-%m-%dT%H:%M:%SZ)"
