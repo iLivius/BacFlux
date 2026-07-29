@@ -558,6 +558,11 @@ AUDIT_COLUMNS = [
 # so the measured span is always reported next to the decision.
 DEFAULT_WINDOW_BP = 15000
 DEFAULT_MIN_ELEMENT_BP = 8000
+# The same floor, for clusters with the IME architecture (integrase + relaxase,
+# no mating-pair apparatus). Lower because IME machinery is two genes where an
+# ICE's is a twenty-gene operon - see keep_or_drop_cluster for the measurement.
+# EMPIRICAL: fitted to a handful of Phase 7 observations, not a published bound.
+DEFAULT_MIN_IME_ELEMENT_BP = 2000
 DEFAULT_MAX_ELEMENT_BP = 500000
 
 # How close to a contig end counts as "probably truncated". Bigger than the
@@ -1462,7 +1467,28 @@ def cluster_has_class(cluster, anchor_class):
     return any(anchor["anchor_class"] == anchor_class for anchor in cluster)
 
 
-def keep_or_drop_cluster(cluster, min_element_bp, max_element_bp):
+def cluster_looks_like_an_ime(cluster, has_mpf_system):
+    """True when this cluster has the IME architecture: integrase + relaxase, no T4SS.
+
+    An IME is mobilised by a helper element rather than moving itself, so by
+    definition it encodes NO mating-pair apparatus. That is also why its
+    machinery is SMALL - two genes, where an ICE carries a twenty-gene T4SS
+    operon - and why the size floor below has to know which of the two it is
+    looking at.
+
+    `has_mpf_system` is passed in rather than derived here because the caller has
+    already worked out whether CONJscan called a typed mating-pair system for
+    this cluster's anchors; an IME must have neither the typed system nor an
+    in-cluster mating-pair gene.
+    """
+    return (cluster_has_class(cluster, ANCHOR_INTEGRASE)
+            and cluster_has_class(cluster, ANCHOR_RELAXASE)
+            and not cluster_has_class(cluster, ANCHOR_T4SS)
+            and not has_mpf_system)
+
+
+def keep_or_drop_cluster(cluster, min_element_bp, max_element_bp,
+                         min_ime_element_bp=None, has_mpf_system=False):
     """Decide whether one cluster becomes a candidate element.
 
     Returns (keep, reason, detail). The three rejections, in the order they are
@@ -1497,10 +1523,36 @@ def keep_or_drop_cluster(cluster, min_element_bp, max_element_bp):
             "is not seeded as an element."
         )
 
-    if span < min_element_bp:
+    # The size floor has to know WHICH KIND of element it is looking at.
+    #
+    # The floor is applied to the ANCHOR-CLUSTER SPAN, and that span scales with
+    # the NUMBER of machinery genes, not with the element's length. An ICE
+    # carries a ~20-gene T4SS operon, so its span is naturally tens of kb; an IME
+    # carries a relaxase and an integrase - two genes - so its span is 1-6 kb.
+    # An 8,000 bp floor therefore selects for ICEs by construction, which is
+    # exactly what the Phase 7 IME pilot measured: six of twelve curated IMEs
+    # were clustered and classified correctly and then dropped for size, Tn4451
+    # at a span of 1,266 bp.
+    #
+    # So IME-architecture clusters get their own, lower floor. Note this is NOT
+    # a general loosening: the ICE floor is untouched, and every one of the 18
+    # ICE-pilot elements scores identically before and after.
+    #
+    # CAUTION FOR THE READER: the IME floor is an EMPIRICAL CUT, not a
+    # biological constant. There is no published minimum size for an IME's
+    # machinery that we could find, and the value here was chosen against a
+    # handful of observations in one benchmark. Treat it as a knob, and say so
+    # in any methods write-up rather than implying it is a property of IMEs.
+    floor = min_element_bp
+    floor_flag = "--min-element-bp"
+    if min_ime_element_bp is not None and cluster_looks_like_an_ime(cluster, has_mpf_system):
+        floor = min_ime_element_bp
+        floor_flag = "--min-ime-element-bp"
+
+    if span < floor:
         return False, "cluster_shorter_than_min", (
-            f"machinery span is {span} bp, below the --min-element-bp threshold of "
-            f"{min_element_bp} bp. Reported as too small to be a credible "
+            f"machinery span is {span} bp, below the {floor_flag} threshold of "
+            f"{floor} bp. Reported as too small to be a credible "
             "integrative element; the hits themselves are still in CONJscan's own "
             "output."
         )
@@ -1650,7 +1702,8 @@ def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_cont
 # ── Phase 4 assembled: clusters -> candidate rows ────────────────────────────
 
 def build_candidates(sample, clusters, systems, contig_lengths,
-                     min_element_bp, max_element_bp, boundary_bp):
+                     min_element_bp, max_element_bp, boundary_bp,
+                     min_ime_element_bp=None):
     """Turn the Phase 2 clusters into the deliverable rows.
 
     Input:  the clusters, the per-system summary from build_conjscan_anchors,
@@ -1668,7 +1721,19 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         start = min(anchor["start"] for anchor in cluster)
         end = max(anchor["end"] for anchor in cluster)
 
-        keep, reason, detail = keep_or_drop_cluster(cluster, min_element_bp, max_element_bp)
+        # Which typed mating-pair systems this cluster's anchors belong to.
+        # Needed BEFORE the keep/drop test, because the size floor depends on
+        # whether this looks like an IME or an ICE.
+        cluster_system_ids_early = {anchor["sys_id"] for anchor in cluster
+                                    if anchor.get("sys_id")}
+        has_mpf_system_early = any(
+            systems.get(sys_id, {}).get("mpf_types", set())
+            for sys_id in cluster_system_ids_early
+        )
+        keep, reason, detail = keep_or_drop_cluster(
+            cluster, min_element_bp, max_element_bp,
+            min_ime_element_bp=min_ime_element_bp,
+            has_mpf_system=has_mpf_system_early)
         if not keep:
             audit_rows.append(audit_row(
                 sample, "dropped", reason, detail, contig=contig, start=start, end=end
@@ -1721,7 +1786,42 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             for sys_id in cluster_system_ids
             for mpf_type in systems.get(sys_id, {}).get("mpf_types", set())
         }
-        has_mpf_apparatus = bool(cluster_mpf_types)
+        has_mpf_system = bool(cluster_mpf_types)
+
+        # Does this cluster's machinery come from a system whose hits are spread
+        # over more than one contig? Computed here rather than with the other
+        # short-read flags further down, because the classification a few lines
+        # below needs it. It is reported unchanged as the spans_contigs column.
+        cluster_spans_contigs = any(
+            len(systems.get(sys_id, {}).get("contigs", set())) > 1
+            for sys_id in cluster_system_ids
+        )
+        # ...but asking the system alone is not enough either, and the Phase 7
+        # benchmark showed why. MacSyFinder LONER genes may sit anywhere on the
+        # replicon, so a lone relaxase declared a loner of a typed T4SS model
+        # drags that model's type letter across the whole chromosome. On
+        # NC_013929 that produced a cluster holding exactly ONE integrase and ONE
+        # relaxase - the textbook IME signature, has_t4cp=FALSE, has_t4ss=FALSE -
+        # reported as `ice`, "predicted self-transmissible". The row contradicted
+        # itself: missing_components read "coupling protein, mating-pair
+        # apparatus" beside a tier-6 mobility claim, and the caller's own audit
+        # had already refused to merge the real apparatus in, 1.2 Mb away.
+        #
+        # So a typed system is necessary but the apparatus must also BE here: at
+        # least one mating-pair anchor in this cluster.
+        #
+        # THE EXCEPTION, and it is not hypothetical. On a fragmented assembly the
+        # tra operon routinely lands on a different contig from the relaxase, so
+        # requiring an in-cluster mating-pair gene would demote real ICEs the
+        # moment the assembly breaks. Measured by rewriting the benchmark
+        # genomes' coordinates into contigs while holding CONJscan's output
+        # fixed: without this exemption, at 20 kb contigs two of the eighteen
+        # ICE-pilot elements drop from `ice` to `ime` - one of them
+        # ICE(Tn4371)6061, a spec section 8 Phase 7 named positive control. With
+        # it, nothing changes under fragmentation and closed genomes are
+        # unaffected. BacFlux's main input is short-read drafts, so this matters
+        # more here than the closed-genome benchmark can show.
+        has_mpf_apparatus = has_mpf_system and (has_t4ss or cluster_spans_contigs)
 
         if has_t4ss and not has_mpf_apparatus:
             audit_rows.append(audit_row(
@@ -2217,6 +2317,14 @@ def build_parser():
                         help="CONJscan/MacSyFinder best_solution.tsv, or the "
                              "MacSyFinder output directory containing it. May be "
                              "absent: most isolates have no conjugative system.")
+    parser.add_argument("--min-ime-element-bp", type=int,
+                        default=DEFAULT_MIN_IME_ELEMENT_BP,
+                        help="Size floor for clusters with the IME architecture "
+                             "(integrase + relaxase, no mating-pair apparatus), "
+                             "whose machinery is two genes rather than a "
+                             "twenty-gene operon. ICE-architecture clusters keep "
+                             f"--min-element-bp. Default {DEFAULT_MIN_IME_ELEMENT_BP}. "
+                             "An empirical cut, not a published bound.")
     parser.add_argument("--conjscan-hmmer-dir", default=None,
                         help="MacSyFinder's hmmer_results/ directory. Read ONLY "
                              "when no complete system was assembled, to recover an "
@@ -2479,6 +2587,7 @@ def main(argv=None):
     rows, candidate_audit = build_candidates(
         args.sample, clusters, systems, contig_lengths,
         args.min_element_bp, args.max_element_bp, args.boundary_bp,
+        min_ime_element_bp=args.min_ime_element_bp,
     )
     audit_rows.extend(candidate_audit)
 

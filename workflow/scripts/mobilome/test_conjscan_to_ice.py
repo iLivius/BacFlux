@@ -774,15 +774,88 @@ def test_truncated_virb4_under_its_exchangeable_name_is_still_flagged(tmp_path):
     assert "machinery_degraded" in audit_reasons(audit)
 
 
-def test_cluster_shorter_than_minimum_is_dropped_with_a_reason(tmp_path):
-    """A 2.5 kb span of machinery is a relic, not an integrative element."""
+def test_a_lone_relaxase_of_a_typed_system_does_not_make_an_ice(tmp_path):
+    """A typed system elsewhere on the replicon must not make THIS cluster an ICE.
+
+    MacSyFinder LONER genes may sit anywhere on the replicon, so a relaxase
+    declared a loner of a typed T4SS model carries that model's type letter with
+    it. Asking only "is the contributing system typed?" therefore let a cluster
+    holding exactly ONE integrase and ONE relaxase - has_t4cp FALSE, has_t4ss
+    FALSE, the textbook IME signature - be reported as `ice`, "predicted
+    self-transmissible".
+
+    That is the worst overcall this script can make: tier 6 is the answer a
+    regulator reads. It happened on NC_013929 in the Phase 7 benchmark, where the
+    row contradicted itself - missing_components said "coupling protein,
+    mating-pair apparatus" beside the tier-6 claim - and the caller's own audit
+    had already refused to merge in the real apparatus, 1.2 Mb away.
+
+    The apparatus must be HERE, not merely somewhere on the replicon.
+    """
     contigs = {"contig_1": 200000}
     cds = [
         gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "Phage integrase family protein"),
-        gff_cds("contig_1", 51500, 52500, "+", "S1_00015", "TrwC relaxase domain-containing protein"),
+        gff_cds("contig_1", 55000, 56600, "+", "S1_00015", "TrwC relaxase domain-containing protein"),
+    ]
+    # The relaxase is the only hit, and it is attributed to a TYPED model - the
+    # loner case. No mating-pair gene is in the cluster.
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id="S1_00015", gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", contigs, cds)
+
+    _return_code, rows, _audit, _ = run_main(
+        tmp_path, conjscan, gff, extra=["--min-element-bp", "1000"])
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["has_t4ss"] == "FALSE"
+    # The type letter is still REPORTED - we do not hide what CONJscan said...
+    assert row["mpf_typed_system"] == "TRUE"
+    # ...but it no longer buys a self-transmissibility claim.
+    assert row["mge_class"] == "ime"
+    assert row["mobility"].startswith("mobilisable")
+
+
+def test_a_mating_pair_gene_in_the_cluster_still_makes_an_ice(tmp_path):
+    """The complement of the test above: real in-cluster apparatus still means ICE.
+
+    Without this, "require the apparatus in the cluster" could be satisfied by
+    simply never calling an ICE again.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+    _return_code, rows, _audit, _ = run_main(tmp_path, conjscan, gff)
+
+    assert len(rows) == 1
+    assert rows[0]["has_t4ss"] == "TRUE"
+    assert rows[0]["mge_class"] == "ice"
+    assert rows[0]["mobility"] == "predicted self-transmissible"
+
+
+def test_ice_architecture_cluster_shorter_than_minimum_is_dropped(tmp_path):
+    """A 2.5 kb span of ICE machinery is a relic, not an integrative element.
+
+    ICE machinery is a ~20-gene mating-pair operon, so a couple of kilobases of
+    it is a fragment. The IME floor below does NOT apply here, because this
+    cluster carries a mating-pair component and so is not IME-architecture.
+    """
+    contigs = {"contig_1": 200000}
+    cds = [
+        gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "Phage integrase family protein"),
+        gff_cds("contig_1", 51500, 52500, "+", "S1_00017", "conjugal transfer protein TraB"),
     ]
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
-        conjscan_row(hit_id="S1_00015", gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id="S1_00017", gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
     ])
     gff = write_gff(tmp_path / "S1.gff3", contigs, cds)
 
@@ -793,8 +866,69 @@ def test_cluster_shorter_than_minimum_is_dropped_with_a_reason(tmp_path):
     dropped = [row for row in audit if row["action"] == "dropped"]
     assert len(dropped) == 1
     assert dropped[0]["reason"] == "cluster_shorter_than_min"
+    assert "--min-element-bp" in dropped[0]["detail"]  # the ICE floor, not the IME one
     assert "2501 bp" in dropped[0]["detail"]           # the measured span is reported
     assert dropped[0]["start"] == "50000" and dropped[0]["end"] == "52500"
+
+
+def test_ime_architecture_cluster_survives_the_lower_floor(tmp_path):
+    """The same 2.5 kb span, but IME-architecture, is KEPT.
+
+    Measured on the Phase 7 IME pilot: the size floor is applied to the anchor
+    cluster's SPAN, and that span scales with the NUMBER of machinery genes. An
+    IME carries a relaxase and an integrase - two genes, 1-6 kb - where an ICE
+    carries a twenty-gene operon. An 8,000 bp floor therefore selected for ICEs
+    by construction: six of the twelve curated IMEs were clustered and
+    classified correctly, then dropped for size, Tn4451 at a span of 1,266 bp.
+
+    This is the same scene as the test above with the mating-pair gene swapped
+    for a relaxase - which is precisely the difference between the two classes.
+    """
+    contigs = {"contig_1": 200000}
+    cds = [
+        gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "Phage integrase family protein"),
+        gff_cds("contig_1", 51500, 52500, "+", "S1_00015", "TrwC relaxase domain-containing protein"),
+    ]
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id="S1_00015", gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/MOB"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", contigs, cds)
+
+    return_code, rows, _audit, _ = run_main(tmp_path, conjscan, gff)
+
+    assert return_code == 0
+    assert len(rows) == 1
+    assert rows[0]["mge_class"] == "ime"
+    assert rows[0]["mobility"].startswith("mobilisable")
+    # Still capped below high: an IME has only two anchor classes by definition.
+    assert rows[0]["confidence"] != "high"
+
+
+def test_ime_floor_can_be_raised_back_to_the_ice_floor(tmp_path):
+    """--min-ime-element-bp is a knob, and the empirical cut is not load-bearing.
+
+    The default of 2,000 bp was fitted to a handful of Phase 7 observations, not
+    taken from a published bound, so a reader who disagrees must be able to turn
+    it off. Setting it to the ICE floor restores the old behaviour exactly.
+    """
+    contigs = {"contig_1": 200000}
+    cds = [
+        gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "Phage integrase family protein"),
+        gff_cds("contig_1", 51500, 52500, "+", "S1_00015", "TrwC relaxase domain-containing protein"),
+    ]
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id="S1_00015", gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/MOB"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", contigs, cds)
+
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, conjscan, gff, extra=["--min-ime-element-bp", "8000"])
+
+    assert rows == []
+    dropped = [row for row in audit if row["action"] == "dropped"]
+    assert dropped and dropped[0]["reason"] == "cluster_shorter_than_min"
 
 
 def test_cluster_longer_than_maximum_is_dropped_with_a_reason(tmp_path):
