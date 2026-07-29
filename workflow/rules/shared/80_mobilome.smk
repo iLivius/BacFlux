@@ -482,6 +482,7 @@ if MOBILOME_RUN:
             python {params.script} \
               --sample {wildcards.sample} \
               --conjscan-tsv {input.conjscan_dir}/best_solution.tsv \
+              --conjscan-hmmer-dir {input.conjscan_dir}/hmmer_results \
               --bakta-gff {input.bakta_dir}/{wildcards.sample}.gff3 \
               --contig-lengths {input.lengths} \
               --genome {input.genome} \

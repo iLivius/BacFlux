@@ -507,6 +507,16 @@ OUTPUT_COLUMNS = [
     "sys_wholeness_min",          # lowest completeness among the contributing systems
     "machinery_intact",           # TRUE/FALSE - FALSE downgrades the mobility wording
     "degraded_reason",            # why machinery_intact is FALSE, or NA
+    # How much this row can be trusted, and why. `system` means MacSyFinder
+    # assembled a complete model; `profile_hits_only` means it did NOT, and the
+    # row was built from individual profile hits because the machinery was too
+    # convincing to discard (see read_conjscan_profile_hits). The latter is
+    # always capped at low confidence.
+    "evidence_level",             # system | profile_hits_only
+    # Which of relaxase / coupling protein / mating-pair apparatus is ABSENT.
+    # Always filled in, for both evidence levels, so that a class like
+    # "passive island" can be read together with the reason for it.
+    "missing_components",
     # Phase 3, the att-site search (att_search.py). When a flanking attL/attR
     # pair is found, `start`/`end` above are REPLACED by the element those
     # boundaries define, because that - not the machinery span - is what actually
@@ -879,6 +889,120 @@ def read_conjscan_hits(path):
             "hit_gene_ref": field(row, "hit_gene_ref"),
         })
     return hits
+
+
+# ── The fallback: profile hits when MacSyFinder assembled no system ──────────
+
+# MacSyFinder's per-profile hit tables, one file per profile, written next to
+# best_solution.tsv. The columns are fixed by the tool; recorded here because the
+# parser is written against them.
+#
+#   # hit_id  replicon_name  position_hit  hit_sequence_length  gene_name
+#   i_eval  score  profile_coverage  sequence_coverage  begin  end
+HMMER_EXTRACT_SUFFIX = ".res_hmm_extract"
+
+
+def default_hmmer_dir(conjscan_path):
+    """Where MacSyFinder puts hmmer_results/, given best_solution.tsv's path.
+
+    The two always sit side by side in one output directory, so the caller does
+    not have to pass both. Returns '' when there is nothing to derive from, and
+    read_conjscan_profile_hits then simply finds no hits.
+    """
+    if not conjscan_path:
+        return ""
+    base = (conjscan_path if os.path.isdir(conjscan_path)
+            else os.path.dirname(conjscan_path))
+    return os.path.join(base, "hmmer_results") if base else "hmmer_results"
+
+
+def read_conjscan_profile_hits(hmmer_dir):
+    """Read the individual profile hits CONJscan found, ignoring system assembly.
+
+    WHY THIS EXISTS. MacSyFinder only reports a SYSTEM when a model's quorum is
+    met, and every conjugative model requires a relaxase. On the Phase 7
+    benchmark, ICEVflInd1 - a genuine 114 kb SXT/R391-family ICE - hit twelve
+    mating-pair profiles (traE, traF, traH, traK, traL, traN, traU, traV, traW),
+    a coupling protein AND VirB4, the signature ATPase, but no MOB* profile. No
+    system was assembled, so the module reported NOTHING: a real conjugative
+    element vanished because one component of the quorum was missing.
+
+    Reporting nothing there is defensible but not useful. Reporting it as though
+    a system had been found would be dishonest. So these hits are read as a
+    SECOND, WEAKER evidence tier: the element is surfaced, the missing component
+    is named in `missing_components`, `evidence_level` says the system was never
+    assembled, and confidence is capped at low. The reader can then see both what
+    was found and what was not.
+
+    Input:  the hmmer_results/ directory inside CONJscan's output.
+    Does:   reads every {profile}.res_hmm_extract. These are ALREADY filtered by
+            MacSyFinder's own i-evalue (0.001) and profile-coverage (0.5)
+            thresholds, so they are vetted hits rather than raw HMM noise - we
+            are not lowering a statistical bar, only skipping the quorum rule.
+    Output: hit dicts in exactly the shape read_conjscan_hits returns, so
+            everything downstream is unchanged. sys_id is deliberately EMPTY:
+            there is no system, and an empty sys_id also stops
+            merge_clusters_sharing_a_system from grouping on absent information.
+
+    Returns [] when the directory is missing or holds no hits, which - as
+    everywhere else in this module - means "no machinery", never an error.
+    """
+    hits = []
+    if not hmmer_dir or not os.path.isdir(hmmer_dir):
+        return hits
+
+    for filename in sorted(os.listdir(hmmer_dir)):
+        if not filename.endswith(HMMER_EXTRACT_SUFFIX):
+            continue
+        path = os.path.join(hmmer_dir, filename)
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                lines = [line.rstrip("\n") for line in handle]
+        except OSError:
+            continue
+
+        for line in lines:
+            if not line.strip() or line.startswith("#"):
+                continue
+            fields = line.split("\t")
+            if len(fields) < 8:
+                continue
+            hits.append({
+                "hit_id": fields[0].strip(),
+                "gene_name": fields[4].strip(),
+                # No model was satisfied, so there is no model_fqn or sys_id to
+                # report. Both stay empty and the columns read NA downstream.
+                "model_fqn": "",
+                "sys_id": "",
+                "sys_wholeness": None,
+                "hit_profile_cov": _float_or_none(fields[7].strip()),
+                "hit_status": "",
+                "hit_gene_ref": fields[4].strip(),
+            })
+    return hits
+
+
+# The components a complete conjugative system needs, in the order a reader
+# wants them. Used only to say which one was ABSENT when the fallback fires.
+CANONICAL_COMPONENTS = [
+    (ANCHOR_RELAXASE, "relaxase"),
+    (ANCHOR_T4CP, "coupling protein"),
+    (ANCHOR_T4SS, "mating-pair apparatus"),
+]
+
+
+def missing_components_for(cluster):
+    """Name the canonical machinery components this cluster does NOT have.
+
+    Returned as a comma-joined string for the `missing_components` column, or
+    'none' when all three are present. This is the transparency half of the
+    fallback: a call built from profile hits alone must say what is missing, so
+    that "passive island" can be read as "no relaxase was detected" rather than
+    as a positive statement about the element's biology.
+    """
+    absent = [label for anchor_class, label in CANONICAL_COMPONENTS
+              if not cluster_has_class(cluster, anchor_class)]
+    return ", ".join(absent) if absent else "none"
 
 
 # ── Phase 1: anchors ─────────────────────────────────────────────────────────
@@ -1397,7 +1521,8 @@ CONFIDENCE_RANK = {"low": 1, "medium": 2, "high": 3}
 
 
 def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_contig_boundary,
-                      boundary_method="none", require_trna_boundary=False):
+                      boundary_method="none", require_trna_boundary=False,
+                      from_profile_hits_only=False):
     """Give the candidate a confidence level, and say what lowered it.
 
     Returns (level, caps) where caps is a list of (level, reason, detail) - one
@@ -1447,6 +1572,20 @@ def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_cont
     adjacent in the file.
     """
     caps = []
+
+    # The profile-hit fallback is the weakest evidence this module reports:
+    # MacSyFinder saw the profiles but never assembled them into a system,
+    # because some component of the quorum was absent. The row exists so a real
+    # element is not silently lost, and it is capped at LOW so it can never be
+    # mistaken for a system-backed call.
+    if from_profile_hits_only:
+        caps.append(("low", "no_assembled_system", (
+            "MacSyFinder did not assemble these hits into a complete conjugation "
+            "system, so the row rests on individual profile hits alone. See "
+            "missing_components for which part of the machinery was not found; "
+            "the element is reported because the remaining evidence was too "
+            "strong to discard, not because a system was called."
+        )))
 
     # boundary_method=None means NOT YET ASSESSED, and is what build_candidates
     # passes: it runs before Phase 3, so at that point no boundary has been looked
@@ -1660,6 +1799,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         confidence, caps = assess_confidence(
             len(present_classes), machinery_intact, spans_contigs, at_boundary,
             boundary_method=None,
+            from_profile_hits_only=not contributing_systems,
         )
         for cap_level, cap_reason, cap_detail in caps:
             audit_rows.append(audit_row(
@@ -1739,6 +1879,14 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             ),
             "machinery_intact": _tsv_bool(machinery_intact),
             "degraded_reason": ",".join(degraded_reasons) if degraded_reasons else "NA",
+            # A cluster whose anchors carry no sys_id came from the profile-hit
+            # fallback: MacSyFinder found these profiles but never assembled them
+            # into a system. Naming that in the row itself means a reader never
+            # has to infer it from an empty conjscan_systems cell.
+            "evidence_level": (
+                "system" if contributing_systems else "profile_hits_only"
+            ),
+            "missing_components": missing_components_for(cluster),
             # Phase 3 defaults. refine_candidate_boundaries() below overwrites
             # these - and start/end - when it finds a flanking att pair.
             "boundary_method": "none",
@@ -2022,6 +2170,14 @@ def finalise_confidence(sample, rows, require_trna_boundary=False):
             _reads_tristate(row.get("at_contig_boundary")),
             boundary_method=row.get("boundary_method") or "none",
             require_trna_boundary=require_trna_boundary,
+            # Re-read from the row: this pass rebuilds the confidence from
+            # scratch, so a cap that is not restated here is silently dropped.
+            # That is exactly how the profile-hit fallback first came out as
+            # 'high' - the cap was applied in build_candidates and then thrown
+            # away the moment boundaries were settled.
+            from_profile_hits_only=(
+                row.get("evidence_level") == "profile_hits_only"
+            ),
         )
         if confidence != row["confidence"]:
             audit_rows.append(audit_row(
@@ -2061,6 +2217,13 @@ def build_parser():
                         help="CONJscan/MacSyFinder best_solution.tsv, or the "
                              "MacSyFinder output directory containing it. May be "
                              "absent: most isolates have no conjugative system.")
+    parser.add_argument("--conjscan-hmmer-dir", default=None,
+                        help="MacSyFinder's hmmer_results/ directory. Read ONLY "
+                             "when no complete system was assembled, to recover an "
+                             "element that failed the quorum by one component "
+                             "(reported at low confidence, with the missing part "
+                             "named). Defaults to hmmer_results/ beside "
+                             "best_solution.tsv.")
     parser.add_argument("--bakta-gff", required=True,
                         help="Bakta GFF3 for the same sample. Supplies the "
                              "coordinates of each CONJscan protein hit and the "
@@ -2246,13 +2409,36 @@ def main(argv=None):
         return 1
 
     if not hits:
-        audit_rows.append(audit_row(
-            args.sample, "input_missing", "conjscan_found_no_systems",
-            f"'{conjscan_path}' contains no system rows: CONJscan ran and found no "
-            "conjugation machinery. This is the expected result for most "
-            "environmental isolates and is a genuine negative, not a failure.",
-        ))
-        return finish(0)
+        # No SYSTEM was assembled. Before accepting that as "no machinery", look
+        # at the individual profile hits: MacSyFinder needs a full quorum, and a
+        # genuine element missing one component of it would otherwise disappear
+        # entirely (ICEVflInd1 on the Phase 7 benchmark - twelve mating-pair
+        # profiles, a coupling protein and VirB4, but no relaxase, so nothing was
+        # reported at all). Anything found this way is labelled
+        # evidence_level=profile_hits_only and capped at low confidence.
+        hits = read_conjscan_profile_hits(args.conjscan_hmmer_dir or
+                                          default_hmmer_dir(conjscan_path))
+        if hits:
+            profiles = sorted({hit["gene_name"] for hit in hits})
+            audit_rows.append(audit_row(
+                args.sample, "evidence_recorded", "no_system_using_profile_hits",
+                f"CONJscan assembled no complete system from '{conjscan_path}', but "
+                f"{len(hits)} individual profile hit(s) passed its own e-value and "
+                f"coverage thresholds ({', '.join(profiles)}). These are reported as "
+                "a weaker evidence tier - evidence_level=profile_hits_only, "
+                "confidence capped at low, and missing_components naming the part "
+                "of the machinery that was absent - rather than discarded, because "
+                "a real element can fail the quorum by one component.",
+            ))
+        else:
+            audit_rows.append(audit_row(
+                args.sample, "input_missing", "conjscan_found_no_systems",
+                f"'{conjscan_path}' contains no system rows and no profile hits "
+                "were found either: CONJscan ran and found no conjugation "
+                "machinery. This is the expected result for most environmental "
+                "isolates and is a genuine negative, not a failure.",
+            ))
+            return finish(0)
 
     # --- Phase 1: anchors ---------------------------------------------------
     machinery_anchors, systems, machinery_audit = build_conjscan_anchors(

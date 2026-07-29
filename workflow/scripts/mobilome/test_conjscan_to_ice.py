@@ -1166,6 +1166,115 @@ def test_anchors_further_apart_than_the_window_form_separate_clusters(tmp_path):
     assert all(row["mge_class"] == "ice" for row in rows)
 
 
+def write_hmmer_extract(directory, profile, hit_ids, profile_coverage=0.8):
+    """Write one MacSyFinder {profile}.res_hmm_extract file.
+
+    Real shape, taken from a CONJscan run: four '#' comment lines (the last one
+    being the column names) and then one tab-separated row per hit.
+    """
+    os.makedirs(str(directory), exist_ok=True)
+    path = os.path.join(str(directory), f"{profile}.res_hmm_extract")
+    with open(path, "w") as handle:
+        handle.write(f"# gene: {profile} extract\n")
+        handle.write("# profile length= 500\n")
+        handle.write("# i_evalue threshold= 0.001\n")
+        handle.write("# hit_id\treplicon_name\tposition_hit\thit_sequence_length\t"
+                     "gene_name\ti_eval\tscore\tprofile_coverage\t"
+                     "sequence_coverage\tbegin\tend\n")
+        for position, hit_id in enumerate(hit_ids, start=1):
+            handle.write(
+                f"{hit_id}\tcontig_1\t{position}\t500\t{profile}\t"
+                f"1.0e-100\t300.0\t{profile_coverage}\t0.9\t1\t490\n"
+            )
+    return path
+
+
+def test_profile_hits_recover_an_element_when_no_system_was_assembled(tmp_path):
+    """Machinery that fails MacSyFinder's quorum is reported, weakly, not lost.
+
+    The case this comes from is ICEVflInd1 on the Phase 7 benchmark: a genuine
+    114 kb SXT/R391-family ICE where CONJscan hit twelve mating-pair profiles, a
+    coupling protein and VirB4 - but no relaxase. Every conjugative model
+    requires a relaxase, so no system was assembled and the module reported
+    nothing whatsoever. A real element vanished on one missing component.
+
+    It is now surfaced as the weakest evidence tier, and must say so in three
+    places at once: evidence_level, missing_components, and confidence.
+    """
+    # best_solution.tsv exists but holds only MacSyFinder's "no system" banner.
+    conjscan = tmp_path / "best_solution.tsv"
+    conjscan.write_text("# macsyfinder 2.1.6\n# No System found\n")
+
+    hmmer_dir = tmp_path / "hmmer_results"
+    write_hmmer_extract(hmmer_dir, "T4SS_t4cp2", [T4CP_HIT])
+    write_hmmer_extract(hmmer_dir, "T4SS_virb4", [VIRB4_HIT])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, conjscan, gff,
+        extra=["--conjscan-hmmer-dir", str(hmmer_dir), "--min-element-bp", "1000"],
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["evidence_level"] == "profile_hits_only"
+    # The relaxase is the component that was absent, and naming it is the whole
+    # point: "passive" must be readable as "no relaxase found", not as a positive
+    # claim about the element.
+    assert "relaxase" in row["missing_components"]
+    assert row["has_relaxase"] == "FALSE"
+    assert row["mobility"] == "passive"
+    # Never presented as though a system had been called.
+    assert row["confidence"] == "low"
+    assert "no_system_using_profile_hits" in audit_reasons(audit)
+
+
+def test_profile_hit_confidence_cap_survives_the_boundary_pass(tmp_path):
+    """The low cap must not be lost when confidence is settled after Phase 3.
+
+    finalise_confidence rebuilds every confidence from scratch once the att
+    search has run, so a cap applied earlier and not restated there is silently
+    thrown away. That is exactly what happened on the first cut of this feature:
+    the fallback element came out 'high'. This pins it.
+    """
+    conjscan = tmp_path / "best_solution.tsv"
+    conjscan.write_text("# No System found\n")
+    hmmer_dir = tmp_path / "hmmer_results"
+    write_hmmer_extract(hmmer_dir, "T4SS_MOBF", [RELAXASE_HIT])
+    write_hmmer_extract(hmmer_dir, "T4SS_t4cp2", [T4CP_HIT])
+    write_hmmer_extract(hmmer_dir, "T4SS_virb4", [VIRB4_HIT])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _return_code, rows, _audit, _ = run_main(
+        tmp_path, conjscan, gff,
+        extra=["--conjscan-hmmer-dir", str(hmmer_dir), "--min-element-bp", "1000"],
+    )
+    assert len(rows) == 1
+    # All four anchor classes are present here, so without the cap this would be
+    # a 'high' call - which is precisely the misleading output being prevented.
+    assert rows[0]["n_anchor_classes"] == "4"
+    assert rows[0]["evidence_level"] == "profile_hits_only"
+    assert rows[0]["confidence"] == "low"
+
+
+def test_assembled_system_is_not_labelled_as_profile_hits(tmp_path):
+    """The normal path is untouched: a real system keeps evidence_level=system."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+    _return_code, rows, _audit, _ = run_main(tmp_path, conjscan, gff)
+    assert len(rows) == 1
+    assert rows[0]["evidence_level"] == "system"
+    assert rows[0]["missing_components"] == "none"
+    assert rows[0]["confidence"] == "high"
+
+
 def test_window_does_not_split_one_conjscan_system(tmp_path):
     """A narrow --window-bp must NOT cut a single CONJscan system into pieces.
 
