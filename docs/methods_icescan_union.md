@@ -475,8 +475,57 @@ Counting them anyway, as an upper bound on the error rate and not an error rate:
 So roughly two-thirds of calls are unvalidated, and about 23 predicted
 self-transmissible and 9 high-confidence claims rest on nothing measurable —
 **in both arms**. The union does not worsen that ratio; it adds 11 unvalidated
-medium/low IME and AICE calls. **Measuring specificity needs a negative control
-set that does not yet exist** (spec §8 Phase 7 asks for one).
+medium/low IME and AICE calls.
+
+### The negative control (added 2026-07-30) — 2 calls in 32.6 Mb, neither invented
+
+Spec §8 Phase 7 asks for "genomes with no reported ICE". Twelve closed genomes
+were screened, every one verified absent from all 1,677 ICEberg entries:
+
+| Genome | Why it is here | Calls |
+|---|---|---|
+| *Buchnera aphidicola* Sg / APS, *Wigglesworthia glossinidia* | reduced endosymbionts, ~0.65 Mb, no MGE traffic | **0** |
+| *Prochlorococcus marinus*, *Synechococcus* sp. CC9605 | streamlined marine genomes | **0** |
+| *Aquifex aeolicus* VF5 | deep-branching thermophile | **0** |
+| *Staphylococcus aureus* N315 | clinical isolate, prophages + transposons | **0** |
+| *Escherichia coli* K-12 MG1655 | the most-studied bacterial genome there is | **0** |
+| *Pseudomonas aeruginosa* PAO1 | 6.3 Mb reference strain | **0** |
+| *Halobacterium* sp. NRC-1 | an ARCHAEON — the models are bacterial, so any call would be spurious by construction | **0** |
+| *Bacillus subtilis* 168 | reference strain | **1** `ice` |
+| *Salmonella* Typhimurium LT2 | reference strain | **1** `ime` |
+
+**Total: 2 calls across 32,601,100 bp. Neither survives as an error.**
+
+*B. subtilis* 168 → **ICE*Bs1*, a real element**, and the best-evidenced call in
+this entire validation: 529,362–549,932 (20,571 bp, ICE*Bs1* is ~20.5 kb), all
+four anchor classes, MOBT relaxase (NicK), boundary resolved by a tRNA-anchored
+att at **tRNA-Leu(gag)** — ICE*Bs1* integrates at *trnS-leu2* — and Bakta
+annotated the integrase literally as "ICE*Bs1* integrase". ICEberg simply has no
+entry for NC_000964.3.
+
+⚠ **A warning about this benchmark's own design, recorded because it nearly
+inverted the result.** The set originally justified including strain 168 with
+"ICE*Bs1* is absent from 168 itself". That is false — ICE*Bs1* was *discovered*
+in strain 168 (Auchtung *et al.* 2005). Had the call been counted rather than
+inspected, a textbook-correct detection would have been recorded as a false
+positive, and a working detector might then have been "fixed". Every call in a
+negative control must be examined, never merely counted.
+
+*Salmonella* Typhimurium LT2 → 2,900,443–2,906,075 (5,633 bp), an integrase plus
+a protein Bakta labels only "DNA-binding protein" but which CONJscan's `T4SS_MOBM`
+profile hits at **i-eval 1.8e-84, coverage 0.986** — a near-full-length relaxase
+match. A strong relaxase beside an integrase is what an IME *is*. Whether this
+locus is a *bona fide* IME or two co-located genes is a question for a
+specialist; it is listed among the open domain questions rather than scored
+either way.
+
+**What this does and does not establish.** It does show the caller is not
+promiscuous: nine full genomes, including three large well-annotated ones dense
+with recombinases, prophages and IS elements, produced nothing at all. It does
+**not** give a false-positive rate — "absent from ICEberg" is not "contains no
+element", since ICEberg's curation is partial. The honest reading is an upper
+bound of **2 candidate false positives in 12 genomes, of which 0 are confirmed
+errors**.
 
 ### Boundaries remain poor
 
