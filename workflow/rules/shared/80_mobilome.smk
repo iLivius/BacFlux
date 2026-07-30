@@ -30,8 +30,12 @@
 #   03.taxonomy/{sample} ─► amrfinder_organism ────────────────┤        (WP-D)
 #              (GTDB-Tk)   (unlocks point mutations)           │           │
 #                                                              │           ▼
-#   bakta/{sample}.faa ──► conjscan ──► conjugation table ─────┤   {sample}_amr_mobility.tsv
-#              (relaxase / T4CP / T4SS = can it self-transmit?) │   + _amr_mobility_audit.tsv
+#   bakta/{sample}.faa ──┬─► conjscan ──► conjugation table ───┤   {sample}_amr_mobility.tsv
+#             (relaxase / T4CP / T4SS = can it self-transmit?) │   + _amr_mobility_audit.tsv
+#                        └─► icescan ──► integrase + IME/AICE ─┤
+#                           (OPTIONAL second model set; both   │
+#                            feed conjscan_ice, which merges   │
+#                            them — see mobilome.icescan.run)  │
 #                                                              │
 #   06.plasmids/…/platon ─► replicon calls (chromosome|plasmid)┘
 #
@@ -57,6 +61,53 @@
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
 # "../../envs/x.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/x.yaml.
 # ─────────────────────────────────────────────────────────────────────────────
+
+# ── The ICEscan model set: switch, paths, and why they live here ─────────────
+# Every other mobilome path constant is declared in 00_common.smk. These four
+# stay in this file on purpose, so that the whole ICEscan layer — the config
+# switch, the two output paths and the two rules that write them — can be read
+# in one place. Move them into 00_common.smk if you prefer the convention;
+# nothing else refers to them.
+#
+# WHAT THIS LAYER IS. ICEscan is a SECOND MacSyFinder model package, run over the
+# same Bakta proteins as CONJscan and merged with it. It is a fork of CONJScan by
+# the same Institut Pasteur authors, one minor version behind the release BacFlux
+# installs, so it is added ALONGSIDE and never instead of it (a swap loses the MOB
+# relaxase models, the decayed-machinery models and the plasmid set). What it adds
+# is the IME and AICE classes, which CONJScan 2.1.0 has no model for at all, plus
+# integrase profiles. What it does NOT add is boundaries: MacSyFinder reports gene
+# ORDINALS, not base pairs, so every coordinate still comes from our own Bakta
+# GFF3 join, our own clustering and our own att search. The reasoning in full is
+# in the config comments next to mobilome.icescan.
+#
+# OFF unless the user both switches it on AND gives a source, because turning it
+# on downloads a CC BY-NC-SA (non-commercial) model set.
+_icescan_cfg = ((config.get("mobilome") or {}).get("icescan") or {})
+ICESCAN_ENABLED = _config_bool(_icescan_cfg.get("run"), False)
+ICESCAN_URL = str(_icescan_cfg.get("url") or "").strip()
+ICESCAN_SHA256 = str(_icescan_cfg.get("sha256") or "").strip()
+# A models directory the user already holds (one CONTAINING an ICEscan/ folder)
+# beats downloading, exactly as directories.* beats links.* everywhere else.
+ICESCAN_LOCAL = str(_icescan_cfg.get("dir") or "").strip()
+
+# Switched on but with nowhere to fetch from is a configuration mistake, not a
+# reason to quietly run without it: the user would get today's results back and
+# no indication that the layer they asked for never existed.
+if MOBILOME_RUN and ICESCAN_ENABLED and not (ICESCAN_URL or ICESCAN_LOCAL):
+    sys.exit(
+        "[BacFlux] mobilome.icescan.run is true but neither mobilome.icescan.url "
+        "nor mobilome.icescan.dir is set, so there is no model package to use. "
+        "Set the url (see config/config_v2.yaml for the ICEfinder2 bundle it "
+        "comes in), point dir at a MacSyFinder models directory that already "
+        "holds ICEscan/, or set run: false."
+    )
+
+MOBILOME_ICESCAN = MOBILOME_RUN and ICESCAN_ENABLED
+
+# One shared copy of the models for all samples, next to conjscan_models.
+ICESCAN_MODELS_DIR = DIR_MOBILOME + "/icescan_models"   # a DIRECTORY (rule icescan_models)
+ICESCAN_DIR = MOBILOME_DIR + "/icescan"                 # a DIRECTORY (rule icescan)
+
 if MOBILOME_RUN:
 
     # ── Rule: contig_lengths — how long is every contig? ─────────────────────
@@ -413,6 +464,206 @@ if MOBILOME_RUN:
               }}
             """
 
+    # ══ The ICEscan model set (a second machinery search) ════════════════════
+    # Only exists when the user opted in. Without it the module behaves exactly
+    # as it did before: CONJscan alone, no IME class, no AICE class.
+    if MOBILOME_ICESCAN:
+
+        # ── Rule: icescan_models — fetch the ICEscan model package once ──────
+        # Biology: the same kind of package as CONJscan — profile models of the
+        # proteins an element needs in order to move — but covering two classes
+        # CONJScan 2.1.0 does not model at all:
+        #   IME  = integrates into the chromosome and carries a relaxase (the
+        #          enzyme that nicks the DNA to start transfer) but NO mating
+        #          apparatus, so it moves only by borrowing one from a
+        #          conjugative element in the same cell (mobility tier 5);
+        #   AICE = the actinomycete elements that do not conjugate at all and
+        #          instead push single-stranded DNA between hyphae with an
+        #          FtsK/SpoIIIE translocase.
+        # It also carries integrase profiles CONJscan lacks. Only some of those
+        # are trusted as element integrases — that judgement lives in the caller
+        # (conjscan_to_ice.py), not here.
+        #
+        # ⚠ LICENCE (from the package's own LICENSE file): CC BY-NC-SA 4.0,
+        # Institut Pasteur / CNRS — academic and non-commercial use only, the
+        # same terms as the CONJscan models. BacFlux never vendors either: they
+        # are fetched here, at the user's request, under the user's own agreement
+        # with the licensor. BacFlux's own MIT licence is unaffected.
+        #
+        # Takes in: nothing from the workflow — a URL from the config, or a
+        #           models directory the user already holds.
+        # Does: fetch ICEfinder2's database bundle and extract ONLY the
+        #       macsydata/ICEscan package from it.
+        # Produces: 08.mobilome/icescan_models/ICEscan/ — one shared copy for all
+        #           samples — plus PROVENANCE.txt.
+        # Consumed by: icescan.
+        #
+        # Why not `msf_data install` as conjscan_models does: ICEscan is not
+        # published in the macsy-models registry that command reads. It is
+        # distributed inside ICEfinder2's database bundle, so it has to be
+        # downloaded and unpacked by hand.
+        #
+        # conda: NONE — wget and tar from the launch environment, the same
+        # arrangement as rule download_amr_db in 50_amr.smk.
+        rule icescan_models:
+            output:
+                models = directory(ICESCAN_MODELS_DIR),
+            params:
+                url = ICESCAN_URL,
+                sha256 = ICESCAN_SHA256,
+                local_dir = ICESCAN_LOCAL,
+            log:
+                LOGS + "/mobilome_icescan_models.log"
+            priority: 4
+            shell:
+                """
+                exec > {log} 2>&1
+                set -euo pipefail
+                mkdir -p {output.models}
+
+                echo "Installing the ICEscan model package."
+                echo "NOTE: these models are licensed CC BY-NC-SA 4.0 (Institut Pasteur/CNRS) - academic / non-commercial use only. They are downloaded here at your request and are never redistributed by BacFlux."
+
+                if [ -n "{params.local_dir}" ]; then
+                    echo "Using the local models directory '{params.local_dir}'. Nothing will be downloaded."
+                    cp -r "{params.local_dir}"/ICEscan {output.models}/ICEscan
+                    SOURCE="local:{params.local_dir}"
+                else
+                    echo "Fetching ICEfinder2's database bundle from {params.url}"
+                    # Use the https:// spelling of this path: the ftp:// one
+                    # times out from behind many firewalls, including ours.
+                    # -nv (not -q) so that a failed transfer says why in the log
+                    # rather than leaving a bare non-zero exit to explain itself.
+                    wget -nv -O {output.models}/icf2_dbs.tar.gz "{params.url}"
+
+                    # A redirect to an HTML error page arrives with a 200 and
+                    # would leave an empty models directory behind. MacSyFinder
+                    # would then run happily and report no systems at all, which
+                    # is a WRONG answer that looks exactly like a real one, so
+                    # fail here instead.
+                    if ! tar -tzf {output.models}/icf2_dbs.tar.gz > /dev/null 2>&1; then
+                        echo "ERROR: the download is not a gzipped tar archive. The server may" >&2
+                        echo "       have moved the file or returned an error page. First bytes:" >&2
+                        head -c 200 {output.models}/icf2_dbs.tar.gz >&2
+                        exit 1
+                    fi
+
+                    OBSERVED=$(sha256sum {output.models}/icf2_dbs.tar.gz | cut -d' ' -f1)
+                    if [ -n "{params.sha256}" ] && [ "$OBSERVED" != "{params.sha256}" ]; then
+                        echo "ERROR: ICEscan bundle checksum mismatch." >&2
+                        echo "       expected {params.sha256}" >&2
+                        echo "       observed $OBSERVED" >&2
+                        echo "       The URL carries no version, so this means the upstream file" >&2
+                        echo "       changed. Update mobilome.icescan.sha256 once you have decided" >&2
+                        echo "       the new release is the one you want." >&2
+                        exit 1
+                    fi
+
+                    # The bundle also ships ICEfinder2's own HMM sets and a
+                    # UniProt BLAST index - about 60 MB this module never reads.
+                    # Extract only the MacSyFinder package. --strip-components=2
+                    # removes the leading 'icf2_dbs/macsydata/', so the package
+                    # lands as <models>/ICEscan, which is the layout
+                    # --models-dir expects.
+                    tar -xzf {output.models}/icf2_dbs.tar.gz -C {output.models} \
+                      --strip-components=2 icf2_dbs/macsydata/ICEscan
+                    rm -f {output.models}/icf2_dbs.tar.gz
+                    SOURCE="{params.url} (sha256 $OBSERVED)"
+                fi
+
+                # A MacSyFinder package is definitions (which genes make a
+                # system) plus profiles (the HMMs that find those genes). With
+                # either missing the search still runs and still finds nothing,
+                # so check for both rather than trust the archive's shape.
+                if [ ! -s {output.models}/ICEscan/definitions/Chromosome/IME.xml ]; then
+                    echo "ERROR: the ICEscan package has no definitions/Chromosome/IME.xml." >&2
+                    echo "       Either the archive layout changed or the local directory does" >&2
+                    echo "       not hold a MacSyFinder model package." >&2
+                    exit 1
+                fi
+                if [ ! -d {output.models}/ICEscan/profiles ]; then
+                    echo "ERROR: the ICEscan package has no profiles/ directory." >&2
+                    exit 1
+                fi
+                N_PROFILES=$(find {output.models}/ICEscan/profiles -name '*.hmm' | wc -l)
+                if [ "$N_PROFILES" -lt 1 ]; then
+                    echo "ERROR: no HMM profiles in {output.models}/ICEscan/profiles." >&2
+                    exit 1
+                fi
+
+                # metadata.yml carries the package's own version line, which is
+                # the only version string in the whole download.
+                VERSION=$(grep '^vers:' {output.models}/ICEscan/metadata.yml | cut -d' ' -f2)
+                {{
+                  echo "source:       $SOURCE"
+                  echo "fetched:      $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  echo "package_vers: $VERSION"
+                  echo "profiles:     $N_PROFILES"
+                  echo ""
+                  echo "The ICEscan download URL is UNVERSIONED, so this file is the only"
+                  echo "record of which release was used. Quote it in a methods section."
+                  echo ""
+                  echo "ICEscan is a fork of CONJScan by the same Institut Pasteur authors,"
+                  echo "distributed inside ICEfinder2's database bundle and licensed"
+                  echo "CC BY-NC-SA 4.0 - academic / non-commercial use only. BacFlux ships"
+                  echo "no models, only this URL. Cite Coluzzi et al. 2022 and Wang et al."
+                  echo "2024 (ICEfinder2)."
+                }} > {output.models}/PROVENANCE.txt
+
+                echo "ICEscan ready: version $VERSION, $N_PROFILES profiles."
+                """
+
+        # ── Rule: icescan — the second machinery search on THIS genome ───────
+        # Takes in: the same Bakta proteins (.faa) rule conjscan reads, and the
+        #           ICEscan models above.
+        # Does: MacSyFinder again, with the ICEscan package. `--models ICEscan
+        #       all` (not ICEscan/Chromosome, the form conjscan uses) because
+        #       ICEscan ships only a Chromosome set - the plasmid models were
+        #       removed in the fork - so `all` is the whole package.
+        # Produces: 08.mobilome/{sample}/icescan/ (best_solution.tsv and friends).
+        # Consumed by: conjscan_ice, which UNIONS this table with CONJscan's.
+        #
+        # --coverage-profile 0.5 is written out although it is also MacSyFinder's
+        # default (and therefore what rule conjscan gets implicitly): the two
+        # searches are merged, so they must be run at the same stringency, and
+        # leaving that to a default the tool could change would be a silent trap.
+        # 0.5 is the value the union was validated at. The EBI pipeline uses 0.3,
+        # which finds more and is a separate question this workflow does not take
+        # a position on.
+        #
+        # Same tolerance of a non-zero exit as rule conjscan: a genome with no
+        # detectable IME or AICE is the ordinary result, not an error.
+        rule icescan:
+            input:
+                bakta_dir = DIR_ANNOTATION + "/bakta/{sample}",
+                models = ICESCAN_MODELS_DIR,
+            output:
+                icescan_dir = directory(ICESCAN_DIR),
+            conda:
+                "../../envs/macsyfinder.yaml"
+            threads: capped_cpus(8)
+            log:
+                LOGS + "/mobilome_icescan_{sample}.log"
+            priority: 3
+            shell:
+                """
+                rm -rf {output.icescan_dir}
+                mkdir -p {output.icescan_dir}
+
+                macsyfinder \
+                  --models ICEscan all \
+                  --sequence-db {input.bakta_dir}/{wildcards.sample}.faa \
+                  --db-type ordered_replicon \
+                  --models-dir {input.models} \
+                  --coverage-profile 0.5 \
+                  --out-dir {output.icescan_dir} \
+                  --worker {threads} \
+                  --force > {log} 2>&1 || {{
+                    echo "" >> {log}
+                    echo "NOTE: MacSyFinder exited non-zero on the ICEscan model set. A genome with no integrative element is the common case; the module continues, and the CONJscan search is unaffected." >> {log}
+                  }}
+                """
+
     # ── Rule: conjscan_ice — turn machinery hits into ICE / IME candidates ───
     # Takes in: CONJscan's best_solution.tsv, Bakta's GFF3 (for the genomic
     #           coordinates of each protein hit, for integrase genes found by
@@ -450,6 +701,13 @@ if MOBILOME_RUN:
     rule conjscan_ice:
         input:
             conjscan_dir = CONJSCAN_DIR,
+            # The optional second machinery search. Present only when the user
+            # opted in to the ICEscan model set; unpacking a dict keeps the input
+            # list valid either way. The script UNIONS the two hit tables and
+            # takes from ICEscan only its integrase hits and its IME/AICE
+            # classes - never its spans (MacSyFinder reports gene ordinals, not
+            # base pairs) and never its quorum for the mating apparatus.
+            **({"icescan_dir": ICESCAN_DIR} if MOBILOME_ICESCAN else {}),
             bakta_dir = DIR_ANNOTATION + "/bakta/{sample}",
             lengths = CONTIG_LENGTHS,
             genome = FINAL_CONTIGS,
@@ -471,18 +729,26 @@ if MOBILOME_RUN:
             # short-read assembly could not show us where it ends.
             strict_boundary = ("--require-trna-boundary-for-high"
                                if MOBILOME_REQUIRE_TRNA_BOUNDARY else ""),
+            # Empty unless the ICEscan layer is on, so a user who left it off
+            # gets exactly the behaviour this rule had before it existed.
+            icescan_flag = lambda w: (
+                "--icescan-tsv " + ICESCAN_DIR.format(sample=w.sample) + "/best_solution.tsv"
+                if MOBILOME_ICESCAN else ""
+            ),
         log:
             LOGS + "/mobilome_conjscan_ice_{sample}.log"
         priority: 3
         shell:
             # best_solution.tsv is absent when MacSyFinder found nothing; the
             # script treats a missing file as "no systems" and still writes a
-            # well-formed empty table, so no guard is needed here.
+            # well-formed empty table, so no guard is needed here - and that
+            # holds for the ICEscan table too.
             """
             python {params.script} \
               --sample {wildcards.sample} \
               --conjscan-tsv {input.conjscan_dir}/best_solution.tsv \
               --conjscan-hmmer-dir {input.conjscan_dir}/hmmer_results \
+              {params.icescan_flag} \
               --bakta-gff {input.bakta_dir}/{wildcards.sample}.gff3 \
               --contig-lengths {input.lengths} \
               --genome {input.genome} \

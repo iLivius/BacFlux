@@ -156,10 +156,27 @@ ANCHOR_RELAXASE = "relaxase"        # T4SS_MOB* - nicks the DNA, pilots the stra
 ANCHOR_T4CP = "t4cp"                # coupling protein - the motor, not the bridge
 ANCHOR_T4SS = "t4ss"                # mating-pair formation apparatus (MPF)
 ANCHOR_INTEGRASE = "integrase"      # site-specific recombinase, from Bakta
+# AICE machinery: an actinomycete element that moves as DOUBLE-STRANDED DNA
+# between Streptomyces hyphae, pushed through the septal pore by a FtsK/SpoIIIE
+# translocase. It has no relaxase and no mating bridge, so it is NOT conjugation
+# and this class is never counted as conjugation machinery anywhere below.
+ANCHOR_AICE = "aice_machinery"
 
 # The order anchor classes are listed in, so the `anchor_classes` column reads
 # the same way for every row and can be compared between samples.
-ANCHOR_CLASS_ORDER = [ANCHOR_INTEGRASE, ANCHOR_RELAXASE, ANCHOR_T4CP, ANCHOR_T4SS]
+ANCHOR_CLASS_ORDER = [ANCHOR_INTEGRASE, ANCHOR_RELAXASE, ANCHOR_T4CP, ANCHOR_T4SS,
+                      ANCHOR_AICE]
+
+# Where one hit came from, so that every downstream rule can ask "was this
+# CONJscan or ICEscan?" and the audit trail can say so in words. See the
+# ICEscan block further down for why the two are not interchangeable.
+SOURCE_CONJSCAN = "conjscan"
+SOURCE_ICESCAN = "icescan"
+# Not a model set: the Bakta product text, which is where most integrases are
+# still found. On the 30 curated pilot elements, 12 have an integrase that ONLY
+# the product-text regex finds and no ICEscan profile does, so this is a
+# first-class source of evidence and not a fallback.
+SOURCE_BAKTA_PRODUCT = "bakta_product"
 
 
 # ── Which CONJscan gene name is which piece of machinery ─────────────────────
@@ -173,24 +190,135 @@ RELAXASE_NAME_PATTERN = re.compile(r"mob", re.IGNORECASE)
 T4CP_NAME_PATTERN = re.compile(r"t4cp|tcpa", re.IGNORECASE)
 
 
+# ── ICEscan's extra vocabulary ───────────────────────────────────────────────
+# ICEscan is a FORK of CONJScan 2.0.1 by the same Pasteur authors (its
+# metadata.yml still says "CONJScan"), one minor version behind the CONJScan
+# 2.1.0 we run. It ADDS an IME model, an AICE model and 21 profiles; it REMOVES
+# MOB.xml, the decayed dCONJ models and the whole Plasmids set, and its T4SS
+# quorum is stricter. So it is a UNION partner, never a replacement - swapping
+# to it loses elements. We run both and take from ICEscan only what it is
+# genuinely better at: integrase anchors, the Gram-positive/IME relaxase
+# families, and the IME/AICE model classes.
+#
+# The profiles below are the ones CONJScan 2.1.0 does not have, so
+# anchor_class_for_gene_name would otherwise fall through to its default and
+# call every one of them a mating-pair component. That default is right for
+# CONJscan (all 125 of its profiles really are T4SS_*) and catastrophic here: it
+# would invent a mating bridge out of an integrase and promote elements to
+# "predicted self-transmissible" on nothing at all.
+
+# INTEGRASE PROFILES WE TRUST.
+# These four are genuine element integrases: the tyrosine-recombinase profile
+# itself, the large serine recombinase family, and two families ICEscan curated
+# for elements CONJScan never modelled.
+ICESCAN_TRUSTED_INTEGRASE_PROFILES = {
+    "Phage_integrase",   # the tyrosine recombinase of most ICEs and prophages
+    "Recombinase",       # large serine recombinase - the Tn916/AICE integrase type
+    "UPF0236",           # ICEscan-curated integrase family
+    "PB001819",          # ICEscan-curated integrase family
+}
+
+# INTEGRASE PROFILES WE REFUSE, each with the protein it really is and what
+# trusting it cost us. All four are listed by ICEscan's own IME.xml as
+# exchangeables of Phage_integrase, so THIS IS A DELIBERATE DIVERGENCE FROM
+# UPSTREAM, not an oversight - a reader comparing us to ICEscan must be able to
+# see that we disagreed on purpose, and why.
+ICESCAN_EXCLUDED_INTEGRASE_PROFILES = {
+    # IntI1, the class-1 INTEGRON integrase. An integron is a gene-capture
+    # system, not an integrative element: it has no att site of its own to
+    # delimit and it does not excise. Measured on CP042858.1 - an att-bounded
+    # 32,103 bp tier-6 ICE became a 103,303 bp UNBOUNDED one at unchanged
+    # 'high' confidence, anchored on IntI1. All four of this profile's hits on
+    # the 28-genome benchmark are Bakta-annotated "class 1 integron integrase
+    # IntI1" or "integron integrase".
+    "TIGR02249": "IntI1, the class-1 integron integrase",
+    # XerC and XerD, the pair of chromosomal housekeeping recombinases that
+    # resolve chromosome dimers at the dif site. Every bacterium has both, they
+    # sit wherever the dif site is, and they have nothing to do with mobile
+    # elements. Measured: a XerC attached 43,639 bp from a 945 bp relaxase
+    # cluster produced an element six times its annotated size. They fire 11 and
+    # 9 times raw on this benchmark and are used by nothing, so the damage is
+    # real but would be invisible in the final table.
+    "TIGR02224": "XerC, a chromosomal dif-site recombinase",
+    "TIGR02225": "XerD, a chromosomal dif-site recombinase",
+    # The rve integrase catalytic domain - which is the DDE domain shared by IS
+    # TRANSPOSASES. Of its 71 hits on this benchmark, 66 are Bakta-annotated
+    # transposases (IS6 IS15DIV x14, IS3 family x14, IS6 IS1216E x8, IS30 x6,
+    # ...). Note that find_integrase_anchors ALREADY throws these out on the
+    # product-text side (TRANSPOSASE_PRODUCT_PATTERN); admitting rve as an HMM
+    # integrase would quietly reintroduce exactly the false positives that guard
+    # exists to remove, and an IS sitting next to a relaxase would be promoted
+    # to an ICE.
+    "rve": "the rve/DDE catalytic domain shared by IS transposases",
+}
+
+# AICE MACHINERY. An AICE (actinomycete integrative and conjugative element)
+# does not conjugate: it encodes a FtsK/SpoIIIE translocase that pushes
+# double-stranded DNA through the septal cross-wall into the next hyphal
+# compartment, plus its own replication initiator. Neither is conjugation
+# machinery, so these are given their own anchor class and are never counted
+# as a relaxase or a mating bridge.
+#
+# WHY THEY MAY NOT SEED AN ELEMENT ON THEIR OWN: FtsK/SpoIIIE is a core
+# chromosome-partitioning protein present in essentially every bacterium. A
+# cluster is only allowed to become an AICE when ICEscan actually assembled its
+# AICE model there (see keep_or_drop_cluster), which requires the translocase,
+# a Rep protein and an integrase together.
+ICESCAN_AICE_PROFILES = {
+    "FtsK_SpoIIIE",   # the translocase that does the moving
+    "RepSAv2",        # replication initiator of the pSAM2/SLP1 family
+    "Prim-Pol",       # primase-polymerase, exchangeable for RepSAv2
+    "DUF3631",        # ditto, exchangeable for RepSAv2
+}
+
+# ICEscan's relaxase families, which are what let it see Gram-positive and
+# IME relaxases that CONJScan's T4SS_MOB* profiles miss. Every one of them is
+# spelled "Relaxase_*", so the prefix is the rule; the two that also contain
+# "MOB" (Relaxase_firmi_MOBL, Relaxase_profile_MOBT) and ICEscan's T4SS_MOBL
+# are already caught by RELAXASE_NAME_PATTERN and are not special-cased twice.
+ICESCAN_RELAXASE_PREFIX = "Relaxase_"
+
+
 def anchor_class_for_gene_name(gene_name):
-    """Say which machinery class one CONJscan `gene_name` belongs to.
+    """Say which machinery class one MacSyFinder `gene_name` belongs to.
 
-    Input:  the `gene_name` cell of best_solution.tsv, e.g. 'T4SS_MOBP1'.
-    Output: one of the ANCHOR_* constants above.
+    Input:  the `gene_name` cell of best_solution.tsv, e.g. 'T4SS_MOBP1' from
+            CONJscan or 'Phage_integrase' from ICEscan. NOTE this is the profile
+            that ACTUALLY matched, not the model's reference gene - ICEscan
+            reports IntI1 hits as gene_name=TIGR02249 under
+            hit_gene_ref=Phage_integrase, so reading the reference gene instead
+            would let every excluded profile back in through the front door.
+    Output: one of the ANCHOR_* constants above, or None for a profile we have
+            decided not to trust as evidence of anything (the caller drops it
+            and writes an audit row naming what it really is).
 
-    The order of the tests matters. Relaxases are checked first because they are
-    the component that decides whether DNA can be transferred at all; coupling
-    proteins are checked next so that they are NOT swept into the T4SS bucket
-    (see the module docstring - that mistake would turn every mobilisable
-    element into a self-transmissible one). Anything left over is treated as a
-    mating-pair component, which is the safe default: those profiles are the
-    structural genes of the apparatus.
+    The order of the tests matters.
+
+    The integrase decisions come FIRST, because both lists below name specific
+    profiles and must not be reached by any of the pattern tests underneath.
+    Then relaxases, because the relaxase is the component that decides whether
+    DNA can be transferred at all; then coupling proteins, so that they are NOT
+    swept into the T4SS bucket (see the module docstring - that mistake would
+    turn every mobilisable element into a self-transmissible one); then the AICE
+    translocase, which is not conjugation machinery at all.
+
+    Anything left over is treated as a mating-pair component. That remains the
+    safe default because, after the named sets above have been taken out, what
+    is left in either tool's vocabulary really is the structural genes of the
+    apparatus (T4SS_T_virB*, T4SS_F_tra*, T4SS_G_tfc*, FATA_*, FA_orf*).
     """
+    if gene_name in ICESCAN_EXCLUDED_INTEGRASE_PROFILES:
+        return None
+    if gene_name in ICESCAN_TRUSTED_INTEGRASE_PROFILES:
+        return ANCHOR_INTEGRASE
+    if gene_name.startswith(ICESCAN_RELAXASE_PREFIX):
+        return ANCHOR_RELAXASE
     if RELAXASE_NAME_PATTERN.search(gene_name):
         return ANCHOR_RELAXASE
     if T4CP_NAME_PATTERN.search(gene_name):
         return ANCHOR_T4CP
+    if gene_name in ICESCAN_AICE_PROFILES:
+        return ANCHOR_AICE
     return ANCHOR_T4SS
 
 
@@ -265,6 +393,32 @@ def mpf_type_from_model(model_fqn):
     if "_type" in model_name:
         return model_name.split("_type", 1)[1], is_decayed
     return "", is_decayed
+
+
+# The two ICEscan models CONJScan 2.1.0 has no equivalent of. These are the only
+# thing we take from ICEscan's system-level output; everything else about a
+# system (its span, its wholeness, its mating-pair type) is read from CONJscan
+# alone - see build_conjscan_anchors for why.
+ICESCAN_MODEL_IME = "IME"
+ICESCAN_MODEL_AICE = "AICE"
+
+
+def icescan_model_class(model_fqn):
+    """Return 'IME', 'AICE' or '' for one ICEscan model name.
+
+    Input:  `model_fqn` as MacSyFinder wrote it, e.g. 'ICEscan/Chromosome/IME'
+            or 'ICEscan/Chromosome/T4SS_typeF'.
+    Output: the bare model name when it is one of the two classes ICEscan adds,
+            otherwise '' - its T4SS_type* models duplicate CONJscan's and are
+            deliberately not used to classify anything.
+
+    Used by build_candidates to let ICEscan name a class our own anchor-presence
+    rules cannot reach (AICE), and to record agreement or disagreement on IME.
+    """
+    model_name = model_fqn.split("/")[-1] if model_fqn else ""
+    if model_name in (ICESCAN_MODEL_IME, ICESCAN_MODEL_AICE):
+        return model_name
+    return ""
 
 
 # ── Which Bakta product text counts as an integrase ──────────────────────────
@@ -374,13 +528,55 @@ MGE_CLASS_ICE = "ice"
 MGE_CLASS_IME = "ime"
 MGE_CLASS_ISLAND = "cime_or_island"
 MGE_CLASS_CONJ_REGION = "conjugative_region"
+# The third class ICEscan brings, and the mobility ladder has no rung for it -
+# see AICE_MOBILITY below.
+MGE_CLASS_AICE = "aice"
 
 ELEMENT_TYPE_FOR_CLASS = {
     MGE_CLASS_ICE: "ice",                        # colocalise.py -> tier 6
     MGE_CLASS_IME: "ime",                        # colocalise.py -> tier 5
     MGE_CLASS_ISLAND: "genomic_island",          # deliberately not consumed
     MGE_CLASS_CONJ_REGION: "conjugative_region",  # deliberately not consumed
+    # Recognised by colocalise.py as CONTEXT ONLY: it sets the neighbourhood and
+    # caps confidence, and can raise no tier. That is the enforcement point for
+    # "an AICE never claims a conjugation tier".
+    MGE_CLASS_AICE: "aice",
 }
+
+# The mobility sentence for an AICE, and the reason it has no tier.
+#
+# THE BIOLOGY, because this is the one class the spec's ladder does not cover.
+# The ladder's top two rungs are both conjugation: tier 5 is "mobilisable by a
+# helper's conjugation machinery", tier 6 is "self-transmissible by its own".
+# An AICE has neither a relaxase nor a mating-pair apparatus - it is not a
+# conjugative element despite the C in its name. It replicates as a circle and
+# is translocated as DOUBLE-STRANDED DNA through the septal pore between
+# compartments of a Streptomyces mycelium by its own FtsK/SpoIIIE ATPase. So
+# putting it at tier 5 or tier 6 would be a FALSE claim in either direction:
+# it is not waiting for a helper, and it cannot mate with another cell.
+# It therefore gets no tier at all, and says why.
+AICE_MOBILITY = (
+    "predicted transferable within the mycelium by FtsK/SpoIIIE translocation "
+    "(actinomycete AICE); not on the conjugation mobility ladder"
+)
+AICE_TIER_REASON = (
+    "no tier: the mobility ladder's tiers 5 and 6 are both conjugation, and an "
+    "AICE conjugates by neither route - it moves as double-stranded DNA between "
+    "hyphal compartments. Reporting it at either tier would be a false claim."
+)
+# An AICE is not a broken ICE, and `missing_components` must not read as though
+# it were: the relaxase and mating bridge are absent BY DEFINITION, not missing.
+AICE_MISSING_COMPONENTS = (
+    "none expected (an AICE has no relaxase and no mating-pair apparatus)"
+)
+
+# What every non-AICE row says in `mobility_tier_reason`. The tier itself is
+# assigned by colocalise.py, per AMR gene, from element_type plus the gene's own
+# context - this table describes elements, not genes, so it never carries one.
+TIER_ASSIGNED_DOWNSTREAM_REASON = (
+    "assigned per AMR gene by colocalise.py from element_type and context; this "
+    "table describes elements, not genes"
+)
 
 # Appended to the mobility wording when the machinery is incomplete. Decayed
 # elements are common in real genomes and are where naive tools overcall, so the
@@ -482,9 +678,16 @@ OUTPUT_COLUMNS = [
     "sample",
     "mge_id",                     # contig|class-start:end  (spec §9 ID format)
     "mge_name",                   # curated name - always NA until a naming DB is wired in
-    "element_type",               # what colocalise.py reads: ice | ime | genomic_island | conjugative_region
-    "mge_class",                  # what we actually called it (ice|ime|cime_or_island|conjugative_region)
+    "element_type",               # what colocalise.py reads: ice | ime | aice | genomic_island | conjugative_region
+    "mge_class",                  # what we actually called it (ice|ime|aice|cime_or_island|conjugative_region)
     "mobility",                   # the sentence, always "predicted ..." for ICEs
+    # This table describes ELEMENTS, not genes, so it never assigns a mobility
+    # tier itself - colocalise.py does that per AMR gene. The column exists so
+    # that the one class which can NEVER have a tier says so in words instead of
+    # leaving a reader to wonder: an AICE is not on the conjugation ladder at
+    # all. Never blank; see AICE_TIER_REASON.
+    "mobility_tier",
+    "mobility_tier_reason",
     "contig",
     "start",                      # 1-based inclusive, first base of the first anchor
     "end",                        # 1-based inclusive, last base of the last anchor
@@ -504,6 +707,11 @@ OUTPUT_COLUMNS = [
     "anchor_ids",                 # locus tags with their class, so a reader can look them up
     "conjscan_systems",           # sys_id list - the join key back to best_solution.tsv
     "conjscan_models",            # model_fqn list
+    # Which model set each piece of evidence came from, and what ICEscan called
+    # here. Present so that a reader comparing this table with ICEscan's own
+    # output can see immediately where we agreed and where we did not.
+    "evidence_sources",           # conjscan / icescan / bakta_product, comma list
+    "icescan_model_class",        # IME | AICE | NA - what ICEscan's models said
     "sys_wholeness_min",          # lowest completeness among the contributing systems
     "machinery_intact",           # TRUE/FALSE - FALSE downgrades the mobility wording
     "degraded_reason",            # why machinery_intact is FALSE, or NA
@@ -834,7 +1042,26 @@ def resolve_conjscan_path(path):
     return path if os.path.exists(path) else None
 
 
-def read_conjscan_hits(path):
+def namespaced_sys_id(sys_id, source):
+    """Prefix an ICEscan system id so it can never be confused with a CONJscan one.
+
+    WHY THIS IS NOT COSMETIC. MacSyFinder builds a system id as
+    {replicon}_{model}_{n}, and the two tools share model names - both define
+    T4SS_typeF. Run over the same genome they therefore produce genuinely
+    DIFFERENT systems under IDENTICAL ids, e.g. 'CP042858_1_T4SS_typeF_3' from
+    each. Merging them would pool their contigs (a false spans_contigs flag),
+    pool their wholeness, and let merge_clusters_sharing_a_system join two
+    clusters that no single tool ever said belonged together.
+
+    CONJscan ids are left exactly as they are, so nothing about the existing
+    single-tool path changes.
+    """
+    if source != SOURCE_ICESCAN or not sys_id:
+        return sys_id
+    return f"{SOURCE_ICESCAN}:{sys_id}"
+
+
+def read_conjscan_hits(path, source=SOURCE_CONJSCAN):
     """Read CONJscan's best_solution.tsv into one dict per machinery hit.
 
     Input: the file written by `macsyfinder --models CONJScan/Chromosome all`.
@@ -885,13 +1112,17 @@ def read_conjscan_hits(path):
             "hit_id": field(row, "hit_id"),
             "gene_name": field(row, "gene_name"),
             "model_fqn": field(row, "model_fqn"),
-            "sys_id": field(row, "sys_id"),
+            "sys_id": namespaced_sys_id(field(row, "sys_id"), source),
             "sys_wholeness": _float_or_none(field(row, "sys_wholeness")),
             "hit_profile_cov": _float_or_none(field(row, "hit_profile_cov")),
             "hit_status": field(row, "hit_status"),
             # The model's OWN gene, which may differ from gene_name: see
             # hit_is_virb4 below for why we need both.
             "hit_gene_ref": field(row, "hit_gene_ref"),
+            # Which model set found this. Carried on every hit so the audit can
+            # say where a piece of evidence came from, and so the rules below
+            # can treat ICEscan's system-level claims differently.
+            "source": source,
         })
     return hits
 
@@ -921,7 +1152,7 @@ def default_hmmer_dir(conjscan_path):
     return os.path.join(base, "hmmer_results") if base else "hmmer_results"
 
 
-def read_conjscan_profile_hits(hmmer_dir):
+def read_conjscan_profile_hits(hmmer_dir, source=SOURCE_CONJSCAN):
     """Read the individual profile hits CONJscan found, ignoring system assembly.
 
     WHY THIS EXISTS. MacSyFinder only reports a SYSTEM when a model's quorum is
@@ -983,6 +1214,7 @@ def read_conjscan_profile_hits(hmmer_dir):
                 "hit_profile_cov": _float_or_none(fields[7].strip()),
                 "hit_status": "",
                 "hit_gene_ref": fields[4].strip(),
+                "source": source,
             })
     return hits
 
@@ -1031,6 +1263,10 @@ def make_anchor(feature, anchor_class, label, hit=None):
         "sys_id": hit["sys_id"] if hit else "",
         "model_fqn": hit["model_fqn"] if hit else "",
         "gene_name": hit["gene_name"] if hit else "",
+        # Where this evidence came from: 'conjscan', 'icescan', or - when there
+        # is no HMM hit behind it at all - the Bakta annotation text. Read by
+        # the integrase tie-break and reported in the audit trail.
+        "source": hit.get("source", SOURCE_CONJSCAN) if hit else SOURCE_BAKTA_PRODUCT,
     }
 
 
@@ -1044,7 +1280,25 @@ def build_conjscan_anchors(sample, hits, features_by_id):
             time it summarises each SYSTEM (`sys_id`), because completeness and
             the contig-spanning check are properties of the system, not of one
             gene.
-    Output: (anchors, systems, audit_rows).
+    Output: (anchors, integrase_candidates, systems, audit_rows).
+
+    `integrase_candidates` is returned SEPARATELY from the machinery anchors,
+    and only ICEscan puts anything in it (CONJScan 2.1.0 has no integrase model
+    at all). They are kept apart for two reasons, both of which matter:
+
+      * an integrase belongs at the ELEMENT BOUNDARY, tens of kb from the
+        machinery operon, so it needs the wide --integrase-window-bp radius that
+        attach_nearby_integrases applies - not the tight machinery window; and
+      * ICEscan must not be allowed to set an element's extent. Its IME
+        "systems" are not loci - both mandatory genes are declared loners, so
+        MacSyFinder exempts them from clustering, and on this benchmark 17 of 71
+        of them span more than 1,000 genes (the largest being an entire 10.1 Mb
+        chromosome called as one "IME"). Letting such a hit join a machinery
+        cluster directly would drag the cluster across the replicon.
+
+    Putting them in the same pool as the Bakta product-text integrases means
+    both sources compete under one rule, which is where the FIX-4 tie-break in
+    attach_nearby_integrases does its work.
 
     `systems` is keyed by sys_id and holds:
       wholeness    lowest sys_wholeness seen for it (all rows of a system carry
@@ -1064,10 +1318,16 @@ def build_conjscan_anchors(sample, hits, features_by_id):
     without coordinates it cannot be clustered with anything.
     """
     anchors = []
+    integrase_candidates = []
     systems = {}
     audit_rows = []
+    # Counted, not listed one by one: `rve` alone fires 71 times on the
+    # benchmark, and a row per hit would drown the audit file.
+    excluded_profile_counts = {}
+    unused_icescan_apparatus = 0
 
     for hit in hits:
+        source = hit.get("source", SOURCE_CONJSCAN)
         system = systems.setdefault(hit["sys_id"], {
             "wholeness": None,
             "decayed": False,
@@ -1076,6 +1336,12 @@ def build_conjscan_anchors(sample, hits, features_by_id):
             "models": set(),
             "mpf_types": set(),
             "n_hits": 0,
+            # Which tool assembled this system. build_candidates reads every
+            # OTHER field here for CONJscan systems only - see the note there.
+            "source": source,
+            # 'IME' / 'AICE' / '' - the one thing we do take from an ICEscan
+            # system, because CONJScan 2.1.0 models neither class.
+            "icescan_class": icescan_model_class(hit["model_fqn"]),
         })
         system["n_hits"] += 1
         system["models"].add(hit["model_fqn"])
@@ -1092,6 +1358,33 @@ def build_conjscan_anchors(sample, hits, features_by_id):
                 system["wholeness"] = wholeness
 
         anchor_class = anchor_class_for_gene_name(hit["gene_name"])
+
+        # A profile we have decided not to trust (IntI1, XerC, XerD, rve - see
+        # ICESCAN_EXCLUDED_INTEGRASE_PROFILES for what each really is and what
+        # trusting it cost). It becomes no anchor of any kind: not an integrase,
+        # and not a mating-pair component either, which is what the fall-through
+        # default would otherwise have made of it.
+        if anchor_class is None:
+            excluded_profile_counts[hit["gene_name"]] = (
+                excluded_profile_counts.get(hit["gene_name"], 0) + 1
+            )
+            continue
+
+        # ICEscan's mating-pair and coupling-protein hits are READ (they still
+        # count towards the system summary above) but are never turned into
+        # anchors. Two reasons, and both are deliberate limits on how far we
+        # trust the fork:
+        #   * its T4SS quorum is stricter than CONJScan 2.1.0's and its model set
+        #     drops MOB.xml and the decayed dCONJ models, so its apparatus calls
+        #     are a different instrument from the one every threshold here was
+        #     tuned against - mixing the two would silently change what counts as
+        #     "self-transmissible"; and
+        #   * an anchor extends a cluster, and ICEscan system spans are not
+        #     element spans (see the docstring above).
+        # CONJscan already covers the apparatus better, so nothing is lost.
+        if source == SOURCE_ICESCAN and anchor_class in (ANCHOR_T4SS, ANCHOR_T4CP):
+            unused_icescan_apparatus += 1
+            continue
 
         # Truncation check (spec §8 Phase 4): only the two components that have
         # to WORK for transfer are tested - the relaxase, and VirB4, the ATPase
@@ -1120,11 +1413,46 @@ def build_conjscan_anchors(sample, hits, features_by_id):
             continue
 
         system["contigs"].add(feature["contig"])
-        anchors.append(make_anchor(
-            feature, anchor_class, machinery_label(hit["gene_name"]), hit=hit
+
+        # AICE machinery keeps its full profile name as the label ('FtsK_SpoIIIE'
+        # rather than machinery_label's 'SpoIIIE'), because the reader needs to
+        # recognise the translocase by name.
+        label = (hit["gene_name"] if anchor_class == ANCHOR_AICE
+                 else machinery_label(hit["gene_name"]))
+        anchor = make_anchor(feature, anchor_class, label, hit=hit)
+
+        if anchor_class == ANCHOR_INTEGRASE:
+            integrase_candidates.append(anchor)
+        else:
+            anchors.append(anchor)
+
+    if excluded_profile_counts:
+        listed = ", ".join(
+            f"{name} x{count} ({ICESCAN_EXCLUDED_INTEGRASE_PROFILES[name]})"
+            for name, count in sorted(excluded_profile_counts.items())
+        )
+        audit_rows.append(audit_row(
+            sample, "row_skipped", "untrusted_integrase_profile",
+            f"{sum(excluded_profile_counts.values())} hit(s) to profiles that "
+            f"ICEscan's IME model lists as integrases but that we do not trust: "
+            f"{listed}. We diverge from upstream here ON PURPOSE - none of these "
+            "is an element integrase, and each has been measured to inflate or "
+            "misplace an element. They were used as no anchor at all.",
         ))
 
-    return anchors, systems, audit_rows
+    if unused_icescan_apparatus:
+        audit_rows.append(audit_row(
+            sample, "row_skipped", "icescan_apparatus_hit_not_used_as_anchor",
+            f"{unused_icescan_apparatus} ICEscan mating-pair/coupling-protein "
+            "hit(s) were read but not used as anchors. The mating-pair apparatus "
+            "is taken from CONJScan 2.1.0 alone: ICEscan is a fork of CONJScan "
+            "2.0.1 with a stricter T4SS quorum and no MOB or decayed-system "
+            "models, and its system spans are not element spans. ICEscan is used "
+            "here for integrase anchors, its Gram-positive relaxase families and "
+            "its IME/AICE model classes only.",
+        ))
+
+    return anchors, integrase_candidates, systems, audit_rows
 
 
 def find_integrase_anchors(sample, cds_features):
@@ -1202,56 +1530,129 @@ def find_integrase_anchors(sample, cds_features):
 DEFAULT_INTEGRASE_WINDOW_BP = 50000
 
 
-def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp):
+# How the sources rank when two integrase candidates are otherwise equal.
+# Lower wins. The Bakta product text is preferred over an HMM profile hit at
+# equal distance and equal att support, because it names the protein in words a
+# reader can check ("class 1 integron integrase IntI1" is a sentence you can
+# disagree with; "TIGR02249" is not) and because it is the source that found the
+# integrase for 12 of the 30 curated pilot elements.
+INTEGRASE_SOURCE_RANK = {
+    SOURCE_BAKTA_PRODUCT: 0,
+    SOURCE_ICESCAN: 1,
+    SOURCE_CONJSCAN: 2,
+}
+
+
+def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp,
+                             att_supports=None):
     """Give each machinery cluster the integrase that belongs to it, if any.
 
-    Takes in: clusters built from MACHINERY anchors only, plus every integrase
-              anchor found in Phase 1.
-    Does:     for each cluster with no integrase, looks for the closest integrase
-              on the same contig within integrase_window_bp of the cluster's
-              bounds, and attaches it.
+    Takes in: clusters built from MACHINERY anchors only; every integrase
+              candidate from Phase 1 (Bakta product text AND, when ICEscan ran,
+              its trusted integrase profiles); and optionally `att_supports`.
+    Does:     for each cluster, ranks every integrase on the same contig within
+              integrase_window_bp and attaches the single best one.
     Returns:  (clusters, audit_rows) - clusters modified in place.
 
-    Only the CLOSEST integrase is attached, and only when the cluster has none.
-    An element has one integrase; attaching every integrase within 50 kb would
-    manufacture anchor classes on a chromosome that is full of prophage
-    integrases.
+    Only ONE integrase is attached per cluster. An element has one integrase;
+    attaching every integrase within 50 kb would manufacture anchor classes on a
+    chromosome that is full of prophage integrases.
+
+    HOW THE BEST ONE IS CHOSEN (this is FIX 4, and it is a correctness fix).
+    The old rule was "closest, and first-seen wins a tie". That is fine while
+    there is only one source of integrases, but once ICEscan's profile hits join
+    the pool the candidates routinely sit INSIDE the machinery cluster, where
+    every one of them has a gap of 0. A tie among all candidates meant the choice
+    fell to whichever happened to be first in the list - i.e. to the SOURCE
+    rather than to any evidence. That is exactly how the CP042858.1 regression
+    happened: an att-bounded 32,103 bp ICE became a 103,303 bp unbounded one, at
+    unchanged 'high' confidence, because an IntI1 hit won a tie it should never
+    have been in.
+
+    So the ranking key is, in order:
+
+      1. does this integrase YIELD AN att PAIR?  An att site is the scar left
+         when the element recombined into the chromosome, so an integrase whose
+         inclusion produces flanking attL/attR is the one that actually put this
+         element here. This is real evidence about which integrase belongs to the
+         element, and it is the only key that is - the other two are tie-breaks.
+      2. distance to the cluster.
+      3. the source, per INTEGRASE_SOURCE_RANK above.
+      4. position, purely so the result is deterministic when all else is equal.
+
+    `att_supports(contig, start, end) -> bool` is supplied by the caller when a
+    genome FASTA is available; without one it is None, key 1 is constant, and the
+    ranking degrades to "closest, then source" - which is the old behaviour made
+    deterministic. Note the consequence of key 1 being primary: an att-supporting
+    integrase BEATS a closer one that yields nothing. That is intended. Distance
+    is a proxy for belonging; an att pair is direct evidence of it.
     """
     audit_rows = []
     attached_ids = set()
+
+    def gap_to(cluster_lo, cluster_hi, anchor):
+        """Bases strictly between the cluster and this integrase; 0 if they overlap."""
+        if anchor["start"] > cluster_hi:
+            return anchor["start"] - cluster_hi
+        if anchor["end"] < cluster_lo:
+            return cluster_lo - anchor["end"]
+        return 0
+
     for cluster in clusters:
-        if any(a["anchor_class"] == ANCHOR_INTEGRASE for a in cluster):
-            continue
         contig = cluster[0]["contig"]
         lo = min(a["start"] for a in cluster)
         hi = max(a["end"] for a in cluster)
 
-        best = None
+        # Every integrase near enough to be in the running, with its distance.
+        in_range = []
         for anchor in integrase_anchors:
             if anchor["contig"] != contig:
                 continue
-            if anchor["start"] > hi:
-                gap = anchor["start"] - hi
-            elif anchor["end"] < lo:
-                gap = lo - anchor["end"]
-            else:
-                gap = 0
-            if gap <= integrase_window_bp and (best is None or gap < best[0]):
-                best = (gap, anchor)
+            gap = gap_to(lo, hi, anchor)
+            if gap <= integrase_window_bp:
+                in_range.append((gap, anchor))
+        if not in_range:
+            continue
 
-        if best is not None:
-            gap, anchor = best
-            cluster.append(anchor)
-            attached_ids.add(id(anchor))
-            audit_rows.append(audit_row(
-                "", "evidence_recorded", "integrase_attached_beyond_cluster_window",
-                f"{contig}:{lo}-{hi}: an integrase at {anchor['start']}-{anchor['end']} "
-                f"({anchor.get('label','')}) sits {gap} bp away - beyond the "
-                f"machinery clustering window but within the {integrase_window_bp} bp "
-                "integrase window. Attached: conjugation machinery is an operon and "
-                "clusters tightly, whereas the integrase sits at the element "
-                "boundary, tens of kb away on a large ICE.",
-                contig=contig, start=lo, end=hi))
+        # Key 1 is the expensive one (it runs the att search), so it is only
+        # computed when there is actually a choice to make. With a single
+        # candidate the answer cannot change the outcome.
+        def att_supported(anchor):
+            if att_supports is None or len(in_range) < 2:
+                return False
+            span_lo = min(lo, anchor["start"])
+            span_hi = max(hi, anchor["end"])
+            return bool(att_supports(contig, span_lo, span_hi))
+
+        ranked = sorted(
+            in_range,
+            key=lambda pair: (
+                not att_supported(pair[1]),                 # False (0) sorts first
+                pair[0],                                    # then closest
+                INTEGRASE_SOURCE_RANK.get(pair[1]["source"], 9),
+                pair[1]["start"],
+            ),
+        )
+        gap, anchor = ranked[0]
+
+        # Clusters are built from MACHINERY anchors only - integrases, from
+        # either source, are held back for exactly this step - so a cluster
+        # never already contains one and there is nothing to de-duplicate here.
+        cluster.append(anchor)
+        attached_ids.add(id(anchor))
+        runners_up = len(in_range) - 1
+        audit_rows.append(audit_row(
+            "", "evidence_recorded", "integrase_attached_beyond_cluster_window",
+            f"{contig}:{lo}-{hi}: an integrase at {anchor['start']}-{anchor['end']} "
+            f"({anchor.get('label','')}, from {anchor.get('source','')}) sits "
+            f"{gap} bp away - beyond the "
+            f"machinery clustering window but within the {integrase_window_bp} bp "
+            "integrase window. Attached: conjugation machinery is an operon and "
+            "clusters tightly, whereas the integrase sits at the element "
+            "boundary, tens of kb away on a large ICE."
+            + (f" Chosen over {runners_up} other candidate(s) by att support, "
+               "then distance, then source." if runners_up else ""),
+            contig=contig, start=lo, end=hi))
 
     # Integrases belonging to NO machinery cluster. Under the old shared-window
     # design these formed integrase-only clusters that were then dropped with a
@@ -1487,8 +1888,26 @@ def cluster_looks_like_an_ime(cluster, has_mpf_system):
             and not has_mpf_system)
 
 
+def cluster_looks_like_an_aice(cluster, has_aice_system):
+    """True when this cluster is an AICE: ICEscan called its AICE model here AND
+    the anchors back it up with an integrase and its translocation machinery.
+
+    BOTH halves are required, and the second is the important one. FtsK/SpoIIIE
+    is a core chromosome-partitioning ATPase carried by essentially every
+    bacterium - seeding an element on one would produce an "AICE" in every
+    genome we ever run. Requiring ICEscan's assembled AICE model (translocase +
+    a Rep protein + an integrase, within 10 genes of each other) is what makes
+    the call specific; requiring the anchors too is what stops a model called
+    somewhere else on the replicon from labelling this cluster.
+    """
+    return (has_aice_system
+            and cluster_has_class(cluster, ANCHOR_INTEGRASE)
+            and cluster_has_class(cluster, ANCHOR_AICE))
+
+
 def keep_or_drop_cluster(cluster, min_element_bp, max_element_bp,
-                         min_ime_element_bp=None, has_mpf_system=False):
+                         min_ime_element_bp=None, has_mpf_system=False,
+                         has_aice_system=False):
     """Decide whether one cluster becomes a candidate element.
 
     Returns (keep, reason, detail). The three rejections, in the order they are
@@ -1513,8 +1932,13 @@ def keep_or_drop_cluster(cluster, min_element_bp, max_element_bp,
 
     has_relaxase = cluster_has_class(cluster, ANCHOR_RELAXASE)
     has_t4ss = cluster_has_class(cluster, ANCHOR_T4SS)
+    is_aice = cluster_looks_like_an_aice(cluster, has_aice_system)
 
-    if not has_relaxase and not has_t4ss:
+    # An AICE has NEITHER a relaxase NOR a mating-pair apparatus - that is what
+    # it is, not what is wrong with it - so the conjugation test below would
+    # throw away every one of them. It is admitted on its own evidence instead:
+    # ICEscan's assembled AICE model plus the matching anchors.
+    if not has_relaxase and not has_t4ss and not is_aice:
         classes = sorted({anchor["anchor_class"] for anchor in cluster})
         return False, "no_conjugation_anchor", (
             f"{len(cluster)} anchor(s) spanning {span} bp, of class(es) "
@@ -1543,9 +1967,15 @@ def keep_or_drop_cluster(cluster, min_element_bp, max_element_bp,
     # machinery that we could find, and the value here was chosen against a
     # handful of observations in one benchmark. Treat it as a knob, and say so
     # in any methods write-up rather than implying it is a property of IMEs.
+    #
+    # An AICE takes the same lower floor, for the same reason: its machinery is
+    # three genes (translocase, Rep protein, integrase), not a twenty-gene
+    # operon, so the ICE floor would select it out by construction.
     floor = min_element_bp
     floor_flag = "--min-element-bp"
-    if min_ime_element_bp is not None and cluster_looks_like_an_ime(cluster, has_mpf_system):
+    small_machinery = (cluster_looks_like_an_ime(cluster, has_mpf_system)
+                       or is_aice)
+    if min_ime_element_bp is not None and small_machinery:
         floor = min_ime_element_bp
         floor_flag = "--min-ime-element-bp"
 
@@ -1729,11 +2159,17 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         has_mpf_system_early = any(
             systems.get(sys_id, {}).get("mpf_types", set())
             for sys_id in cluster_system_ids_early
+            if systems.get(sys_id, {}).get("source") == SOURCE_CONJSCAN
+        )
+        has_aice_system_early = any(
+            systems.get(sys_id, {}).get("icescan_class") == ICESCAN_MODEL_AICE
+            for sys_id in cluster_system_ids_early
         )
         keep, reason, detail = keep_or_drop_cluster(
             cluster, min_element_bp, max_element_bp,
             min_ime_element_bp=min_ime_element_bp,
-            has_mpf_system=has_mpf_system_early)
+            has_mpf_system=has_mpf_system_early,
+            has_aice_system=has_aice_system_early)
         if not keep:
             audit_rows.append(audit_row(
                 sample, "dropped", reason, detail, contig=contig, start=start, end=end
@@ -1781,12 +2217,42 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         # down is built the same way and reports it.
         cluster_system_ids = {anchor["sys_id"] for anchor in cluster
                               if anchor.get("sys_id")}
+
+        # THE ONE PLACE THE TWO MODEL SETS ARE TREATED DIFFERENTLY.
+        #
+        # Every system-level property below - the mating-pair type, the
+        # completeness, the decayed/truncated flags, and the set of contigs a
+        # system's hits landed on - is read from CONJscan systems ONLY. ICEscan
+        # contributes its hits' coordinates and its IME/AICE model class, and
+        # nothing else. Two measured reasons:
+        #
+        #   * ICEscan's T4SS quorum is stricter and its model set is missing
+        #     MOB.xml and the decayed dCONJ models, so its apparatus calls are
+        #     not interchangeable with the ones every threshold here was tuned
+        #     against. Keeping them out is what holds the tier-6 counts on the
+        #     benchmark exactly where they were (self-transmissible 36,
+        #     high-confidence 17, unchanged by adding ICEscan).
+        #   * an ICEscan IME "system" is not a locus - both its mandatory genes
+        #     are loners, so 17 of the 71 on this benchmark span more than 1,000
+        #     genes. Its contig set would set spans_contigs on almost any draft
+        #     assembly and cap perfectly good calls at low confidence.
+        conjscan_system_ids = {
+            sys_id for sys_id in cluster_system_ids
+            if systems.get(sys_id, {}).get("source") == SOURCE_CONJSCAN
+        }
         cluster_mpf_types = {
             mpf_type
-            for sys_id in cluster_system_ids
+            for sys_id in conjscan_system_ids
             for mpf_type in systems.get(sys_id, {}).get("mpf_types", set())
         }
         has_mpf_system = bool(cluster_mpf_types)
+
+        # The classes ICEscan called for this cluster's anchors, if any.
+        cluster_icescan_classes = {
+            systems[sys_id]["icescan_class"]
+            for sys_id in cluster_system_ids
+            if systems.get(sys_id, {}).get("icescan_class")
+        }
 
         # Does this cluster's machinery come from a system whose hits are spread
         # over more than one contig? Computed here rather than with the other
@@ -1794,7 +2260,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         # below needs it. It is reported unchanged as the spans_contigs column.
         cluster_spans_contigs = any(
             len(systems.get(sys_id, {}).get("contigs", set())) > 1
-            for sys_id in cluster_system_ids
+            for sys_id in conjscan_system_ids
         )
         # ...but asking the system alone is not enough either, and the Phase 7
         # benchmark showed why. MacSyFinder LONER genes may sit anywhere on the
@@ -1841,15 +2307,71 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             has_integrase, has_relaxase, has_mpf_apparatus
         )
 
+        # --- what ICEscan's own model class adds -----------------------------
+        # classify_cluster works purely from which anchors are present, and that
+        # is still the rule for every conjugative class. ICEscan is allowed to
+        # change the answer in exactly one situation - AICE - and is recorded
+        # but not obeyed in the other.
+        #
+        # AICE: our anchor rules CANNOT reach this class, because they are built
+        # around a relaxase and a mating bridge and an AICE has neither. There is
+        # nothing for the ICEscan call to contradict, so it stands - and
+        # cluster_looks_like_an_aice has already required the anchors to agree.
+        #
+        # IME: ICEscan's IME model is deliberately NOT allowed to promote
+        # anything. Its quorum is two genes, either of which may be a loner
+        # anywhere on the replicon, so an IME model firing near a cluster is weak
+        # evidence about THIS locus. If our anchors say island (an integrase and
+        # no relaxase) then there is no relaxase, and calling it an IME would
+        # claim it can be mobilised by a helper - a real mobility claim, tier 5,
+        # on evidence we do not have. Agreement and disagreement are both written
+        # to the audit file so the comparison with ICEscan stays visible.
+        mobility_tier_reason = TIER_ASSIGNED_DOWNSTREAM_REASON
+        if ICESCAN_MODEL_AICE in cluster_icescan_classes and cluster_looks_like_an_aice(
+                cluster, True):
+            mge_class = MGE_CLASS_AICE
+            mobility = AICE_MOBILITY
+            mobility_tier_reason = AICE_TIER_REASON
+            audit_rows.append(audit_row(
+                sample, "kept_flagged", "class_taken_from_icescan_aice_model",
+                "ICEscan assembled its AICE model here (FtsK/SpoIIIE translocase, "
+                "a Rep protein and an integrase) and the anchors agree. Reported "
+                "as an AICE: it moves as double-stranded DNA between hyphal "
+                "compartments, so it is given NO mobility tier - tiers 5 and 6 "
+                "are both conjugation and an AICE does neither. CAVEAT: the only "
+                "AICE boundary we have validated (AICEScab56241) was recovered at "
+                "MacSyFinder --coverage-profile 0.3, not the 0.5 used here; at 0.5 "
+                "neither AICE call on the benchmark overlaps a curated one. Treat "
+                "an AICE call as unvalidated.",
+                contig=contig, start=start, end=end))
+        elif ICESCAN_MODEL_IME in cluster_icescan_classes:
+            agrees = mge_class == MGE_CLASS_IME
+            audit_rows.append(audit_row(
+                sample, "kept_flagged", "icescan_ime_model_agrees" if agrees
+                else "icescan_ime_model_not_followed",
+                f"ICEscan called its IME model over these anchors; our own rules "
+                f"say '{mge_class}'."
+                + (" The two agree." if agrees else
+                   " OUR CALL STANDS. ICEscan's IME quorum is two genes, both "
+                   "declared loners, so the model can fire from hits anywhere on "
+                   "the replicon and says little about this locus. Following it "
+                   "would assert the element is mobilisable by a helper - a "
+                   "tier-5 mobility claim - which these anchors do not support."),
+                contig=contig, start=start, end=end))
+
         # --- is the machinery actually intact? ------------------------------
         # Three independent ways of being broken, all reported by name so the
         # reader knows which one fired. Any of them downgrades the mobility
         # sentence itself, not just a flag column.
+        # Reported in full (both tools) so a reader can trace every hit back,
+        # but - as set out above - the health of the machinery is judged from
+        # CONJscan's systems alone.
         contributing_systems = sorted({
             anchor["sys_id"] for anchor in cluster if anchor["sys_id"]
         })
+        judged_systems = sorted(conjscan_system_ids)
         wholeness_values = [
-            systems[sys_id]["wholeness"] for sys_id in contributing_systems
+            systems[sys_id]["wholeness"] for sys_id in judged_systems
             if systems.get(sys_id, {}).get("wholeness") is not None
         ]
         lowest_wholeness = min(wholeness_values) if wholeness_values else None
@@ -1857,11 +2379,18 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         degraded_reasons = []
         if lowest_wholeness is not None and lowest_wholeness < WHOLENESS_INTACT_MIN:
             degraded_reasons.append("low_system_wholeness")
-        if any(systems.get(sys_id, {}).get("decayed") for sys_id in contributing_systems):
+        if any(systems.get(sys_id, {}).get("decayed") for sys_id in judged_systems):
             degraded_reasons.append("decayed_system_model")
-        if any(systems.get(sys_id, {}).get("truncated") for sys_id in contributing_systems):
+        if any(systems.get(sys_id, {}).get("truncated") for sys_id in judged_systems):
             degraded_reasons.append("truncated_core_hit")
         machinery_intact = not degraded_reasons
+
+        # An AICE is not a degraded ICE and must not be described as one: it has
+        # no relaxase and no mating bridge BY DEFINITION, so "machinery
+        # incomplete" would be an untrue sentence rather than a hedge.
+        if mge_class == MGE_CLASS_AICE:
+            machinery_intact = True
+            degraded_reasons = []
 
         if not machinery_intact:
             mobility = mobility + DEGRADED_MOBILITY_SUFFIX
@@ -1878,7 +2407,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         # --- honest short-read flags ----------------------------------------
         spans_contigs = any(
             len(systems.get(sys_id, {}).get("contigs", set())) > 1
-            for sys_id in contributing_systems
+            for sys_id in judged_systems
         )
 
         contig_length = contig_lengths.get(contig)
@@ -1921,7 +2450,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         })
         mpf_types = sorted({
             mpf_type
-            for sys_id in contributing_systems
+            for sys_id in judged_systems
             for mpf_type in systems.get(sys_id, {}).get("mpf_types", set())
         })
         # A T4SS_type*/dCONJ_type* model among the contributing systems means
@@ -1954,6 +2483,11 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             "element_type": ELEMENT_TYPE_FOR_CLASS[mge_class],
             "mge_class": mge_class,
             "mobility": mobility,
+            # Always NA here: the tier belongs to an AMR gene, not to an element.
+            # The reason column is what carries the meaning - and for an AICE it
+            # says the tier is not merely unassigned but inapplicable.
+            "mobility_tier": "NA",
+            "mobility_tier_reason": mobility_tier_reason,
             "contig": contig,
             "start": str(start),
             "end": str(end),
@@ -1974,6 +2508,11 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             "anchor_ids": ",".join(anchor_ids),
             "conjscan_systems": ",".join(contributing_systems) if contributing_systems else "NA",
             "conjscan_models": ",".join(models) if models else "NA",
+            "evidence_sources": ",".join(sorted({
+                anchor.get("source", SOURCE_CONJSCAN) for anchor in cluster
+            })),
+            "icescan_model_class": (",".join(sorted(cluster_icescan_classes))
+                                    if cluster_icescan_classes else "NA"),
             "sys_wholeness_min": (
                 f"{lowest_wholeness:g}" if lowest_wholeness is not None else "NA"
             ),
@@ -1986,7 +2525,13 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             "evidence_level": (
                 "system" if contributing_systems else "profile_hits_only"
             ),
-            "missing_components": missing_components_for(cluster),
+            # For an AICE, the relaxase and mating bridge are absent by
+            # definition, so listing them as "missing" would read as a degraded
+            # ICE. See AICE_MISSING_COMPONENTS.
+            "missing_components": (
+                AICE_MISSING_COMPONENTS if mge_class == MGE_CLASS_AICE
+                else missing_components_for(cluster)
+            ),
             # Phase 3 defaults. refine_candidate_boundaries() below overwrites
             # these - and start/end - when it finds a flanking att pair.
             "boundary_method": "none",
@@ -2325,6 +2870,25 @@ def build_parser():
                              "twenty-gene operon. ICE-architecture clusters keep "
                              f"--min-element-bp. Default {DEFAULT_MIN_IME_ELEMENT_BP}. "
                              "An empirical cut, not a published bound.")
+    parser.add_argument("--icescan-tsv", default=None,
+                        help="OPTIONAL second MacSyFinder best_solution.tsv, run "
+                             "with the ICEscan model set (or its output "
+                             "directory). ICEscan is a fork of CONJScan 2.0.1 by "
+                             "the same authors: it adds an IME model, an AICE "
+                             "model and 21 profiles, but drops MOB, the decayed "
+                             "system models and the whole Plasmids set, so it is "
+                             "unioned with CONJscan rather than replacing it. "
+                             "Only its integrase anchors, its Gram-positive "
+                             "relaxase families and its IME/AICE model classes "
+                             "are used. ABSENT BY DEFAULT: without it the result "
+                             "is exactly what CONJscan alone produces. Its models "
+                             "are CC BY-NC-SA, so they are fetched at runtime and "
+                             "never shipped with BacFlux.")
+    parser.add_argument("--icescan-hmmer-dir", default=None,
+                        help="ICEscan's hmmer_results/ directory, used the same "
+                             "way --conjscan-hmmer-dir is: only when no system "
+                             "was assembled at all. Defaults to hmmer_results/ "
+                             "beside the ICEscan best_solution.tsv.")
     parser.add_argument("--conjscan-hmmer-dir", default=None,
                         help="MacSyFinder's hmmer_results/ directory. Read ONLY "
                              "when no complete system was assembled, to recover an "
@@ -2412,6 +2976,7 @@ def summarise(sample, rows, audit_rows, out_audit):
         MGE_CLASS_IME: 0,
         MGE_CLASS_ISLAND: 0,
         MGE_CLASS_CONJ_REGION: 0,
+        MGE_CLASS_AICE: 0,
     }
     for row in rows:
         counts[row["mge_class"]] += 1
@@ -2427,7 +2992,8 @@ def summarise(sample, rows, audit_rows, out_audit):
         f"{counts[MGE_CLASS_ICE]} ICE (predicted self-transmissible), "
         f"{counts[MGE_CLASS_IME]} IME (mobilisable with a helper), "
         f"{counts[MGE_CLASS_ISLAND]} passive island, "
-        f"{counts[MGE_CLASS_CONJ_REGION]} unbounded conjugative region; "
+        f"{counts[MGE_CLASS_CONJ_REGION]} unbounded conjugative region, "
+        f"{counts[MGE_CLASS_AICE]} AICE (no conjugation tier); "
         f"confidence high {confidences['high']}, medium {confidences['medium']}, "
         f"low {confidences['low']}; {n_dropped} cluster(s) dropped "
         f"(reasons in {out_audit})."
@@ -2516,6 +3082,53 @@ def main(argv=None):
         sys.stderr.write(f"ERROR: {error}\n")
         return 1
 
+    # --- the optional second model set --------------------------------------
+    # ICEscan is unioned in here, at the hit level, because both tools are
+    # MacSyFinder and write the same 22 columns - so everything downstream sees
+    # one hit list and does not need to know there were two runs. What each tool
+    # is allowed to CONCLUDE is decided later, per rule, from the `source` tag
+    # that read_conjscan_hits put on every hit.
+    #
+    # When --icescan-tsv is not given, `icescan_hits` stays empty and this whole
+    # block is a no-op: the caller behaves exactly as it did before ICEscan
+    # existed. That equivalence is deliberate and is pinned by a test.
+    icescan_hits = []
+    icescan_path = resolve_conjscan_path(args.icescan_tsv)
+    if args.icescan_tsv and icescan_path is None:
+        audit_rows.append(audit_row(
+            args.sample, "input_missing", "icescan_output_missing",
+            f"--icescan-tsv was given as '{args.icescan_tsv}' but no "
+            "best_solution.tsv could be read there. Continuing with CONJscan "
+            "alone: no IME or AICE model class and no ICEscan integrase anchors "
+            "were available, so those elements can only be found if CONJscan's "
+            "own models reach them.",
+        ))
+    elif icescan_path is not None:
+        try:
+            icescan_hits = read_conjscan_hits(icescan_path, source=SOURCE_ICESCAN)
+        except ValueError as error:
+            sys.stderr.write(f"ERROR: {error}\n")
+            return 1
+        if not icescan_hits:
+            icescan_hits = read_conjscan_profile_hits(
+                args.icescan_hmmer_dir or default_hmmer_dir(icescan_path),
+                source=SOURCE_ICESCAN)
+        if icescan_hits:
+            audit_rows.append(audit_row(
+                args.sample, "evidence_recorded", "icescan_hits_unioned",
+                f"{len(icescan_hits)} hit(s) from the ICEscan model set were "
+                f"unioned with CONJscan's {len(hits)}. ICEscan contributes "
+                "integrase anchors, the Gram-positive and IME relaxase families "
+                "CONJScan 2.1.0 does not model, and its IME/AICE model classes. "
+                "It does NOT contribute mating-pair apparatus calls or element "
+                "spans - its T4SS quorum is stricter and its IME systems are not "
+                "loci - so tier-6 (predicted self-transmissible) calls rest on "
+                "CONJscan alone.",
+            ))
+    # CONJscan's own quorum fallback, keyed on CONJSCAN'S result alone. It has to
+    # be asked before the union, not after: if ICEscan happened to report one
+    # unrelated hit, an `if not hits` test over the merged list would silently
+    # skip this recovery and lose the element it exists for.
     if not hits:
         # No SYSTEM was assembled. Before accepting that as "no machinery", look
         # at the individual profile hits: MacSyFinder needs a full quorum, and a
@@ -2538,7 +3151,9 @@ def main(argv=None):
                 "of the machinery that was absent - rather than discarded, because "
                 "a real element can fail the quorum by one component.",
             ))
-        else:
+        elif not icescan_hits:
+            # Nothing from either model set. Only now is "no machinery" the
+            # honest answer.
             audit_rows.append(audit_row(
                 args.sample, "input_missing", "conjscan_found_no_systems",
                 f"'{conjscan_path}' contains no system rows and no profile hits "
@@ -2548,14 +3163,58 @@ def main(argv=None):
             ))
             return finish(0)
 
+    # The union everything downstream works from. Done AFTER the fallback above
+    # so that CONJscan's recovery is judged on CONJscan's evidence, and BEFORE
+    # the anchor phase so that an element only ICEscan can see - a Gram-positive
+    # IME whose relaxase family CONJScan 2.1.0 does not model - is not lost to an
+    # early return.
+    hits = hits + icescan_hits
+
     # --- Phase 1: anchors ---------------------------------------------------
-    machinery_anchors, systems, machinery_audit = build_conjscan_anchors(
+    machinery_anchors, hmm_integrases, systems, machinery_audit = build_conjscan_anchors(
         args.sample, hits, features_by_id
     )
     audit_rows.extend(machinery_audit)
 
     integrase_anchors, integrase_audit = find_integrase_anchors(args.sample, cds_features)
     audit_rows.extend(integrase_audit)
+
+    # One pool of integrase candidates from both sources, product-text first so
+    # that it is the one kept when the same CDS is found twice.
+    #
+    # THE SAME CDS OFTEN IS found twice: an ICEscan Phage_integrase hit and a
+    # Bakta "tyrosine recombinase XerC" product line can be the same gene. Two
+    # anchors on one feature would count it twice in n_anchors and list it twice
+    # in anchor_ids. The product-text anchor is the one kept, because its label
+    # is a sentence a reader can check rather than a profile accession - and
+    # the corroboration is not lost, it is recorded in the audit file.
+    corroborated = 0
+    product_text_by_feature = {anchor["feature_id"]: anchor
+                               for anchor in integrase_anchors}
+    for anchor in hmm_integrases:
+        twin = product_text_by_feature.get(anchor["feature_id"])
+        if twin is None:
+            integrase_anchors.append(anchor)
+            continue
+        corroborated += 1
+        # Keep the product-text anchor, but do not throw away what ICEscan knew
+        # about it. A product-text anchor carries no system, so the ICEscan
+        # system id and model come across - that is how the IME/AICE model class
+        # reaches build_candidates for an integrase both sources found. Dropping
+        # it would mean the BETTER-evidenced integrase (two independent methods
+        # agreeing) silently lost the model class a worse-evidenced one keeps.
+        if not twin["sys_id"]:
+            twin["sys_id"] = anchor["sys_id"]
+            twin["model_fqn"] = anchor["model_fqn"]
+    if corroborated:
+        audit_rows.append(audit_row(
+            args.sample, "evidence_recorded", "integrase_corroborated_by_icescan",
+            f"{corroborated} integrase(s) were found by BOTH the Bakta product "
+            "text and an ICEscan integrase profile. Counted once, keeping the "
+            "Bakta product text as the label because it names the protein in "
+            "words. Agreement between an annotation and an HMM is the strongest "
+            "integrase evidence this module has.",
+        ))
 
     if not machinery_anchors:
         audit_rows.append(audit_row(
@@ -2579,8 +3238,47 @@ def main(argv=None):
     for row in merge_audit:
         row["sample"] = args.sample
     audit_rows.extend(merge_audit)
+    # The att probe for the integrase tie-break (FIX 4). When two or more
+    # integrases are in the running for one cluster - which is the normal case
+    # once ICEscan's hits join the pool - the one that actually produces a
+    # flanking attL/attR pair is the one that put this element here. This closure
+    # answers "would including an integrase at this span yield an att pair?" by
+    # running the same Phase 3 search that will later fix the boundaries.
+    #
+    # Only a tRNA-ANCHORED pair counts, exactly as in refine_candidate_boundaries:
+    # a de novo repeat turns up in ~16% of arbitrary chromosomal spans by chance,
+    # which is far too noisy to decide anything with.
+    #
+    # Without a genome FASTA there is nothing to search, so the probe is None and
+    # the ranking falls back to distance then source.
+    # The IS intervals are read once here and reused by Phase 3 below: the att
+    # search must mask insertion sequences out, or their terminal inverted
+    # repeats flood the candidate att pairs.
+    is_intervals_by_contig = read_is_intervals(args.is_table)
+
+    att_probe = None
+    if args.genome and os.path.isfile(args.genome):
+        probe_sequences = att_search.read_fasta(args.genome)
+        probe_trnas = att_search.group_by_contig(
+            att_search.parse_trna_features(args.bakta_gff))
+
+        def att_probe(contig, span_start, span_end):
+            sequence = probe_sequences.get(contig, "")
+            if not sequence:
+                return False
+            result = att_search.find_att_sites(
+                sequence, span_start, span_end,
+                trnas=probe_trnas.get(contig, []),
+                mask=is_intervals_by_contig.get(contig, []),
+                flank_window_bp=args.att_flank_window_bp,
+                min_element_bp=args.min_element_bp,
+                max_element_bp=args.max_element_bp,
+            )
+            return result["boundary_method"] == "tRNA"
+
     clusters, integrase_attach_audit = attach_nearby_integrases(
-        clusters, integrase_anchors, args.integrase_window_bp)
+        clusters, integrase_anchors, args.integrase_window_bp,
+        att_supports=att_probe)
     for row in integrase_attach_audit:
         row["sample"] = args.sample
     audit_rows.extend(integrase_attach_audit)
@@ -2592,7 +3290,7 @@ def main(argv=None):
     audit_rows.extend(candidate_audit)
 
     # --- Phase 3: resolve the real element boundaries -----------------------
-    is_intervals_by_contig = read_is_intervals(args.is_table)
+    # is_intervals_by_contig was read above, next to the att probe.
     rows, boundary_audit = refine_candidate_boundaries(
         args.sample, rows, args.genome, args.bakta_gff, is_intervals_by_contig,
         args.att_flank_window_bp, args.min_element_bp, args.max_element_bp,

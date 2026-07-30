@@ -1878,3 +1878,471 @@ def test_an_unknown_contig_length_is_not_read_as_not_at_the_boundary(tmp_path):
 
     assert rows[0]["at_contig_boundary"] == "NA"
     assert rows[0]["confidence"] == "medium"
+
+
+# ── The ICEscan union ────────────────────────────────────────────────────────
+#
+# ICEscan is a FORK of CONJScan 2.0.1 by the same Pasteur authors, one minor
+# version behind the CONJScan 2.1.0 we run. It ADDS an IME model, an AICE model
+# and 21 profiles; it REMOVES MOB.xml, the decayed dCONJ models and the whole
+# Plasmids set, and its T4SS quorum is stricter - so swapping to it LOSES
+# elements. We union the two instead, and take from ICEscan only its integrase
+# anchors, its Gram-positive/IME relaxase families and its IME/AICE model
+# classes. These tests pin the parts of that bargain that are easy to break.
+
+
+def icescan_row(**overrides):
+    """One ICEscan best_solution.tsv line.
+
+    Identical column layout to CONJscan's - both are MacSyFinder - so the same
+    row builder is reused and only the model namespace differs.
+    """
+    fields = {"model_fqn": "ICEscan/Chromosome/IME"}
+    fields.update(overrides)
+    return conjscan_row(**fields)
+
+
+def test_the_four_trusted_icescan_integrase_profiles_are_integrases():
+    """These four are genuine element integrases and must anchor an element."""
+    for profile in ("Phage_integrase", "Recombinase", "UPF0236", "PB001819"):
+        assert ci.anchor_class_for_gene_name(profile) == ci.ANCHOR_INTEGRASE
+
+
+def test_the_four_untrusted_integrase_profiles_anchor_nothing():
+    """FIX 1-3, and a deliberate divergence from ICEscan's own IME.xml.
+
+    Upstream lists all four as exchangeables of Phage_integrase. None of them is
+    an element integrase:
+
+      TIGR02249  IntI1, the class-1 INTEGRON integrase. Measured on CP042858.1:
+                 an att-bounded 32,103 bp tier-6 ICE became a 103,303 bp
+                 UNBOUNDED one at unchanged 'high' confidence, anchored on IntI1.
+      TIGR02224  XerC   } the chromosomal dif-site recombinases every bacterium
+      TIGR02225  XerD   } carries. A XerC attached 43,639 bp from a 945 bp
+                 relaxase cluster produced an element six times its true size.
+      rve        the DDE catalytic domain shared by IS transposases - 66 of its
+                 71 hits on the benchmark are Bakta-annotated transposases.
+
+    They must be neither an integrase NOR - via the fall-through default -
+    a mating-pair component, which is why None is the required answer.
+    """
+    for profile in ("TIGR02249", "TIGR02224", "TIGR02225", "rve"):
+        assert ci.anchor_class_for_gene_name(profile) is None
+
+
+def test_icescan_relaxase_families_are_recognised_as_relaxases():
+    """The Gram-positive and IME relaxase families are the reason ICEscan sees
+    IMEs that CONJScan 2.1.0 cannot. Missing one would silently drop the anchor
+    into the mating-pair bucket and could promote an IME to an ICE."""
+    for profile in ("Relaxase_firmi_MOBL", "Relaxase_firmi_Rep_2",
+                    "Relaxase_firmi_Viral_Rep_A", "Relaxase_firmi_Viral_Rep_B1",
+                    "Relaxase_firmi_Viral_Rep_B2", "Relaxase_PHA_IME_A1",
+                    "Relaxase_PHA_IME_B", "Relaxase_profile_MOBT", "T4SS_MOBL"):
+        assert ci.anchor_class_for_gene_name(profile) == ci.ANCHOR_RELAXASE
+
+
+def test_aice_machinery_is_never_conjugation_machinery():
+    """An AICE translocates double-stranded DNA through a septal pore; it has no
+    relaxase and no mating bridge. Classing any of these as T4SS - which the
+    fall-through default would have done - would manufacture a mating-pair
+    apparatus and promote elements to 'predicted self-transmissible'."""
+    for profile in ("FtsK_SpoIIIE", "Prim-Pol", "RepSAv2", "DUF3631"):
+        assert ci.anchor_class_for_gene_name(profile) == ci.ANCHOR_AICE
+
+
+def test_conjscan_profile_names_are_unchanged_by_the_icescan_vocabulary():
+    """The new name rules must not have moved any CONJscan profile between
+    classes - that would change every existing call."""
+    assert ci.anchor_class_for_gene_name("T4SS_MOBF") == ci.ANCHOR_RELAXASE
+    assert ci.anchor_class_for_gene_name("T4SS_t4cp2") == ci.ANCHOR_T4CP
+    assert ci.anchor_class_for_gene_name("T4SS_tcpA") == ci.ANCHOR_T4CP
+    assert ci.anchor_class_for_gene_name("T4SS_virb4") == ci.ANCHOR_T4SS
+    assert ci.anchor_class_for_gene_name("T4SS_F_traU") == ci.ANCHOR_T4SS
+
+
+def test_without_icescan_the_result_is_byte_for_byte_what_it_always_was(tmp_path):
+    """THE CONTROL. A user who has not downloaded the ICEscan models - the
+    default - must get exactly today's answer.
+
+    The models are CC BY-NC-SA and fetched at runtime, so most runs will not have
+    them. Running the same input with and without --icescan-tsv pointed at
+    nothing must produce identical tables."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _rc, without_flag, _audit, path_a = run_main(tmp_path / "a", conjscan, gff)
+    # The flag present but pointing at a file that does not exist: the module
+    # must degrade rather than fail, and must not change its answer.
+    _rc, with_absent, _audit_b, path_b = run_main(
+        tmp_path / "b", conjscan, gff,
+        extra=["--icescan-tsv", str(tmp_path / "not_there.tsv")])
+
+    assert without_flag == with_absent
+    with open(path_a) as a, open(path_b) as b:
+        assert a.read() == b.read()
+
+
+def test_an_icescan_integron_integrase_cannot_anchor_an_element(tmp_path):
+    """FIX 1 end to end, as the CP042858.1 regression would have arrived.
+
+    A TIGR02249 hit sits 45 kb from the machinery, well inside the 50 kb
+    integrase window. Trusting it would attach it, stretch the element to cover
+    it, and report an ICE. It must anchor nothing, leaving the cluster with no
+    integrase - so the honest "machinery, but no element boundaries" call stands.
+
+    NOTE the CDS is deliberately annotated "hypothetical protein" so that the
+    ONLY thing that could make it an integrase is the ICEscan profile, which is
+    what this test is about. Bakta usually annotates IntI1 as "class 1 integron
+    integrase IntI1", and INTEGRASE_PRODUCT_PATTERN matches that on purpose (see
+    its comment) - so the product-text path has its own, separate exposure to
+    integron integrases, which the FIX-4 tie-break rather than this rule is what
+    keeps in check.
+    """
+    cds = list(SCENE_CDS)
+    # Replace the real integrase with a CDS only ICEscan could call an integrase.
+    cds = [line for line in cds if "S1_00010" not in line]
+    cds.append(gff_cds("contig_1", 95000, 96000, "+", "S1_00090",
+                       "hypothetical protein"))
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    icescan = write_conjscan(tmp_path / "icescan.tsv", [
+        icescan_row(hit_id="S1_00090", gene_name="TIGR02249",
+                    hit_gene_ref="Phage_integrase", sys_id="S1_IME_1"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, cds)
+
+    _rc, rows, audit, _path = run_main(tmp_path, conjscan, gff,
+                                       extra=["--icescan-tsv", icescan])
+
+    assert len(rows) == 1
+    assert rows[0]["has_integrase"] == "FALSE"
+    assert rows[0]["element_type"] != "ice"
+    # The element must not have been stretched to reach the IntI1 at 95-96 kb.
+    assert int(rows[0]["end"]) < 90000
+    assert "untrusted_integrase_profile" in audit_reasons(audit)
+
+
+def test_an_icescan_rve_hit_cannot_anchor_an_element(tmp_path):
+    """FIX 3. `rve` is the transposase catalytic domain; find_integrase_anchors
+    already refuses these on the product-text side, and admitting them as an HMM
+    hit would let an insertion sequence next to a relaxase become an ICE."""
+    # Annotated as a transposase, which is what these really are: 66 of rve's 71
+    # hits on the benchmark are Bakta-annotated transposases. The product-text
+    # path already refuses it (TRANSPOSASE_PRODUCT_PATTERN); this pins that the
+    # HMM path refuses it too, so the two cannot let it in by different doors.
+    cds = [line for line in SCENE_CDS if "S1_00010" not in line]
+    cds.append(gff_cds("contig_1", 52000, 53000, "+", "S1_00012",
+                       "IS3 family transposase"))
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    icescan = write_conjscan(tmp_path / "icescan.tsv", [
+        icescan_row(hit_id="S1_00012", gene_name="rve",
+                    hit_gene_ref="Phage_integrase", sys_id="S1_IME_1"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, cds)
+
+    _rc, rows, _audit, _path = run_main(tmp_path, conjscan, gff,
+                                        extra=["--icescan-tsv", icescan])
+
+    assert rows[0]["has_integrase"] == "FALSE"
+    assert rows[0]["element_type"] != "ice"
+
+
+def test_an_icescan_relaxase_can_make_an_ime_conjscan_would_have_missed(tmp_path):
+    """The measured gain. A Gram-positive relaxase family CONJScan 2.1.0 does
+    not model, plus a product-text integrase, is exactly the IME architecture -
+    and its machinery is two genes, so it needs the lower IME size floor."""
+    cds = [
+        gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "tyrosine recombinase XerC"),
+        gff_cds("contig_1", 52000, 53500, "+", "S1_00011",
+                "MobV family relaxase"),
+    ]
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [])
+    icescan = write_conjscan(tmp_path / "icescan.tsv", [
+        icescan_row(hit_id="S1_00011", gene_name="Relaxase_firmi_MOBL",
+                    sys_id="S1_IME_1", hit_gene_ref="T4SS_MOBV"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, cds)
+
+    _rc, rows, _audit, _path = run_main(tmp_path, conjscan, gff,
+                                        extra=["--icescan-tsv", icescan])
+
+    assert len(rows) == 1
+    assert rows[0]["mge_class"] == "ime"
+    assert rows[0]["has_relaxase"] == "TRUE"
+    assert rows[0]["has_integrase"] == "TRUE"
+    assert "icescan" in rows[0]["evidence_sources"]
+
+
+def test_an_icescan_ime_model_cannot_promote_an_island(tmp_path):
+    """ICEscan's IME quorum is two genes, both declared loners, so the model can
+    fire from hits anywhere on the replicon. It must never turn a cluster with no
+    relaxase into an IME - that would be a tier-5 mobility claim on no evidence.
+    """
+    # The cluster has a mating-pair gene and an integrase but NO relaxase, so our
+    # own rules call it a passive island. ICEscan's IME model fires over the same
+    # integrase - and must not be allowed to change the answer.
+    cds = list(SCENE_CDS)
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF",
+                     sys_id="S1_T4SS_typeF_1"),
+    ])
+    icescan = write_conjscan(tmp_path / "icescan.tsv", [
+        icescan_row(hit_id=INTEGRASE_HIT, gene_name="Phage_integrase",
+                    sys_id="S1_IME_1"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, cds)
+
+    _rc, rows, audit, _path = run_main(tmp_path, conjscan, gff,
+                                       extra=["--icescan-tsv", icescan])
+
+    assert len(rows) == 1
+    assert rows[0]["mge_class"] != "ime"
+    assert rows[0]["has_relaxase"] == "FALSE"
+    assert "icescan_ime_model_not_followed" in audit_reasons(audit)
+
+
+def test_icescan_system_ids_cannot_collide_with_conjscan_ones():
+    """Both tools define a model called T4SS_typeF, and MacSyFinder builds a
+    system id as {replicon}_{model}_{n}. Run over one genome they therefore emit
+    DIFFERENT systems under IDENTICAL ids. Merging them would pool their contigs
+    into a false spans_contigs flag and let two clusters be joined that neither
+    tool ever said belonged together."""
+    assert ci.namespaced_sys_id("X_T4SS_typeF_3", ci.SOURCE_CONJSCAN) == "X_T4SS_typeF_3"
+    assert ci.namespaced_sys_id("X_T4SS_typeF_3", ci.SOURCE_ICESCAN) != "X_T4SS_typeF_3"
+
+
+# ── AICE: a third class, and it is not on the conjugation ladder ─────────────
+
+def aice_scene(tmp_path):
+    """A minimal AICE: integrase, FtsK/SpoIIIE translocase and a Rep protein,
+    called as ICEscan's AICE model. No relaxase and no mating-pair gene - which
+    is what an AICE is, not what is wrong with it."""
+    cds = [
+        gff_cds("contig_1", 50000, 51200, "+", "S1_00010",
+                "site-specific recombinase"),
+        gff_cds("contig_1", 52000, 54400, "+", "S1_00011",
+                "FtsK/SpoIIIE family DNA translocase"),
+        gff_cds("contig_1", 54600, 55900, "+", "S1_00012",
+                "replication initiator protein"),
+    ]
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [])
+    icescan = write_conjscan(tmp_path / "icescan.tsv", [
+        icescan_row(hit_id="S1_00011", gene_name="FtsK_SpoIIIE",
+                    model_fqn="ICEscan/Chromosome/AICE", sys_id="S1_AICE_1"),
+        icescan_row(hit_id="S1_00012", gene_name="RepSAv2",
+                    model_fqn="ICEscan/Chromosome/AICE", sys_id="S1_AICE_1"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, cds)
+    return conjscan, icescan, gff
+
+
+def test_an_aice_is_reported_as_its_own_class(tmp_path):
+    """It must not be folded into `ice`: an AICE has no relaxase and no mating
+    bridge, so calling it an ICE would assert self-transmissibility it cannot
+    have."""
+    conjscan, icescan, gff = aice_scene(tmp_path)
+    _rc, rows, audit, _path = run_main(tmp_path, conjscan, gff,
+                                       extra=["--icescan-tsv", icescan])
+
+    assert len(rows) == 1
+    assert rows[0]["mge_class"] == "aice"
+    assert rows[0]["element_type"] == "aice"
+    assert rows[0]["icescan_model_class"] == "AICE"
+    assert "class_taken_from_icescan_aice_model" in audit_reasons(audit)
+
+
+def test_an_aice_never_claims_a_conjugation_tier(tmp_path):
+    """THE HEADLINE RULE. Tiers 5 and 6 are both conjugation - "mobilisable by a
+    helper" and "self-transmissible" - and an AICE does neither: it moves as
+    double-stranded DNA between hyphal compartments by FtsK/SpoIIIE
+    translocation. Either tier would be a false claim, so it gets none, and the
+    reason is spelled out rather than left blank."""
+    conjscan, icescan, gff = aice_scene(tmp_path)
+    _rc, rows, _audit, _path = run_main(tmp_path, conjscan, gff,
+                                        extra=["--icescan-tsv", icescan])
+    row = rows[0]
+
+    assert row["mobility_tier"] == "NA"
+    assert row["mobility_tier_reason"].strip()          # never blank
+    assert "conjugation" in row["mobility_tier_reason"]
+    # The mobility sentence names the real mechanism instead of hedging.
+    assert "FtsK/SpoIIIE" in row["mobility"]
+    assert "not on the conjugation mobility ladder" in row["mobility"]
+    assert "self-transmissible" not in row["mobility"]
+    assert "mobilisable" not in row["mobility"]
+    # colocalise.py is the enforcement point: recognised, but context only, so
+    # it can raise no gene's tier.
+    assert co.ELEMENT_TYPE_SYNONYMS["aice"] == "aice"
+    assert "aice" in co.CONTEXT_ONLY_ELEMENT_TYPES
+    assert co.ELEMENT_TYPE_SYNONYMS["aice"] not in {"ice", "ime"}
+
+
+def test_an_aice_does_not_read_as_a_degraded_ice(tmp_path):
+    """`missing_components` must not list the relaxase and mating bridge as
+    missing: they are absent by definition, not broken."""
+    conjscan, icescan, gff = aice_scene(tmp_path)
+    _rc, rows, _audit, _path = run_main(tmp_path, conjscan, gff,
+                                        extra=["--icescan-tsv", icescan])
+
+    assert rows[0]["missing_components"] == ci.AICE_MISSING_COMPONENTS
+    assert "none expected" in rows[0]["missing_components"]
+    assert rows[0]["machinery_intact"] == "TRUE"
+    assert ci.DEGRADED_MOBILITY_SUFFIX not in rows[0]["mobility"]
+
+
+def test_loose_ftsk_hits_do_not_manufacture_an_aice(tmp_path):
+    """FtsK/SpoIIIE is a core chromosome-partitioning ATPase present in
+    essentially every bacterium. Without ICEscan's assembled AICE model behind
+    it, it must seed nothing at all - otherwise every genome we ever run grows an
+    'AICE'."""
+    cds = [
+        gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "integrase"),
+        gff_cds("contig_1", 52000, 54400, "+", "S1_00011",
+                "DNA translocase FtsK"),
+    ]
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [])
+    # A profile hit with no system behind it: sys_id empty, no AICE model.
+    icescan = write_conjscan(tmp_path / "icescan.tsv", [
+        icescan_row(hit_id="S1_00011", gene_name="FtsK_SpoIIIE",
+                    model_fqn="", sys_id=""),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, cds)
+
+    _rc, rows, audit, _path = run_main(tmp_path, conjscan, gff,
+                                       extra=["--icescan-tsv", icescan])
+
+    assert rows == []
+    assert "no_conjugation_anchor" in audit_reasons(audit)
+
+
+# ── FIX 4: which integrase belongs to the element ────────────────────────────
+
+def test_the_tie_break_prefers_the_integrase_that_yields_an_att_pair(tmp_path):
+    """FIX 4, and the reason the CP042858.1 regression was possible.
+
+    Two integrases are in the running for one cluster. The old rule was
+    "closest, first-seen wins a tie", so when both sat inside the machinery span
+    - gap 0 for each, which is the normal case once ICEscan's hits join the pool
+    - the winner was decided by list order, i.e. by SOURCE rather than by any
+    evidence.
+
+    The geometry here makes distance and att support disagree on purpose:
+
+      40000..40024   attL - the last 25 bp of the tRNA ending at 40024
+      41000..42200   the REAL integrase, inside the att-bounded interval,
+                     23,800 bp from the machinery
+      66000..68500   the conjugation machinery
+      70000..70024   attR - the second copy of that same 25-mer
+      70500..71500   the DECOY, only 2,000 bp from the machinery, but OUTSIDE
+                     the att interval
+
+    Attaching the decoy pushes the element's right edge past attR, so attR is
+    swallowed by the span instead of flanking it and no pair can be found.
+    Attaching the real integrase leaves both copies in the flanks, where the
+    scar of integration actually lies. The decoy is more than ten times closer,
+    so if distance still ranked first it would win - and the element would come
+    out unbounded, which is precisely the CP042858.1 failure.
+
+    Both candidates come from the Bakta product text, so this isolates key 1
+    (att support) from key 3 (source) and tests it against key 2 (distance)
+    alone.
+    """
+    import random as _random
+    generator = _random.Random(1729)
+    sequence = "".join(generator.choice("ACGT") for _ in range(200_000))
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    sequence = plant_att_pair(sequence, motif, 40_000, 70_000)
+    genome = tmp_path / "genome.fna"
+    genome.write_text(">contig_1\n" + sequence + "\n")
+
+    cds = [
+        # The REAL integrase: far from the machinery, but inside the element.
+        gff_cds("contig_1", 41_000, 42_200, "+", "S1_00005",
+                "phage integrase family protein"),
+        # The machinery, sitting near the element's right-hand edge.
+        gff_cds("contig_1", 66_000, 67_600, "+", "S1_00015",
+                "TrwC relaxase domain-containing protein"),
+        gff_cds("contig_1", 67_800, 68_200, "-", "S1_00016",
+                "Type IV secretory pathway, VirD4 component"),
+        gff_cds("contig_1", 68_300, 68_500, "+", "S1_00017",
+                "conjugal transfer protein TraB"),
+        # The DECOY: much closer, but outside the att-bounded interval.
+        gff_cds("contig_1", 70_500, 71_500, "+", "S1_00020",
+                "tyrosine recombinase XerD"),
+    ]
+    trna = gff_trna("contig_1", 39_952, 40_024)
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id="S1_00015", gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF",
+                     sys_id="S1_T4SS_typeF_1"),
+        conjscan_row(hit_id="S1_00016", gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF",
+                     sys_id="S1_T4SS_typeF_1"),
+        conjscan_row(hit_id="S1_00017", gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF",
+                     sys_id="S1_T4SS_typeF_1"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, cds + [trna],
+                    with_fasta=False)
+
+    _rc, rows, _audit, _path = run_main(
+        tmp_path, conjscan, gff, extra=["--genome", str(genome)])
+
+    assert len(rows) == 1
+    element = rows[0]
+    # The att-supporting integrase was chosen over the ten-times-closer decoy.
+    assert "phage integrase" in element["integrase_products"].lower()
+    assert "XerD" not in element["integrase_products"]
+    # ...and because it was, the element has real boundaries instead of none.
+    assert element["boundary_method"] == "tRNA"
+    assert element["attL"] == "40000..40024"
+    assert element["attR"] == "70000..70024"
+
+
+def test_at_equal_distance_an_hmm_hit_does_not_displace_the_annotation(tmp_path):
+    """The last clause of FIX 4. When two integrase candidates are the same
+    distance away and neither yields an att pair, the Bakta product text wins:
+    it names the protein in words a reader can check, and it is the source that
+    found the integrase for 12 of the 30 curated pilot elements."""
+    assert (ci.INTEGRASE_SOURCE_RANK[ci.SOURCE_BAKTA_PRODUCT]
+            < ci.INTEGRASE_SOURCE_RANK[ci.SOURCE_ICESCAN])
+
+    # The same CDS found by both sources is counted once, keeping the readable
+    # product text as its label.
+    cds = list(SCENE_CDS)
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    icescan = write_conjscan(tmp_path / "icescan.tsv", [
+        icescan_row(hit_id=INTEGRASE_HIT, gene_name="Phage_integrase",
+                    sys_id="S1_IME_1"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, cds)
+
+    _rc, rows, audit, _path = run_main(tmp_path, conjscan, gff,
+                                       extra=["--icescan-tsv", icescan])
+
+    assert len(rows) == 1
+    # Counted once, not twice.
+    assert rows[0]["anchor_ids"].count(INTEGRASE_HIT) == 1
+    # Labelled with the Bakta product text, not the profile name.
+    assert "Phage integrase family protein" in rows[0]["integrase_products"]
+    assert "integrase_corroborated_by_icescan" in audit_reasons(audit)

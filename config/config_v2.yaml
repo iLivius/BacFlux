@@ -250,6 +250,72 @@ mobilome:
   max_composite_span_bp: 20000 # two IS copies further apart than this are not called one
                                #   composite transposon. A CONVENTION, not biology — the
                                #   measured distance is always reported next to the call.
+
+  # ── Detection layer: a SECOND machinery model set, ICEscan ────────────────
+  # OFF by default; leave it off and the module behaves exactly as it does today.
+  # When on, MacSyFinder runs TWICE over the same Bakta proteins — once with
+  # CONJScan (as always) and once with ICEscan — and the two hit tables are
+  # merged before the ICE/IME caller sees them.
+  #
+  # WHAT ICEscan IS. Not a rival tool: it is a FORK of CONJScan by the same
+  # Institut Pasteur authors (its own metadata.yml still calls itself "CONJScan"),
+  # distributed with ICEfinder2 and used by the EBI mobilome-annotation-pipeline.
+  # It is one minor version BEHIND the CONJScan release BacFlux installs (2.0.1
+  # against 2.1.0), which is why it is added ALONGSIDE rather than instead of it:
+  # ICEscan drops the MOB relaxase models, the decayed-machinery models and the
+  # whole plasmid model set, and applies a stricter quorum to the mating
+  # apparatus. Swapping would have lost elements we currently detect.
+  #
+  # WHAT IT BUYS YOU. Three things CONJScan 2.1.0 has no model for at all:
+  #   * IME  — an element that integrates into the chromosome and carries a
+  #            relaxase (the enzyme that nicks the DNA to start transfer) but no
+  #            mating apparatus of its own, so it can only move when a
+  #            conjugative element in the same cell lends it one. Ladder tier 5.
+  #   * AICE — the actinomycete elements (Streptomyces and relatives) that do not
+  #            conjugate at all: they push single-stranded DNA between hyphae
+  #            using an FtsK/SpoIIIE translocase. Reported with its own class and
+  #            NO mobility tier, because tiers 5 and 6 are both statements about
+  #            conjugation and would be false claims here.
+  #   * 21 extra profile HMMs, including integrase families the CONJScan set does
+  #     not carry. Four of them are trusted as element integrases; the rest are
+  #     deliberately ignored (see the caller — some are integron or chromosomal
+  #     housekeeping recombinases that would anchor elements onto the wrong gene).
+  #   Measured over 12 curated IMEs: 3 detected before, 5 after — and, more to the
+  #   point, the detections whose called length is within a factor of two of the
+  #   published length went from 1 to 4.
+  #
+  # WHAT IT DOES NOT BUY YOU. ICEscan DELIMITS NOTHING. MacSyFinder reports gene
+  # ORDINALS ("the 41st protein in the file"), never base pairs, so every
+  # coordinate BacFlux prints still comes from its own Bakta GFF3 join, its own
+  # clustering and its own att-site search. ICEscan's IME "systems" are not even
+  # loci: both of their mandatory genes are declared loners, which exempts them
+  # from MacSyFinder's clustering, and across 28 benchmark genomes the widest
+  # single "IME" covered an entire 10.1 Mb chromosome. So its spans are never
+  # used as element boundaries and its quorum is never used to decide what counts
+  # as self-transmissible — only its integrase hits and its IME/AICE classes are.
+  #
+  # LICENCE: the ICEscan models are CC BY-NC-SA 4.0 (Institut Pasteur/CNRS) —
+  # academic and NON-COMMERCIAL use only, the same terms as the CONJscan models
+  # this module already fetches. BacFlux ships neither: setting `run: true` means
+  # YOU download them, under your own agreement with the licensor.
+  icescan:
+    run: false                 # master switch for this layer. Requires `url` or `dir`.
+    url: "https://ftp.ebi.ac.uk/pub/databases/metagenomics/pipelines/tool-dbs/icefinder2lite/icf2_dbs.tar.gz"
+                               #   ICEfinder2's whole database bundle (~61 MB); only
+                               #   macsydata/ICEscan is extracted from it, the rest
+                               #   (ICEfinder's own HMMs and a UniProt BLAST index)
+                               #   is discarded because nothing here uses it.
+                               #   Use the https:// form — the ftp:// spelling of the
+                               #   same path times out from behind many firewalls.
+    sha256: ""                 # OPTIONAL but recommended. The URL carries no version,
+                               #   so this is the only way to pin which release you
+                               #   analysed with. Leave empty to skip the check; the
+                               #   observed checksum is recorded either way, in
+                               #   08.mobilome/icescan_models/PROVENANCE.txt.
+    dir: ""                    # OPTIONAL — a MacSyFinder models directory you already
+                               #   hold, i.e. one CONTAINING an ICEscan/ folder. Takes
+                               #   precedence over `url`; nothing is downloaded.
+
   # ── Naming layer: curated transposons and integrons (ladder tier 4) ────────
   # Leave `url` and `dir` both empty and this whole layer is simply skipped —
   # the module runs exactly as before, and tier 4 stays unreachable.

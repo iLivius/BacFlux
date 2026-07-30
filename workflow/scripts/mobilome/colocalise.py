@@ -518,13 +518,24 @@ ELEMENT_TYPE_SYNONYMS = {
     "genomic_island": "genomic_island",
     "island": "genomic_island",
     "cime": "genomic_island",        # a CIME is an integrated, non-mobile island
+    # An AICE - an actinomycete integrative element, from the ICEscan model set.
+    # Despite the C in the name it does NOT conjugate: it has no relaxase and no
+    # mating-pair apparatus, and moves as double-stranded DNA between the
+    # compartments of a Streptomyces mycelium, pushed through the septal pore by
+    # its own FtsK/SpoIIIE translocase. Both mobility tiers at the top of the
+    # ladder are conjugation - tier 5 "mobilisable by a helper", tier 6
+    # "self-transmissible" - so an AICE belongs to neither and is recognised here
+    # as CONTEXT ONLY, like the two classes above it: it sets the neighbourhood
+    # and caps confidence, and can raise no tier. Without this entry it parsed as
+    # None and was dropped with an "unrecognised element_type" line.
+    "aice": "aice",
 }
 
 # Element types that describe a real mobile-element neighbourhood but are NOT
 # allowed to raise the mobility tier on their own. Used by the tier-1 branch to
 # turn "nothing found" into an honest "something is here, but it does not prove
 # mobility".
-CONTEXT_ONLY_ELEMENT_TYPES = {"conjugative_region", "genomic_island"}
+CONTEXT_ONLY_ELEMENT_TYPES = {"conjugative_region", "genomic_island", "aice"}
 
 
 def parse_mobile_elements(path):

@@ -141,7 +141,7 @@ EFSA does not literally require "report the replicon and flanking IS". It requir
 |---|---|---|---|
 | **AMRFinderPlus** | primary AMR input for mobility module | **already present** in Bakta conda env; DB at `{bakta_db}/amrfinderplus-db/` | see §4 — this is the cheapest win |
 | **ISEScan** | IS detection on contigs | bioconda | self-contained pHMMs, no external DB, works on drafts, flags complete vs partial |
-| **CONJscan** (MacSyFinder module) | conjugation machinery → ICE/IME mobility class | bioconda + `macsydata install` | conservative, model-based, no giant DB |
+| **CONJscan** (MacSyFinder module) | conjugation machinery → ICE/IME mobility class | bioconda + `macsydata install` | conservative, model-based, no giant DB. **Added 2026-07-30:** an optional second model set, **ICEscan** (from ICEfinder2, CC BY-NC-SA, default off), now runs alongside it and is UNIONed — it supplies the IME and AICE classes CONJScan 2.1.0 has no model for. It is a *fork* of CONJScan, not an independent tool, and four of its integrase profiles are deliberately distrusted. Full rationale, measurements and limitations: `docs/methods_icescan_union.md`. |
 | **ISOSDB** | redistributable IS nucleotide DB | from pseudoR repo | read-mapping copy number + sensitive detection |
 | **TnCentral (± ISfinder ± Integrall)** | naming + transposon/integron layer | direct download, see §5 | |
 | **geNomad** | phage caller + 2nd-opinion plasmid caller alongside Platon — **role under review, see licensing note** | bioconda; **⚠ LICENSE: Berkeley Lab ACADEMIC / NON-COMMERCIAL USE ONLY** (verified from the raw LICENSE 2026-07-22 — NOT BSD-4-Clause; the bioconda recipe's `BSD-4-Clause` tag is wrong). Clause 4: "NON-COMMERCIAL USE, purposes ONLY. User must be an accredited academic institution." Commercial use requires a separate LBNL license. | **Licensing correction 2026-07-22 (supersedes the 2026-07-21 "default/mandatory geNomad" framing of D8/D9).** BacFlux is MIT and the project's hard rule (§11) is to impose no non-commercial restriction on downstream users — so geNomad CANNOT be the default/mandatory caller: that would force every user (incl. commercial) into a non-commercial tool. BacFlux invokes geNomad (does not vendor its code), so BacFlux's own MIT is not contaminated, but a mandatory geNomad step is not commercially usable. **Design decision pending (see unification plan D8/D9 revision):** make geNomad OPT-IN (default off) with a clear non-commercial README notice — same pattern BacFlux already uses for licence-encumbered databases (§11) — with VirSorter2 (permissive) as the default phage caller and the D9 plasmid concordance degrading to Platon-only when geNomad is off. Technical merits still hold (v1.12.0 actively maintained, 97.3% precision vs VirSorter2 94.7%, one run does viruses+plasmids); the licence, not the science, constrains the role. |
@@ -162,7 +162,7 @@ EFSA does not literally require "report the replicon and flanking IS". It requir
 | pseudoR | built for fragmented metagenome assemblies; on clonal isolates it measures within-population heterogeneity, not inventory. Heavy R+Bowtie2+blastn+mosdepth stack. **Still needed as the ISOSDB download source** |
 | mobileOG-db | protein-level MGE context only; duplicates Bakta; manual DB download |
 | ICEfinder 2.0 / icefinder-opt | no installation section, no conda recipe, hard-coded `config.ini` paths, CentOS 7. **vmatch** dependency has an UNVERIFIABLE licence → cannot be redistributed with an MIT workflow. ⚠ **Corrected 2026-07-28:** the earlier claim that vmatch "is not on bioconda" was WRONG — `bioconda/vmatch 2.3.1` exists (linux-64, osx-64). The rejection stands on the licence alone: the recipe declares `license: Unknown / OTHER` and vmatch.de is unreachable, so its terms cannot be established, which §11 makes a blocker. See `docs/methods_att_and_small_plasmids.md`. NOTE ICEfinder2 is CC BY-NC-SA 4.0 — its source may be READ to establish an algorithm (§11 permits this) but never copied. |
-| EBI mobilome-annotation-pipeline as a dependency | Nextflow, metagenome-oriented, currently does not run AMRFinderPlus. **Use as escape hatch / design reference only** |
+| EBI mobilome-annotation-pipeline as a dependency | Nextflow, metagenome-oriented. **Use as escape hatch / design reference only.** ⚠ **Corrected 2026-07-30:** the claim that it "currently does not run AMRFinderPlus" was WRONG — see the correction at §11. The rejection stands on the remaining grounds (Nextflow runtime, metagenome/MAG orientation), not on missing AMR calling. |
 
 ---
 
@@ -522,7 +522,30 @@ CC BY-NC-SA is **non-commercial + share-alike → incompatible with MIT**. Copyi
 - *Tools & databases used:* ISEScan (Xie & Tang 2017), CONJscan/MacSyFinder, AMRFinderPlus (Feldgarden et al. 2021), ABRicate, TnCentral (Ross et al. 2021), ISfinder (Siguier et al. 2006), ISOSDB/pseudoR (Kirsch et al. 2024, Cell Host Microbe), ICEberg 3.0 (Wang et al. 2024, NAR), ICEfinder 2.0
 - *Design influence & further analysis:* EBI Mobilome Annotation Pipeline (Apache-2.0, with its own ICEfinder2 attribution) — frame as **complementary scope**, not "simplified alternative": MAP goes deep on the mobilome for metagenomes/MAGs; BacFlux covers assembly→annotation→AMR→plasmids→mobility for single isolates.
 
-Note in the README that MAP's current release deliberately does not run AMRFinderPlus (gene-level AMR/virulence subworkflow in development), so this module is not duplicating their roadmap.
+> ⚠ **CORRECTED 2026-07-30 — the paragraph below is FALSE. Do not put it in the README.**
+> It claimed MAP "deliberately does not run AMRFinderPlus (gene-level AMR/virulence
+> subworkflow in development)". Established by reading the pipeline at revision
+> `3aa408d` (2026-07-23): **MAP does run AMRFinderPlus, on by default.**
+> `subworkflows/ebi-metagenomics/amr_annotation/main.nf` includes the nf-core
+> `AMRFINDERPLUS_RUN` module (alongside DeepARG, RGI/CARD, hAMRonization and an
+> `AMRINTEGRATOR` that joins AMR calls to the mobilome). It is included at
+> `workflows/mobilomeannotation.nf:39`, invoked at line 385, has publishDir rules in
+> `conf/modules.config`, ships test fixtures, and is opt-**out** via
+> `--skip_amrfinderplus`. AMRFinderPlus is also cited in their `CITATIONS.md`.
+>
+> **What this changes.** The "we are not duplicating their roadmap" argument is dead —
+> MAP already does AMR × mobilome integration. The *complementary scope* framing in the
+> bullet above still stands, but it now rests solely on the real distinction: MAP goes
+> deep on the mobilome for **metagenomes and MAGs**; BacFlux covers
+> assembly → annotation → AMR → plasmids → mobility for **single isolates**. Frame it
+> that way and nothing else. See `CITATIONS.md`.
+>
+> The §11 HARD CONSTRAINT above is **unaffected** — re-verified at the same revision:
+> `bin/ice_boundary_refinement.py`, `bin/map_tools/icefinder_process.py` and
+> `bin/prescan_to_fasta.py` are all still present and still carry the header
+> *"Original ICEfinder2 work licensed under CC BY-NC-SA 4.0"*. Still never copy them.
+
+~~Note in the README that MAP's current release deliberately does not run AMRFinderPlus (gene-level AMR/virulence subworkflow in development), so this module is not duplicating their roadmap.~~
 
 **Escape hatch to document for users:** "for full ICE delimitation and deeper mobilome analysis, run the EBI Mobilome Annotation Pipeline; BacFluxL writes `{sample}_contigs.fna` and `{sample}.gbk` ready for it." Consuming its `mobilome.gff.gz` output carries no licence contamination.
 
