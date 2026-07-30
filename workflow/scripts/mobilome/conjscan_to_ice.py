@@ -740,6 +740,13 @@ OUTPUT_COLUMNS = [
     "att_trna",                   # the tRNA the element integrated into, when known
     "machinery_start",            # the CONJscan machinery span, always preserved
     "machinery_end",
+    # The widest stretch INSIDE this call that carries no anchor at all - the
+    # biggest hole in its machinery. Conjugation genes are an operon, so a real
+    # element's anchors sit shoulder to shoulder and this stays small even for a
+    # 100 kb ICE. A large number means the interval was stitched together from
+    # blocks that are far apart, which is what resolve_nested_calls uses to tell
+    # a real element from an over-extended one. 0 when there is a single anchor.
+    "machinery_gap_bp",
     "contig_length",
     "dist_to_contig_start",
     "dist_to_contig_end",
@@ -852,6 +859,23 @@ def _float_or_none(value):
         return None
     try:
         return float(text)
+    except ValueError:
+        return None
+
+
+def _int_or_none(value):
+    """Parse a whole-number field, returning None instead of raising.
+
+    Used for MacSyFinder's `locus_num` (see read_conjscan_hits), where None means
+    "the tool did not tell us", which the merge rule treats differently from a
+    number it did tell us."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return int(text)
     except ValueError:
         return None
 
@@ -1113,6 +1137,21 @@ def read_conjscan_hits(path, source=SOURCE_CONJSCAN):
             "gene_name": field(row, "gene_name"),
             "model_fqn": field(row, "model_fqn"),
             "sys_id": namespaced_sys_id(field(row, "sys_id"), source),
+            # WHICH LOCUS OF THE SYSTEM THIS GENE SITS IN - and the one thing
+            # that says whether the system id means "these genes are next to
+            # each other".
+            #
+            # MacSyFinder numbers the co-localised blocks of a system 1, 2, 3...
+            # A gene the model declares a LONER is admitted to the system while
+            # sitting anywhere on the replicon, and MacSyFinder marks it with a
+            # NEGATIVE number (-1, -2, ...) - it is telling us, explicitly, that
+            # this gene was NOT required to co-localise with the rest.
+            #
+            # merge_clusters_sharing_a_system is the only consumer: a shared
+            # system id is evidence of proximity only when both sides of the
+            # merge hold a gene of a real locus. Absent column -> None, which
+            # that function treats as "unknown, behave as before".
+            "locus_num": _int_or_none(field(row, "locus_num")),
             "sys_wholeness": _float_or_none(field(row, "sys_wholeness")),
             "hit_profile_cov": _float_or_none(field(row, "hit_profile_cov")),
             "hit_status": field(row, "hit_status"),
@@ -1210,6 +1249,10 @@ def read_conjscan_profile_hits(hmmer_dir, source=SOURCE_CONJSCAN):
                 # report. Both stay empty and the columns read NA downstream.
                 "model_fqn": "",
                 "sys_id": "",
+                # No system means no locus either. Nothing reads this for a
+                # profile-only hit (an empty sys_id already stops any merge), but
+                # the key is present so every hit dict has the same shape.
+                "locus_num": None,
                 "sys_wholeness": None,
                 "hit_profile_cov": _float_or_none(fields[7].strip()),
                 "hit_status": "",
@@ -1261,6 +1304,10 @@ def make_anchor(feature, anchor_class, label, hit=None):
         "label": label,
         "feature_id": feature["feature_id"],
         "sys_id": hit["sys_id"] if hit else "",
+        # Which locus of that system, straight from MacSyFinder; negative marks a
+        # loner (see read_conjscan_hits). None for an anchor with no HMM hit
+        # behind it - a Bakta product-text integrase belongs to no system at all.
+        "locus_num": hit.get("locus_num") if hit else None,
         "model_fqn": hit["model_fqn"] if hit else "",
         "gene_name": hit["gene_name"] if hit else "",
         # Where this evidence came from: 'conjscan', 'icescan', or - when there
@@ -1744,14 +1791,39 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
     judgement made with better information. Widening --window-bp instead would
     merge genuinely unrelated neighbours too.
 
-    Input:  the distance-based clusters, each a list of anchors carrying sys_id.
-    Does:   joins clusters that share any non-empty sys_id ON THE SAME CONTIG.
+    Input:  the distance-based clusters, each a list of anchors carrying sys_id
+            and MacSyFinder's locus_num.
+    Does:   joins clusters that share any non-empty sys_id ON THE SAME CONTIG,
+            counting only the anchors MacSyFinder placed in a real locus of that
+            system.
     Output: (merged clusters, audit rows describing every merge).
 
-    Two deliberate restrictions:
+    THREE deliberate restrictions:
       - anchors with an EMPTY sys_id (integrases found by Bakta product text,
         which belong to no CONJscan system) never cause a merge, or every
         unrelated integrase would pull the whole contig into one blob;
+
+      - LONER anchors never cause a merge either. This is the same principle as
+        the line above, applied to something MacSyFinder tells us outright. A
+        loner is a gene the model allows into a system from anywhere on the
+        replicon, WITHOUT the co-localisation test the paragraph above rests on;
+        MacSyFinder marks it by writing a negative `locus_num`. Merging on such a
+        hit therefore uses the system id as evidence of proximity in exactly the
+        case where MacSyFinder has said proximity was never checked.
+
+        Measured on CP011419.1 (Streptococcus suis, IME pilot). One MOBT
+        relaxase at gene 102 is a LONER of system MOB_3, whose only other member
+        is a coupling protein 175 genes away at gene 277. Merging on MOB_3 made
+        one 179,889 bp "IME" out of two anchors 177 kb apart - sixteen times the
+        curated element - and the genuine 4,959 bp IME 63 bp from the curated
+        start was then reported a SECOND time inside it. Requiring a real locus
+        on both sides leaves R391 (AY090559) and every other benchmark merge
+        untouched: those are locus members, which is what the system id is
+        supposed to mean.
+
+        When the column is absent (locus_num is None) nothing is assumed and the
+        anchor can still link, so an older MacSyFinder table behaves as before.
+
       - clusters on DIFFERENT contigs are never merged even when they share a
         sys_id. On a fragmented assembly MacSyFinder treats the proteome as one
         pseudo-replicon and can group hits across contigs; merging those would
@@ -1783,7 +1855,14 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
         if root_i != root_j:
             parent[max(root_i, root_j)] = min(root_i, root_j)
 
-    first_cluster_with_key = {}
+    # Pass 1 - who claims which system, and on what footing.
+    #   locus_clusters_by_key  (contig, sys_id) -> cluster indices holding a
+    #                          gene MacSyFinder placed in a real LOCUS of it.
+    #                          These are the only links allowed to merge.
+    #   loner_clusters_by_key  the same, for genes admitted as LONERS. Kept only
+    #                          so the audit can report a link that was refused.
+    locus_clusters_by_key = {}
+    loner_clusters_by_key = {}
     for index, cluster in enumerate(clusters):
         contig = cluster[0]["contig"]
         for anchor in cluster:
@@ -1791,10 +1870,20 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
             if not sys_id:
                 continue
             key = (contig, sys_id)
-            if key in first_cluster_with_key:
-                union(first_cluster_with_key[key], index)
+            # A negative locus_num is MacSyFinder saying "this gene was let into
+            # the system without a proximity test" - see the docstring.
+            locus_num = anchor.get("locus_num")
+            is_loner = locus_num is not None and locus_num < 0
+            if is_loner:
+                loner_clusters_by_key.setdefault(key, set()).add(index)
             else:
-                first_cluster_with_key[key] = index
+                locus_clusters_by_key.setdefault(key, set()).add(index)
+
+    # Pass 2 - the unions, from locus members only.
+    for indices in locus_clusters_by_key.values():
+        ordered = sorted(indices)
+        for other in ordered[1:]:
+            union(ordered[0], other)
 
     groups = {}
     for index in range(len(clusters)):
@@ -1859,6 +1948,56 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
                 start=min(a["start"] for a in joined),
                 end=max(a["end"] for a in joined),
             ))
+
+    # The merges that were REFUSED because the only thing joining two clusters
+    # was a loner. Written out because a merge that does not happen changes the
+    # reported element just as much as one that does, and this module records
+    # every such decision with its reason.
+    #
+    # Only reported when it actually held something apart: a loner whose system
+    # lives entirely inside one cluster changed nothing and would only add noise.
+    for key in sorted(loner_clusters_by_key):
+        contig, sys_id = key
+        clusters_touching_this_system = (
+            loner_clusters_by_key[key] | locus_clusters_by_key.get(key, set()))
+        # The separate elements this system's hits ended up in. Reported at GROUP
+        # level, not cluster level, because locus members of the same system may
+        # legitimately have merged already - what the loner would have added is
+        # the fusion of these groups into one.
+        surviving_groups = sorted({find(index) for index in clusters_touching_this_system})
+        if len(surviving_groups) < 2:
+            continue
+
+        loner_genes = sorted({
+            f"{anchor.get('feature_id', '?')} ({anchor.get('label', '?')})"
+            for index in loner_clusters_by_key[key]
+            for anchor in clusters[index]
+            if (anchor.get("sys_id") or "").strip() == sys_id
+            and anchor.get("locus_num") is not None and anchor["locus_num"] < 0
+        })
+        pieces = sorted(
+            (min(a["start"] for index in groups[root] for a in clusters[index]),
+             max(a["end"] for index in groups[root] for a in clusters[index]))
+            for root in surviving_groups
+        )
+        would_have_spanned = pieces[-1][1] - pieces[0][0] + 1
+        audit_rows.append(audit_row(
+            "NA",
+            "evidence_recorded",
+            "system_merge_refused_loner_only_link",
+            f"{len(pieces)} separate anchor group(s) "
+            f"({', '.join(f'{lo}-{hi}' for lo, hi in pieces)}) hold hits of the "
+            f"system {sys_id}, and the only thing joining them is a MacSyFinder "
+            f"LONER ({', '.join(loner_genes)}) - a gene the model admits from "
+            "anywhere on the replicon, without the co-localisation test that "
+            "makes a shared system id mean 'these genes sit together'. They are "
+            f"kept apart; joining them would have produced one "
+            f"{would_have_spanned} bp element out of pieces MacSyFinder never "
+            "said were adjacent.",
+            contig=contig,
+            start=pieces[0][0],
+            end=pieces[-1][1],
+        ))
 
     return merged, audit_rows
 
@@ -2460,6 +2599,21 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         # was already made above, per mating-pair hit, and audited there.
         mpf_typed_system = bool(mpf_types)
 
+        # The biggest anchor-free hole inside this cluster. Conjugation machinery
+        # is an operon, so on a real element the anchors sit close together and
+        # this number stays small however long the element is; a big number means
+        # the interval only exists because two distant blocks were joined (by the
+        # system merge, or by the wide integrase window). resolve_nested_calls
+        # reads it when two calls overlap and it has to decide which is real.
+        ordered_anchors = sorted(cluster, key=lambda a: (a["start"], a["end"]))
+        machinery_gap_bp = 0
+        reach = ordered_anchors[0]["end"]           # rightmost base covered so far
+        for anchor in ordered_anchors[1:]:
+            gap = anchor["start"] - reach - 1       # negative when they overlap
+            if gap > machinery_gap_bp:
+                machinery_gap_bp = gap
+            reach = max(reach, anchor["end"])
+
         integrase_products = [
             anchor["label"] for anchor in cluster
             if anchor["anchor_class"] == ANCHOR_INTEGRASE
@@ -2543,6 +2697,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             "att_trna": "NA",
             "machinery_start": str(start),
             "machinery_end": str(end),
+            "machinery_gap_bp": str(machinery_gap_bp),
             "contig_length": _text_or_na(contig_length),
             "dist_to_contig_start": _text_or_na(dist_to_start),
             "dist_to_contig_end": _text_or_na(dist_to_end),
@@ -2777,6 +2932,167 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
         ))
 
     return rows, audit_rows
+
+
+def resolve_nested_calls(sample, rows, window_bp):
+    """Phase 3b: report ONE element where two calls of the same class nest.
+
+    Input:  the candidate rows AFTER Phase 3 has fixed the boundaries and after
+            the plasmid check has settled every class - both matter, because
+            this pass compares intervals and compares classes.
+    Does:   finds pairs on the same contig, of the SAME class, where one call
+            lies entirely inside the other, and keeps only one of them.
+    Output: (surviving rows, audit rows). Every suppressed call is written to the
+            audit with its coordinates, its anchors and the reason it lost, so
+            nothing disappears without a trace.
+
+    WHY THIS IS NEEDED. One locus was being reported twice. On CP011419.1
+    (Streptococcus suis) the caller emitted a 179,889 bp "IME" and, inside it, the
+    honest 4,959 bp IME that sits 63 bp from the curated element's start. Both
+    are the same relaxase-and-integrase neighbourhood seen at two different
+    extents, and a reader has no way to tell which line to believe. The direct
+    cause of that particular pair is fixed upstream (see the loner rule in
+    merge_clusters_sharing_a_system); this pass is the general guard, because
+    single-linkage clustering and the 50 kb integrase window can produce a nested
+    pair in other ways too.
+
+    WHICH ONE SURVIVES - and why it is not simply "the smaller one". On other
+    genomes the larger call is the real element: a 100 kb ICE genuinely contains
+    smaller machinery blocks. So the choice is made on evidence, in this order:
+
+      1. A tRNA-ANCHORED att PAIR WINS. An att site is the scar left where the
+         element recombined into the chromosome, so a call whose ends came from
+         one has direct evidence of where the element starts and stops, while a
+         call whose ends are just the machinery span has none. (A DE NOVO repeat
+         does NOT count here, for the same reason refine_candidate_boundaries
+         refuses to act on one: ~16% of arbitrary chromosomal spans yield such a
+         repeat by chance.)
+
+      2. OTHERWISE, COHERENT MACHINERY BEATS STITCHED MACHINERY. Conjugation
+         genes are an operon: on a real element the anchors sit shoulder to
+         shoulder, so machinery_gap_bp - the widest anchor-free hole inside the
+         call - stays small no matter how long the element is. A call with a hole
+         wider than --window-bp, the module's own statement of how far apart one
+         element's machinery genes sit, exists only because two distant blocks
+         were joined. When exactly one of the pair is coherent by that test, it
+         is the element and the other is the join.
+
+      3. OTHERWISE KEEP THE OUTER ONE. With no evidence separating them, the
+         wider interval is the safer report: it contains every base and every
+         anchor the inner call had, so the inner one is cargo of it rather than a
+         second finding. This follows the EBI Mobilome Annotation Pipeline, which
+         suppresses an IME nested inside an ICE for the same reason. (Adopting
+         their convention is fine - it is a design decision, not their code; see
+         spec §11.)
+
+    DELIBERATELY LIMITED TO ONE CLASS. Two calls of DIFFERENT classes that nest -
+    an IME inside an ICE - are two genuinely different elements, and BacFlux
+    reports both: the IME is real cargo and suppressing it would lose the more
+    mobile of the two findings. This pass only removes a duplicate description of
+    one locus, which is what a same-class nest is.
+    """
+    audit_rows = []
+    if len(rows) < 2:
+        return rows, audit_rows
+
+    def interval(row):
+        return int(row["start"]), int(row["end"])
+
+    def contains(outer, inner):
+        """True when `inner` lies entirely inside `outer` AND is the shorter of
+        the two. Two calls with identical intervals are not containment - neither
+        is inside the other - and are both kept rather than silently halved."""
+        outer_start, outer_end = interval(outer)
+        inner_start, inner_end = interval(inner)
+        if outer_start > inner_start or inner_end > outer_end:
+            return False
+        return (outer_end - outer_start) > (inner_end - inner_start)
+
+    def has_trna_boundary(row):
+        return row.get("boundary_method") == "tRNA"
+
+    def describe(row):
+        """One-line summary of a call, for the audit."""
+        return (f"{row['mge_id']} ({row['start']}-{row['end']}, "
+                f"{row['length_bp']} bp, {row['n_anchors']} anchors, "
+                f"boundary={row['boundary_method']}, "
+                f"machinery gap {row['machinery_gap_bp']} bp)")
+
+    suppressed = set()          # positions in `rows` that lost a comparison
+    for outer_position, outer in enumerate(rows):
+        for inner_position, inner in enumerate(rows):
+            if outer_position == inner_position:
+                continue
+            # A call that has already lost cannot decide anything, and a chain
+            # (A contains B contains C) is resolved one pair at a time.
+            if outer_position in suppressed or inner_position in suppressed:
+                continue
+            if outer["contig"] != inner["contig"]:
+                continue
+            if outer["mge_class"] != inner["mge_class"]:
+                continue
+            if not contains(outer, inner):
+                continue
+
+            # --- the three keys, in order --------------------------------
+            if has_trna_boundary(inner) != has_trna_boundary(outer):
+                if has_trna_boundary(inner):
+                    winner_position, loser_position = inner_position, outer_position
+                else:
+                    winner_position, loser_position = outer_position, inner_position
+                key = ("its ends come from a tRNA-anchored att pair, the scar of "
+                       "the integration event, while the other call's ends are "
+                       "only the span of its machinery")
+            # A SECOND KEY WAS TRIED HERE AND REMOVED - "the call whose machinery
+            # sits together as one operon wins over the one stitched from distant
+            # blocks", tested as machinery_gap_bp <= --window-bp.
+            #
+            # It sounds right and it is wrong, because the premise that
+            # conjugation machinery always sits together does not survive contact
+            # with real ICEs. Measured over the 66 calls on this benchmark, 20 of
+            # the 37 `ice` calls - 54% - have an anchor-free hole wider than the
+            # 15 kb window, and they are not marginal cases: R391 28,354 bp,
+            # ICEEc2 20,667, SPI-7 42,039, ICEKpnQD23-1 39,788, ICEKpn16 37,169,
+            # Tn4371 15,120. Those are the spec's own named positive controls, all
+            # at high confidence. Large ICEs carry cargo BETWEEN their machinery
+            # genes; that is what makes them interesting.
+            #
+            # So the rule was a systematic vote against big elements. On a
+            # constructed case it deleted a 193 kb ICE outright in favour of a
+            # 7 kb element sitting inside it. It also contradicted the merge rule
+            # directly above: merge_clusters_sharing_a_system joins two loci of one
+            # system on MacSyFinder's authority, and this key then called the
+            # result "stitched" and threw it away.
+            #
+            # Only measure a hole against a threshold if you have first checked
+            # what real elements' holes look like. machinery_gap_bp is still
+            # REPORTED, because it is genuinely useful for a reader judging a call
+            # by eye - it is simply not trusted to decide one.
+            else:
+                winner_position, loser_position = outer_position, inner_position
+                key = ("no evidence separates them, so the wider interval is "
+                       "reported: it already contains every base and every "
+                       "anchor of the other call, which is then cargo of it "
+                       "rather than a second finding")
+
+            winner, loser = rows[winner_position], rows[loser_position]
+            suppressed.add(loser_position)
+            audit_rows.append(audit_row(
+                sample, "dropped", "nested_call_of_same_class_suppressed",
+                # Say which call CONTAINS which, not which won - those are
+                # different questions and the inner call can win. Writing it the
+                # other way round produced audit lines claiming an 89 kb interval
+                # lay inside a 10 kb one.
+                f"{describe(inner)} lies inside {describe(outer)} on "
+                f"{outer['contig']} and both were called '{outer['mge_class']}', "
+                "so one locus was being reported twice. "
+                f"Kept {winner['mge_id']} because {key}. "
+                f"Anchors of the suppressed call: {loser['anchor_ids']}.",
+                contig=loser["contig"], start=loser["start"], end=loser["end"],
+            ))
+
+    kept = [row for position, row in enumerate(rows) if position not in suppressed]
+    return kept, audit_rows
 
 
 def finalise_confidence(sample, rows, require_trna_boundary=False):
@@ -3341,6 +3657,15 @@ def main(argv=None):
                     "applied. The call stands; treat it with the caution any "
                     "unknown replicon deserves.",
                     contig=row.get("contig"), start=row.get("start"), end=row.get("end")))
+
+    # --- Phase 3b: one locus, one row ---------------------------------------
+    # Two calls of the same class where one sits inside the other describe the
+    # same neighbourhood twice. Run here, after the boundaries are fixed (the
+    # intervals being compared must be final) and after the plasmid check (the
+    # classes being compared must be final), but before confidence is settled so
+    # that no confidence decision is recorded for a row that then disappears.
+    rows, nesting_audit = resolve_nested_calls(args.sample, rows, args.window_bp)
+    audit_rows.extend(nesting_audit)
 
     # --- Phase 6: settle the confidence now the boundaries are known ---------
     rows, confidence_audit = finalise_confidence(

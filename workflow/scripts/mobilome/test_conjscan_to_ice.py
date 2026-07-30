@@ -1527,6 +1527,119 @@ def test_window_still_separates_distinct_systems(tmp_path):
     assert systems == {"S1_MOB_1", "S1_MOB_2"}
 
 
+# ── Loners: a shared system id is not always a claim of proximity ────────────
+
+def test_a_loner_hit_does_not_merge_two_distant_clusters(tmp_path):
+    """A MacSyFinder LONER must not join two blocks of machinery into one element.
+
+    THE CASE THIS COMES FROM. CP011419.1 (Streptococcus suis, IME pilot). A MOBT
+    relaxase at gene 102 is a loner of system MOB_3, whose only other member is a
+    coupling protein 175 genes away at gene 277. The merge rule keyed on the
+    system id alone, so those two anchors became one 179,889 bp "IME" - sixteen
+    times the curated element - and the genuine 4,959 bp IME inside it was then
+    reported a second time.
+
+    WHY THE SYSTEM ID IS NOT ENOUGH HERE. Merging on a shared system id is
+    justified because MacSyFinder has already applied its own co-localisation
+    test, counted in genes. A LONER is precisely the gene it exempted from that
+    test - the model lets it join from anywhere on the replicon - and MacSyFinder
+    says so by writing a NEGATIVE locus_num. So on a loner the system id carries
+    no statement about proximity at all.
+
+    The fixture: a relaxase at 55000 and a VirB4 at 350000 in the same system,
+    where the relaxase is the loner. They must stay apart.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        # locus_num -1: MacSyFinder admitted this relaxase to the system without
+        # requiring it to sit near anything.
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF", locus_num="-1"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF", locus_num="-1"),
+        # A real locus member of the same system, 300 kb away.
+        conjscan_row(hit_id="S1_00090", gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF", locus_num="1"),
+    ])
+    contigs = {"contig_1": 400000}
+    cds = list(SCENE_CDS) + [
+        gff_cds("contig_1", 350000, 352000, "+", "S1_00090",
+                "conjugal transfer protein TraB"),
+    ]
+    gff = write_gff(tmp_path / "S1.gff3", contigs, cds)
+
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, conjscan, gff, extra=["--min-element-bp", "1000"])
+
+    # No 300 kb blob: nothing reaches from the relaxase to the distant VirB4.
+    assert all(int(row["length_bp"]) < 300000 for row in rows)
+    assert "system_merge_refused_loner_only_link" in audit_reasons(audit)
+    # The refusal names the loner, so a reader can check it in best_solution.tsv.
+    refusal = [entry for entry in audit
+               if entry["reason"] == "system_merge_refused_loner_only_link"][0]
+    assert RELAXASE_HIT in refusal["detail"]
+    assert "LONER" in refusal["detail"]
+
+
+def test_locus_members_of_one_system_are_still_merged(tmp_path):
+    """The loner rule must not undo the fix it sits next to.
+
+    Same geometry as the test above - two machinery blocks farther apart than the
+    clustering window, one shared system id - but here BOTH sides are genes
+    MacSyFinder placed in a real locus (positive locus_num). That is the R391
+    case the merge exists for, and it must still produce one element.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF", locus_num="1"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF", locus_num="1"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF", locus_num="1"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    # 3 kb window: VirB4 (starts 63000) is 4299 bp from the coupling protein
+    # (ends 58700), so distance clustering alone would split the machinery.
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, conjscan, gff,
+        extra=["--window-bp", "3000", "--min-element-bp", "1000"])
+
+    assert len(rows) == 1
+    assert int(rows[0]["machinery_end"]) == 65500          # VirB4's end, not cut off
+    assert "clusters_merged_same_conjscan_system" in audit_reasons(audit)
+    assert "system_merge_refused_loner_only_link" not in audit_reasons(audit)
+
+
+def test_an_absent_locus_num_column_still_merges(tmp_path):
+    """An older MacSyFinder table without locus_num behaves as it did before.
+
+    The loner rule reads a column we did not use until now. If a future - or
+    past - version of the tool does not write it, nothing is assumed about the
+    hits and the merge goes ahead, rather than the module silently stopping to
+    merge anything.
+    """
+    columns_without_locus = [c for c in CONJSCAN_COLUMNS if c != "locus_num"]
+    rows_out = []
+    for hit_id, gene in ((RELAXASE_HIT, "T4SS_MOBF"), (T4CP_HIT, "T4SS_t4cp2"),
+                         (VIRB4_HIT, "T4SS_virb4")):
+        fields = dict(CONJSCAN_DEFAULTS)
+        fields.update({"hit_id": hit_id, "gene_name": gene,
+                       "model_fqn": "CONJScan/Chromosome/T4SS_typeF"})
+        rows_out.append("\t".join(fields[c] for c in columns_without_locus))
+    path = str(tmp_path / "best_solution.tsv")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("\t".join(columns_without_locus) + "\n")
+        handle.write("\n".join(rows_out) + "\n")
+
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, path, gff,
+        extra=["--window-bp", "3000", "--min-element-bp", "1000"])
+
+    assert len(rows) == 1
+    assert "clusters_merged_same_conjscan_system" in audit_reasons(audit)
+
+
 def test_gff_parsing_reads_coordinates_products_and_lengths(tmp_path):
     """The GFF3 loader: both ID and locus_tag are join keys, percent-encoded
     product text is decoded, sequence-region gives the contig length, and the
@@ -2346,3 +2459,295 @@ def test_at_equal_distance_an_hmm_hit_does_not_displace_the_annotation(tmp_path)
     # Labelled with the Bakta product text, not the profile name.
     assert "Phage integrase family protein" in rows[0]["integrase_products"]
     assert "integrase_corroborated_by_icescan" in audit_reasons(audit)
+
+
+# ── One locus, one row: the nested double-report ─────────────────────────────
+#
+# Two calls of the same class where one sits inside the other describe the same
+# neighbourhood twice, and a reader has no way to tell which line to believe.
+# resolve_nested_calls keeps one of them - on evidence, never simply the smaller
+# one - and writes the other to the audit. The end-to-end test below reproduces
+# the CP011419.1 shape that prompted this; the pure-function tests after it pin
+# each rung of the decision ladder separately, including the cases where the
+# LARGER call is the one that must survive.
+
+def nesting_row(mge_id, contig, start, end, mge_class="ime",
+                boundary_method="none", machinery_gap_bp=0, anchor_ids="x(relaxase)"):
+    """A minimal element row, just the columns resolve_nested_calls reads.
+
+    Building these by hand rather than through main() keeps each rule of the
+    ladder testable on its own; the end-to-end test covers the wiring.
+    """
+    return {
+        "mge_id": mge_id,
+        "contig": contig,
+        "start": str(start),
+        "end": str(end),
+        "length_bp": str(end - start + 1),
+        "mge_class": mge_class,
+        "boundary_method": boundary_method,
+        "machinery_gap_bp": str(machinery_gap_bp),
+        "n_anchors": "3",
+        "anchor_ids": anchor_ids,
+    }
+
+
+def test_one_locus_is_not_reported_as_two_nested_imes(tmp_path):
+    """The CP011419.1 defect, end to end: a blob and the honest call inside it.
+
+    THE MEASURED CASE. On CP011419.1 the caller emitted a 179,889 bp "IME"
+    spanning sixteen times the curated element, and - inside it - the honest
+    4,959 bp IME that sits 63 bp from the curated start. Both were reported, so
+    one locus appeared twice and the benchmark still scored the element as a
+    16.19x swallow.
+
+    THE CAUSE, established from MacSyFinder's own output rather than guessed:
+    the blob was built by merging through a LONER. CP011419_1_00138 (T4SS_MOBT)
+    is listed under two systems with locus_num = -1, and it is the sole entry of
+    best_solution_loners.tsv. A loner is precisely the gene a model admits from
+    anywhere on the replicon WITHOUT the co-localisation test, and MacSyFinder
+    signals that with a negative locus_num. So merge_clusters_sharing_a_system's
+    justification - "MacSyFinder already decided these genes form one system" -
+    is false for a loner, and merging on it invented a 179,889 bp interval.
+
+    The fixture reproduces that shape: a compact, genuine element, and a distant
+    loner of the same system 240 kb away. The loner must not drag the two
+    together, so only one call comes out and no nesting resolution is needed.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        # The LONER, 240 kb from everything else. locus_num = -1 is
+        # MacSyFinder telling us it was admitted without the co-localisation
+        # test, so it must not link two clusters into one element.
+        conjscan_row(hit_id="S1_00100", gene_name="T4SS_MOBF",
+                     sys_id="S1_MOB_2", locus_num="-1"),
+        # The compact element in between: its own system, three genes together.
+        conjscan_row(hit_id="S1_00200", gene_name="T4SS_MOBP1",
+                     sys_id="S1_MOB_2", locus_num="1"),
+        conjscan_row(hit_id="S1_00201", gene_name="T4SS_t4cp2",
+                     sys_id="S1_MOB_2", locus_num="1"),
+    ])
+    contigs = {"contig_1": 400000}
+    cds = [
+        gff_cds("contig_1", 60000, 61600, "+", "S1_00100",
+                "TrwC relaxase domain-containing protein"),
+        gff_cds("contig_1", 199000, 200200, "+", "S1_00199",
+                "Phage integrase family protein"),
+        gff_cds("contig_1", 200400, 202000, "+", "S1_00200",
+                "MobA/MobL family protein"),
+        gff_cds("contig_1", 202400, 204100, "-", "S1_00201",
+                "Type IV secretory pathway, VirD4 component, TraG/TraD family ATPase"),
+        gff_cds("contig_1", 300000, 301700, "-", "S1_00400",
+                "Type IV secretory pathway, VirD4 component, TraG/TraD family ATPase"),
+    ]
+    gff = write_gff(tmp_path / "S1.gff3", contigs, cds)
+
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, conjscan, gff, extra=["--min-element-bp", "1000"])
+
+    # The compact element is reported at its own size, NOT stretched to 240 kb.
+    ime_rows = [row for row in rows if row["mge_class"] == "ime"]
+    assert len(ime_rows) == 1
+    kept = ime_rows[0]
+    assert int(kept["start"]) == 199000 and int(kept["end"]) == 204100
+
+    # The orphaned loner is still REPORTED - separately, and as the weakest class
+    # its evidence supports. A relaxase with no integrase beside it is a
+    # conjugative region, not an element with boundaries. This is the same shape
+    # seen on the real CP011419.1, where the loner's own compact locus came out
+    # as its own small call rather than being folded into the element 150 kb away.
+    assert all(int(row["length_bp"]) < 100000 for row in rows)
+    # The blob is never BUILT, so this is a refusal to merge rather than a
+    # suppression after the fact - and the audit says which gene caused it.
+    assert "system_merge_refused_loner_only_link" in audit_reasons(audit)
+
+
+def test_two_separate_elements_on_one_contig_are_both_reported(tmp_path):
+    """The guard against over-suppression: nesting is not the same as neighbouring.
+
+    Two genuinely separate IMEs on one contig, neither inside the other, must
+    both survive. Without this the fix above would quietly become "report at most
+    one element per contig", which is the opposite failure.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id="S1_00100", gene_name="T4SS_MOBF",
+                     sys_id="S1_MOB_1", locus_num="1"),
+        conjscan_row(hit_id="S1_00101", gene_name="T4SS_t4cp2",
+                     sys_id="S1_MOB_1", locus_num="1"),
+        conjscan_row(hit_id="S1_00300", gene_name="T4SS_MOBP1",
+                     sys_id="S1_MOB_2", locus_num="1"),
+        conjscan_row(hit_id="S1_00301", gene_name="T4SS_t4cp2",
+                     sys_id="S1_MOB_2", locus_num="1"),
+    ])
+    contigs = {"contig_1": 400000}
+    cds = [
+        gff_cds("contig_1", 60000, 61200, "+", "S1_00099",
+                "Phage integrase family protein"),
+        gff_cds("contig_1", 61500, 63100, "+", "S1_00100",
+                "TrwC relaxase domain-containing protein"),
+        gff_cds("contig_1", 63400, 65100, "-", "S1_00101",
+                "Type IV secretory pathway, VirD4 component, TraG/TraD family ATPase"),
+        gff_cds("contig_1", 300000, 301200, "+", "S1_00299",
+                "tyrosine-type recombinase/integrase"),
+        gff_cds("contig_1", 301500, 303100, "+", "S1_00300",
+                "MobA/MobL family protein"),
+        gff_cds("contig_1", 303400, 305100, "-", "S1_00301",
+                "Type IV secretory pathway, VirD4 component, TraG/TraD family ATPase"),
+    ]
+    gff = write_gff(tmp_path / "S1.gff3", contigs, cds)
+
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, conjscan, gff, extra=["--min-element-bp", "1000"])
+
+    assert len(rows) == 2
+    assert {row["mge_class"] for row in rows} == {"ime"}
+    assert [int(row["start"]) for row in rows] == [60000, 300000]
+    assert "nested_call_of_same_class_suppressed" not in audit_reasons(audit)
+
+
+def test_a_nested_call_with_an_att_boundary_beats_the_larger_one():
+    """Key 1: a tRNA-anchored att pair decides it, whichever call is bigger.
+
+    An att site is the scar left where the element recombined into the
+    chromosome, so a call whose ends came from one knows where the element
+    starts and stops; a call whose ends are only the span of its machinery does
+    not. Here the SMALLER call carries the att pair and wins.
+    """
+    outer = nesting_row("c1|ime-1000:90000", "c1", 1000, 90000, machinery_gap_bp=0)
+    inner = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000,
+                        boundary_method="tRNA", machinery_gap_bp=0)
+    kept, audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+
+    assert [row["mge_id"] for row in kept] == ["c1|ime-40000:50000"]
+    assert audit[0]["reason"] == "nested_call_of_same_class_suppressed"
+    assert "tRNA-anchored att pair" in audit[0]["detail"]
+
+
+def test_the_larger_call_survives_when_it_is_the_one_with_the_att_boundary():
+    """Key 1 again, the other way round - because "keep the smaller one" would be
+    wrong. A 100 kb ICE genuinely contains smaller blocks of machinery, and when
+    the LARGE call is the one with the att evidence it is the element."""
+    outer = nesting_row("c1|ice-1000:90000", "c1", 1000, 90000, mge_class="ice",
+                        boundary_method="tRNA", machinery_gap_bp=40000)
+    inner = nesting_row("c1|ice-40000:50000", "c1", 40000, 50000, mge_class="ice",
+                        machinery_gap_bp=0)
+    kept, _audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+
+    assert [row["mge_id"] for row in kept] == ["c1|ice-1000:90000"]
+
+
+def test_machinery_coherence_is_reported_but_never_decides():
+    """The removed key 2: a wide machinery gap must NOT lose a nesting contest.
+
+    An earlier version preferred the call whose machinery "sits together as one
+    operon", on the reasoning that conjugation genes form an operon. Measured on
+    the benchmark that premise is false for exactly the elements we care about:
+    20 of 37 ice calls (54%) have an anchor-free hole wider than the 15 kb
+    window, among them R391 (28,354 bp), SPI-7 (42,039) and Tn4371 (15,120) -
+    the spec's own positive controls. Large ICEs carry cargo BETWEEN their
+    machinery genes. The rule deleted a 193 kb ICE in favour of a 7 kb element
+    inside it, so it was removed; machinery_gap_bp is still reported for a reader
+    to judge by eye.
+    """
+    outer = nesting_row("c1|ime-1000:90000", "c1", 1000, 90000, machinery_gap_bp=70000)
+    inner = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, machinery_gap_bp=300)
+    kept, audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+
+    # Key 3 decides instead: with no att evidence, the wider interval is kept.
+    assert [row["mge_id"] for row in kept] == ["c1|ime-1000:90000"]
+    assert "no evidence separates them" in audit[0]["detail"]
+
+
+def test_nested_calls_with_nothing_to_separate_them_keep_the_outer_one():
+    """Key 3: with no evidence either way, report the wider interval.
+
+    It already contains every base and every anchor the inner call had, so the
+    inner one is cargo of it rather than a second finding. This is the EBI
+    Mobilome Annotation Pipeline's convention, adopted here as a design decision
+    (their code is CC BY-NC-SA and is never copied - see spec §11).
+    """
+    outer = nesting_row("c1|ime-1000:90000", "c1", 1000, 90000, machinery_gap_bp=200)
+    inner = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, machinery_gap_bp=100)
+    kept, audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+
+    assert [row["mge_id"] for row in kept] == ["c1|ime-1000:90000"]
+    assert "no evidence separates them" in audit[0]["detail"]
+
+
+def test_an_ime_nested_inside_an_ice_is_still_reported():
+    """Two DIFFERENT classes nested are two different elements, and both stand.
+
+    An IME sitting inside an ICE is real cargo - and the more mobile of the two
+    findings, since it can be picked up by a helper independently. Suppressing it
+    would lose the answer a reader most needs. This pass only removes a duplicate
+    description of ONE locus, which is what a same-class nest is.
+    """
+    ice = nesting_row("c1|ice-1000:90000", "c1", 1000, 90000, mge_class="ice",
+                      machinery_gap_bp=40000)
+    ime = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, mge_class="ime",
+                      machinery_gap_bp=100)
+    kept, audit = ci.resolve_nested_calls("S1", [ice, ime], window_bp=15000)
+
+    assert len(kept) == 2
+    assert audit == []
+
+
+def test_overlapping_calls_that_do_not_nest_are_both_kept():
+    """Partial overlap is not containment. Two calls that merely share some bases
+    are two findings with a shared neighbourhood, and both are reported - the
+    rule is deliberately narrow."""
+    left = nesting_row("c1|ime-1000:50000", "c1", 1000, 50000)
+    right = nesting_row("c1|ime-40000:90000", "c1", 40000, 90000)
+    kept, audit = ci.resolve_nested_calls("S1", [left, right], window_bp=15000)
+
+    assert len(kept) == 2
+    assert audit == []
+
+
+def test_nested_calls_on_different_contigs_are_never_compared():
+    """Two contigs are two pieces of DNA. Coordinates on one say nothing about
+    the other, so a call at 40000-50000 on contig_2 is not 'inside' anything on
+    contig_1."""
+    outer = nesting_row("c1|ime-1000:90000", "contig_1", 1000, 90000,
+                        machinery_gap_bp=70000)
+    inner = nesting_row("c2|ime-40000:50000", "contig_2", 40000, 50000,
+                        machinery_gap_bp=100)
+    kept, audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+
+    assert len(kept) == 2
+    assert audit == []
+
+
+def test_a_chain_of_three_nested_calls_collapses_to_one():
+    """A ⊃ B ⊃ C is still one locus described three times.
+
+    Resolved one pair at a time, so the ladder never has to reason about three
+    calls at once. Here only the innermost has an att pair, so it is what stands.
+    """
+    a = nesting_row("c1|ime-1000:90000", "c1", 1000, 90000, machinery_gap_bp=70000)
+    b = nesting_row("c1|ime-30000:60000", "c1", 30000, 60000, machinery_gap_bp=20000)
+    c = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000,
+                    boundary_method="tRNA", machinery_gap_bp=100)
+    kept, audit = ci.resolve_nested_calls("S1", [a, b, c], window_bp=15000)
+
+    assert [row["mge_id"] for row in kept] == ["c1|ime-40000:50000"]
+    assert len(audit) == 2
+
+
+def test_machinery_gap_bp_measures_the_widest_hole_in_the_machinery(tmp_path):
+    """The column the nesting rule reads: the biggest anchor-free stretch inside
+    a call. Small for a real operon however long the element is; large only when
+    the interval was stitched from distant blocks."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+    _return_code, rows, _audit, _ = run_main(tmp_path, conjscan, gff)
+
+    assert len(rows) == 1
+    # SCENE_CDS anchors: 50000-51200, 55000-56600, 57000-58700, 63000-65500.
+    # The widest hole is between the coupling protein and VirB4: 63000-58700-1.
+    # Every gap here is small - this is one operon, which is the point.
+    assert rows[0]["machinery_gap_bp"] == "4299"
