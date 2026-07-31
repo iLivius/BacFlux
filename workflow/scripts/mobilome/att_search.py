@@ -72,16 +72,24 @@ import argparse
 import csv
 import math
 import os
+import re
 import sys
 
 
 # ── Tunables ────────────────────────────────────────────────────────────────
 
-# How far beyond the machinery span to look for the element's real ends. An ICE
-# is usually a good deal larger than its tra cluster, but not unboundedly so;
-# 30 kb each side comfortably covers the realistic range while keeping the k-mer
-# index small enough to be instant.
-DEFAULT_FLANK_WINDOW_BP = 30_000
+# How far beyond the machinery span to look for the element's real ends.
+#
+# 50 kb rather than the original 30 kb, measured: on SPI-7 (AL513382) the correct
+# attR sits in tRNA-Phe 5,800 bp OUTSIDE a 30 kb window, so the element was
+# reported 50 kb short for want of somewhere to look. Widening to 50 kb recovers
+# it. Going further does not help - 80 kb, 120 kb and 200 kb windows change no
+# element's answer on the benchmark - so this is the point where the curve flattens
+# rather than an arbitrary larger number.
+#
+# The cost of a wider window is more candidate repeats to rank, which is why the
+# ranking rule in search_trna_anchored matters more at 50 kb than it did at 30.
+DEFAULT_FLANK_WINDOW_BP = 50_000
 
 # Length of the probe taken from a tRNA's 3' end in Mode A. att sites are
 # typically 15-25 bp, so 25 is the long end: long enough to be specific in a
@@ -423,6 +431,62 @@ def search_trna_anchored(sequence, element_start, element_end, trnas,
         trna_end=trna["end"],
         repeat_orientation=orientation,
     )
+
+
+def trna_covering(copy, trnas):
+    """Which annotated tRNA gene, if any, does this att copy sit inside?
+
+    Same test as overlaps_any_trna but returns the FEATURE rather than a boolean,
+    because the caller needs to know which amino acid the tRNA carries - see
+    same_trna_species below for why that distinction matters.
+    """
+    start, end = copy[0], copy[1]
+    for trna in trnas:
+        if start <= trna["end"] and end >= trna["start"]:
+            return trna
+    return None
+
+
+def trna_species(trna):
+    """The amino acid a tRNA carries: 'tRNA-Phe(gaa)' -> 'phe'.
+
+    Bakta writes tRNA products as tRNA-<AminoAcid>(<anticodon>). Only the amino
+    acid is taken, so the several anticodons of one amino acid count as the same
+    species - they are the paralogues the guard below is aimed at.
+    Returns '' when the product cannot be parsed, which makes the caller fall back
+    to the old, stricter behaviour rather than guessing.
+    """
+    if not trna:
+        return ""
+    match = re.search(r"tRNA[-_ ]([A-Za-z]{3})", trna.get("name", ""))
+    return match.group(1).lower() if match else ""
+
+
+def same_trna_species(left_trna, right_trna):
+    """True when both att copies sit in tRNAs carrying the SAME amino acid.
+
+    THE DISTINCTION THIS DRAWS, and why it was worth adding. The guard in
+    search_trna_anchored rejects a repeat whose two copies both sit inside tRNA
+    genes, on the reasoning that those are two paralogous copies of one tRNA
+    rather than the scar of an integration event. That reasoning is sound for
+    paralogues and WRONG for anything else, because a genome's tRNA genes are not
+    all copies of each other.
+
+    Measured on ICEEc2 (GU725392): its real 22 bp att pair sits in tRNA-Phe at
+    one end and tRNA-Ser at the other - two DIFFERENT tRNA species, so not
+    paralogues at all. The blanket rule threw the correct boundary away, and the
+    element was reported 37 kb short of its true extent. Requiring the SAME amino
+    acid keeps the guard's power against real paralogues while letting an element
+    that integrated between two unlike tRNAs through.
+
+    When either product cannot be parsed the answer is True, which reproduces the
+    old behaviour: an unparseable name is not evidence that the two differ.
+    """
+    left_species = trna_species(left_trna)
+    right_species = trna_species(right_trna)
+    if not left_species or not right_species:
+        return True
+    return left_species == right_species
 
 
 def overlaps_any_trna(copy, trnas):
@@ -918,10 +982,14 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
         if not (min_element_bp <= element_length <= max_element_bp):
             continue
 
-        left_in_trna = overlaps_any_trna((left_start, left_end, 0), trnas)
-        right_in_trna = overlaps_any_trna((right_start, right_end, 0), trnas)
-        # Two paralogous tRNAs are not an integration scar - see the note above.
-        if left_in_trna and right_in_trna:
+        left_trna = trna_covering((left_start, left_end, 0), trnas)
+        right_trna = trna_covering((right_start, right_end, 0), trnas)
+        left_in_trna = left_trna is not None
+        right_in_trna = right_trna is not None
+        # Two copies of the SAME tRNA are paralogues, not an integration scar.
+        # Two copies in DIFFERENT tRNA species are a real possibility and used to
+        # be discarded here - see same_trna_species for the ICEEc2 measurement.
+        if left_in_trna and right_in_trna and same_trna_species(left_trna, right_trna):
             continue
 
         kmer = sequence[left_start - 1:left_end]
@@ -950,14 +1018,30 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
             continue
 
         anchored = left_in_trna or right_in_trna
-        # The bonus is deliberately modest: it should break ties between repeats
-        # of comparable length, not let a marginal 15 bp repeat at a tRNA beat a
-        # convincing 40 bp one elsewhere.
         score = length + (TRNA_ANCHOR_BONUS_BP if anchored else 0)
 
+        # RANK BY ANCHORING FIRST, THEN BY LENGTH.
+        #
+        # This used to rank on score alone, with tRNA anchoring worth a modest
+        # bonus so that it "broke ties between repeats of comparable length". That
+        # is the wrong ordering, because the two properties are not comparable
+        # quantities. Repeat length says how unlikely the match is by chance;
+        # sitting at a tRNA 3' end says the match is where integration actually
+        # happens. The second is evidence about the biology, the first is only
+        # evidence against coincidence.
+        #
+        # Measured on SPI-7 (AL513382): a 51 bp repeat in ordinary sequence beat
+        # the real 24 bp att pair at tRNA-Phe, and the element came out 50 kb
+        # short. Under this ordering the tRNA-anchored pair wins and the call
+        # lands on the curated interval.
+        #
+        # Length still decides among anchored candidates, and among unanchored
+        # ones - it is only no longer allowed to outvote the anchor itself.
         candidate = (score, length, anchored, left_start, left_end,
                      right_start, right_end, kmer)
-        if best is None or candidate[:2] > best[:2]:
+        ranking = (anchored, score, length)
+        best_ranking = (best[2], best[0], best[1]) if best else None
+        if best is None or ranking > best_ranking:
             best = candidate
 
     if best is None:

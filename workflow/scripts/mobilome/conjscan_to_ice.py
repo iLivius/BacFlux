@@ -3029,6 +3029,46 @@ def resolve_nested_calls(sample, rows, window_bp):
                 continue
             if outer["contig"] != inner["contig"]:
                 continue
+
+            # IDENTICAL intervals are one locus reported twice, whatever the two
+            # calls were classed as - a different situation from one element
+            # nested inside another, and it has to be caught before the
+            # same-class test below lets a cross-class pair through.
+            #
+            # It appears when two machinery clusters resolve onto the SAME att
+            # pair: both are widened to the element the repeats define, and the
+            # result is two rows with identical coordinates. Measured on ICEEc2
+            # (GU725392) once the att search was fixed - an `ime` row and an `ice`
+            # row, both 27-92263. Left alone, score.py's tie-break reported the
+            # `ime`, i.e. tier 5 for an element we had correctly identified as a
+            # tier-6 ICE.
+            #
+            # The one kept is the one resting on more independent anchor classes,
+            # because that is what separates a full conjugation system from a
+            # fragment of one that happens to share its boundaries.
+            if (outer["start"] == inner["start"] and outer["end"] == inner["end"]
+                    and outer_position < inner_position):
+                outer_classes = _int_or_none(outer.get("n_anchor_classes")) or 0
+                inner_classes = _int_or_none(inner.get("n_anchor_classes")) or 0
+                if outer_classes >= inner_classes:
+                    winner_position, loser_position = outer_position, inner_position
+                else:
+                    winner_position, loser_position = inner_position, outer_position
+                winner, loser = rows[winner_position], rows[loser_position]
+                suppressed.add(loser_position)
+                audit_rows.append(audit_row(
+                    sample, "dropped", "identical_interval_reported_twice",
+                    f"{loser['mge_id']} and {winner['mge_id']} span exactly the same "
+                    f"interval on {outer['contig']}: two machinery clusters resolved "
+                    "onto the same att pair, so one locus was being reported twice. "
+                    f"Kept {winner['mge_id']}, which rests on "
+                    f"{max(outer_classes, inner_classes)} anchor class(es) against "
+                    f"{min(outer_classes, inner_classes)}. Anchors of the suppressed "
+                    f"call: {loser['anchor_ids']}.",
+                    contig=loser["contig"], start=loser["start"], end=loser["end"],
+                ))
+                continue
+
             if outer["mge_class"] != inner["mge_class"]:
                 continue
             if not contains(outer, inner):

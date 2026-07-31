@@ -562,3 +562,67 @@ def test_a_trna_derived_repeat_survives_its_own_paralogues():
         trnas=trnas, min_element_bp=8_000, flank_window_bp=30_000)
 
     assert result["boundary_method"] == "tRNA"
+
+
+def test_two_different_trna_species_can_still_bracket_an_element():
+    """An element that landed between UNLIKE tRNAs is not a paralogue pair.
+
+    The guard above rejects a repeat whose two copies both sit in tRNA genes,
+    because two copies of the SAME tRNA are paralogues rather than an integration
+    scar. That reasoning does not extend to two DIFFERENT tRNAs: a genome's tRNA
+    genes are not all copies of each other.
+
+    Measured on ICEEc2 (GU725392), where the real 22 bp att pair sits in tRNA-Phe
+    at one end and tRNA-Ser at the other. The blanket rule discarded the correct
+    boundary and the element was reported 37 kb short of its true extent - even
+    though the right pair was in the candidate list and outscored the winner.
+    """
+    sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000, length=200_000, seed=505)
+    unlike_trnas = [
+        trna_feature("contig_1", 29_952, 30_024, "+", name="tRNA-Phe(gaa)"),
+        trna_feature("contig_1", 84_952, 85_024, "+", name="tRNA-Ser(gct)"),
+    ]
+
+    result = att.find_att_sites(
+        sequence, element_start=50_000, element_end=60_000,
+        trnas=unlike_trnas, min_element_bp=8_000, flank_window_bp=30_000)
+
+    assert result["boundary_method"] == "tRNA"
+
+
+def test_an_unparseable_trna_product_keeps_the_stricter_old_behaviour():
+    """A tRNA whose product cannot be read must not be assumed to differ.
+
+    same_trna_species answers True when either name is unparseable, so the pair
+    is still rejected. Guessing the other way would let an unnamed feature open
+    the guard that exists to keep paralogues out.
+    """
+    sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000, length=200_000, seed=505)
+    unnamed = [
+        trna_feature("contig_1", 29_952, 30_024, "+", name="tRNA"),
+        trna_feature("contig_1", 84_952, 85_024, "+", name="tRNA"),
+    ]
+
+    result = att.find_att_sites(
+        sequence, element_start=50_000, element_end=60_000,
+        trnas=unnamed, min_element_bp=8_000, flank_window_bp=30_000)
+
+    assert result["boundary_method"] != "tRNA"
+
+
+def test_a_trna_anchored_pair_beats_a_longer_unanchored_one():
+    """Anchoring outranks length, because they are not the same kind of evidence.
+
+    Repeat length says how unlikely a match is by chance; sitting at a tRNA 3' end
+    says the match is where integration actually happens. Ranking on length alone
+    let a 51 bp repeat in ordinary sequence beat the real 24 bp att pair at
+    tRNA-Phe on SPI-7 (AL513382), and the element came out 50 kb short.
+    """
+    assert att.trna_species({"name": "tRNA-Phe(gaa)"}) == "phe"
+    assert att.trna_species({"name": "tRNA-Ser(gct)"}) == "ser"
+    assert att.trna_species({"name": "tRNA"}) == ""
+    # Unlike species do not trip the paralogue guard; like species do.
+    assert not att.same_trna_species({"name": "tRNA-Phe(gaa)"}, {"name": "tRNA-Ser(gct)"})
+    assert att.same_trna_species({"name": "tRNA-Gly(gcc)"}, {"name": "tRNA-Gly(tcc)"})
+    # An unreadable product falls back to "treat as the same", the safer answer.
+    assert att.same_trna_species({"name": "tRNA"}, {"name": "tRNA-Ser(gct)"})

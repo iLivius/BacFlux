@@ -2751,3 +2751,47 @@ def test_machinery_gap_bp_measures_the_widest_hole_in_the_machinery(tmp_path):
     # The widest hole is between the coupling protein and VirB4: 63000-58700-1.
     # Every gap here is small - this is one operon, which is the point.
     assert rows[0]["machinery_gap_bp"] == "4299"
+
+
+def test_two_calls_on_the_same_interval_collapse_to_the_better_evidenced_one():
+    """Identical coordinates are one locus reported twice, whatever the classes.
+
+    This appears when two machinery clusters resolve onto the SAME att pair: both
+    are widened to the element the repeats define, and two rows come out with the
+    same start and end. Measured on ICEEc2 (GU725392) once the att search was
+    fixed - an `ime` row and an `ice` row, both 27-92263. score.py's tie-break
+    then reported the `ime`, i.e. tier 5 for an element correctly identified as a
+    tier-6 ICE.
+
+    The same-class nesting rule cannot catch this: the classes differ, and the
+    intervals nest in neither direction because they are equal.
+    """
+    weak = nesting_row("c1|ime-27:92263", "c1", 27, 92263, machinery_gap_bp=100)
+    weak["mge_class"] = "ime"
+    weak["n_anchor_classes"] = "2"
+    strong = nesting_row("c1|ice-27:92263", "c1", 27, 92263, machinery_gap_bp=100)
+    strong["mge_class"] = "ice"
+    strong["n_anchor_classes"] = "4"
+
+    kept, audit = ci.resolve_nested_calls("S1", [weak, strong], window_bp=15000)
+
+    assert len(kept) == 1
+    assert kept[0]["mge_class"] == "ice"          # the better-evidenced call
+    assert "identical_interval_reported_twice" in [row["reason"] for row in audit]
+
+
+def test_an_ime_genuinely_inside_an_ice_is_not_collapsed():
+    """Cross-class nesting stays two findings - only EQUAL intervals collapse.
+
+    An IME sitting inside an ICE is two real elements, and the IME is the more
+    mobile finding. The identical-interval rule must not become a back door that
+    suppresses it.
+    """
+    ice = nesting_row("c1|ice-1000:90000", "c1", 1000, 90000, machinery_gap_bp=100)
+    ice["mge_class"] = "ice"
+    ime = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, machinery_gap_bp=100)
+    ime["mge_class"] = "ime"
+
+    kept, _audit = ci.resolve_nested_calls("S1", [ice, ime], window_bp=15000)
+
+    assert len(kept) == 2
