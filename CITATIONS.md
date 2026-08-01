@@ -90,16 +90,22 @@ Two sections, following the structure set out in
   use only. BacFlux does not ship these models; they are fetched at run time.*
 
 - **ICEscan models / ICEfinder2** — the optional second machinery model set
-  (`mobilome.icescan.run`, default off), which supplies the IME and AICE classes:
-  > Wang M, Goh Y-X, Tai C, Wang H, Deng Z, Ou H-Y. (2024)
+  (`mobilome.icescan.run`, default off), which supplies the IME and AICE classes.
+
+  **ICEscan has two parents, and both deserve the credit.** It is distributed with
+  **ICEfinder2** (Ou lab, Shanghai Jiao Tong University — the group behind
+  ICEberg), and it is itself a **fork of CONJScan 2.0.1** (Institut Pasteur /
+  CNRS): its own `metadata.yml` still identifies it as CONJScan. So cite **both**
+  when it is enabled — the ICEberg 3.0 paper below for the ICEfinder2 / ICEscan
+  distribution, and the three CONJScan references above for the models it derives
+  from:
+  > Wang M, Liu G, Liu M, Tai C, Deng Z, Song J, Ou H-Y. (2024)
   > *ICEberg 3.0: functional categorization and analysis of the integrative and
   > conjugative elements in bacteria.* Nucleic Acids Research 52(D1):D732–D737.
   > <https://doi.org/10.1093/nar/gkad935>
 
-  ICEscan is a **fork of CONJScan** by the same Institut Pasteur authors — its own
-  `metadata.yml` still identifies it as CONJScan 2.0.1 — so when it is enabled,
-  **cite the CONJScan references above as well**. Same CC BY-NC-SA 4.0 terms; also
-  not shipped. Rationale, measurements and limitations:
+  Licence: **CC BY-NC-SA 4.0**, the same terms as the CONJScan models it forks;
+  not shipped by BacFlux. Rationale, measurements and limitations:
   `docs/methods_icescan_union.md`.
 
 - **ICEberg 3.0** — element sequences and the curated ICE/IME coordinates used as

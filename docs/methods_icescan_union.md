@@ -10,6 +10,28 @@ Established 2026-07-30, on the 28-genome Phase 7 benchmark
 comparing two arms that differ **only** by whether the ICE caller was given
 `--icescan-tsv`.
 
+> ### ⚠ Read this before quoting any coordinate from this page
+>
+> This is a **controlled two-arm experiment**, and it answers exactly one
+> question: *what does adding ICEscan change?* Both arms were run on
+> **2026-07-30**, before commit `4a93d89` reworked the *att*-site search.
+>
+> **The arm comparison is still valid** — both arms used the same att search, so
+> the difference between them is unaffected, and that difference is what this
+> document is for.
+>
+> **The absolute per-element coordinates and ratios in §8 are superseded.**
+> `4a93d89` moved many of them substantially: ICE*Ec2*, for instance, is listed
+> below at 55,055 bp (ratio 0.59) and is now called at 92,237 bp (0.98); SPI-7 is
+> listed at 83,403 bp and is now 133,582 bp against a curated 133,500. Current
+> per-element numbers live in `results_final.tsv` and `ime_results_final.tsv` in
+> the benchmark tree, and the current headline figures are in the README's
+> Validation section and in `methods_ebi_comparison.md`.
+>
+> The tables in §8 are kept as they were measured rather than refreshed, because
+> refreshing one arm and not the other would destroy the comparison. Treat them as
+> a dated snapshot, not as the module's current output.
+
 **Short version.** ICEscan is not a second opinion — it is a fork of the tool we
 already run. We add it *alongside* CONJScan rather than in place of it, take only
 two things from it (integrase hits and the IME/AICE element classes), and
@@ -527,17 +549,40 @@ element", since ICEberg's curation is partial. The honest reading is an upper
 bound of **2 candidate false positives in 12 genomes, of which 0 are confirmed
 errors**.
 
-### Boundaries remain poor
+### Boundaries: measured before `4a93d89`, and again after
 
-About **one third** of elements get a direct repeat (35% in the union arm).
-The rest are reported unbounded, and their start and end are the outermost
-machinery genes, not the true edges of the element.
+> ⚠ **Superseded numbers, kept deliberately.** The two-arm comparison in this
+> document was run on 2026-07-30, *before* commit `4a93d89` reworked the *att*
+> search. The arm comparison itself is unaffected — it asks what ICEscan adds, and
+> both arms were measured with the same att search — but the absolute boundary
+> numbers it produced are no longer current. Both are given below, labelled.
 
-On the nine ICE pilot elements that are both detected and *chromosomal* (the only
-ones where boundary error is a meaningful question — see §10, "standalone"
-deposits), the median absolute offsets are **14,294 bp at the start and 34,239 bp
-at the end**, identical in both arms. That is the honest scale of the boundary
-problem: tens of kilobases. Read `boundary_method` before quoting any coordinate.
+**Before `4a93d89`.** About **one third** of detected elements got a direct
+repeat (6 of 18 in the CONJScan-only arm, 6 of 20 in the union arm). On the nine
+ICE pilot elements that are both detected and *chromosomal* (the only ones where
+boundary error is a meaningful question — see §10, "standalone" deposits), the
+median absolute offsets were **14,294 bp at the start and 34,239 bp at the end**,
+**identical in both arms** — which was this section's actual finding: ICEscan
+moved boundaries not at all.
+
+**After `4a93d89`.** Re-measured on the union arm, which is what ships
+(`results_final.tsv` / `ime_results_final.tsv`): **10 of the 20 detected curated
+elements (50%)** now carry an *att* pair, and across all calls the rate is
+**34 of 63 (54%)** on this 28-genome benchmark. The chromosomal median absolute
+offsets are **5,141 bp at the start and 14,912 bp at the end** — roughly a third
+and a half of the previous values.
+
+Two cautions on those newer figures. First, mind the denominator: 50% is over
+*detected curated elements*, 54% is over *all calls*, and the two are different
+questions. Second, the CONJScan-only arm has **not** been re-run since
+`4a93d89`, so the "identical in both arms" result above is established only for
+the older att search; it is likely but not measured that it still holds.
+
+Either way the shape of the problem is unchanged and worth stating plainly: half
+of all elements are still reported unbounded, their start and end being the
+outermost machinery genes rather than the true edges, and the residual error on
+the ones that are bounded is still measured in kilobases. Read `boundary_method`
+before quoting any coordinate.
 
 ### One benchmark entry is broken
 

@@ -72,31 +72,117 @@ att-site detection**. Existing benchmarks measure genomic-island *calling*, not
 *boundary* calling. Islander's paper admits only "the few false positives", with
 no number.
 
-This matters for writing up: our own measured **22% spurious de-novo boundary
-rate** (300 randomly placed non-ICE spans on the KPNIH1 chromosome, with the
-real IS mask applied) is better characterised than anything in the published
-literature, and can be stated as such.
+This matters for writing up: our own measured spurious de-novo boundary rate is
+better characterised than anything in the published literature, and can be stated
+as such. Measured on 300 randomly placed 15 kb non-ICE spans of a clinical
+*K. pneumoniae* chromosome, with the real IS mask applied: **22%** of them
+returned a confident de novo "boundary", falling to **16%** once the
+repeat-family guard was added, and to **~1%** reaching the AMR table once de novo
+repeats stopped being applied at all. Quote **16%** as the current de novo
+false-boundary rate — 22% is the *before* figure, and the two are easy to confuse
+because both appear in the code comments.
+
+*(The source comment in `att_search.py` names this chromosome "KPNIH1" and
+`mobilome_worked_example.md` attributes it to ATCC BAA-2146. Those are two
+different genomes — see the note in the worked example — and which one carried
+this particular measurement has not been re-established, so no strain is claimed
+here. The rate itself is unaffected either way.)*
+
+This is also why de novo repeats are **reported but not applied**: at a
+one-in-six error rate a de novo pair is a reasonable lead for a human to follow
+and an unacceptable basis for silently redefining an element, since widening an
+interval turns every gene inside it into predicted cargo. tRNA-anchored pairs
+*are* applied, because they start from a position integrases are known to target.
 
 ### What BacFlux does as a result
 
-Flank-vs-flank **BLASTN**, following DEPhT and DBSCAN-SWA:
+**Exact maximal repeats between the two flanks, computed in standard-library
+Python** — `vmatch -l N` semantics, which is what ICEfinder and ICEfinder2 use.
+The search is in `workflow/scripts/mobilome/att_search.py`
+(`find_maximal_repeats` / `search_maximal_repeat`).
 
-```
-blastn -query <left flank> -subject <right flank> -task blastn-short -dust no
-```
+> **Correction, 2026-07-31.** This section previously described a flank-vs-flank
+> `blastn -task blastn-short -dust no` call, following DEPhT and DBSCAN-SWA. That
+> was the design at the time of writing; it is **not** what shipped. Since commit
+> `9c05c3e` the search calls no external program at all. The reason is stated in
+> the code: `att_search.py` is stdlib-only and the Snakemake rule that calls it
+> has no conda environment of its own, so shelling out to `blastn` would make the
+> module depend on whatever happened to be on `PATH`. The BLAST recipe is
+> genuinely more sensitive — it absorbs mismatches and gaps, which an exact
+> repeat search cannot — so this is a deliberate trade of sensitivity for a
+> dependency-free rule, not an equivalence.
 
-- **`-task blastn-short`** — tuned for query lengths under ~50 bp
-  ([BLAST+ manual](https://www.ncbi.nlm.nih.gov/books/NBK279684/))
-- **`-dust no`** is load-bearing: DUST masking hides low-complexity att cores,
-  which are common
-- **minimum 15 bp**, matching ICEfinder2 and icefinder-opt; DBSCAN-SWA uses 12
-- ranked by **bitscore**, as DEPhT does
-- **tRNA proximity is a scoring bonus, not a separate mode** — the same shape as
-  DEPhT's integrase-proximity bonus, and as ICEfinder's division of labour
-  (tRNA locates, Vmatch delimits)
+> **Correction, 2026-07-31 (second pass).** Three further things in this section
+> had gone stale against commit `4a93d89`, and are fixed below rather than
+> quietly rewritten:
+> 1. the flank window is **50 kb**, not 30 kb — the bullets used 30 kb as their
+>    worked example throughout;
+> 2. the ranking test was described as "**exactly** one copy in a tRNA". The code
+>    tests *at least* one, which is not a detail: the paralogue guard that
+>    removes the both-in-a-tRNA case now only fires when the two tRNAs carry the
+>    **same amino acid**, so a genuine element sitting between two unlike tRNAs
+>    reaches the ranking with both copies anchored;
+> 3. "two 30 kb flanks share a 15 bp repeat by luck roughly six times over" was
+>    simply wrong arithmetic — the formula the code uses gives ~0.8 at 30 kb and
+>    ~2.3 at 50 kb. The conclusion it supported (a flat 15 bp floor is not safe
+>    on a large window) survives; the number did not.
+>
+> The licensing note at the end of this part needed the same treatment, for a
+> reason that matters more — see the correction there.
 
-No new dependency: NCBI BLAST+ is already a BacFlux dependency, is **public
-domain**, and carries no commercial restriction.
+How it works, and where each choice comes from:
+
+- **Exact maximal repeats**: index every *k*-mer of the left flank, find matches
+  in the right flank, then extend each match outwards for as long as the two
+  sequences agree. One pass returns the longest repeat, so nothing has to "step
+  the probe down".
+- **A 50 kb flank window each side** (`DEFAULT_FLANK_WINDOW_BP`), raised from
+  30 kb. Measured on SPI-7 (`AL513382`): the correct attR sits in a tRNA-Phe
+  5,800 bp *outside* a 30 kb window, so the element was reported 50 kb short for
+  want of anywhere to look. Widening to 50 kb recovers it, and 80 kb, 120 kb and
+  200 kb change no element's answer on the benchmark — so this is where the curve
+  flattens, not simply a bigger round number. The cost is more candidate repeats
+  to rank, which is why the ranking rule below matters more at 50 kb than at 30.
+- **Floor of 15 bp**, matching ICEfinder2 and icefinder-opt; DBSCAN-SWA uses 12,
+  so 15 is the more conservative of the two published choices. The floor actually
+  applied is the **larger** of 15 and a chance-match threshold computed from the
+  two window sizes: at 15 bp, two 50 kb flanks are expected to share **~2.3**
+  repeats by luck alone, so a flat 15 would report noise on any large window. At
+  the shipped 50 kb window this resolves to **18 bp** — as it also did at 30 kb,
+  so widening the window did not move the floor.
+  Note this threshold assumes DNA is a random string of four equally likely
+  letters, which real chromosomes are not; it is a floor against random
+  background, not a filter against repetitive sequence. The 16% figure above is
+  what happens when it is asked to do more than that.
+- **One search, not two modes.** tRNA proximity is a **ranking term inside the
+  single search**, not a separate search: every maximal repeat that brackets the
+  machinery is found first, and only then are they ranked. This follows
+  ICEfinder's division of labour — the tRNA *locates* a candidate site, the
+  repeat search *delimits* it — and DEPhT's treatment of integrase proximity as
+  one term among several rather than as a gate.
+- **Anchoring outranks length.** Candidates are ordered by whether *at least one*
+  copy sits inside an annotated tRNA **first**, and by repeat length only within
+  each group. The two are not comparable quantities: length says how unlikely the
+  match is by chance, a tRNA 3′ end says the match is where integration actually
+  happens. Measured on SPI-7 (`AL513382`), a 51 bp repeat in ordinary sequence
+  beat the real 24 bp *att* pair at tRNA-Phe and the element came out 50 kb short;
+  under this ordering the tRNA-anchored pair wins and the call lands on the
+  curated interval. (A small `TRNA_ANCHOR_BONUS_BP = 10` also exists in the score,
+  from the earlier tie-break design.)
+- **Both copies inside tRNAs of the *same amino acid* is rejected outright** —
+  that is two paralogous tRNA genes, not an integration scar. Two copies in
+  tRNAs of *different* amino acids is allowed, and the distinction is not
+  academic: ICE*Ec2* (`GU725392`) has its real 22 bp *att* pair in tRNA-Phe at
+  one end and tRNA-Ser at the other, and the earlier blanket rule threw that
+  boundary away, reporting the element 37 kb short. This is why the ordering
+  above tests "at least one copy in a tRNA" rather than "exactly one": by the
+  time ranking happens, the paralogue case has already been removed.
+- The label written to `boundary_method` is therefore an **outcome**, not a mode:
+  `tRNA` when the winning repeat has a copy in a tRNA, `denovo` when it does not,
+  `none` when nothing survived.
+
+**No new dependency, and no external program**: the search is pure Python
+standard library.
 
 ### Why not Vmatch
 
@@ -107,12 +193,65 @@ osx-64. The rejection stands for the other reason: the recipe declares
 verified — which under the project's §11 rule is still a blocker for an
 MIT-licensed workflow. The spec has been corrected to give the right reason.
 
+There is now also a **measured** reason, which matters more than the licence one.
+Because the search above already computes vmatch's own semantics, a second
+implementation was built on vmatch's actual data structure — prefix-doubling
+suffix array, Kasai LCP array, cross-flank MEM enumeration — and run against ours
+on every real flank window in the benchmark.
+
+The script is
+`BacFlux_v2_validation/phase7_benchmark/verify_att_equivalence.py`
+and it re-runs in about ten minutes. It does not generate windows of its own: it
+replays the actual caller (`conjscan_to_ice.py`) over the benchmark genomes with
+`find_maximal_repeats` wrapped in a recorder, so every window tested is one the
+pipeline genuinely searched — after IS masking, at the real element coordinates,
+at the real computed floor.
+
+**Result, re-run 2026-07-31 at commit `4a93d89`:** 52 benchmark genomes, 246 att
+searches, **180 distinct flank windows, 1,033 repeats, exact set equality on
+every window**. No window hit either implementation's internal cap. So the
+conclusion holds: **a vmatch-based search would find nothing that is not already
+found**, and the licence blocker costs no sensitivity.
+
+> **Correction, 2026-07-31.** The figure previously quoted here — "**35 of 35
+> windows, 122 repeats**" — **does not reproduce**, and it should not be cited.
+> The equality result reproduces and is now measured over roughly five times as
+> many windows, but the counts do not match under any scoping that could be
+> reconstructed: not all searches (246), not distinct windows (180), not the
+> 18-genome ICE pilot alone (137 searches / 98 windows), and not the subset of
+> windows that returned at least one repeat (142 and 62 respectively). Since the
+> original script was never kept, what it was run over cannot now be recovered —
+> which is exactly the failure mode that prompted retaining this one. Quote the
+> numbers above, which are reproducible by running the script.
+
+One tempting follow-up idea is disposed of by the same measurement: shipping both
+searches and treating their agreement as a confidence signal would be worthless.
+Two implementations of identical semantics are *expected* to agree exactly, so
+their agreement carries no information about whether a boundary is real. It tests
+the code, once, and that is all it is for.
+
 ### Licensing note
 
 ICEfinder2 is **CC BY-NC-SA 4.0**. Its source was read only to establish the
 algorithm and its parameters, which spec §11 explicitly permits. **No code was
-copied**, and none of the above requires it — the flank-vs-flank BLAST recipe
-comes from DEPhT and DBSCAN-SWA.
+copied.**
+
+> **Correction, 2026-07-31.** This paragraph used to end "*none of the above
+> requires it — the flank-vs-flank BLAST recipe comes from DEPhT and
+> DBSCAN-SWA*". That sentence was the licence argument, and it stopped being
+> true when the implementation changed: BacFlux no longer uses the DEPhT recipe,
+> it computes the same maximal exact repeats ICEfinder2 gets from Vmatch. So the
+> separation has to be stated properly rather than by pointing at a different
+> tool.
+
+What was taken from ICEfinder2 is **which algorithm to use and with what
+parameters** — maximal exact repeats between the flanks, floor 15 bp — and spec
+§11 is explicit that design decisions and thresholds are facts, not expression.
+The algorithm itself is not ICEfinder2's to license: maximal exact repeat search
+is standard published string processing (Vmatch, and REPuter before it), and
+`find_maximal_repeats` is an independent stdlib Python implementation written
+from that definition. Vmatch's own terms are a separate question and are the
+reason it is not installed — see above.
 
 ---
 
@@ -241,9 +380,11 @@ Flye never sees the plasmid
 
 This bites when a plasmid's best BLAST hit is a **different genus from the
 host** — which is not exotic, since plasmids cross genus boundaries constantly.
-On KPNIH1, `auto` mode dropped a genuine plasmid because *E. coli* database
-entries outnumbered *Klebsiella* ones 58,709 to 16,253: BLAST bestsum follows
-database composition, not biology.
+On *K. pneumoniae* **ATCC BAA-2146**, `auto` mode dropped a genuine plasmid —
+pMYS, `NZ_CP006660.1`, 2,014 bp — because *E. coli* database entries outnumbered
+*Klebsiella* ones 58,709 to 16,253: BLAST bestsum follows database composition,
+not biology. (This page previously attributed that run to KPNIH1; `NZ_CP006660.1`
+is a BAA-2146 replicon, and KPNIH1 is `CP008827.1`.)
 
 **It did not cause the TUM24772 loss** — that plasmid survived decontamination
 (verified: present in `contigs_filt.fasta`) and was lost purely to
