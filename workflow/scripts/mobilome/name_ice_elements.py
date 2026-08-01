@@ -20,10 +20,12 @@ WHY IT JOINS BY OVERLAP RATHER THAN BLASTING EACH ELEMENT
     its own FASTA, and it has a useful side effect: a curated ICE that overhangs
     our interval still shows up, and the overhang is reported. That matters
     because our interval is a FLOOR - the machinery span, not the element's true
-    ends, unless a tRNA-anchored att pair was found. On the KPNIH1 positive
-    control the ICE call runs 4,604,073-4,644,558 while ICEberg's record for the
-    same element runs 4,603,840-4,661,887: we under-call the right end by about
-    17 kb, and this script can say so instead of leaving the reader to guess.
+    ends, unless a tRNA-anchored att pair was found. On the K. pneumoniae
+    positive control (ATCC BAA-2146, CP006659.2) the ICE call runs
+    4,604,073-4,644,558 while ICEberg's record for the same element
+    (ICEKpnATCCBAA-2146-1) runs 4,603,840-4,661,887: we under-call the right end
+    by about 17 kb, and this script can say so instead of leaving the reader to
+    guess.
 
 A CAVEAT WORTH KNOWING
     ICEberg entries are derived from published genomes, so if the sample IS one
@@ -64,6 +66,12 @@ DEFAULT_MIN_IDENTITY = 80.0
 # At or above this fraction of the REFERENCE element present, the name is used
 # bare; below it the name is suffixed "-like", because what we have is clearly
 # related to the curated element but is not the whole of it.
+#
+# THIS IS THE ONLY THING THAT CONTROLS THE "-like" SUFFIX, and it is deliberately
+# NOT exposed on the command line - there is no --exact-name-coverage flag, so a
+# user who wants to change when a name is hedged has to edit this line. It is
+# named here so that grepping for "-like" or for this constant finds the one
+# place that decides it (applied in name_elements, below).
 EXACT_NAME_REFERENCE_COVERAGE = 0.80
 
 # Element types that can carry a curated ICEberg name. A conjugative_region has
@@ -165,8 +173,8 @@ def best_match_for_element(element_start, element_end, contig_hits,
     Why n_comparable matters: ICEs of one species are often near-identical across
     strains, so a single genuine element routinely matches a dozen ICEberg entries
     at ~100%. Reporting one name without saying that would imply a precision the
-    data does not have. On KPNIH1 the winning name beats six others that are all
-    within 0.01% identity.
+    data does not have. On the K. pneumoniae positive control the winning name
+    beats six others that are all within 0.01% identity.
     """
     element_length = element_end - element_start + 1
     if element_length <= 0:
@@ -235,6 +243,29 @@ def audit_row(sample, action, reason, detail, contig="NA", start="NA", end="NA")
 
 
 AUDIT_COLUMNS = ["sample", "contig", "start", "end", "action", "reason", "detail"]
+
+# EVERY `action` / `reason` PAIR THIS SCRIPT CAN WRITE. Nothing is ever dropped
+# from the ICE table here - this script only ADDS a name column - so there is no
+# "discarded" action. What the audit records is why an element did or did not get
+# a curated name.
+#
+#   action=named           a curated ICEberg name was applied to the element
+#     iceberg_match                 the detail line carries the identity, the
+#                                   overlap fraction and any comparable runners-up
+#
+#   action=kept_flagged    the element stays in the table with mge_name=NA
+#     no_curated_name_found         ICEberg was searched and nothing cleared the
+#                                   identity/overlap thresholds. Normal for a
+#                                   genuinely novel element, or a host genus
+#                                   ICEberg covers thinly.
+#
+#   action=not_applicable  naming was never attempted, for a stated reason
+#     no_ice_candidates             the ICE table was empty; nothing to name
+#     no_iceberg_hits               BLAST returned nothing against ICEberg
+#     element_type_not_nameable     the element is a type that must NOT carry an
+#                                   ICE name - a conjugative_region has no
+#                                   integrase and is deliberately not an ICE, so
+#                                   naming it would undo that distinction
 
 # Columns this script adds to the ICE table. mge_name already exists there (as
 # NA); the rest are the evidence behind whatever it now says.
@@ -309,7 +340,8 @@ def name_elements(sample, element_rows, hits,
         # actually INSIDE our element, not over the whole genome-wide HSP.
         #
         # The whole genome is blasted, so a curated element can match far beyond
-        # our interval - on KPNIH1 the ICEberg record runs 17.5 kb past our call.
+        # our interval - on the K. pneumoniae positive control the ICEberg record
+        # runs 17.5 kb past our call.
         # Judging "-like" on the full HSP therefore answers "how much of the
         # curated element exists anywhere on this contig?" when the question is
         # "how much of it is in the thing we are naming?". The first reading

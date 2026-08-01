@@ -208,6 +208,42 @@ def audit_row(sample, action, reason, detail, element="NA"):
 
 AUDIT_COLUMNS = ["sample", "element", "action", "reason", "detail"]
 
+# EVERY `action` / `reason` PAIR THIS SCRIPT CAN WRITE. `action` says what
+# happened, `reason` says why. Note that NOTHING here changes an AMR gene's
+# mobility tier - this whole leg is a QC measurement of how badly the assembler
+# collapsed the IS copies, reported alongside the located count.
+#
+#   action=discarded      an ISOSDB database entry was not counted as detected
+#     database_entry_not_fully_covered  less of the entry was covered by reads
+#                                       than --min-covered-percent requires, so
+#                                       it is not solid evidence the element is
+#                                       present
+#     depth_below_single_copy           read depth over the entry came out below
+#                                       one copy's worth, so it cannot support a
+#                                       copy-number estimate
+#
+#   action=not_applicable no estimate could be made, for a reason that is NOT a
+#                         failure - the located count simply stands on its own
+#     no_genome_baseline_depth          assembly depth could not be established,
+#                                       so there is no single-copy baseline to
+#                                       divide by. Nothing can be estimated.
+#     isosdb_does_not_cover_this_organism  ISOSDB has no entries matching this
+#                                       genome's IS at all
+#     family_absent_from_isosdb         this particular IS family is not in the
+#                                       database, so its collapse cannot be
+#                                       measured even though others can
+#     isosdb_detected_fewer_than_located  the read-mapping leg found FEWER copies
+#                                       than ISEScan located on the contigs. The
+#                                       delta is reported as NA rather than as a
+#                                       negative number, because a negative
+#                                       "collapse" is not meaningful - it means
+#                                       the database is the limiting factor here,
+#                                       not the assembly.
+#
+#   action=summary        one closing row per family, recording that an estimate
+#                         was made
+#     copy_number_estimate_complete
+
 SUMMARY_COLUMNS = [
     "sample", "is_family",
     "located_copies",          # what ISEScan found on the contigs

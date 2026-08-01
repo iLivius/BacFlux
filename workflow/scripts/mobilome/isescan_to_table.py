@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Turn ISEScan's raw output for ONE sample into the single tidy insertion-sequence
 (IS) table the rest of the mobilome module consumes, and compute the honest
-short-read QC signals that go with it (WP-C in docs/mobilome_module_SPEC.md §6).
+short-read QC signals that go with it ("work package C" - the IS-detection stage
+- in docs/mobilome_module_SPEC.md §6).
 
 WHY THIS EXISTS — the biology
     Insertion sequences are small mobile elements that copy themselves around a
@@ -40,8 +41,10 @@ WHERE THE INPUT COMES FROM
 WHAT THIS SCRIPT PRODUCES (and what consumes it)
     --out-table    one row per IS copy, normalised column names, 1-based inclusive
                    coordinates. This is the IS side of the AMR x MGE
-                   co-localisation step (WP-D), which will convert it to BED and
-                   intersect it with the AMRFinderPlus hits.
+                   co-localisation step (colocalise.py), which reads it straight
+                   in as a TSV and does its own interval arithmetic - despite what
+                   the spec's recipe suggests, no BED file and no bedtools are
+                   involved anywhere in this module.
     --out-summary  one row per sample: totals, complete vs partial, how many IS sit
                    within --boundary-bp of a contig end, and that fraction. This is
                    the QC metric the spec asks for; it travels with the report so a
@@ -61,10 +64,10 @@ COORDINATES
     ISEScan reports isBegin/isEnd as 1-based and inclusive of both ends. We keep
     them exactly as they are — NO conversion happens here — because 1-based
     inclusive is what Bakta, AMRFinderPlus and GFF all use, so every table in this
-    module joins without an off-by-one trap. Whoever writes the BED file for
-    bedtools downstream must subtract 1 from `start` there (BED is 0-based,
-    half-open); that conversion belongs in the BED writer, not here, so there is
-    exactly one place to check it.
+    module joins without an off-by-one trap. IF anyone ever adds a BED export (the
+    module does not have one today), they must subtract 1 from `start` there,
+    because BED is 0-based and half-open. That conversion belongs in the BED
+    writer, not here, so there stays exactly one place to check it.
 
 DEFENSIVE PARSING
     ISEScan's .tsv column NAMES were read from the v1.7.3 source, but this parser
@@ -221,9 +224,43 @@ AUDIT_COLUMNS = [
     "start",
     "end",
     "action",     # dropped | kept_flagged | input_missing | input_empty
-    "reason",     # short machine-readable token, see normalise_records and startup_audit_rows
+    "reason",     # short machine-readable token - the full list is below
     "detail",     # human-readable explanation + the offending raw line
 ]
+
+# EVERY `reason` TOKEN THIS SCRIPT CAN WRITE, so you can grep for one without
+# reading the source. `action` says what happened to the record, `reason` says
+# why. The two that matter most are marked.
+#
+#   action=dropped        the IS record was thrown away and is NOT in the table
+#     unexpected_field_count          the line did not have the expected number
+#                                     of columns - malformed ISEScan output
+#     missing_contig_id               no sequence identifier on the row
+#     unparseable_coordinates         isBegin/isEnd were not numbers
+#     invalid_coordinate_range        start > end, or a zero/negative coordinate
+#     below_min_length_bp             shorter than --min-length-bp
+#  ** contig_not_in_contig_lengths    the contig is missing from the lengths file,
+#                                     so distance-to-contig-end cannot be computed
+#                                     and the IS is dropped rather than reported
+#                                     without the honesty flag.
+#  ** coordinates_beyond_contig_length  the IS runs past the end of its own contig.
+#                                     Both of these ** reasons almost always mean
+#                                     ISEScan and the contig-lengths file were
+#                                     built from DIFFERENT assemblies. If either
+#                                     appears in quantity, that is a wiring bug to
+#                                     fix, not a property of the genome - the IS
+#                                     table will be silently short.
+#
+#   action=kept_flagged   the IS IS in the table, but something about it is
+#                         unreliable and the row says so
+#     unknown_isescan_type_value      ISEScan's c/p completeness column held
+#                                     something else; completeness reads NA
+#
+#   action=input_missing / input_empty   sample-level, written once. These two are
+#                         deliberately DIFFERENT: input_missing means ISEScan wrote
+#                         no results file (the run is why the table is empty),
+#                         input_empty means ISEScan ran and found no IS (the genome
+#                         is why). Never let the first look like the second.
 
 # Reporting convention, NOT biology: when more than this share of the located IS
 # sit at a contig end, the assembly broke at its repeats badly enough that the
@@ -872,9 +909,18 @@ def build_parser():
                         help="ISEScan results .tsv, OR the ISEScan --output directory.")
     parser.add_argument("--contig-lengths",
                         help="Two-column TSV (contig, length) for the same assembly.")
+    # NOTE: conjscan_to_ice.py also has a --boundary-bp, with a DIFFERENT default
+    # (1000) and a different job - it decides when a whole ICE/IME element is too
+    # close to a contig end and caps that element's confidence. This one asks the
+    # same question about a single IS copy and only sets a flag plus the summary
+    # fraction. Two knobs, same name, deliberately not linked; only this one is
+    # actually passed by the workflow (rule isescan_table).
     parser.add_argument("--boundary-bp", type=int, default=100,
                         help="An IS within this many bp of a contig end is flagged "
-                             "as sitting at a contig boundary (default: 100).")
+                             "as sitting at a contig boundary (default: 100). Not "
+                             "the same threshold as conjscan_to_ice.py's flag of "
+                             "the same name, which defaults to 1000 and applies to "
+                             "whole elements.")
     parser.add_argument("--min-length-bp", type=int, default=0,
                         help="Drop IS shorter than this, recording them in the audit "
                              "file. Default 0 = keep everything, because short calls "

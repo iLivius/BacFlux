@@ -175,20 +175,6 @@ def to_int(value, default=0):
         return default
 
 
-def subject_coverage(hit):
-    """What fraction of the REFERENCE element this alignment covers.
-
-    BLAST reports one HSP per line, and a real transposon hit is often split into
-    several HSPs by internal indels. Using a single HSP's length therefore
-    UNDERSTATES coverage - which is why merge_hits_per_element below sums the
-    covered subject span across HSPs before this threshold is applied.
-    """
-    slen = to_int(hit.get("slen"))
-    if slen <= 0:
-        return 0.0
-    return min(1.0, to_int(hit.get("length")) / slen)
-
-
 def weighted_identity(hsps):
     """Percent identity over a whole copy, weighted by how much each HSP covers.
 
@@ -234,7 +220,8 @@ def merge_span(intervals):
 # into one element spanning both of them PLUS the chromosome in between, and
 # every gene in that gap became tier-4 cargo.
 #
-# Measured on the KPNIH1 control: every genuine copy has a largest internal HSP
+# Measured on the K. pneumoniae positive control: every genuine copy has a
+# largest internal HSP
 # gap of <= 140 bp, because what separates the pieces of ONE copy is an indel or
 # a small internal insertion. The gaps that marked a wrongly merged pair were
 # thousands of bp. So the allowance is now sized to internal indels, which is
@@ -245,7 +232,8 @@ SAME_COPY_GAP_FLOOR_BP = 500
 # The fraction of the reported interval that must actually be ALIGNED to the
 # reference. This is the guard the span check below could never be.
 #
-# Real case from the KPNIH1 control. Tn3000 (3,235 bp) matched NZ_CP006662.2 with
+# Real case from the K. pneumoniae positive control (the accession below pins it
+# to ATCC BAA-2146). Tn3000 (3,235 bp) matched NZ_CP006662.2 with
 # two tiny terminal inverted-repeat HSPs (84 bp and 146 bp) at ~27,200 belonging
 # to a NEIGHBOURING element, plus the real copy at 29,785-32,882. The IRs pulled
 # the reported interval out to 27,185-32,882, and 2,454 bp of that 5,698 bp span
@@ -273,7 +261,7 @@ def cluster_hsps_by_position(group, reference_length):
     """Split HSPs against one reference element into separate COPIES.
 
     THE BUG THIS EXISTS TO PREVENT, because it is not hypothetical - it was found
-    on the KPNIH1 positive control before this script was ever wired in:
+    on the K. pneumoniae positive control before this script was ever wired in:
 
         Tn7246 (7,325 bp reference) hit the chromosome at ~3,544,000 and again at
         ~4,480,000. Taking min(qstart) and max(qend) over all HSPs merged those
@@ -320,10 +308,14 @@ def merge_hits_per_element(hits):
               copy's query span as its coordinates.
     Returns:  a list of merged candidate dicts, one per copy.
 
-    Why merge HSPs at all: without it, a 6 kb transposon split into three HSPs
-    looks like three separate 33%-coverage hits and is thrown out by the coverage
-    threshold, so the very elements most worth naming - the big, mosaic,
-    clinically interesting ones - would be the ones systematically missed.
+    Why merge HSPs at all: BLAST reports one HSP per line, and a real transposon
+    hit is usually broken into several by internal indels. Judging coverage on a
+    single HSP's length therefore UNDERSTATES it badly - a 6 kb transposon split
+    into three HSPs looks like three separate 33%-coverage hits and is thrown out
+    by the coverage threshold, so the very elements most worth naming (the big,
+    mosaic, clinically interesting ones) would be the ones systematically missed.
+    The `subject_coverage` column written further down is computed from the
+    MERGED span for exactly this reason.
 
     Why merge only WITHIN a copy: see cluster_hsps_by_position.
     """
@@ -446,6 +438,40 @@ ELEMENT_COLUMNS = [
 
 AUDIT_COLUMNS = ["sample", "contig", "start", "end", "action", "reason", "detail"]
 
+# EVERY `action` / `reason` PAIR THIS SCRIPT CAN WRITE. This is the layer that
+# unlocks mobility tier 4, so a missing name is the difference between "inside
+# TnX" and "just on a plasmid" - which is exactly why every refusal is recorded.
+#
+#   action=discarded       the BLAST hit did NOT become a named element
+#     blast_line_unparsable            a line had fewer columns than expected;
+#                                      means the file was truncated or the -outfmt
+#                                      in the rule drifted from BLAST_COLUMNS
+#     tncentral_name_not_recognised    the defline did not parse to a known kind
+#                                      of element (Tn.../In.../IS...)
+#     identity_below_naming_threshold  too diverged to carry the name
+#     reference_coverage_below_threshold  too little of the curated element is
+#                                      present. THE COMMON ONE - a fragment of a
+#                                      transposon is not that transposon, and this
+#                                      is why tier 4 is rarely reached in practice
+#     interval_mostly_unaligned        the reported interval is padded with DNA
+#                                      that does not align to the reference,
+#                                      usually via terminal inverted repeats
+#                                      shared with a neighbouring element
+#     element_span_implausible_for_reference  the interval is far longer than the
+#                                      reference element could account for
+#     nested_or_overlapping_tncentral_hit  a better hit already covers this span
+#
+#   action=not_applicable  nothing was attempted, for a stated reason
+#     no_tncentral_hits                BLAST found nothing. A normal result: most
+#                                      genomes carry no characterised transposon
+#     tncentral_hit_is_a_plain_is      the hit is an insertion sequence, which by
+#                                      definition carries no passenger gene, so it
+#                                      cannot put an AMR gene inside a named
+#                                      element. ISEScan already inventories these
+#
+#   action=summary         one closing row recording the thresholds actually used
+#     tncentral_naming_complete
+
 
 def build_elements(sample, hits, min_identity, min_coverage, skipped_lines=None):
     """Turn BLAST hits into named element rows, auditing everything dropped.
@@ -521,7 +547,7 @@ def build_elements(sample, hits, min_identity, min_coverage, skipped_lines=None)
         # are shared between related transposons, so short IR hits belonging to a
         # NEIGHBOURING element cluster with the real copy and drag the reported
         # interval across DNA that has nothing to do with this transposon. On the
-        # KPNIH1 control that put 2,454 bp of an unrelated IS66 element inside a
+        # control run that put 2,454 bp of an unrelated IS66 element inside a
         # "Tn3000" interval - and colocalise.py would call any AMR gene in there
         # cargo of Tn3000, at high confidence, with no audit line to explain it.
         # Neither the identity, coverage nor span checks can see this: the

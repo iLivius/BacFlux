@@ -54,7 +54,12 @@ def build_contig_with_att(att_motif, left_position, right_position,
 ATT_MOTIF = "GGCTCGAACCCAGGACCTCTTGCAT"
 
 
-# ── Mode B: de novo direct repeats ──────────────────────────────────────────
+# ── Repeats with no tRNA involved: boundary_method='denovo' ─────────────────
+#
+# These tests pass no tRNAs at all, so no candidate can be tRNA-anchored and
+# every call the search makes is labelled 'denovo'. That is the weaker of the two
+# labels and conjscan_to_ice.py refuses to move an element's coordinates onto it,
+# but the search still has to find the right repeat at the right offsets.
 
 def test_denovo_finds_a_planted_direct_repeat_at_the_exact_offsets():
     """The core case: two copies of one motif bracketing the machinery."""
@@ -112,8 +117,9 @@ def test_denovo_respects_the_element_size_bounds():
 
 
 def test_denovo_prefers_the_longest_repeat():
-    """k counts down from 25, so a 25 bp match wins over a 12 bp one. A long
-    exact match between two specific windows is far less likely by chance."""
+    """Among unanchored candidates the longest repeat wins: a 25 bp match beats a
+    12 bp one, because a long exact match between two specific windows is far
+    less likely to have happened by chance."""
     sequence = random_sequence(80_000, seed=5)
     # A short repeat, and a longer one, both bracketing the machinery.
     short_motif = "ACGTACGTACGT"                       # 12 bp
@@ -176,7 +182,7 @@ def test_masking_is_clamped_to_the_sequence():
     assert masked.endswith("NNN")
 
 
-# ── Mode A: tRNA-anchored ───────────────────────────────────────────────────
+# ── Repeats sitting in a tRNA: boundary_method='tRNA' ───────────────────────
 
 def trna_feature(contig, start, end, strand, name="tRNA-Gly(gcc)"):
     return {"contig": contig, "start": start, "end": end,
@@ -184,12 +190,13 @@ def trna_feature(contig, start, end, strand, name="tRNA-Gly(gcc)"):
 
 
 def test_trna_anchored_search_is_preferred_over_denovo():
-    """When a tRNA 3' end brackets the element, that answer wins.
+    """When a repeat sits in a tRNA 3' end, that answer wins - even if a longer
+    unanchored repeat is available.
 
-    Mode A tested a prediction made in advance from the biology (ICEs integrate
-    at tRNA 3' ends); Mode B merely found the best available repeat. So even
-    though a de novo repeat is also present here, the tRNA hit must be returned
-    and the method reported as 'tRNA'.
+    This is the ranking rule the search turns on: a repeat at a tRNA is where
+    integration actually happens, while a longer repeat elsewhere is only less
+    likely to be coincidence. So the tRNA hit must be returned and the method
+    reported as 'tRNA', which is the only label conjscan_to_ice.py acts on.
     """
     sequence = random_sequence(80_000, seed=7)
 
@@ -214,28 +221,13 @@ def test_trna_anchored_search_is_preferred_over_denovo():
     assert result["att_left"].startswith(str(trna_end - 24))
 
 
-def test_trna_probe_is_strand_aware():
-    """A minus-strand tRNA's 3' end is at its LOWER coordinate, and the probe
-    must be reverse-complemented to be read in the gene's own direction.
-
-    Getting this wrong would search for a sequence that is simply not present,
-    so the test checks the probe itself rather than only the end result.
-    """
-    sequence = random_sequence(2_000, seed=8)
-    motif = "AAAACCCCGGGGTTTTAAAACCCCG"          # 25 bp
-    # Plant the motif at the START of the gene; for a '-' strand gene that IS
-    # the 3' end, and the probe should come back as its reverse complement.
-    sequence = plant(sequence, 1_000, motif)
-
-    minus_strand = trna_feature("c1", 1_000, 1_075, "-")
-    probe = att.trna_three_prime_probe(sequence, minus_strand)
-    assert probe == att.reverse_complement(motif)
-
-    # The same gene on the + strand takes its probe from the far end instead.
-    plus_strand = trna_feature("c1", 1_000, 1_075, "+")
-    plus_probe = att.trna_three_prime_probe(sequence, plus_strand)
-    assert plus_probe == sequence[1_075 - 25:1_075]
-
+# THE NEXT TWO ARE DELIBERATELY RETIRED, not broken - note the `_retired_`
+# prefix, which stops pytest collecting them. They pinned the OLD mismatch-
+# tolerant probe, which allowed attL and attR to differ by one base. The search
+# is exact now (maximal repeats are grown only while the flanks agree base for
+# base), so both would fail. They are kept as the record of what the module used
+# to promise; what replaced them is the exact-match pair further down, under
+# "The exact-match contract". Do not "fix" them - delete them or leave them.
 
 def _retired_test_trna_anchored_tolerates_a_single_mismatch():
     """attL and attR often differ by one base, because only the copy that
@@ -304,22 +296,6 @@ def test_reversed_coordinates_are_tolerated():
     reversed_pair = att.find_att_sites(sequence, 40_000, 30_000, min_element_bp=8_000)
     assert forward["att_left"] == reversed_pair["att_left"]
     assert forward["att_right"] == reversed_pair["att_right"]
-
-
-def test_count_mismatches_gives_up_once_over_budget():
-    """The comparison short-circuits, and N never counts as a match."""
-    assert att.count_mismatches("ACGT", "ACGT", 1) == 0
-    assert att.count_mismatches("ACGT", "ACGA", 1) == 1
-    assert att.count_mismatches("ACGT", "TGCA", 1) > 1
-    # N is ambiguous, so it can never satisfy a match even against itself.
-    assert att.count_mismatches("ANGT", "ANGT", 1) >= 1
-
-
-def test_a_probe_drawn_from_masked_sequence_is_refused():
-    """If the probe itself contains N there is nothing to prove, so no
-    occurrences may be reported."""
-    sequence = "ACGT" * 100
-    assert att.find_probe_occurrences(sequence, "ACNT", 1, len(sequence)) == []
 
 
 # ── FASTA and GFF3 readers ──────────────────────────────────────────────────
@@ -410,7 +386,8 @@ def test_random_sequence_yields_no_boundaries_at_several_window_sizes():
 #
 # The tests above use i.i.d. uniform random DNA, which is exactly the assumption
 # the de novo chance model makes - so they can only ever confirm that model, never
-# challenge it. Measured on the KPNIH1 chromosome, 300 randomly placed non-ICE
+# challenge it. Measured on the K. pneumoniae positive-control chromosome, 300
+# randomly placed non-ICE
 # spans produced a confident "denovo" boundary 22% of the time, against the ~1.3%
 # the model predicts. The difference is not noise: it is the repetitive structure
 # that every real chromosome has and random DNA does not.
@@ -420,7 +397,8 @@ def test_random_sequence_yields_no_boundaries_at_several_window_sizes():
 def test_a_dispersed_repeat_family_is_not_an_att_site():
     """An rRNA-operon-like repeat, present many times, must not become a boundary.
 
-    This is the KPNIH1 false positive in miniature. A 25 bp stretch of 16S rRNA
+    This is that control's false positive in miniature. A 25 bp stretch of 16S
+    rRNA
     satisfies every length threshold and genuinely IS an exact direct repeat
     shared by the two flanks - but the cell carries seven rRNA operons, so the
     sequence occurs seven times. An integration scar occurs exactly twice, which
@@ -458,10 +436,11 @@ def test_a_repeat_present_exactly_twice_is_still_accepted():
 def test_two_paralogous_trnas_are_not_an_att_pair():
     """Isoacceptor tRNAs share their 3' ends, and a genome carries dozens.
 
-    Mode A builds its probe FROM a tRNA 3' end, so a second tRNA of the same
-    species is guaranteed to match it - producing a beautifully bracketing pair
-    that is labelled 'tRNA', the method this module treats as its most precise.
-    Nine such pairs turned up in 300 random spans of the KPNIH1 chromosome.
+    Two paralogous tRNA genes share their 3' ends by definition, so a repeat
+    found in one is guaranteed to be found in the other - producing a beautifully
+    bracketing pair that gets labelled 'tRNA', the method this module treats as
+    its most precise. Nine such pairs turned up in 300 random spans of the
+    K. pneumoniae positive-control chromosome.
 
     Real integration reconstitutes the host tRNA at ONE end and leaves the second
     copy out in ordinary sequence, so exactly one copy may sit in a tRNA.

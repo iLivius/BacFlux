@@ -1050,6 +1050,58 @@ def test_isescan_native_column_names_are_accepted(tmp_path):
     assert [element["complete"] for element in elements] == ["complete", "partial"]
     # No element_type column -> everything is an insertion sequence.
     assert {element["element_type"] for element in elements} == {"insertion_sequence"}
+    # ...and the parser records that the column was absent, so main() can audit it.
+    assert all(not element["element_type_column_present"] for element in elements)
+
+
+def test_a_table_with_no_element_type_column_is_audited(tmp_path):
+    """Reading a whole table as insertion sequences is an assumption, not a fact,
+    so it must leave a trace in the audit file.
+
+    This is the documented default that lets a hand-trimmed contig/start/end
+    table still run. It cannot fire in the shipped workflow - every table the
+    rule passes to --is-table carries a type column - but if someone points the
+    script at their own file, the audit has to say that any transposon, integron
+    or ICE rows in it were demoted to plain IS.
+    """
+    amr_path = write_tsv(tmp_path / "amr.tsv", AMRFINDER_HEADER, [amr_row()])
+    # A minimal element table: coordinates only, no type column of any spelling.
+    bare_path = write_tsv(tmp_path / "bare.tsv", ["contig", "start", "end"],
+                          [["contig_1", "8000", "9000"],
+                           ["contig_1", "12000", "13000"]])
+    length_path = write_tsv(tmp_path / "lengths.tsv", LENGTH_HEADER,
+                            [["contig_1", "50000"]])
+    replicon_path = write_tsv(tmp_path / "replicons.tsv", REPLICON_HEADER,
+                              [["contig_1", "chromosome", "contig_1", "NA", "NA"]])
+    co.main([
+        "--sample", "sampleA",
+        "--amrfinder", amr_path,
+        "--is-table", bare_path,
+        "--replicons", replicon_path,
+        "--contig-lengths", length_path,
+        "--out-table", str(tmp_path / "mobility.tsv"),
+        "--out-audit", str(tmp_path / "audit.tsv"),
+    ])
+    audit = read_tsv(str(tmp_path / "audit.tsv"))
+
+    assumed = [row for row in audit if row["decision"] == "input_assumed"]
+    assert len(assumed) == 1
+    assert assumed[0]["reason"] == "no_element_type_column"
+    # The detail names the file and says how many rows were affected.
+    assert "bare.tsv" in assumed[0]["detail"]
+    assert "all 2 of its rows" in assumed[0]["detail"]
+
+
+def test_a_table_that_has_an_element_type_column_is_not_audited_as_assumed(tmp_path):
+    """The counterpart: the normal case must stay quiet, or the audit fills with
+    a line that says nothing on every real run."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row()],
+        is_rows=[is_row(start=8000, end=9000)],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+    )
+    assert not [row for row in audit if row["decision"] == "input_assumed"]
 
 
 def test_contig_lengths_accept_a_headerless_samtools_fai(tmp_path):

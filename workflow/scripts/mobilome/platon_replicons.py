@@ -37,6 +37,19 @@ WHAT IT PRODUCES
     most misleading mistake this module could make. So this script lists EVERY
     contig it can see, and says `unknown` honestly when Platon did not classify
     one.
+
+WHY THERE IS NO --out-audit HERE, WHEN EVERY OTHER SCRIPT IN THIS MODULE HAS ONE
+    The project rule is that every filtering decision is auditable with a stated
+    reason. This script honours that rule in a COLUMN rather than in a separate
+    file, and the reason is that it filters nothing: it writes exactly one row per
+    contig it can see, and drops none. There is no discard list to explain.
+
+    What it does instead is REASON about each contig, and that reasoning is
+    written out per row in `mobility_evidence` (the Platon gene counts behind a
+    conjugative/mobilisable call) and `replicon_call_source` (which of Platon's
+    outputs the chromosome/plasmid call came from, including the
+    --min-chromosome-bp size rule). So the audit is the table itself. If this
+    script ever starts DROPPING contigs, it needs a real audit file at that point.
 """
 
 import argparse
@@ -388,8 +401,18 @@ def main(argv=None):
     parser.add_argument("--sample", required=True, help="Sample name (for messages).")
     parser.add_argument("--platon-dir", required=True,
                         help="Platon output directory for this sample.")
+    # NAMING NOTE, so nobody "tidies" these and breaks the rule that calls them.
+    # This script says --contigs where isescan_to_table.py says --genome-fasta and
+    # conjscan_to_ice.py/att_search.py say --genome, and it says --out where the
+    # others say --out-table. All of them are handed the same assembly FASTA and
+    # all write one table; the names simply drifted. They are left alone because
+    # renaming a flag silently breaks any command a colleague has saved, and the
+    # matching change in 80_mobilome.smk would have to land in the same edit.
     parser.add_argument("--prefix", required=True,
-                        help="Platon's file prefix (the input genome's basename).")
+                        help="Platon's file prefix. Both Platon and geNomad name "
+                             "every output file after their input's basename, so "
+                             "this is that basename - see the reconciliation in "
+                             "00_common.smk, which is where the value comes from.")
     parser.add_argument("--contigs", default="",
                         help="Assembly FASTA, so contigs Platon never mentioned "
                              "are still listed as 'unknown' rather than omitted.")
