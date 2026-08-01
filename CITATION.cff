@@ -1,0 +1,738 @@
+# Machine-readable citation metadata (Citation File Format 1.2.0).
+# GitHub and Zenodo read this file to generate a citation for BacFlux.
+#
+# TWO THINGS ARE DELIBERATELY LEFT FOR THE MAINTAINER TO FILL IN, because they
+# cannot be known before the release is actually tagged and archived:
+#
+#   1. date-released — the day v2.0.0 is tagged. Add it as `date-released: YYYY-MM-DD`
+#      just below `version:`.
+#   2. the VERSION DOI — Zenodo mints a new one for each release under the concept
+#      DOI recorded in `identifiers` below. Add it as a second entry of type `doi`
+#      once the release is archived.
+#
+# Also left out on purpose: an ORCID for the author (none was on file here), and
+# the v1 Zenodo record's co-authors — Großkinsky D. K., Koch H., Trognitz F.,
+# Sanchez Mejia A. and Nagel M. — who are credited on the 2024 record for
+# BacFlux v1. Whether they carry over to the v2.0.0 record is an authorship
+# decision, not a documentation one, so nothing has been assumed here.
+#
+# The `references` list below covers the tools BacFlux depends on. It is a
+# working subset: CITATIONS.md is the authoritative and complete list, and it
+# carries the licensing notes as well. Where a reference has a long author list,
+# only the first author is given and the entry says so in its `notes` field.
+
+cff-version: 1.2.0
+message: "If you use BacFlux, please cite it using the metadata in this file — and also cite the tools whose output you actually used (see CITATIONS.md)."
+title: "BacFlux: a unified Snakemake workflow for bacterial whole-genome sequencing"
+abstract: >-
+  BacFlux is an automated Snakemake workflow for bacterial whole-genome
+  sequencing data. Version 2.0.0 unifies four previously separate workflows into
+  one with four entry points — Illumina paired-end reads, Oxford Nanopore reads,
+  hybrid Illumina + Nanopore, and pre-assembled contigs — converging on a single
+  shared analysis spine: decontamination, assembly QC, completeness and
+  contamination, taxonomic placement, functional annotation, secondary
+  metabolites, CAZymes, antimicrobial resistance and virulence screening, plasmid
+  and prophage detection, and an aggregated report. An optional mobilome module
+  (off by default) reports, for each AMR gene, whether it sits in a mobile
+  genetic element and how transferable that element is predicted to be. Every
+  tool runs in its own conda environment.
+type: software
+version: 2.0.0
+license: MIT
+repository-code: "https://github.com/iLivius/BacFlux"
+url: "https://github.com/iLivius/BacFlux"
+
+authors:
+  - family-names: Antonielli
+    given-names: Livio
+    alias: iLivius
+
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.11143917
+    description: "Concept DOI — always resolves to the latest BacFlux release."
+
+keywords:
+  - bacterial genomics
+  - whole-genome sequencing
+  - Snakemake
+  - genome assembly
+  - genome annotation
+  - antimicrobial resistance
+  - mobile genetic elements
+  - insertion sequences
+  - integrative and conjugative elements
+  - plasmids
+  - Illumina
+  - Oxford Nanopore
+
+references:
+
+  # ── Workflow engine ────────────────────────────────────────────────────────
+  - type: article
+    title: "Sustainable data analysis with Snakemake"
+    authors:
+      - family-names: Mölder
+        given-names: Felix
+    year: 2021
+    journal: F1000Research
+    volume: 10
+    start: 33
+    doi: 10.12688/f1000research.29032.2
+    notes: "Snakemake. Author list abbreviated; full citation in CITATIONS.md."
+
+  # ── Assembly and polishing ─────────────────────────────────────────────────
+  - type: article
+    title: "SPAdes: a new genome assembly algorithm and its applications to single-cell sequencing"
+    authors:
+      - family-names: Bankevich
+        given-names: Anton
+    year: 2012
+    journal: "Journal of Computational Biology"
+    volume: 19
+    issue: 5
+    start: 455
+    end: 477
+    doi: 10.1089/cmb.2012.0021
+    notes: "SPAdes. Author list abbreviated; full citation in CITATIONS.md."
+
+  - type: article
+    title: "Assembly of long, error-prone reads using repeat graphs"
+    authors:
+      - family-names: Kolmogorov
+        given-names: Mikhail
+      - family-names: Yuan
+        given-names: Jeffrey
+      - family-names: Lin
+        given-names: Yu
+      - family-names: Pevzner
+        given-names: Pavel A.
+    year: 2019
+    journal: "Nature Biotechnology"
+    volume: 37
+    issue: 5
+    start: 540
+    end: 546
+    doi: 10.1038/s41587-019-0072-8
+    notes: "Flye."
+
+  - type: software
+    title: "Medaka: sequence correction provided by ONT Research"
+    authors:
+      - name: "Oxford Nanopore Technologies"
+    repository-code: "https://github.com/nanoporetech/medaka"
+    notes: "No accompanying publication."
+
+  - type: article
+    title: "Polypolish: short-read polishing of long-read bacterial genome assemblies"
+    authors:
+      - family-names: Wick
+        given-names: Ryan R.
+      - family-names: Holt
+        given-names: Kathryn E.
+    year: 2022
+    journal: "PLOS Computational Biology"
+    volume: 18
+    issue: 1
+    start: e1009802
+    doi: 10.1371/journal.pcbi.1009802
+    notes: "Polypolish."
+
+  - type: article
+    title: "Dnaapler: a tool to reorient circular microbial genomes"
+    authors:
+      - family-names: Bouras
+        given-names: George
+      - family-names: Grigson
+        given-names: Susanna R.
+      - family-names: Papudeshi
+        given-names: Bhavya
+      - family-names: Mallawaarachchi
+        given-names: Vijini
+      - family-names: Roach
+        given-names: Michael J.
+    year: 2024
+    journal: "Journal of Open Source Software"
+    volume: 9
+    issue: 93
+    start: 5968
+    doi: 10.21105/joss.05968
+    notes: "dnaapler."
+
+  # ── Read processing and mapping ────────────────────────────────────────────
+  - type: article
+    title: "fastp: an ultra-fast all-in-one FASTQ preprocessor"
+    authors:
+      - family-names: Chen
+        given-names: Shifu
+      - family-names: Zhou
+        given-names: Yanqing
+      - family-names: Chen
+        given-names: Yaru
+      - family-names: Gu
+        given-names: Jia
+    year: 2018
+    journal: Bioinformatics
+    volume: 34
+    issue: 17
+    start: i884
+    end: i890
+    doi: 10.1093/bioinformatics/bty560
+    notes: "fastp."
+
+  - type: article
+    title: "NanoPack: visualizing and processing long-read sequencing data"
+    authors:
+      - family-names: De Coster
+        given-names: Wouter
+      - family-names: D'Hert
+        given-names: Svenn
+      - family-names: Schultz
+        given-names: Darrin T.
+      - family-names: Cruts
+        given-names: Marc
+      - family-names: Van Broeckhoven
+        given-names: Christine
+    year: 2018
+    journal: Bioinformatics
+    volume: 34
+    issue: 15
+    start: 2666
+    end: 2669
+    doi: 10.1093/bioinformatics/bty149
+    notes: "NanoPlot."
+
+  - type: software
+    title: "Filtlong: quality filtering tool for long reads"
+    authors:
+      - family-names: Wick
+        given-names: Ryan R.
+    repository-code: "https://github.com/rrwick/Filtlong"
+    notes: "No accompanying publication."
+
+  - type: article
+    title: "Fast gapped-read alignment with Bowtie 2"
+    authors:
+      - family-names: Langmead
+        given-names: Ben
+      - family-names: Salzberg
+        given-names: Steven L.
+    year: 2012
+    journal: "Nature Methods"
+    volume: 9
+    issue: 4
+    start: 357
+    end: 359
+    doi: 10.1038/nmeth.1923
+    notes: "bowtie2."
+
+  - type: article
+    title: "Minimap2: pairwise alignment for nucleotide sequences"
+    authors:
+      - family-names: Li
+        given-names: Heng
+    year: 2018
+    journal: Bioinformatics
+    volume: 34
+    issue: 18
+    start: 3094
+    end: 3100
+    doi: 10.1093/bioinformatics/bty191
+    notes: "minimap2."
+
+  - type: article
+    title: "Twelve years of SAMtools and BCFtools"
+    authors:
+      - family-names: Danecek
+        given-names: Petr
+    year: 2021
+    journal: GigaScience
+    volume: 10
+    issue: 2
+    start: giab008
+    doi: 10.1093/gigascience/giab008
+    notes: "SAMtools. Author list abbreviated; full citation in CITATIONS.md."
+
+  # ── Decontamination and assembly QC ────────────────────────────────────────
+  - type: article
+    title: "BLAST+: architecture and applications"
+    authors:
+      - family-names: Camacho
+        given-names: Christiam
+    year: 2009
+    journal: "BMC Bioinformatics"
+    volume: 10
+    start: 421
+    doi: 10.1186/1471-2105-10-421
+    notes: "BLAST+. Author list abbreviated; full citation in CITATIONS.md."
+
+  - type: article
+    title: "BlobToolKit — interactive quality assessment of genome assemblies"
+    authors:
+      - family-names: Challis
+        given-names: Richard
+      - family-names: Richards
+        given-names: Edward
+      - family-names: Rajan
+        given-names: Jeena
+      - family-names: Cochrane
+        given-names: Guy
+      - family-names: Blaxter
+        given-names: Mark
+    year: 2020
+    journal: "G3 Genes|Genomes|Genetics"
+    volume: 10
+    issue: 4
+    start: 1361
+    end: 1374
+    doi: 10.1534/g3.119.400908
+    notes: "BlobTools."
+
+  - type: article
+    title: "QUAST: quality assessment tool for genome assemblies"
+    authors:
+      - family-names: Gurevich
+        given-names: Alexey
+      - family-names: Saveliev
+        given-names: Vladislav
+      - family-names: Vyahhi
+        given-names: Nikolay
+      - family-names: Tesler
+        given-names: Glenn
+    year: 2013
+    journal: Bioinformatics
+    volume: 29
+    issue: 8
+    start: 1072
+    end: 1075
+    doi: 10.1093/bioinformatics/btt086
+    notes: "QUAST."
+
+  - type: article
+    title: "CheckM: assessing the quality of microbial genomes recovered from isolates, single cells, and metagenomes"
+    authors:
+      - family-names: Parks
+        given-names: Donovan H.
+      - family-names: Imelfort
+        given-names: Michael
+      - family-names: Skennerton
+        given-names: Connor T.
+      - family-names: Hugenholtz
+        given-names: Philip
+      - family-names: Tyson
+        given-names: Gene W.
+    year: 2015
+    journal: "Genome Research"
+    volume: 25
+    issue: 7
+    start: 1043
+    end: 1055
+    doi: 10.1101/gr.186072.114
+    notes: "CheckM."
+
+  - type: article
+    title: "Qualimap 2: advanced multi-sample quality control for high-throughput sequencing data"
+    authors:
+      - family-names: Okonechnikov
+        given-names: Konstantin
+      - family-names: Conesa
+        given-names: Ana
+      - family-names: García-Alcalde
+        given-names: Fernando
+    year: 2016
+    journal: Bioinformatics
+    volume: 32
+    issue: 2
+    start: 292
+    end: 294
+    doi: 10.1093/bioinformatics/btv566
+    notes: "QualiMap."
+
+  # ── Taxonomy ───────────────────────────────────────────────────────────────
+  - type: article
+    title: "GTDB-Tk v2: memory friendly classification with the genome taxonomy database"
+    authors:
+      - family-names: Chaumeil
+        given-names: Pierre-Alain
+      - family-names: Mussig
+        given-names: Aaron J.
+      - family-names: Hugenholtz
+        given-names: Philip
+      - family-names: Parks
+        given-names: Donovan H.
+    year: 2022
+    journal: Bioinformatics
+    volume: 38
+    issue: 23
+    start: 5315
+    end: 5316
+    doi: 10.1093/bioinformatics/btac672
+    notes: "GTDB-Tk."
+
+  - type: article
+    title: "GTDB: an ongoing census of bacterial and archaeal diversity through a phylogenetically consistent, rank normalized and complete genome-based taxonomy"
+    authors:
+      - family-names: Parks
+        given-names: Donovan H.
+    year: 2022
+    journal: "Nucleic Acids Research"
+    volume: 50
+    issue: D1
+    start: D785
+    end: D794
+    doi: 10.1093/nar/gkab776
+    notes: "GTDB reference database. Author list abbreviated; full citation in CITATIONS.md."
+
+  # ── Annotation ─────────────────────────────────────────────────────────────
+  - type: article
+    title: "Bakta: rapid and standardized annotation of bacterial genomes via alignment-free sequence identification"
+    authors:
+      - family-names: Schwengers
+        given-names: Oliver
+      - family-names: Jelonek
+        given-names: Lukas
+      - family-names: Dieckmann
+        given-names: Marius A.
+      - family-names: Beyvers
+        given-names: Sebastian
+      - family-names: Blom
+        given-names: Jochen
+      - family-names: Goesmann
+        given-names: Alexander
+    year: 2021
+    journal: "Microbial Genomics"
+    volume: 7
+    issue: 11
+    start: "000685"
+    doi: 10.1099/mgen.0.000685
+    notes: "Bakta."
+
+  - type: article
+    title: "eggNOG-mapper v2: functional annotation, orthology assignments, and domain prediction at the metagenomic scale"
+    authors:
+      - family-names: Cantalapiedra
+        given-names: Carlos P.
+      - family-names: Hernández-Plaza
+        given-names: Ana
+      - family-names: Letunic
+        given-names: Ivica
+      - family-names: Bork
+        given-names: Peer
+      - family-names: Huerta-Cepas
+        given-names: Jaime
+    year: 2021
+    journal: "Molecular Biology and Evolution"
+    volume: 38
+    issue: 12
+    start: 5825
+    end: 5829
+    doi: 10.1093/molbev/msab293
+    notes: "eggNOG-mapper."
+
+  - type: article
+    title: "antiSMASH 8.0: extended gene cluster detection capabilities and analyses of chemistry, enzymology, and regulation"
+    authors:
+      - family-names: Blin
+        given-names: Kai
+    year: 2025
+    journal: "Nucleic Acids Research"
+    volume: 53
+    issue: W1
+    start: W32
+    end: W38
+    doi: 10.1093/nar/gkaf334
+    notes: "antiSMASH. Author list abbreviated; full citation in CITATIONS.md."
+
+  - type: article
+    title: "dbCAN3: automated carbohydrate-active enzyme and substrate annotation"
+    authors:
+      - family-names: Zheng
+        given-names: Jinfang
+      - family-names: Ge
+        given-names: Qiwei
+      - family-names: Yan
+        given-names: Yuchen
+      - family-names: Zhang
+        given-names: Xinpeng
+      - family-names: Huang
+        given-names: Le
+      - family-names: Yin
+        given-names: Yanbin
+    year: 2023
+    journal: "Nucleic Acids Research"
+    volume: 51
+    issue: W1
+    start: W115
+    end: W121
+    doi: 10.1093/nar/gkad328
+    notes: "dbCAN3 / run_dbcan."
+
+  # ── Antimicrobial resistance ───────────────────────────────────────────────
+  - type: software
+    title: "ABRicate: mass screening of contigs for antimicrobial and virulence genes"
+    authors:
+      - family-names: Seemann
+        given-names: Torsten
+    repository-code: "https://github.com/tseemann/abricate"
+    notes: "No accompanying publication."
+
+  - type: article
+    title: "AMRFinderPlus and the Reference Gene Catalog facilitate examination of the genomic links among antimicrobial resistance, stress response, and virulence"
+    authors:
+      - family-names: Feldgarden
+        given-names: Michael
+    year: 2021
+    journal: "Scientific Reports"
+    volume: 11
+    start: 12728
+    doi: 10.1038/s41598-021-91456-0
+    notes: "AMRFinderPlus, used by the mobilome module. Author list abbreviated; full citation in CITATIONS.md."
+
+  - type: article
+    title: "CARD 2023: expanded curation, support for machine learning, and resistome prediction at the Comprehensive Antibiotic Resistance Database"
+    authors:
+      - family-names: Alcock
+        given-names: Brian P.
+    year: 2023
+    journal: "Nucleic Acids Research"
+    volume: 51
+    issue: D1
+    start: D690
+    end: D699
+    doi: 10.1093/nar/gkac920
+    notes: "CARD database. Author list abbreviated; full citation in CITATIONS.md."
+
+  - type: generic
+    title: "BBMap: a fast, accurate, splice-aware aligner"
+    authors:
+      - family-names: Bushnell
+        given-names: Brian
+    year: 2014
+    url: "https://escholarship.org/uc/item/1h3515gn"
+    notes: "BBMap, used for the CARD read-mapping AMR leg."
+
+  # ── Plasmids and prophages ─────────────────────────────────────────────────
+  - type: article
+    title: "Platon: identification and characterization of bacterial plasmid contigs in short-read draft assemblies exploiting protein sequence-based replicon distribution scores"
+    authors:
+      - family-names: Schwengers
+        given-names: Oliver
+      - family-names: Barth
+        given-names: Patrick
+      - family-names: Falgenhauer
+        given-names: Linda
+      - family-names: Hain
+        given-names: Torsten
+      - family-names: Chakraborty
+        given-names: Trinad
+      - family-names: Goesmann
+        given-names: Alexander
+    year: 2020
+    journal: "Microbial Genomics"
+    volume: 6
+    issue: 10
+    start: mgen000398
+    doi: 10.1099/mgen.0.000398
+    notes: "Platon."
+
+  - type: article
+    title: "VirSorter2: a multi-classifier, expert-guided approach to detect diverse DNA and RNA viruses"
+    authors:
+      - family-names: Guo
+        given-names: Jiarong
+    year: 2021
+    journal: Microbiome
+    volume: 9
+    issue: 1
+    start: 37
+    doi: 10.1186/s40168-020-00990-y
+    notes: "VirSorter2, the default virus caller. Author list abbreviated; full citation in CITATIONS.md."
+
+  - type: article
+    title: "CheckV assesses the quality and completeness of metagenome-assembled viral genomes"
+    authors:
+      - family-names: Nayfach
+        given-names: Stephen
+      - family-names: Camargo
+        given-names: Antonio Pedro
+      - family-names: Schulz
+        given-names: Frederik
+      - family-names: Eloe-Fadrosh
+        given-names: Emiley
+      - family-names: Roux
+        given-names: Simon
+      - family-names: Kyrpides
+        given-names: Nikos C.
+    year: 2021
+    journal: "Nature Biotechnology"
+    volume: 39
+    issue: 5
+    start: 578
+    end: 585
+    doi: 10.1038/s41587-020-00774-7
+    notes: "CheckV."
+
+  - type: article
+    title: "Identification of mobile genetic elements with geNomad"
+    authors:
+      - family-names: Camargo
+        given-names: Antonio Pedro
+    year: 2024
+    journal: "Nature Biotechnology"
+    volume: 42
+    issue: 8
+    start: 1303
+    end: 1312
+    doi: 10.1038/s41587-023-01953-y
+    notes: "geNomad — OPT-IN only; licensed by Berkeley Lab for academic / non-commercial use. Author list abbreviated; full citation in CITATIONS.md."
+
+  # ── Mobilome module (optional, off by default) ─────────────────────────────
+  - type: article
+    title: "ISEScan: automated identification of insertion sequence elements in prokaryotic genomes"
+    authors:
+      - family-names: Xie
+        given-names: Zhiqun
+      - family-names: Tang
+        given-names: Haixu
+    year: 2017
+    journal: Bioinformatics
+    volume: 33
+    issue: 21
+    start: 3340
+    end: 3347
+    doi: 10.1093/bioinformatics/btx433
+    notes: "ISEScan."
+
+  - type: article
+    title: "MacSyFinder v2: improved modelling and search engine to identify molecular systems in genomes"
+    authors:
+      - family-names: Néron
+        given-names: Bertrand
+      - family-names: Denise
+        given-names: Rémi
+      - family-names: Coluzzi
+        given-names: Charles
+      - family-names: Touchon
+        given-names: Marie
+      - family-names: Rocha
+        given-names: Eduardo P. C.
+      - family-names: Abby
+        given-names: Sophie S.
+    year: 2023
+    journal: "Peer Community Journal"
+    volume: 3
+    start: e28
+    doi: 10.24072/pcjournal.250
+    notes: "MacSyFinder, the engine behind the CONJscan search (GPLv3)."
+
+  - type: article
+    title: "Integrative and conjugative elements and their hosts: composition, distribution and organization"
+    authors:
+      - family-names: Cury
+        given-names: Jean
+      - family-names: Touchon
+        given-names: Marie
+      - family-names: Rocha
+        given-names: Eduardo P. C.
+    year: 2017
+    journal: "Nucleic Acids Research"
+    volume: 45
+    issue: 15
+    start: 8943
+    end: 8956
+    doi: 10.1093/nar/gkx607
+    notes: "One of three papers to cite for the CONJscan models (CC BY-NC-SA 4.0, non-commercial; never redistributed by BacFlux). See CITATIONS.md for the other two."
+
+  - type: article
+    title: "ICEberg 3.0: functional categorization and analysis of the integrative and conjugative elements in bacteria"
+    authors:
+      - family-names: Wang
+        given-names: Meng
+      - family-names: Liu
+        given-names: Guitian
+      - family-names: Liu
+        given-names: Meng
+      - family-names: Tai
+        given-names: Cui
+      - family-names: Deng
+        given-names: Zixin
+      - family-names: Song
+        given-names: Jiangning
+      - family-names: Ou
+        given-names: Hong-Yu
+    year: 2024
+    journal: "Nucleic Acids Research"
+    volume: 52
+    issue: D1
+    start: D732
+    end: D737
+    doi: 10.1093/nar/gkad935
+    notes: "ICEberg 3.0 — optional ICE/IME naming layer, and the source of the curated coordinates used to benchmark the module."
+
+  - type: article
+    title: "TnCentral: a prokaryotic transposable element database and web portal for transposon analysis"
+    authors:
+      - family-names: Ross
+        given-names: Karen
+      - family-names: Varani
+        given-names: Alessandro M.
+      - family-names: Snesrud
+        given-names: Erik
+      - family-names: Huang
+        given-names: Hongzhan
+      - family-names: Alvarenga
+        given-names: Danillo O.
+      - family-names: Zhang
+        given-names: Jianli
+      - family-names: Wu
+        given-names: Cathy
+      - family-names: McGann
+        given-names: Patrick
+      - family-names: Chandler
+        given-names: Michael
+    year: 2021
+    journal: mBio
+    volume: 12
+    issue: 5
+    start: e02060-21
+    doi: 10.1128/mBio.02060-21
+    notes: "TnCentral — optional transposon/integron naming layer."
+
+  - type: article
+    title: "A metagenomics pipeline reveals insertion sequence-driven evolution of the microbiota"
+    authors:
+      - family-names: Kirsch
+        given-names: Joshua M.
+      - family-names: Hryckowian
+        given-names: Andrew J.
+      - family-names: Duerkop
+        given-names: Breck A.
+    year: 2024
+    journal: "Cell Host & Microbe"
+    volume: 32
+    issue: 5
+    start: 739
+    end: 754
+    doi: 10.1016/j.chom.2024.03.005
+    notes: "pseudoR / ISOSDB — optional IS copy-number layer (MIT licensed)."
+
+  # ── Reporting ──────────────────────────────────────────────────────────────
+  - type: article
+    title: "MultiQC: summarize analysis results for multiple tools and samples in a single report"
+    authors:
+      - family-names: Ewels
+        given-names: Philip
+      - family-names: Magnusson
+        given-names: Måns
+      - family-names: Lundin
+        given-names: Sverker
+      - family-names: Käller
+        given-names: Max
+    year: 2016
+    journal: Bioinformatics
+    volume: 32
+    issue: 19
+    start: 3047
+    end: 3048
+    doi: 10.1093/bioinformatics/btw354
+    notes: "MultiQC."

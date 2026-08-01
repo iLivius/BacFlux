@@ -10,7 +10,7 @@ directories:
   blast_db: /path/to/NCBI_core_nt
   dbcan_db: /path/to/dbcan
   eggnog_db: /path/to/eggnog
-  gtdbtk_db: /path/to/GTDB_R226/release226
+  gtdbtk_db: /path/to/GTDB_R232/release232
   platon_db: /path/to/platon/db
 resources:
   ram_gb: 256
