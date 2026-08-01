@@ -1413,6 +1413,86 @@ def test_assembled_system_is_not_labelled_as_profile_hits(tmp_path):
     assert rows[0]["confidence"] == "high"
 
 
+def test_an_icescan_integrase_cannot_upgrade_profile_hits_to_a_system(tmp_path):
+    """An attached integrase must not answer "was a conjugation system assembled?".
+
+    THE BUG THIS PINS. The profile-hit fallback exists for machinery MacSyFinder
+    saw but never assembled into a system, and every such row is capped at low
+    confidence and labelled evidence_level=profile_hits_only. That judgement used
+    to be made by asking whether ANY anchor in the cluster carried a system id -
+    and an ICEscan integrase carries one, because ICEscan (unlike CONJScan) does
+    have integrase models.
+
+    So the moment ICEscan was switched on, one integrase was enough to make a
+    cluster of loose profile hits look system-backed. The row came out
+    evidence_level=system at HIGH confidence while its own audit file carried the
+    line `no_system_using_profile_hits` saying the machinery had been assembled
+    into nothing. The table and the audit contradicted each other.
+
+    The scene below is exactly that: CONJscan found no system, its three
+    machinery profiles are recovered from hmmer_results/, and ICEscan supplies a
+    Phage_integrase on the same CDS the Bakta product text already calls an
+    integrase - which is how the ICEscan system id ends up on the surviving
+    anchor (see the corroboration step in main()).
+    """
+    conjscan = tmp_path / "best_solution.tsv"
+    conjscan.write_text("# No System found\n")
+    hmmer_dir = tmp_path / "hmmer_results"
+    write_hmmer_extract(hmmer_dir, "T4SS_MOBF", [RELAXASE_HIT])
+    write_hmmer_extract(hmmer_dir, "T4SS_t4cp2", [T4CP_HIT])
+    write_hmmer_extract(hmmer_dir, "T4SS_virb4", [VIRB4_HIT])
+    icescan = write_conjscan(tmp_path / "icescan.tsv", [
+        icescan_row(hit_id=INTEGRASE_HIT, gene_name="Phage_integrase",
+                    model_fqn="ICEscan/Chromosome/IME"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _return_code, rows, audit, _ = run_main(
+        tmp_path, conjscan, gff,
+        extra=["--conjscan-hmmer-dir", str(hmmer_dir),
+               "--icescan-tsv", icescan, "--min-element-bp", "1000"],
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    # The integrase is real evidence and still counts towards the class and the
+    # anchor classes - it is only the "was a SYSTEM assembled?" question it may
+    # not answer.
+    assert row["has_integrase"] == "TRUE"
+    assert row["n_anchor_classes"] == "4"
+    # The two things the bug got wrong. Without the fix these read "system" and
+    # "high", because nothing else here caps the confidence.
+    assert row["evidence_level"] == "profile_hits_only"
+    assert row["confidence"] == "low"
+    # And the table now agrees with the audit line that was always being written.
+    assert "no_system_using_profile_hits" in audit_reasons(audit)
+
+
+def test_an_icescan_relaxase_system_still_counts_as_an_assembled_system(tmp_path):
+    """The fix above narrows the question to machinery - not to CONJscan.
+
+    ICEscan's Gram-positive and IME relaxase families are the reason it is
+    unioned in at all, and a relaxase belonging to a real assembled ICEscan
+    system IS a system. Fixing the integrase leak must not sweep those up as
+    collateral: this row has to keep evidence_level=system.
+    """
+    conjscan = tmp_path / "best_solution.tsv"
+    conjscan.write_text("# No System found\n")
+    icescan = write_conjscan(tmp_path / "icescan.tsv", [
+        icescan_row(hit_id=RELAXASE_HIT, gene_name="Relaxase_firmi_MOBL",
+                    model_fqn="ICEscan/Chromosome/IME"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _return_code, rows, _audit, _ = run_main(
+        tmp_path, conjscan, gff,
+        extra=["--icescan-tsv", icescan, "--min-element-bp", "1000"])
+
+    assert len(rows) == 1
+    assert rows[0]["has_relaxase"] == "TRUE"
+    assert rows[0]["evidence_level"] == "system"
+
+
 def test_window_does_not_split_one_conjscan_system(tmp_path):
     """A narrow --window-bp must NOT cut a single CONJscan system into pieces.
 
@@ -1694,7 +1774,8 @@ def test_att_search_is_skipped_when_there_is_no_integrase(tmp_path):
     """An att site is the scar of integrase-mediated recombination, so an element
     with no integrase cannot have one.
 
-    This is the real KPNIH1 failure: without this gate the search "resolved"
+    This is the real failure seen on the K. pneumoniae positive control: without
+    this gate the search "resolved"
     boundaries for two conjugative_region calls that had no integrase at all -
     one of them on a plasmid, which does not integrate - while the one genuinely
     integrative element got nothing. Any repeat found in that situation is
@@ -2619,7 +2700,7 @@ def test_a_nested_call_with_an_att_boundary_beats_the_larger_one():
     outer = nesting_row("c1|ime-1000:90000", "c1", 1000, 90000, machinery_gap_bp=0)
     inner = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000,
                         boundary_method="tRNA", machinery_gap_bp=0)
-    kept, audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+    kept, audit = ci.resolve_nested_calls("S1", [outer, inner])
 
     assert [row["mge_id"] for row in kept] == ["c1|ime-40000:50000"]
     assert audit[0]["reason"] == "nested_call_of_same_class_suppressed"
@@ -2634,7 +2715,7 @@ def test_the_larger_call_survives_when_it_is_the_one_with_the_att_boundary():
                         boundary_method="tRNA", machinery_gap_bp=40000)
     inner = nesting_row("c1|ice-40000:50000", "c1", 40000, 50000, mge_class="ice",
                         machinery_gap_bp=0)
-    kept, _audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+    kept, _audit = ci.resolve_nested_calls("S1", [outer, inner])
 
     assert [row["mge_id"] for row in kept] == ["c1|ice-1000:90000"]
 
@@ -2654,7 +2735,7 @@ def test_machinery_coherence_is_reported_but_never_decides():
     """
     outer = nesting_row("c1|ime-1000:90000", "c1", 1000, 90000, machinery_gap_bp=70000)
     inner = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, machinery_gap_bp=300)
-    kept, audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+    kept, audit = ci.resolve_nested_calls("S1", [outer, inner])
 
     # Key 3 decides instead: with no att evidence, the wider interval is kept.
     assert [row["mge_id"] for row in kept] == ["c1|ime-1000:90000"]
@@ -2671,7 +2752,7 @@ def test_nested_calls_with_nothing_to_separate_them_keep_the_outer_one():
     """
     outer = nesting_row("c1|ime-1000:90000", "c1", 1000, 90000, machinery_gap_bp=200)
     inner = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, machinery_gap_bp=100)
-    kept, audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+    kept, audit = ci.resolve_nested_calls("S1", [outer, inner])
 
     assert [row["mge_id"] for row in kept] == ["c1|ime-1000:90000"]
     assert "no evidence separates them" in audit[0]["detail"]
@@ -2689,7 +2770,7 @@ def test_an_ime_nested_inside_an_ice_is_still_reported():
                       machinery_gap_bp=40000)
     ime = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, mge_class="ime",
                       machinery_gap_bp=100)
-    kept, audit = ci.resolve_nested_calls("S1", [ice, ime], window_bp=15000)
+    kept, audit = ci.resolve_nested_calls("S1", [ice, ime])
 
     assert len(kept) == 2
     assert audit == []
@@ -2701,7 +2782,7 @@ def test_overlapping_calls_that_do_not_nest_are_both_kept():
     rule is deliberately narrow."""
     left = nesting_row("c1|ime-1000:50000", "c1", 1000, 50000)
     right = nesting_row("c1|ime-40000:90000", "c1", 40000, 90000)
-    kept, audit = ci.resolve_nested_calls("S1", [left, right], window_bp=15000)
+    kept, audit = ci.resolve_nested_calls("S1", [left, right])
 
     assert len(kept) == 2
     assert audit == []
@@ -2715,7 +2796,7 @@ def test_nested_calls_on_different_contigs_are_never_compared():
                         machinery_gap_bp=70000)
     inner = nesting_row("c2|ime-40000:50000", "contig_2", 40000, 50000,
                         machinery_gap_bp=100)
-    kept, audit = ci.resolve_nested_calls("S1", [outer, inner], window_bp=15000)
+    kept, audit = ci.resolve_nested_calls("S1", [outer, inner])
 
     assert len(kept) == 2
     assert audit == []
@@ -2731,7 +2812,7 @@ def test_a_chain_of_three_nested_calls_collapses_to_one():
     b = nesting_row("c1|ime-30000:60000", "c1", 30000, 60000, machinery_gap_bp=20000)
     c = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000,
                     boundary_method="tRNA", machinery_gap_bp=100)
-    kept, audit = ci.resolve_nested_calls("S1", [a, b, c], window_bp=15000)
+    kept, audit = ci.resolve_nested_calls("S1", [a, b, c])
 
     assert [row["mge_id"] for row in kept] == ["c1|ime-40000:50000"]
     assert len(audit) == 2
@@ -2777,7 +2858,7 @@ def test_two_calls_on_the_same_interval_collapse_to_the_better_evidenced_one():
     strong["mge_class"] = "ice"
     strong["n_anchor_classes"] = "4"
 
-    kept, audit = ci.resolve_nested_calls("S1", [weak, strong], window_bp=15000)
+    kept, audit = ci.resolve_nested_calls("S1", [weak, strong])
 
     assert len(kept) == 1
     assert kept[0]["mge_class"] == "ice"          # the better-evidenced call
@@ -2796,7 +2877,7 @@ def test_an_ime_genuinely_inside_an_ice_is_not_collapsed():
     ime = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, machinery_gap_bp=100)
     ime["mge_class"] = "ime"
 
-    kept, _audit = ci.resolve_nested_calls("S1", [ice, ime], window_bp=15000)
+    kept, _audit = ci.resolve_nested_calls("S1", [ice, ime])
 
     assert len(kept) == 2
 

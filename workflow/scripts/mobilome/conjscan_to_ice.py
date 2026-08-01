@@ -1,24 +1,46 @@
 #!/usr/bin/env python3
 """Turn CONJscan machinery hits + Bakta annotation into ICE / IME candidates.
 
-This is work package E, PHASES 0, 1, 2 and 4 of the mobilome spec
-(`docs/mobilome_module_SPEC.md` §8) - what the spec calls the "usable v0":
+This is work package E of the mobilome spec (`docs/mobilome_module_SPEC.md` §8).
+All of the spec's phases are here except the cargo intersection, which is
+colocalise.py's job:
 
     Phase 0  data contract   -> every input becomes the same tidy shape
                                 (contig, start, end, strand, type, label)
     Phase 1  anchors         -> relaxase / coupling protein / T4SS(MPF) from
                                 CONJscan, integrase from the Bakta products
     Phase 2  candidate seeds -> anchors on the same contig, clustered by distance
-    Phase 4  classification  -> ICE / IME / island / conjugative region
+    Phase 3  boundaries      -> the att-site search, in att_search.py, driven from
+                                refine_candidate_boundaries below
+    Phase 4  classification  -> ICE / IME / AICE / island / conjugative region
+    Phase 6  confidence      -> high / medium / low, settled once the boundaries
+                                are known (finalise_confidence)
 
-PHASE 3 (att-site and direct-repeat search, i.e. the real BOUNDARIES of the
-element) IS DELIBERATELY NOT IMPLEMENTED HERE. It belongs to the long-read
-workflows, because on a short-read assembly the element usually does not sit on
-one contig in the first place. Every candidate therefore reports
-`boundary_method = none` and empty `attL`/`attR`: the interval below is the span
-of the machinery we could see, NOT the true extent of the element. Those three
-columns are kept in the schema so the long-read version can fill them in without
-changing the file format.
+WHAT PHASE 3 IS ALLOWED TO CHANGE, because this is the part that surprises people
+-------------------------------------------------------------------------------
+The att search runs in EVERY mode - short read, long read and everything between.
+It was originally planned as long-read-only, but what actually decides whether an
+element's ends can be found is how FRAGMENTED the assembly is, not which
+sequencer produced it, and a good short-read assembly can beat a poor long-read
+one. So the search always runs and the fragmentation is reported per call instead
+(`spans_contigs`, `dist_to_contig_end`, and the contiguity row at the top of the
+audit file).
+
+Only a tRNA-ANCHORED att pair is ACTED ON. When one is found, `start` / `end` /
+`length_bp` are replaced by the element those repeats define, because that - not
+the machinery operon - is what physically travels, and it is the interval
+colocalise.py intersects with the AMR genes to decide cargo. A DE NOVO repeat
+(one with no tRNA behind it) is reported in the att columns and never applied:
+~16% of arbitrary chromosomal spans yield such a repeat by chance, and widening
+an element on that would turn unrelated chromosomal genes into "predicted
+self-transmissible" cargo.
+
+The machinery span is never lost: `machinery_start` / `machinery_end` always keep
+it, so the two readings of the same element can be compared. When no att pair is
+found - the common case on a fragmented assembly, where the flanks are simply not
+in the contig - `boundary_method` stays 'none' and the reported interval is the
+machinery span, which is an honest FLOOR on the element's extent rather than a
+delimitation of it.
 
 WHY THIS SCRIPT EXISTS (the biology)
 ------------------------------------
@@ -123,7 +145,9 @@ judgement, not the judgement.
 
 Coordinates are 1-BASED AND INCLUSIVE throughout, which is what GFF3 uses, so no
 conversion happens anywhere. Distances are the number of bases strictly BETWEEN
-two features, so touching features are 0 bp apart.
+two features, so touching features are 0 bp apart. (One deliberate exception:
+`gap_to` inside attach_nearby_integrases measures one more than that. It is only
+ever compared against a 50 kb window, and the docstring there says so.)
 
 Licensing note: an independent implementation. No code was taken from EBI's
 mobilome-annotation-pipeline or from ICEfinder (parts of which are CC BY-NC-SA
@@ -433,13 +457,18 @@ def icescan_model_class(model_fqn):
 # WHY THE LIST IS LONGER THAN THE SPEC'S: the spec (§8 Phase 1) gives the pattern
 # in terms of protein FAMILY names, but Bakta writes UniRef product text, which
 # says the same thing several other ways. Checked against every distinct
-# integrase-like product in the KPNIH1 positive control; the two that the
+# integrase-like product in the K. pneumoniae positive control; the two that the
 # spec-literal pattern missed are marked below, and missing them is not cosmetic
-# — "DNA integration/recombination/inversion protein" is how Bakta annotates
-# KPNIH1_04511, the integrase 5.7 kb from KPNIH1's conjugative region. Without it
-# that element scored as a bare "conjugative_region" (report, do not call an ICE)
-# instead of the ICE it is, so the positive control silently under-called its own
-# headline result.
+# — "DNA integration/recombination/inversion protein" is how Bakta annotated
+# locus KPNIH1_04511, the integrase 5.7 kb from that genome's conjugative region.
+# Without it that element scored as a bare "conjugative_region" (report, do not
+# call an ICE) instead of the ICE it is, so the positive control silently
+# under-called its own headline result.
+#
+# (The locus tag reads KPNIH1_* because that is the sample name a human typed for
+# the run, not the strain: the genome is CP006659.2, which is ATCC BAA-2146.
+# KPNIH1 is a different isolate, CP008827.1. See docs/validation/README.md - the
+# tag is quoted verbatim here because it is what is actually in the file.)
 INTEGRASE_PRODUCT_PATTERN = re.compile(
     r"tyr(osine)? recombinase"          # "tyrosine recombinase XerC"; MISSED "Tyr recombinase domain-containing protein"
     r"|phage[_ ]integrase"
@@ -677,7 +706,11 @@ def classify_cluster(has_integrase, has_relaxase, has_mpf_apparatus):
 OUTPUT_COLUMNS = [
     "sample",
     "mge_id",                     # contig|class-start:end  (spec §9 ID format)
-    "mge_name",                   # curated name - always NA until a naming DB is wired in
+    # Curated element name. ALWAYS 'NA' in this file - naming is a separate,
+    # opt-in step (rule name_ice_elements -> name_ice_elements.py) that BLASTs
+    # these intervals against ICEberg and writes the name into a copy of this
+    # table. colocalise.py then reads whichever of the two tables exists.
+    "mge_name",
     "element_type",               # what colocalise.py reads: ice | ime | aice | genomic_island | conjugative_region
     "mge_class",                  # what we actually called it (ice|ime|aice|cime_or_island|conjugative_region)
     "mobility",                   # the sentence, always "predicted ..." for ICEs
@@ -689,9 +722,21 @@ OUTPUT_COLUMNS = [
     "mobility_tier",
     "mobility_tier_reason",
     "contig",
-    "start",                      # 1-based inclusive, first base of the first anchor
-    "end",                        # 1-based inclusive, last base of the last anchor
-    "length_bp",                  # end - start + 1: the MACHINERY span, not the element
+    # THE REPORTED EXTENT OF THE ELEMENT, 1-based and inclusive. Which of two
+    # things this is depends on boundary_method, and a reader must check that
+    # column before quoting a length:
+    #   boundary_method = 'tRNA'  -> the att-bounded element: the attL/attR
+    #                                repeats and everything between them, i.e.
+    #                                what actually travels when it moves.
+    #   boundary_method = 'none' or 'denovo'
+    #                             -> the MACHINERY span only, from the first base
+    #                                of the first anchor to the last base of the
+    #                                last. A floor on the element, not its extent.
+    # machinery_start / machinery_end below always hold the second reading, so
+    # the two can be compared on any row.
+    "start",
+    "end",
+    "length_bp",                  # end - start + 1
     "strand",                     # + / - when every anchor agrees, else '.' (mixed)
     "n_anchors",
     "n_anchor_classes",           # 1-4; >=3 is one of the conditions for high confidence
@@ -746,16 +791,27 @@ OUTPUT_COLUMNS = [
     "attR",                       # coordinates of the right repeat, or NA
     "att_sequence",               # the repeat itself, so a reader can BLAST it
     "att_length_bp",
-    "att_mismatches",             # 0 or 1 between the two copies; >1 is not accepted
+    # Mismatches between the two copies of the repeat. In practice ALWAYS 0: the
+    # current search finds exact maximal repeats, so the two copies are identical
+    # by construction. The column is kept because it is part of the agreed schema
+    # and because a mismatch-tolerant search would fill it in - but do not read a
+    # 0 here as evidence that a mismatch was looked for and not found.
+    "att_mismatches",
     "att_trna",                   # the tRNA the element integrated into, when known
     "machinery_start",            # the CONJscan machinery span, always preserved
     "machinery_end",
     # The widest stretch INSIDE this call that carries no anchor at all - the
-    # biggest hole in its machinery. Conjugation genes are an operon, so a real
-    # element's anchors sit shoulder to shoulder and this stays small even for a
-    # 100 kb ICE. A large number means the interval was stitched together from
-    # blocks that are far apart, which is what resolve_nested_calls uses to tell
-    # a real element from an over-extended one. 0 when there is a single anchor.
+    # biggest hole in its machinery. 0 when there is a single anchor.
+    #
+    # REPORTED, NOT ACTED ON. The tempting reading is "conjugation genes are an
+    # operon, so a big hole means the interval was stitched together from distant
+    # blocks" - and resolve_nested_calls did once use it to pick between two
+    # overlapping calls. It was removed because the premise is false for big
+    # elements: 20 of the 37 `ice` calls on the benchmark have a hole wider than
+    # the 15 kb clustering window, including R391, ICEEc2, SPI-7 and Tn4371.
+    # Large ICEs carry cargo BETWEEN their machinery genes; that is what makes
+    # them interesting. It is still a useful number for judging a call by eye,
+    # which is why it is here - see the removal note in resolve_nested_calls.
     "machinery_gap_bp",
     "contig_length",
     "dist_to_contig_start",
@@ -773,10 +829,21 @@ AUDIT_COLUMNS = [
     "contig",
     "start",
     "end",
-    # assembly_qc is the one action that describes the INPUT rather than a
-    # candidate: one row per sample recording how fragmented the assembly is.
-    "action",     # assembly_qc | input_missing | row_skipped | not_applicable |
-                  # dropped | kept_flagged | boundaries_resolved
+    # The eight actions this script writes, and what each one means. This list is
+    # what a user filters on (`cut -f5,6 *_ice_discarded.tsv | sort | uniq -c`),
+    # so it has to be complete - keep it in step with the audit_row() calls below.
+    #
+    #   assembly_qc          describes the INPUT, not a candidate: one row per
+    #                        sample saying how fragmented the assembly is
+    #   input_missing        a file we wanted was absent or unusable
+    #   row_skipped          one input row was not used, and why
+    #   not_applicable       a step was correctly skipped for this candidate
+    #                        (e.g. no integrase, so no att site can exist)
+    #   dropped              a candidate did NOT make it into the table
+    #   kept_flagged         a candidate IS in the table, carrying a caveat
+    #   boundaries_resolved  Phase 3 found an att pair and moved start/end
+    #   evidence_recorded    something worth knowing that changed no call
+    "action",
     "reason",     # short machine-readable token
     "detail",     # human-readable explanation, with the numbers behind it
 ]
@@ -797,6 +864,13 @@ DEFAULT_MAX_ELEMENT_BP = 500000
 # equivalent number for an insertion sequence (1 kb vs 100 bp) because an ICE is
 # tens of kilobases: if the machinery stops 1 kb from the end of the contig, the
 # rest of the element is almost certainly in the missing sequence.
+#
+# THERE ARE THREE OF THESE IN THE MODULE and they are deliberately different
+# numbers on different objects, so do not "harmonise" them:
+#   here (--boundary-bp, 1000)                an ELEMENT near a contig end
+#   isescan_to_table.py --boundary-bp (100)   an INSERTION SEQUENCE near one
+#   colocalise.py CONTIG_END_WINDOW_BP (1000) an AMR GENE near one
+# Only ISEScan's is wired to a config key; this one always runs at its default.
 DEFAULT_BOUNDARY_BP = 1000
 
 
@@ -1458,8 +1532,8 @@ def build_conjscan_anchors(sample, hits, features_by_id):
         cluster directly would drag the cluster across the replicon.
 
     Putting them in the same pool as the Bakta product-text integrases means
-    both sources compete under one rule, which is where the FIX-4 tie-break in
-    attach_nearby_integrases does its work.
+    both sources compete under one rule, which is where the integrase tie-break
+    in attach_nearby_integrases does its work.
 
     `systems` is keyed by sys_id and holds:
       wholeness    lowest sys_wholeness seen for it (all rows of a system carry
@@ -1719,7 +1793,9 @@ def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp,
     attaching every integrase within 50 kb would manufacture anchor classes on a
     chromosome that is full of prophage integrases.
 
-    HOW THE BEST ONE IS CHOSEN (this is FIX 4, and it is a correctness fix).
+    HOW THE BEST ONE IS CHOSEN. (The comments and tests call this "FIX 4" - that
+    is only this project's working label for the change, not the name of anything
+    outside the repo.)
     The old rule was "closest, and first-seen wins a tie". That is fine while
     there is only one source of integrases, but once ICEscan's profile hits join
     the pool the candidates routinely sit INSIDE the machinery cluster, where
@@ -1751,25 +1827,35 @@ def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp,
     audit_rows = []
     attached_ids = set()
 
-    def gap_to(cluster_lo, cluster_hi, anchor):
-        """Bases strictly between the cluster and this integrase; 0 if they overlap."""
-        if anchor["start"] > cluster_hi:
-            return anchor["start"] - cluster_hi
-        if anchor["end"] < cluster_lo:
-            return cluster_lo - anchor["end"]
+    def gap_to(cluster_start, cluster_end, anchor):
+        """How far this integrase sits from the cluster; 0 if they overlap.
+
+        MEASURED FROM THE CLUSTER'S LAST BASE TO THE INTEGRASE'S FIRST, so two
+        features that abut read 1, not 0. That is one more than the convention
+        the module docstring states and cluster_anchors uses ("bases strictly
+        between two features"). The difference is left alone deliberately: this
+        number is only ever compared against --integrase-window-bp (50 kb) and
+        printed in the audit line, so a one-base shift moves nothing that
+        matters, and correcting it would change which integrases are admitted at
+        exactly the window edge - a behaviour change with no benefit.
+        """
+        if anchor["start"] > cluster_end:
+            return anchor["start"] - cluster_end
+        if anchor["end"] < cluster_start:
+            return cluster_start - anchor["end"]
         return 0
 
     for cluster in clusters:
         contig = cluster[0]["contig"]
-        lo = min(a["start"] for a in cluster)
-        hi = max(a["end"] for a in cluster)
+        cluster_start = min(anchor["start"] for anchor in cluster)
+        cluster_end = max(anchor["end"] for anchor in cluster)
 
         # Every integrase near enough to be in the running, with its distance.
         in_range = []
         for anchor in integrase_anchors:
             if anchor["contig"] != contig:
                 continue
-            gap = gap_to(lo, hi, anchor)
+            gap = gap_to(cluster_start, cluster_end, anchor)
             if gap <= integrase_window_bp:
                 in_range.append((gap, anchor))
         if not in_range:
@@ -1781,9 +1867,9 @@ def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp,
         def att_supported(anchor):
             if att_supports is None or len(in_range) < 2:
                 return False
-            span_lo = min(lo, anchor["start"])
-            span_hi = max(hi, anchor["end"])
-            return bool(att_supports(contig, span_lo, span_hi))
+            span_start = min(cluster_start, anchor["start"])
+            span_end = max(cluster_end, anchor["end"])
+            return bool(att_supports(contig, span_start, span_end))
 
         ranked = sorted(
             in_range,
@@ -1804,7 +1890,8 @@ def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp,
         runners_up = len(in_range) - 1
         audit_rows.append(audit_row(
             "", "evidence_recorded", "integrase_attached_beyond_cluster_window",
-            f"{contig}:{lo}-{hi}: an integrase at {anchor['start']}-{anchor['end']} "
+            f"{contig}:{cluster_start}-{cluster_end}: an integrase at "
+            f"{anchor['start']}-{anchor['end']} "
             f"({anchor.get('label','')}, from {anchor.get('source','')}) sits "
             f"{gap} bp away - beyond the "
             f"machinery clustering window but within the {integrase_window_bp} bp "
@@ -1813,14 +1900,15 @@ def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp,
             "boundary, tens of kb away on a large ICE."
             + (f" Chosen over {runners_up} other candidate(s) by att support, "
                "then distance, then source." if runners_up else ""),
-            contig=contig, start=lo, end=hi))
+            contig=contig, start=cluster_start, end=cluster_end))
 
     # Integrases belonging to NO machinery cluster. Under the old shared-window
     # design these formed integrase-only clusters that were then dropped with a
     # stated reason; clustering machinery alone means they never form one, so the
     # reason has to be recorded here or the decision becomes invisible - and every
     # filtering decision in this module carries a reason.
-    orphans = [a for a in integrase_anchors if id(a) not in attached_ids]
+    orphans = [anchor for anchor in integrase_anchors
+               if id(anchor) not in attached_ids]
     if orphans:
         audit_rows.append(audit_row(
             "", "not_applicable", "integrase_without_conjugation_machinery",
@@ -1828,7 +1916,8 @@ def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp,
             f"machinery within {integrase_window_bp} bp, so they anchor no "
             "element. An integrase alone is not an ICE - chromosomes carry many, "
             "mostly from prophages. Examples: "
-            + "; ".join(f"{a['contig']}:{a['start']}-{a['end']}" for a in orphans[:3])))
+            + "; ".join(f"{anchor['contig']}:{anchor['start']}-{anchor['end']}"
+                        for anchor in orphans[:3])))
     return clusters, audit_rows
 
 
@@ -1953,21 +2042,35 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
     The merge exists to repair an artefact of an arbitrary bp threshold, not to
     override the biological limit on how large an element can be.
     """
-    # Group cluster indices by (contig, sys_id). A cluster carrying two system
-    # IDs links both groups, which is why this needs a proper union rather than
-    # a single pass.
-    parent = list(range(len(clusters)))
+    # ── Working out which clusters end up in the same pile ───────────────────
+    # Sorting clusters into piles is not a single pass, because links CHAIN: if
+    # cluster 0 and cluster 3 share one system, and cluster 3 and cluster 7 share
+    # a different one, then all three belong in one pile even though 0 and 7 have
+    # nothing in common directly. A cluster can carry two system ids, so this
+    # happens for real.
+    #
+    # The standard bookkeeping for that is below. Each cluster records ONE other
+    # cluster it currently answers to (`answers_to`), so every pile is a little
+    # chain ending at the pile's representative - the cluster that answers to
+    # itself. `pile_of` walks that chain to the representative; `join_piles`
+    # makes two piles one by pointing the higher-numbered representative at the
+    # lower, so the representative of a pile is always its lowest member and the
+    # result does not depend on the order links were found in.
+    #
+    # (`pile_of` also shortens the chain as it walks - `answers_to[i] =
+    # answers_to[answers_to[i]]` - which is pure speed and changes no answer.)
+    answers_to = list(range(len(clusters)))
 
-    def find(i):
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
+    def pile_of(i):
+        while answers_to[i] != i:
+            answers_to[i] = answers_to[answers_to[i]]
+            i = answers_to[i]
         return i
 
-    def union(i, j):
-        root_i, root_j = find(i), find(j)
-        if root_i != root_j:
-            parent[max(root_i, root_j)] = min(root_i, root_j)
+    def join_piles(i, j):
+        pile_i, pile_j = pile_of(i), pile_of(j)
+        if pile_i != pile_j:
+            answers_to[max(pile_i, pile_j)] = min(pile_i, pile_j)
 
     # Pass 1 - who claims which system, and on what footing.
     #   locus_clusters_by_key  (contig, sys_id) -> cluster indices holding a
@@ -1993,15 +2096,17 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
             else:
                 locus_clusters_by_key.setdefault(key, set()).add(index)
 
-    # Pass 2 - the unions, from locus members only.
+    # Pass 2 - do the joining, from locus members only. Every cluster holding a
+    # locus member of the same system goes into one pile.
     for indices in locus_clusters_by_key.values():
         ordered = sorted(indices)
         for other in ordered[1:]:
-            union(ordered[0], other)
+            join_piles(ordered[0], other)
 
+    # The piles, read back out: representative -> the clusters that ended up in it.
     groups = {}
     for index in range(len(clusters)):
-        groups.setdefault(find(index), []).append(index)
+        groups.setdefault(pile_of(index), []).append(index)
 
     merged = []
     audit_rows = []
@@ -2010,16 +2115,18 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
         joined = []
         for index in members:
             joined.extend(clusters[index])
-        joined.sort(key=lambda a: (a["start"], a["end"]))
+        joined.sort(key=lambda anchor: (anchor["start"], anchor["end"]))
+        joined_start = min(anchor["start"] for anchor in joined)
+        joined_end = max(anchor["end"] for anchor in joined)
 
         # The size guard. Refuse a merge that would produce something larger than
         # any real element, and keep the pieces instead - a truncated call is far
         # more useful than an element dropped for being impossibly long.
-        merged_span = max(a["end"] for a in joined) - min(a["start"] for a in joined) + 1
+        merged_span = joined_end - joined_start + 1
         if len(members) > 1 and merged_span > max_element_bp:
-            shared = sorted({(a.get("sys_id") or "").strip()
-                             for index in members for a in clusters[index]
-                             if (a.get("sys_id") or "").strip()})
+            shared = sorted({(anchor.get("sys_id") or "").strip()
+                             for index in members for anchor in clusters[index]
+                             if (anchor.get("sys_id") or "").strip()})
             audit_rows.append(audit_row(
                 "NA",
                 "evidence_recorded",
@@ -2031,8 +2138,8 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
                 "replicon; they are kept as separate clusters rather than joined "
                 "into one implausible element.",
                 contig=joined[0]["contig"],
-                start=min(a["start"] for a in joined),
-                end=max(a["end"] for a in joined),
+                start=joined_start,
+                end=joined_end,
             ))
             for index in sorted(members):
                 merged.append(clusters[index])
@@ -2041,12 +2148,13 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
         merged.append(joined)
 
         if len(members) > 1:
-            shared = sorted({(a.get("sys_id") or "").strip()
-                             for index in members for a in clusters[index]
-                             if (a.get("sys_id") or "").strip()})
+            shared = sorted({(anchor.get("sys_id") or "").strip()
+                             for index in members for anchor in clusters[index]
+                             if (anchor.get("sys_id") or "").strip()})
             spans = ", ".join(
-                f"{min(a['start'] for a in clusters[i])}-{max(a['end'] for a in clusters[i])}"
-                for i in sorted(members))
+                f"{min(anchor['start'] for anchor in clusters[index])}"
+                f"-{max(anchor['end'] for anchor in clusters[index])}"
+                for index in sorted(members))
             audit_rows.append(audit_row(
                 # `sample` is filled in by the caller, exactly as it is for the
                 # integrase-attachment audit rows.
@@ -2059,8 +2167,8 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
                 "Splitting them would both inflate the element count and truncate "
                 "the element's reported span.",
                 contig=joined[0]["contig"],
-                start=min(a["start"] for a in joined),
-                end=max(a["end"] for a in joined),
+                start=joined_start,
+                end=joined_end,
             ))
 
     # The merges that were REFUSED because the only thing joining two clusters
@@ -2078,7 +2186,8 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
         # level, not cluster level, because locus members of the same system may
         # legitimately have merged already - what the loner would have added is
         # the fusion of these groups into one.
-        surviving_groups = sorted({find(index) for index in clusters_touching_this_system})
+        surviving_groups = sorted({pile_of(index)
+                                   for index in clusters_touching_this_system})
         if len(surviving_groups) < 2:
             continue
 
@@ -2089,18 +2198,23 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
             if (anchor.get("sys_id") or "").strip() == sys_id
             and anchor.get("locus_num") is not None and anchor["locus_num"] < 0
         })
-        pieces = sorted(
-            (min(a["start"] for index in groups[root] for a in clusters[index]),
-             max(a["end"] for index in groups[root] for a in clusters[index]))
-            for root in surviving_groups
-        )
+        # The stretch each surviving pile covers, left to right. Written as a
+        # plain loop: three nested comprehensions in one expression is a puzzle.
+        pieces = []
+        for root in surviving_groups:
+            anchors_in_pile = [anchor for index in groups[root]
+                               for anchor in clusters[index]]
+            pieces.append((min(anchor["start"] for anchor in anchors_in_pile),
+                           max(anchor["end"] for anchor in anchors_in_pile)))
+        pieces.sort()
+
         would_have_spanned = pieces[-1][1] - pieces[0][0] + 1
         audit_rows.append(audit_row(
             "NA",
             "evidence_recorded",
             "system_merge_refused_loner_only_link",
             f"{len(pieces)} separate anchor group(s) "
-            f"({', '.join(f'{lo}-{hi}' for lo, hi in pieces)}) hold hits of the "
+            f"({', '.join(f'{start}-{end}' for start, end in pieces)}) hold hits of the "
             f"system {sys_id}, and the only thing joining them is a MacSyFinder "
             f"LONER ({', '.join(loner_genes)}) - a gene the model admits from "
             "anywhere on the replicon, without the co-localisation test that "
@@ -2404,70 +2518,16 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         start = min(anchor["start"] for anchor in cluster)
         end = max(anchor["end"] for anchor in cluster)
 
-        # Which typed mating-pair systems this cluster's anchors belong to.
-        # Needed BEFORE the keep/drop test, because the size floor depends on
-        # whether this looks like an IME or an ICE.
-        cluster_system_ids_early = {anchor["sys_id"] for anchor in cluster
-                                    if anchor.get("sys_id")}
-        has_mpf_system_early = any(
-            systems.get(sys_id, {}).get("mpf_types", set())
-            for sys_id in cluster_system_ids_early
-            if systems.get(sys_id, {}).get("source") == SOURCE_CONJSCAN
-        )
-        has_aice_system_early = any(
-            systems.get(sys_id, {}).get("icescan_class") == ICESCAN_MODEL_AICE
-            for sys_id in cluster_system_ids_early
-        )
-        keep, reason, detail = keep_or_drop_cluster(
-            cluster, min_element_bp, max_element_bp,
-            min_ime_element_bp=min_ime_element_bp,
-            has_mpf_system=has_mpf_system_early,
-            has_aice_system=has_aice_system_early)
-        if not keep:
-            audit_rows.append(audit_row(
-                sample, "dropped", reason, detail, contig=contig, start=start, end=end
-            ))
-            continue
+        # ── What the two tools said about the SYSTEMS behind these anchors ───
+        # All of this is worked out ONCE, here, before anything is decided,
+        # because two separate decisions need the same answers: the keep/drop
+        # test immediately below (its size floor depends on whether this looks
+        # like an IME, an AICE or an ICE) and the classification further down.
+        # It used to be computed twice, in two places, from the same inputs -
+        # identical arithmetic written out twice is an invitation for the two
+        # copies to drift apart.
 
-        # --- which evidence is present -------------------------------------
-        has_integrase = cluster_has_class(cluster, ANCHOR_INTEGRASE)
-        has_relaxase = cluster_has_class(cluster, ANCHOR_RELAXASE)
-        has_t4cp = cluster_has_class(cluster, ANCHOR_T4CP)
-        has_t4ss = cluster_has_class(cluster, ANCHOR_T4SS)
-        present_classes = [
-            anchor_class for anchor_class in ANCHOR_CLASS_ORDER
-            if cluster_has_class(cluster, anchor_class)
-        ]
-
-        # --- does the SYSTEM itself evidence a mating-pair apparatus? --------
-        # `has_t4ss` above only says that SOME mating-pair profile was hit inside
-        # this cluster. That alone must not make an ICE, because CONJscan's
-        # relaxase-centred `MOB` model lists VirB4 as an ACCESSORY gene: a MOB
-        # system is BY DEFINITION a relaxase-only system - it describes DNA that
-        # can be picked up by someone else's machinery - and one incidental VirB4
-        # inside it is not evidence that this cell can build a mating bridge.
-        #
-        # Only the typed models (`T4SS_type*`, and their decayed `dCONJ_type*`
-        # counterparts) describe a complete mating-pair apparatus. So we ask, per
-        # mating-pair hit, which model it was found under, and count only the
-        # typed ones. Without this test a single accessory VirB4 would promote an
-        # IME (mobilisable, needs a helper) straight to an ICE (predicted
-        # self-transmissible) - the worst overcall this script could make, since
-        # tier 6 is exactly the answer a regulator reads.
-        # Ask the SYSTEM, not the individual hit. An earlier version of this test
-        # looked at each mating-pair anchor's own model, which diverges from the
-        # system view in a case that really happens: in T4SS_typeF both the
-        # relaxase and the coupling protein are declared loner genes, so a typed
-        # system can contribute those two while a separate MOB system in the same
-        # cluster contributes the accessory VirB4. The per-hit test then said "no
-        # apparatus" for a cluster that plainly had a typed T4SS system in it, and
-        # wrote an audit line asserting something the row's own mpf_type column
-        # contradicted. Whether CONJscan called a typed mating-pair SYSTEM here is
-        # the question that matters, and mpf_types already answers it.
-        # Which typed mating-pair systems do the anchors in this cluster belong
-        # to? Computed here from the anchors' own system ids, because the tier
-        # decision below needs the answer; the descriptive mpf_types list further
-        # down is built the same way and reports it.
+        # Every system id any anchor in this cluster belongs to, from either tool.
         cluster_system_ids = {anchor["sys_id"] for anchor in cluster
                               if anchor.get("sys_id")}
 
@@ -2493,6 +2553,31 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             sys_id for sys_id in cluster_system_ids
             if systems.get(sys_id, {}).get("source") == SOURCE_CONJSCAN
         }
+
+        # DID CONJscan CALL A TYPED MATING-PAIR SYSTEM HERE?
+        #
+        # This is not the same question as "was a mating-pair profile hit in this
+        # cluster" (that is has_t4ss, below), and the difference is the worst
+        # overcall this script could make. CONJscan's relaxase-centred `MOB`
+        # model is BY DEFINITION a relaxase-only system - it describes DNA that
+        # can be picked up by someone else's machinery - and it lists VirB4 as an
+        # ACCESSORY gene. So one incidental VirB4 inside a MOB system is not
+        # evidence that this cell can build a mating bridge, and must not promote
+        # an IME (mobilisable, needs a helper) to an ICE (predicted
+        # self-transmissible). Tier 6 is exactly the answer a regulator reads.
+        #
+        # Only the typed models (`T4SS_type*` and their decayed `dCONJ_type*`
+        # counterparts) describe a complete apparatus, and only those carry an
+        # MPF type letter - so a non-empty set of type letters IS the answer.
+        #
+        # Asked of the SYSTEM, not of the individual hit. An earlier version
+        # looked at each mating-pair anchor's own model, which diverges from the
+        # system view in a case that really happens: in T4SS_typeF both the
+        # relaxase and the coupling protein are declared loner genes, so a typed
+        # system can contribute those two while a separate MOB system in the same
+        # cluster contributes the accessory VirB4. The per-hit test then said "no
+        # apparatus" for a cluster that plainly had a typed T4SS system in it, and
+        # wrote an audit line contradicting the row's own mpf_type column.
         cluster_mpf_types = {
             mpf_type
             for sys_id in conjscan_system_ids
@@ -2506,16 +2591,41 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             for sys_id in cluster_system_ids
             if systems.get(sys_id, {}).get("icescan_class")
         }
+        has_aice_system = ICESCAN_MODEL_AICE in cluster_icescan_classes
 
         # Does this cluster's machinery come from a system whose hits are spread
-        # over more than one contig? Computed here rather than with the other
-        # short-read flags further down, because the classification a few lines
-        # below needs it. It is reported unchanged as the spans_contigs column.
-        cluster_spans_contigs = any(
+        # over more than one contig? Reported unchanged as the spans_contigs
+        # column, and an absolute cap on confidence wherever it is true.
+        spans_contigs = any(
             len(systems.get(sys_id, {}).get("contigs", set())) > 1
             for sys_id in conjscan_system_ids
         )
-        # ...but asking the system alone is not enough either, and the Phase 7
+
+        # ── Does this cluster become a candidate at all? ─────────────────────
+        keep, reason, detail = keep_or_drop_cluster(
+            cluster, min_element_bp, max_element_bp,
+            min_ime_element_bp=min_ime_element_bp,
+            has_mpf_system=has_mpf_system,
+            has_aice_system=has_aice_system)
+        if not keep:
+            audit_rows.append(audit_row(
+                sample, "dropped", reason, detail, contig=contig, start=start, end=end
+            ))
+            continue
+
+        # --- which evidence is present -------------------------------------
+        has_integrase = cluster_has_class(cluster, ANCHOR_INTEGRASE)
+        has_relaxase = cluster_has_class(cluster, ANCHOR_RELAXASE)
+        has_t4cp = cluster_has_class(cluster, ANCHOR_T4CP)
+        has_t4ss = cluster_has_class(cluster, ANCHOR_T4SS)
+        present_classes = [
+            anchor_class for anchor_class in ANCHOR_CLASS_ORDER
+            if cluster_has_class(cluster, anchor_class)
+        ]
+
+        # --- is the mating-pair apparatus actually HERE? ---------------------
+        # A typed system (has_mpf_system, worked out above) is necessary but not
+        # sufficient, and the Phase 7
         # benchmark showed why. MacSyFinder LONER genes may sit anywhere on the
         # replicon, so a lone relaxase declared a loner of a typed T4SS model
         # drags that model's type letter across the whole chromosome. On
@@ -2540,7 +2650,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         # it, nothing changes under fragmentation and closed genomes are
         # unaffected. BacFlux's main input is short-read drafts, so this matters
         # more here than the closed-genome benchmark can show.
-        has_mpf_apparatus = has_mpf_system and (has_t4ss or cluster_spans_contigs)
+        has_mpf_apparatus = has_mpf_system and (has_t4ss or spans_contigs)
 
         # Did the exemption above do the work? TRUE means "this is an ICE only
         # because a typed system's OTHER hits are on a different contig" - the
@@ -2611,8 +2721,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         # on evidence we do not have. Agreement and disagreement are both written
         # to the audit file so the comparison with ICEscan stays visible.
         mobility_tier_reason = TIER_ASSIGNED_DOWNSTREAM_REASON
-        if ICESCAN_MODEL_AICE in cluster_icescan_classes and cluster_looks_like_an_aice(
-                cluster, True):
+        if cluster_looks_like_an_aice(cluster, has_aice_system):
             mge_class = MGE_CLASS_AICE
             mobility = AICE_MOBILITY
             mobility_tier_reason = AICE_TIER_REASON
@@ -2654,6 +2763,33 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             anchor["sys_id"] for anchor in cluster if anchor["sys_id"]
         })
         judged_systems = sorted(conjscan_system_ids)
+
+        # DID EITHER TOOL ACTUALLY ASSEMBLE A CONJUGATION SYSTEM HERE, or is this
+        # row built from loose profile hits? That is the question `evidence_level`
+        # answers and the reason the profile-hit fallback is capped at low
+        # confidence, so it has to be asked of the MACHINERY - the relaxase, the
+        # coupling protein, the mating-pair genes, the AICE translocase - and of
+        # nothing else.
+        #
+        # WHY THE INTEGRASE IS EXCLUDED, and it is not a detail. CONJScan has no
+        # integrase model at all, so every integrase reaching us comes either from
+        # the Bakta product text (no system, ever) or from an ICEscan integrase
+        # profile, which DOES carry its own system id. attach_nearby_integrases
+        # adds that integrase to the cluster after clustering, so asking
+        # `contributing_systems` - which pools every anchor's system id - let one
+        # ICEscan integrase answer "yes, a system was assembled" on behalf of
+        # machinery that MacSyFinder had assembled into nothing. The row then read
+        # evidence_level=system and escaped the low cap while its own audit file
+        # carried the line `no_system_using_profile_hits` saying the opposite.
+        #
+        # Note this deliberately does NOT narrow to CONJscan: an ICEscan relaxase
+        # belonging to a real ICEscan system is a genuine assembled system and is
+        # counted, exactly as it was before.
+        machinery_system_ids = {
+            anchor["sys_id"] for anchor in cluster
+            if anchor["sys_id"] and anchor["anchor_class"] != ANCHOR_INTEGRASE
+        }
+        from_profile_hits_only = not machinery_system_ids
         wholeness_values = [
             systems[sys_id]["wholeness"] for sys_id in judged_systems
             if systems.get(sys_id, {}).get("wholeness") is not None
@@ -2689,11 +2825,9 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             ))
 
         # --- honest short-read flags ----------------------------------------
-        spans_contigs = any(
-            len(systems.get(sys_id, {}).get("contigs", set())) > 1
-            for sys_id in judged_systems
-        )
-
+        # `spans_contigs` was worked out at the top of the loop, because the
+        # classification needed it; how far this call sits from a contig end
+        # depends only on the interval, so it is measured here.
         contig_length = contig_lengths.get(contig)
         if contig_length is None:
             dist_to_start = None
@@ -2712,7 +2846,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         confidence, caps = assess_confidence(
             len(present_classes), machinery_intact, spans_contigs, at_boundary,
             boundary_method=None,
-            from_profile_hits_only=not contributing_systems,
+            from_profile_hits_only=from_profile_hits_only,
         )
         for cap_level, cap_reason, cap_detail in caps:
             audit_rows.append(audit_row(
@@ -2732,24 +2866,17 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             anchor["label"] for anchor in cluster
             if anchor["anchor_class"] == ANCHOR_RELAXASE
         })
-        mpf_types = sorted({
-            mpf_type
-            for sys_id in judged_systems
-            for mpf_type in systems.get(sys_id, {}).get("mpf_types", set())
-        })
-        # A T4SS_type*/dCONJ_type* model among the contributing systems means
-        # CONJscan called a whole typed mating-pair system somewhere in this
-        # cluster. Reported as a column so a reader can see at a glance whether
-        # the call rests on a typed system; the classification decision itself
-        # was already made above, per mating-pair hit, and audited there.
-        mpf_typed_system = bool(mpf_types)
+        # The MPF type letters, for the report. Same set the classification used
+        # at the top of the loop, just put in a stable order for the column.
+        mpf_types = sorted(cluster_mpf_types)
+        # Reported as a column so a reader can see at a glance whether the call
+        # rests on a typed mating-pair system. The decision itself was made above.
+        mpf_typed_system = has_mpf_system
 
-        # The biggest anchor-free hole inside this cluster. Conjugation machinery
-        # is an operon, so on a real element the anchors sit close together and
-        # this number stays small however long the element is; a big number means
-        # the interval only exists because two distant blocks were joined (by the
-        # system merge, or by the wide integrase window). resolve_nested_calls
-        # reads it when two calls overlap and it has to decide which is real.
+        # The biggest anchor-free hole inside this cluster. Reported for a reader
+        # judging the call by eye; nothing decides anything on it - see the note
+        # on machinery_gap_bp in OUTPUT_COLUMNS for the rule that was tried here
+        # and withdrawn.
         ordered_anchors = sorted(cluster, key=lambda a: (a["start"], a["end"]))
         machinery_gap_bp = 0
         reach = ordered_anchors[0]["end"]           # rightmost base covered so far
@@ -2778,7 +2905,9 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             # Spec §9 identifier format: contig|type-start:end. Stable across
             # runs, and it is the join key a report can use.
             "mge_id": f"{contig}|{mge_class}-{start}:{end}",
-            "mge_name": "NA",          # no curated naming database in this phase
+            # Never named here. The optional rule name_ice_elements fills this in
+            # on a copy of the table, by BLASTing the interval against ICEberg.
+            "mge_name": "NA",
             "element_type": ELEMENT_TYPE_FOR_CLASS[mge_class],
             "mge_class": mge_class,
             "mobility": mobility,
@@ -2818,12 +2947,15 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             ),
             "machinery_intact": _tsv_bool(machinery_intact),
             "degraded_reason": ",".join(degraded_reasons) if degraded_reasons else "NA",
-            # A cluster whose anchors carry no sys_id came from the profile-hit
-            # fallback: MacSyFinder found these profiles but never assembled them
-            # into a system. Naming that in the row itself means a reader never
-            # has to infer it from an empty conjscan_systems cell.
+            # A cluster whose MACHINERY anchors carry no sys_id came from the
+            # profile-hit fallback: MacSyFinder found these profiles but never
+            # assembled them into a system. Naming that in the row itself means a
+            # reader never has to infer it from an empty conjscan_systems cell -
+            # and finalise_confidence re-reads this very cell to restate the low
+            # cap, so the two must agree. See machinery_system_ids above for why
+            # an attached integrase does not count as an assembled system.
             "evidence_level": (
-                "system" if contributing_systems else "profile_hits_only"
+                "profile_hits_only" if from_profile_hits_only else "system"
             ),
             # For an AICE, the relaxase and mating bridge are absent by
             # definition, so listing them as "missing" would read as a degraded
@@ -2864,7 +2996,7 @@ def read_is_intervals(is_table_path):
     Input:  {sample}_is_elements.tsv from isescan_table, or "" when the mobilome
             module ran without it.
     Output: dict of contig -> intervals. Empty dict when there is no table, which
-            simply means the de novo att scan runs unmasked.
+            simply means the att search runs unmasked.
 
     Why the att search needs this at all: insertion sequences carry terminal
     repeats and duplicate a few bases of target DNA when they transpose, so an
@@ -2958,8 +3090,8 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
         # duplication, or noise. Searching anyway is not merely wasteful, it
         # manufactures boundaries that do not exist.
         #
-        # This was caught on the KPNIH1 positive control: the two elements the
-        # search "resolved" were both conjugative_region calls with no integrase
+        # This was caught on the K. pneumoniae positive control: the two elements
+        # the search "resolved" were both conjugative_region calls with no integrase
         # (one of them on a plasmid, which does not integrate at all), while the
         # one genuinely integrative element - the chromosomal IME - got nothing.
         # Exactly backwards, until this gate was added.
@@ -3014,7 +3146,11 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
 
         # A DE NOVO boundary is REPORTED but never ACTED ON. This is the single
         # most important restraint in Phase 3, so here is the measurement behind
-        # it, taken on the KPNIH1 chromosome (5.4 Mb) with the real IS mask:
+        # it, taken on a clinical K. pneumoniae chromosome (5.4 Mb) with the real
+        # IS mask. (The strain is left unnamed on purpose: this project used two
+        # K. pneumoniae positive controls and conflated them, and which one
+        # carried this particular run was never re-established. The rate is the
+        # same either way - see docs/methods_att_and_small_plasmids.md.)
         #
         #   300 randomly placed 15 kb spans, none of them an ICE
         #   -> 22% came back with a confident de novo "boundary"
@@ -3030,9 +3166,12 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
         # textbook INTRINSIC determinant, and it sits on the chromosome where
         # these spurious repeats live.
         #
-        # Mode A (tRNA-anchored) is a different proposition: it starts from a
-        # position integrases are known to target and requires the probe to be the
-        # 3' end of an actual annotated tRNA, so it is specific enough to act on.
+        # A tRNA-ANCHORED pair is a different proposition, and the difference is
+        # only that one copy of the repeat OVERLAPS AN ANNOTATED tRNA. That is
+        # the position integrases are known to target - an ICE recombines into a
+        # tRNA gene and reconstitutes it - so the repeat is not merely a repeat,
+        # it sits exactly where the scar of an integration event would be. That
+        # is specific enough to act on.
         #
         # The de novo columns stay in the output because they are a real lead for
         # a human to follow - which is what the spec's boundary_method column is
@@ -3067,6 +3206,22 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
             # moved an element in the first place, so no coordinate changes -
             # the row drops back to boundary_method='none', which is the honest
             # statement that the extent is the machinery span.
+            #
+            # ⚠ NOTE WHERE THIS GUARD SITS, because it is not where you would
+            # expect. It is inside the DE NOVO branch, which changes no
+            # coordinate - so a repeat family caught here costs nothing but a
+            # column. The tRNA branch below is the one that rewrites start/end
+            # and therefore decides which AMR genes colocalise.py treats as
+            # cargo, and it has NO assembly-wide repeat check: its only
+            # repetitiveness test is att_search's own, which counts copies within
+            # the single contig it was handed.
+            #
+            # This asymmetry is deliberate for now, not an oversight. A
+            # tRNA-anchored repeat is a much stronger claim to begin with (one
+            # copy has to overlap an annotated tRNA), and extending the
+            # assembly-wide count to that branch would change calls and could
+            # lose real elements from the ICE pilot. It needs a benchmark run,
+            # not a quiet edit - so it is written down here instead.
             att_kmer = result["att_sequence"]
             n_copies = copies_in_assembly(att_kmer) if att_kmer else 0
             if n_copies > att_search.DENOVO_MAX_CONTIG_COPIES:
@@ -3153,7 +3308,7 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
     return rows, audit_rows
 
 
-def resolve_nested_calls(sample, rows, window_bp):
+def resolve_nested_calls(sample, rows):
     """Phase 3b: report ONE element where two calls of the same class nest.
 
     Input:  the candidate rows AFTER Phase 3 has fixed the boundaries and after
@@ -3177,7 +3332,10 @@ def resolve_nested_calls(sample, rows, window_bp):
 
     WHICH ONE SURVIVES - and why it is not simply "the smaller one". On other
     genomes the larger call is the real element: a 100 kb ICE genuinely contains
-    smaller machinery blocks. So the choice is made on evidence, in this order:
+    smaller machinery blocks. So the choice is made on evidence. There are TWO
+    tests, tried in this order (a third was written, measured and removed - the
+    long note in the code below says why, and it is worth reading before adding
+    another):
 
       1. A tRNA-ANCHORED att PAIR WINS. An att site is the scar left where the
          element recombined into the chromosome, so a call whose ends came from
@@ -3187,22 +3345,17 @@ def resolve_nested_calls(sample, rows, window_bp):
          refuses to act on one: ~16% of arbitrary chromosomal spans yield such a
          repeat by chance.)
 
-      2. OTHERWISE, COHERENT MACHINERY BEATS STITCHED MACHINERY. Conjugation
-         genes are an operon: on a real element the anchors sit shoulder to
-         shoulder, so machinery_gap_bp - the widest anchor-free hole inside the
-         call - stays small no matter how long the element is. A call with a hole
-         wider than --window-bp, the module's own statement of how far apart one
-         element's machinery genes sit, exists only because two distant blocks
-         were joined. When exactly one of the pair is coherent by that test, it
-         is the element and the other is the join.
-
-      3. OTHERWISE KEEP THE OUTER ONE. With no evidence separating them, the
+      2. OTHERWISE KEEP THE OUTER ONE. With no evidence separating them, the
          wider interval is the safer report: it contains every base and every
          anchor the inner call had, so the inner one is cargo of it rather than a
          second finding. This follows the EBI Mobilome Annotation Pipeline, which
          suppresses an IME nested inside an ICE for the same reason. (Adopting
          their convention is fine - it is a design decision, not their code; see
          spec §11.)
+
+    Two calls with IDENTICAL intervals are handled separately and first, before
+    the same-class test, because they are one locus reported twice rather than
+    one element inside another - see the block that does it.
 
     DELIBERATELY LIMITED TO ONE CLASS. Two calls of DIFFERENT classes that nest -
     an IME inside an ICE - are two genuinely different elements, and BacFlux
@@ -3293,7 +3446,7 @@ def resolve_nested_calls(sample, rows, window_bp):
             if not contains(outer, inner):
                 continue
 
-            # --- the three keys, in order --------------------------------
+            # --- the two tests, in order ---------------------------------
             if has_trna_boundary(inner) != has_trna_boundary(outer):
                 if has_trna_boundary(inner):
                     winner_position, loser_position = inner_position, outer_position
@@ -3302,9 +3455,11 @@ def resolve_nested_calls(sample, rows, window_bp):
                 key = ("its ends come from a tRNA-anchored att pair, the scar of "
                        "the integration event, while the other call's ends are "
                        "only the span of its machinery")
-            # A SECOND KEY WAS TRIED HERE AND REMOVED - "the call whose machinery
-            # sits together as one operon wins over the one stitched from distant
-            # blocks", tested as machinery_gap_bp <= --window-bp.
+            # A TEST WAS TRIED BETWEEN THESE TWO AND REMOVED - "the call whose
+            # machinery sits together as one operon wins over the one stitched
+            # from distant blocks", tested as machinery_gap_bp <= --window-bp.
+            # (It is the reason this function used to take a window_bp argument,
+            # which is why it no longer does.)
             #
             # It sounds right and it is wrong, because the premise that
             # conjugation machinery always sits together does not survive contact
@@ -3416,9 +3571,17 @@ def finalise_confidence(sample, rows, require_trna_boundary=False):
 # ── The command-line interface ───────────────────────────────────────────────
 
 def build_parser():
-    """Define the CLI. Every threshold is exposed, because all three are
-    conventions rather than biology and a user working on, say, Bacteroidetes ICEs
-    may reasonably want different ones."""
+    """Define the CLI.
+
+    Every threshold is exposed on the command line, because they are all
+    conventions rather than biology - a real ICE can be 15 kb or 200 kb - and a
+    user working on, say, Bacteroidetes ICEs may reasonably want different ones.
+
+    NOTE, because it surprises people: rule conjscan_ice passes NONE of the size
+    or window flags, so in the workflow they always run at the defaults set here.
+    Every measured result in docs/ was produced at those defaults. Changing one
+    means re-running the benchmark, not just editing a number.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Turn CONJscan machinery hits plus Bakta annotation into ICE/IME "
@@ -3463,7 +3626,9 @@ def build_parser():
                         help="ICEscan's hmmer_results/ directory, used the same "
                              "way --conjscan-hmmer-dir is: only when no system "
                              "was assembled at all. Defaults to hmmer_results/ "
-                             "beside the ICEscan best_solution.tsv.")
+                             "beside the ICEscan best_solution.tsv - which is "
+                             "where MacSyFinder puts it, so rule conjscan_ice "
+                             "does not pass this flag and relies on the default.")
     parser.add_argument("--conjscan-hmmer-dir", default=None,
                         help="MacSyFinder's hmmer_results/ directory. Read ONLY "
                              "when no complete system was assembled, to recover an "
@@ -3496,8 +3661,11 @@ def build_parser():
                         help="genome FASTA Bakta annotated; enables the Phase 3 "
                              "att-site search that resolves element boundaries")
     parser.add_argument("--is-table", default="",
-                        help="IS element table, masked out before the de novo att "
-                             "scan so transposon repeats cannot masquerade as att sites")
+                        help="IS element table. These intervals are blanked out of "
+                             "the sequence before the att search - the WHOLE search, "
+                             "not just part of it - so that the terminal repeats and "
+                             "target-site duplications insertion sequences leave "
+                             "behind cannot masquerade as att sites.")
     parser.add_argument("--att-flank-window-bp", type=int,
                         default=att_search.DEFAULT_FLANK_WINDOW_BP,
                         help="how far beyond the machinery span to look for the "
@@ -3847,12 +4015,14 @@ def main(argv=None):
     for row in merge_audit:
         row["sample"] = args.sample
     audit_rows.extend(merge_audit)
-    # The att probe for the integrase tie-break (FIX 4). When two or more
-    # integrases are in the running for one cluster - which is the normal case
-    # once ICEscan's hits join the pool - the one that actually produces a
-    # flanking attL/attR pair is the one that put this element here. This closure
-    # answers "would including an integrase at this span yield an att pair?" by
-    # running the same Phase 3 search that will later fix the boundaries.
+    # The att probe for the integrase tie-break. ("FIX 4" in the comments here and
+    # in attach_nearby_integrases is just this project's working label for that
+    # change; it names no external thing.) When two or more integrases are in the
+    # running for one cluster - which is the normal case once ICEscan's hits join
+    # the pool - the one that actually produces a flanking attL/attR pair is the
+    # one that put this element here. This closure answers "would including an
+    # integrase at this span yield an att pair?" by running the same Phase 3
+    # search that will later fix the boundaries.
     #
     # Only a tRNA-ANCHORED pair counts, exactly as in refine_candidate_boundaries:
     # a de novo repeat turns up in ~16% of arbitrary chromosomal spans by chance,
@@ -3865,12 +4035,28 @@ def main(argv=None):
     # repeats flood the candidate att pairs.
     is_intervals_by_contig = read_is_intervals(args.is_table)
 
+    # NOTE ON THE SIZE FLOOR PASSED TO BOTH att SEARCHES (here and in Phase 3
+    # below). Both hand att_search `--min-element-bp` (8 kb), and att_search
+    # rejects any att-bounded interval outside [min_element_bp, max_element_bp].
+    # That is the ICE floor. The separate, lower `--min-ime-element-bp` (2 kb)
+    # applies ONLY to the anchor-cluster size test in keep_or_drop_cluster.
+    #
+    # So an IME can be admitted at 2 kb and still never have its boundaries
+    # resolved, because an att pair implying anything under 8 kb is refused.
+    # That is not a bug and it is not free either: four of the five curated IMEs
+    # the module detects have machinery spans of 3.8-6.3 kb, and Tn4451 in the
+    # worked example is one of them, reported with boundary_method='none'.
+    # Lowering the att floor per class would change results and has not been
+    # measured, so the asymmetry stands and is written down here instead.
     att_probe = None
     if args.genome and os.path.isfile(args.genome):
         probe_sequences = att_search.read_fasta(args.genome)
         probe_trnas = att_search.group_by_contig(
             att_search.parse_trna_features(args.bakta_gff))
 
+        # `att_probe` starts as None and is REPLACED by this function when a
+        # genome is available. attach_nearby_integrases treats None as "no att
+        # evidence obtainable" and falls back to distance-then-source ranking.
         def att_probe(contig, span_start, span_end):
             sequence = probe_sequences.get(contig, "")
             if not sequence:
@@ -3957,7 +4143,7 @@ def main(argv=None):
     # intervals being compared must be final) and after the plasmid check (the
     # classes being compared must be final), but before confidence is settled so
     # that no confidence decision is recorded for a row that then disappears.
-    rows, nesting_audit = resolve_nested_calls(args.sample, rows, args.window_bp)
+    rows, nesting_audit = resolve_nested_calls(args.sample, rows)
     audit_rows.extend(nesting_audit)
 
     # --- Phase 6: settle the confidence now the boundaries are known ---------
