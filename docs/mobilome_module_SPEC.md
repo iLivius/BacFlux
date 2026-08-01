@@ -1,9 +1,43 @@
 # BacFlux — Mobilome & AMR-Mobility Module: Implementation Spec
 
-**Status:** design complete, implementation not started
+**Status:** **IMPLEMENTED** in v2.0.0 (as of 2026-07-31). This is now a *design
+record*, not a work order. See the box below before acting on anything in it.
 **Author of design notes:** Livio Antonielli (iLivius), with an AI brainstorming session
-**Target repo:** `https://github.com/iLivius/BacFlux` (MIT), and long-read derivatives BacFluxL / BacFluxLplus
+**Target repo:** `https://github.com/iLivius/BacFlux` (MIT) — written when BacFlux had long-read siblings BacFluxL / BacFluxLplus; v2.0.0 merged all of them into this one repository.
 **Document purpose:** give a coding agent everything needed to reconstruct context and start implementing without re-deriving the reasoning.
+
+---
+
+> ## ⚠ How to read this document now
+>
+> This spec was written **before** the module existed, and it still reads like a
+> plan. The module is built: **22 rules in
+> `workflow/rules/shared/80_mobilome.smk`**, with the helper package in
+> `workflow/scripts/mobilome/` and a passing test suite
+> (`pytest workflow/scripts` — 420 tests). Some sections were updated in place as
+> they were implemented (§5.3 and §5.5 carry dated correction boxes); most were
+> not.
+>
+> **Three things in here are stale by construction, and are flagged where they
+> appear:**
+>
+> 1. **The v1 output paths in §1.2** (`05.annotation`, `06.AMR`, `07.plasmids`,
+>    `08.phages`, `04.taxonomy`) were renumbered in v2. The real paths were
+>    established in [`mobilome_wpA_ground_truth.md`](mobilome_wpA_ground_truth.md)
+>    — read that, not §1.2.
+> 2. **The rule-file path in §10** (`workflow/rules/mobilome.smk`) is not where
+>    the code lives.
+> 3. **"BacFluxL only"**, in §2.3, §6, §8 and §13, meant "the long-read sibling
+>    repository". There is no such repository any more. Those parts run in **all
+>    four v2 modes**; the *caveat* behind the restriction — that they are much less
+>    reliable on a fragmented short-read assembly — is still entirely real and is
+>    the reason the module reports contig-edge flags on every row.
+>
+> For what the module actually does and how well it works, read the README's
+> *Validation* section, [`methods_att_and_small_plasmids.md`](methods_att_and_small_plasmids.md),
+> [`methods_icescan_union.md`](methods_icescan_union.md),
+> [`methods_ebi_comparison.md`](methods_ebi_comparison.md) and
+> [`mobilome_worked_example.md`](mobilome_worked_example.md).
 
 ---
 
@@ -31,7 +65,29 @@ Run with `snakemake --sdm conda`. Conda-per-rule is the dependency model. Everyt
 
 ### 1.2 Relevant existing outputs
 
-> ⚠️ **UNVERIFIED — FIRST TASK FOR THE AGENT.** The paths below are inferred from the README, not read from the Snakefile. Before writing any rule, run the greps in §1.5 and replace this table with the actual `output:` paths. Do not trust these strings.
+> ⚠️ **SUPERSEDED — DO NOT USE THESE PATHS.** They were guessed from the v1 README
+> and never corrected here. The ground truth was established by reading the
+> Snakefile and is written up in
+> [`mobilome_wpA_ground_truth.md`](mobilome_wpA_ground_truth.md); **that is the
+> document to use.**
+>
+> Two things changed. First, the original warning below ("run the greps in §1.5
+> and paste the results in") was never actioned, so the table is still guesswork.
+> Second, and more importantly, **v2 renumbered every stage**, so even a corrected
+> v1 table would now be wrong:
+>
+> | this table says (v1) | v2 actual |
+> |---|---|
+> | `04.taxonomy` | `03.taxonomy` |
+> | `05.annotation` | `04.annotation` |
+> | `06.AMR` | `05.amr` |
+> | `07.plasmids` | `06.plasmids` |
+> | `08.phages` | `07.phages` |
+> | — | `08.mobilome` |
+>
+> The tool versions below are also v1: v2 runs **GTDB-Tk 2.7.2 against GTDB R232**,
+> not 2.6.1 / R226. The table is kept only because §1.5 and the surrounding
+> reasoning refer to it.
 
 **Known facts (from v1.3.1 release notes, verified):**
 - ABRicate runs as a **named wildcard rule `amr_contigs`** across multiple databases (anonymous per-database rules were replaced in v1.3.1). So there are *several* ABRicate outputs per sample — the mobilome module must choose one (or merge) rather than assume a single file.
@@ -74,6 +130,13 @@ sed -n '1,60p' config/config.yaml                                 # key names + 
 ```
 Paste the results into §1.2 and delete the warning above.
 
+*(Done, but not here: this was carried out against the real Snakefile and written
+up in [`mobilome_wpA_ground_truth.md`](mobilome_wpA_ground_truth.md) instead of
+being pasted back into §1.2. Note also that these commands are themselves v1 —
+in v2 the rules live in `workflow/rules/{shared,illumina,nanopore,hybrid,contigs}/*.smk`
+rather than in one `workflow/Snakefile`, and the config to read is
+`config/config_v2.yaml`.)*
+
 ---
 
 ## 2. Core conceptual model
@@ -107,6 +170,22 @@ Consequences (hard rules):
 - Composite-transposon and ICE-boundary calling → **BacFluxL only**.
 - BacFlux (short-read) reports the weaker, honest signals: distance to contig end, IS-at-contig-boundary flag, read-depth-derived copy number.
 
+> **Revised in v2.0.0.** The first bullet is no longer how this is enforced.
+> There is no separate long-read repository to restrict things to — v2 is one
+> workflow with four entry points, and composite-transposon and ICE-boundary
+> calling run in **all four**, including `illumina`. Gating a whole capability on
+> the sequencing technology turned out to be the wrong instrument: what actually
+> degrades the call is *assembly fragmentation*, which is correlated with the
+> technology but not determined by it (a good short-read assembly of a low-repeat
+> genome can beat a poor long-read one).
+>
+> What v2 does instead is report the fragmentation directly, per call, so the
+> reader can judge: `dist_to_contig_end`, `at_contig_boundary`, `spans_contigs`,
+> and a hard rule that **anything spanning contigs is capped at `low` confidence**
+> regardless of how good its machinery looks. The second bullet — report the
+> weaker, honest signals — is therefore the part that survived, and it now applies
+> everywhere rather than only in short-read mode.
+
 ### 2.4 IS vs transposon vs ICE — the definitions drive the tool choice
 - **IS** = encodes only what it needs to move. By definition carries **no** passenger genes. ISfinder covers this.
 - **Transposon** (composite or unit/Tn3-family) = carries passenger genes incl. AMR. **TnCentral** covers this, not ISfinder.
@@ -120,7 +199,7 @@ There is no hidden ISfinder feature that tells you an IS carries AMR. The analys
 3. Inside IS-flanked composite → mobilisable within the cell
 4. Inside unit transposon / integron cassette → mobilisable, named architecture
 5. On a mobilizable plasmid → transferable with helper
-6. **Inside an ICE, or on a conjugative plasmid → self-transmissible**
+6. **Inside an ICE, or on a conjugative plasmid → predicted self-transmissible**
 
 Special case: IS inserted *inside* an AMR CDS → likely inactivation. Report separately; do not pollute the mobilisation count.
 
@@ -308,8 +387,11 @@ unrepaired file — an independent reason to rebuild rather than reuse it. Both
 `download_db` rules now split embedded deflines onto their own lines and then
 **assert** that every `>` begins a line, failing rather than indexing a file whose
 shape they do not understand. Repairing TnCentral recovered `In781_p` on the
-KPNIH1 positive control (99.8% identity, 82% coverage) — a real integron that the
-unrepaired database could not see.
+positive control (99.8% identity, 82% coverage) — a real integron that the
+unrepaired database could not see. (The note originally named that control
+"KPNIH1"; this project has used both *K. pneumoniae* KPNIH1 (`CP008827.1`) and
+ATCC BAA-2146 (`CP006659.2`) as positive controls and repeatedly conflated them,
+so the strain is left unstated rather than guessed.)
 
 (The `download_full/fa` endpoint ships 513 well-formed per-element files and is a
 possible alternative source, but it is a year older — 2024-05-16 versus
@@ -361,6 +443,14 @@ The dumped FASTA is also the input for minimap2/diamond legs.
 ### BacFluxL/Lplus
 Same core, plus per-replicon IS burden (chromosome vs each plasmid), composite-transposon detection, IS×CDS intersection for pseudogene candidates. Optional: digIS (novelty), MobileElementFinder (cross-check).
 
+*In v2 this heading means "`nanopore` and `hybrid` mode", and the split is softer
+than it looks: per-replicon IS burden, composite-transposon detection and the
+IS×CDS intersection all run in every mode. What genuinely differs is how much you
+should believe them, which is why every call carries its contig-edge flags. The
+one leg that really is mode-restricted is the ISOSDB read-mapping copy-number
+step — it needs reads, so it is `illumina` and `hybrid` only. digIS and
+MobileElementFinder were not adopted.*
+
 ---
 
 ## 7. Work package D — AMR × MGE co-localisation
@@ -382,7 +472,14 @@ Composite call = short parser over `pairs.tsv`: same contig, ≥2 IS hits, **sam
 
 ---
 
-## 8. Work package E — ICE-lite (BacFluxL only, ~9–12 working days)
+## 8. Work package E — ICE-lite (~9–12 working days)
+
+*Was "BacFluxL only". **Built, and it runs in all four v2 modes** — a hybrid dry
+run prints "Mobilome module: ON" like any other. Phases 0–6 are implemented in
+`workflow/scripts/mobilome/` (`att_search.py`, `conjscan_to_ice.py`,
+`colocalise.py`); Phase 7 was carried out and is written up in the README's
+Validation section and in `methods_ebi_comparison.md`. The single biggest
+departure from the plan below is Phase 3 — see the superseded-probe box in it.*
 
 Design principle: **build an evidence integrator, not an ICE finder.** Only genuinely new algorithm is att-site search.
 
@@ -416,7 +513,7 @@ Design principle: **build an evidence integrator, not an ICE finder.** Only genu
 
 | Integrase | Relaxase | T4SS | Class | Mobility |
 |:-:|:-:|:-:|---|---|
-| ✓ | ✓ | ✓ | ICE | self-transmissible |
+| ✓ | ✓ | ✓ | ICE | predicted self-transmissible |
 | ✓ | ✓ | ✗ | IME | mobilisable (needs helper) |
 | ✓ | ✗ | ✗ | CIME / island | passive |
 | ✗ | ✓ | ✓ | conjugative region, unbounded | report, don't call ICE |
@@ -480,14 +577,23 @@ Example report line (target quality):
 
 ## 10. Snakemake structure
 
+> ⚠ **The path below is wrong; the layout was planned before v2's rule directories
+> existed.** The module is implemented in **`workflow/rules/shared/80_mobilome.smk`**
+> (22 rules), alongside the other shared stages
+> (`00_common`, `10_decontam`, `20_qc`, `30_taxonomy`, `40_annotation`, `50_amr`,
+> `60_plasmid`, `70_phage`, `90_report`). The helper package landed where planned,
+> at `workflow/scripts/mobilome/`, though with different file names — the real ones
+> are `att_search.py`, `conjscan_to_ice.py`, `colocalise.py`, `isescan_to_table.py`
+> and `name_elements.py`, plus their `test_*.py` siblings.
+
 ```
-workflow/rules/mobilome.smk
+workflow/rules/mobilome.smk        # ACTUAL: workflow/rules/shared/80_mobilome.smk
     isescan
     isescan_name_tncentral       # blastn + blastp cascade
     isosdb_read_mapping          # copy number
     amrfinderplus                # WP-A
     conjscan
-    ice_anchors                  # BacFluxL only
+    ice_anchors                  # runs in all four v2 modes; see the §2.3 revision
     ice_candidates
     ice_boundaries               # script: att_search.py
     ice_classify
@@ -567,6 +673,14 @@ CC BY-NC-SA is **non-commercial + share-alike → incompatible with MIT**. Copyi
 3. **WP-C** ISEScan + naming cascade + read-depth copy number — 2–3 days
 4. **WP-D** AMR × IS co-localisation + mobility tiers 1–4 — 2–3 days
 5. **CONJscan** rule (tiers 5–6, no boundaries) — ½ day
-6. **WP-E** ICE-lite, BacFluxL only — 9–12 days, only if boundaries are actually wanted
+6. **WP-E** ICE-lite — 9–12 days, only if boundaries are actually wanted (planned as "BacFluxL only"; built, and runs in all four v2 modes)
 
 Steps 1–5 deliver a complete, defensible mobility ladder. Step 6 is the expensive refinement.
+
+*All six were completed for v2.0.0. Two notes on how the finished ladder differs
+from the plan: step 4's "tiers 1–4" in practice reaches tier 3 without the
+optional TnCentral layer, because **tier 4 requires a curated name** and that
+layer is opt-in; and **tier 4 has never actually been assigned** in any retained
+run, because on the one occasion the naming layer did match a curated transposon
+the gene was on a conjugative plasmid and scored tier 6 instead. See the README's
+"What the benchmark does not show".*

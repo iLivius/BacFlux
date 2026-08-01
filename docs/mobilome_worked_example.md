@@ -21,6 +21,33 @@ a positive control needs.
 Run as `mode: contigs` with `mobilome.run: true` and `phage.caller: genomad`.
 Config: `BacFlux_v2_validation/kpnih1_positive_control/config.yaml`.
 
+> ### ⚠ Licensing: this run is not commercially usable as configured
+>
+> `BacFlux` itself is MIT, and it ships no third-party data. But two things this
+> particular run switches on are **not** free for commercial use, and both are off
+> by default:
+>
+> - **`mobilome.run: true` fetches the CONJscan models**, which Institut Pasteur /
+>   CNRS license **CC BY-NC-SA 4.0 — non-commercial, share-alike**. Every mobility
+>   call on this page rests on them. The optional **ICEscan** models are a fork of
+>   CONJScan under the **same terms**. MacSyFinder, the engine that runs them, is
+>   GPLv3 and unrestricted; it is the *models* that carry the restriction.
+> - **`phage.caller: genomad`** is licensed by Berkeley Lab for **accredited
+>   academic institutions only**; commercial use needs a separate LBNL licence.
+>   `VirSorter2` is the permissive default.
+>
+> The optional naming layers used further down carry their own unclear terms:
+> **TnCentral** publishes "© All Rights Reserved" and no terms page at all, and
+> **ICEberg 3.0** publishes no licence or reuse statement anywhere. Neither is
+> redistributed by `BacFlux`; you fetch them under your own agreement with the
+> licensor.
+>
+> None of this affects `BacFlux`'s own MIT licence — share-alike attaches to
+> distributed source, not to execution, and none of these are vendored. It does
+> affect whether *you* may run this configuration. Full detail and the citation
+> list: [`CITATIONS.md`](../CITATIONS.md) and the README's *Licensing and
+> commercial use* section.
+
 ---
 
 ## What each output file is for
@@ -124,21 +151,37 @@ Eight conjugation-gene hits is a strong signal, and the tier is not lowered. But
 a carbapenemase, so it is not asserted at high confidence without a verified
 mating-pair apparatus. Always read the tier **and** the confidence together.
 
-### Tier 4 — `blaCTX-M-15`, inside Tn*Ecp1.1*
+### Tier 4 — what the naming layer is *for*, and why this run does not reach it
 
-```
-amr_gene            blaCTX-M-15
-mge_context         unit_transposon
-mge_name            TnEcp1.1
-mobility_tier       4          named_element_mobilisable
-confidence          high
-identity             99.9      over 87% of the 3,417 bp reference
-```
+> ⚠ **Corrected 2026-07-31. This section previously showed a `blaCTX-M-15` row at
+> tier 4 inside Tn*Ecp1.1*, at 99.9% identity over 87% of the reference. That row
+> is not reproducible and has been removed.**
+>
+> What the retained artefacts actually contain:
+>
+> - In this run, `blaCTX-M-15` appears **twice** — a chromosomal copy at
+>   **tier 2** (`is_adjacent`) and a plasmid copy on `NZ_CP006662.2` at
+>   **tier 5** (`plasmid`). `mge_name` is `NA` on **every one of the 66 rows**,
+>   because this run did not have the TnCentral layer switched on at all.
+> - In the two clinical *K. pneumoniae* runs that **did** have it on, every
+>   Tn*Ecp1.1* candidate was **discarded**, with the reason recorded:
+>   *"only 12% / 49% of the 3417 bp reference element is present (needs 80%). A
+>   fragment of a transposon is not that transposon."*
+> - **No run kept on disk contains a tier 4 row at all.** The naming layer has
+>   matched a curated element on real data exactly once — `bla`KPC-2 inside
+>   Tn*7247* — and that gene scored **tier 6**, because the transposon sat on a
+>   conjugative plasmid and the plasmid evidence outranks a transposon name.
+>
+> So tier 4 is a real code path with a real rationale, set out below, but it is
+> **unexercised**: it is reached only when a curated name is the *strongest*
+> evidence available, which in practice means a chromosomal element recovered at
+> ≥80% of its reference length, and no genome tested so far has produced that
+> combination. See the README's *What the benchmark does not show*.
 
 Tier 4 needs the **TnCentral naming layer** (`mobilome.tncentral.url`). Without
-it nothing produces a `unit_transposon` element and this gene falls back to
-**tier 2** — "an IS is adjacent, so expression may change" — which is true but
-sells the situation short.
+it nothing produces a `unit_transposon` element, and a gene that a curated
+transposon would have explained falls back to **tier 2** — "an IS is adjacent, so
+expression may change" — which is true but can sell the situation short.
 
 The difference is worth dwelling on, because it is the whole argument for the
 naming layer. Tier 2/3 calls are **inferences** from IS positions: two copies of
@@ -148,14 +191,21 @@ orientation, breaking the same-orientation rule the pattern depends on. A
 TnCentral hit is not an inference at all: it matches an element somebody
 characterised, named and deposited, whose architecture is already known.
 
-And here the curated answer is the biologically right one. `blaCTX-M-15` is the
-most prevalent ESBL in the world, and IS*Ecp1* does not merely sit beside it
-providing a hybrid promoter — IS*Ecp1* **mobilises** it, capturing the gene and
-moving it as a unit. Tn*Ecp1.1* is that unit. Reporting "expression modulation,
-not mobilisation" would have been precisely backwards.
+`blaCTX-M-15` is the standing example of why this matters. It is the most
+prevalent ESBL in the world, and IS*Ecp1* does not merely sit beside it providing
+a hybrid promoter — IS*Ecp1* **mobilises** it, capturing the gene and moving it as
+a unit, and Tn*Ecp1.1* is that unit. Where a run can establish that, reporting
+"expression modulation, not mobilisation" would be precisely backwards, which is
+why spec §7 says a curated hit should **override** the pattern-based call rather
+than merely agree with it.
 
-This is why spec §7 says a curated hit should **override** the pattern-based
-call rather than merely agree with it.
+**But note what happened on the real short-read data above:** the transposon was
+present only as a 12–49% fragment, and the module refused the name rather than
+claiming it. That refusal is the correct behaviour — a fragment of a transposon is
+not that transposon — and it is also why tier 4 is so hard to reach on fragmented
+assemblies. The gene stays at tier 2 and the reason is written to
+`{sample}_named_elements_discarded.tsv`, which is where to look before concluding
+that a genome has no named transposon in it.
 
 ---
 
@@ -294,34 +344,70 @@ and plasmid alike: CONJscan is run over the whole proteome, so nothing restricts
 it to the chromosome. On this genome it found three:
 
 ```
-NZ_CP006659.2|ime-1979164:1994490                  chromosome  -> ime
-NZ_CP006659.2|ice-4604073:4644558                  chromosome  -> ice   ICEKpnATCCBAA-2146-1-like
-NZ_CP006661.1|conjugative_region-57877:90473       PLASMID     -> conjugative_region
+CP006659.2|ime-589955:596310                       chromosome  -> ime
+CP006659.2|ime-1979164:1994490                     chromosome  -> ime
+CP006659.2|ice-4604073:4644558                     chromosome  -> ice
+CP006661.1|conjugative_region-57877:90473          PLASMID     -> conjugative_region
 ```
 
-That name comes from the **ICEberg naming layer** (`mobilome.iceberg.urls`), and
-the audit line behind it is a small lesson in reading this module:
+The middle ICE row is the one worth looking at, because ICEberg curates an
+element at exactly that locus and so it can be scored:
 
-> named `ICEKpnATCCBAA-2146-1-like` (100.00% identity, covering 100% of our
-> interval but only **70%** of the 58,048 bp curated element, accession
-> CP006659.2). **30 other
-> curated element(s) fit about as well**, so treat the exact name as one of a
-> near-identical group. **NOTE** the curated element is 58,048 bp while our
-> interval is 40,486 bp: our boundaries are a floor, not the element's true ends.
+| | value |
+|---|---|
+| curated element | `ICEKpnATCCBAA-2146-1`, CP006659.2:4,603,840–4,661,887 (58,048 bp) |
+| our call | 4,603,807–4,658,749 (**54,943 bp**) |
+| start / end offset | **−33 bp** / **−3,138 bp** |
+| fraction of the curated element recovered | **0.946** |
+| `boundary_method` | **`tRNA`**, a 43 bp repeat at **tRNA-Phe(gaa)** |
+| machinery | integrase + relaxase + T4CP + T4SS, all intact |
+| confidence | **high** |
 
-Three things to take from that. First, `CP006659.2` *is* KPNIH1's own chromosome
-accession — ICEberg catalogued this ICE **from this genome**, so 100% identity is
-a self-match and not independent confirmation. Second, ICEs of one species are
-near-identical across strains, so a single real element matches dozens of
-entries; the name is a group label, not a unique identification. Third, and most
-useful: the curated record is **17.5 kb longer** than our call. With
-`boundary_method = none` our interval is the machinery span — a floor — and here
-is exactly how much we are missing. That shortfall is also why the name carries
-a **`-like`** suffix: we have 70% of the curated element, not all of it, and the
-suffix is the module refusing to claim the bare name for a partial match.
+> **This passage was rewritten on 2026-07-31.** Before commit `4a93d89` this same
+> element was called at 40,486 bp with `boundary_method = none`, i.e. the bare
+> machinery span, recovering about 70% of the curated record and falling 17.5 kb
+> short. The *att* search now finds the tRNA-anchored repeat that was there all
+> along, and the shortfall is **3.1 kb, not 17.5 kb**. The older numbers are
+> superseded; the lesson drawn from them is not — see below.
+
+**The lesson survives the better numbers.** Even at 0.946 recovered, our interval
+is still a **floor**: it ends 3,138 bp inside the curated element, and any AMR
+gene in that last 3 kb would be scored as though it were outside the ICE. That is
+the general failure mode, and it is much larger on other genomes — see the README's
+"What the benchmark does not show", where 57% of AMR genes inside curated ICE
+intervals come out at tier 1 precisely because the called edge stops short.
+
+**Two further things to take from this element.** First, `CP006659.2` is **ATCC
+BAA-2146's own chromosome accession** — ICEberg catalogued this ICE *from this
+very genome*, so a 100% identity match against it is a self-match and not
+independent confirmation of anything. Second, ICEs of one species are
+near-identical across strains, so a single real element matches dozens of curated
+entries (30 others fit about as well here); a name from this layer is a **group
+label, not a unique identification**, which is what the `-like` suffix is for —
+the module declines to claim the bare name when it has only part of the curated
+element.
+
+> ⚠ **`CP006659.2` is not KPNIH1.** An earlier version of this page said it was.
+> `CP006659.2` is *K. pneumoniae* **ATCC BAA-2146**; **KPNIH1 is `CP008827.1`** —
+> a different ST258 isolate with different resistance content, carrying its own
+> curated element `ICEKpnKPNIH1-1` at 4,561,833–4,621,080. The two are easy to
+> confuse because both are carbapenem-resistant clinical *K. pneumoniae* and both
+> have been used as positive controls in this project. The example output files
+> under [`docs/validation/`](validation/) were shipped under the name `KPNIH1` for
+> the same reason; they have been renamed to `BAA-2146_*`, and
+> [`docs/validation/README.md`](validation/README.md) records what else in them is
+> superseded.
+
+*A caveat on the naming layer specifically:* the element table above was
+regenerated after `4a93d89` **without** the optional ICEberg naming layer
+switched on, so `mge_name` is `NA` in the current artefact. The name
+`ICEKpnATCCBAA-2146-1-like` and the "30 others fit about as well" audit line come
+from the earlier run that had `mobilome.iceberg.urls` set. The naming layer has
+not been re-run since the boundary fix, so the coverage percentage it would now
+report against the curated element would be higher than the 70% it recorded then.
 
 > **A worked example of how this table gets things wrong, and how it was caught.**
-> The middle row used to read `conjugative_region-4610740:4644558` — the same
+> The `ice` row above used to read `conjugative_region-4610740:4644558` — the same
 > machinery, but no integrase found, so it fell into the last row of the table
 > below instead of the first. The integrase was there all along: Bakta annotates
 > it `DNA integration/recombination/inversion protein` at 4,604,073–4,605,020,
@@ -414,8 +500,12 @@ element's ends were established, and it takes three values:
 | `none` | no att pair; the interval is the machinery span | no |
 
 **A de novo repeat never moves an element, and the reason is worth knowing.**
-Measured on this genome's chromosome, 300 randomly placed 15 kb non-ICE spans
-produced a confident de novo "boundary" **22%** of the time. Real chromosomes are
+Measured on a clinical *K. pneumoniae* chromosome, 300 randomly placed 15 kb
+non-ICE spans produced a confident de novo "boundary" **22%** of the time. (The
+source comment in `att_search.py` attributes that measurement to "KPNIH1" and this
+page previously attributed it to ATCC BAA-2146; those are two different genomes —
+see the warning further down — and which one it was has not been re-established,
+so neither is claimed here. The rate is unaffected.) Real chromosomes are
 full of rRNA operons, REP elements and paralogues, so an exact 18–25 bp direct
 repeat between two 30 kb windows is ordinary rather than remarkable. Requiring the
 repeat to occur exactly twice — an integration scar is created once; an rRNA
@@ -445,8 +535,30 @@ unresolved boundary is a warning sign rather than the norm.
 - IS-adjacent genes are called expression modulation, **not** mobilisation (tier 2).
 - A class 1 integron's 3′ conserved segment is recovered as a composite (tier 3).
 - Plasmid mobility is typed, and non-mobilisable plasmids are labelled honestly (tier 5).
-- A curated TnCentral hit puts blaCTX-M-15 in TnEcp1.1 (tier 4), overriding the
-  weaker IS-adjacency inference — and ICEberg names the chromosomal ICE.
-- A carbapenemase on a conjugative plasmid reaches tier 6 — at *medium* confidence,
-  because the mating apparatus was not verified.
+- **Tier 4 is not reached, and that is the honest result**, not an omission from
+  the walkthrough: the naming layer was off in this run, and where it *was* on in
+  other runs the Tn*Ecp1.1* candidates were refused at 12–49% reference coverage.
+  A fragment of a transposon is not that transposon. No retained run has ever
+  assigned tier 4.
+- `bla`NDM-1, on a conjugative plasmid, reaches tier 6 at **high** confidence —
+  CONJscan typed the mating apparatus (MOBH relaxase, F-type MPF, intact) and so
+  corroborated Platon's replicon call rather than merely agreeing with a gene count.
+- The chromosomal ICE is recovered at 0.946 of its curated length with a
+  tRNA-anchored boundary — and still ends 3.1 kb short, because a called interval
+  is a floor.
 - Every rejection carries its evidence in an audit file.
+
+---
+
+## What none of this establishes
+
+Every mobility statement on this page is a **prediction** made from sequence.
+"Predicted self-transmissible" means an element carries conjugation machinery that
+looks complete and intact; it does **not** mean the element has been shown to
+move. The confirmatory experiment is a **filter or broth mating assay**, and no
+output of this module substitutes for one.
+
+Nor is any of this "EFSA-compliant", a claim `BacFlux` does not make. What the
+module produces is *supporting evidence* for the intrinsic-versus-acquired
+judgement that the regulatory framing actually asks for. The judgement remains
+the analyst's.
