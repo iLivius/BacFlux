@@ -247,9 +247,86 @@ mobilome:
                                #   are looking for is often what broke the assembly. Every
                                #   call carries a confidence tier and a contig-boundary
                                #   flag; read them, never a bare count.
+                               #   The same applies to the ICE/IME calls, and it has now
+                               #   been MEASURED: 40 benchmark genomes cut to ~150, ~50 and
+                               #   ~20 kb N50, re-annotated and re-run. The class survives
+                               #   fragmentation; the EXTENT does not (median reported
+                               #   length falls to 0.34x the true element at ~50 kb N50).
+                               #   Which columns to read on a draft, and what NOT to
+                               #   conclude: docs/mobilome_draft_assemblies.md.
   max_composite_span_bp: 20000 # two IS copies further apart than this are not called one
                                #   composite transposon. A CONVENTION, not biology — the
                                #   measured distance is always reported next to the call.
+
+  # ── How much of a machinery profile a protein must match ──────────────────
+  # MacSyFinder finds conjugation machinery with profile HMMs: statistical
+  # descriptions of what a relaxase, a coupling protein or a VirB4 looks like
+  # across many species. A protein can score convincingly against a profile while
+  # aligning to only PART of it, and that happens for two opposite reasons —
+  # either it really is a fragment or a decayed remnant, or it is a genuine
+  # full-length member of a divergent family that shares only the catalytic core.
+  # This number is the fraction of the PROFILE the alignment must cover before
+  # the hit is kept. It is not identity and it is not an E-value: a hit can be
+  # statistically beyond doubt and still be dropped by this rule alone.
+  #
+  # 0.5 is MacSyFinder's own default and the value every validated result in
+  # docs/ was measured at, so the shipped setting is the measured one.
+  #
+  # WHAT LOWERING IT DOES. Measured end to end at 0.5 / 0.4 / 0.3 over all three
+  # benchmark sets — 18 curated ICEs, 12 curated IMEs, and 12 genomes with no
+  # curated element at all (32.6 Mb). With the ICEscan layer on:
+  #
+  #                    curated ICEs   curated IMEs   calls on the negative set
+  #     0.5             15 of 18        5 of 12       5   (2 without ICEscan)
+  #     0.4             15 of 18        6 of 12       7   (4 without ICEscan)
+  #     0.3             15 of 18        6 of 12       9   (5 without ICEscan)
+  #
+  # So across 30 curated elements, lowering the threshold recovers exactly ONE
+  # more: a 23 kb IME in Faecalibacterium duncaniae, found in full (right edge
+  # 53 bp off the published one) and correctly classed. It appears at 0.4 and
+  # gains nothing further at 0.3, and it does not need the ICEscan layer.
+  #
+  # WHAT IT COSTS. Two more calls on the negative controls at 0.4 (Escherichia
+  # coli K-12 MG1655 and Pseudomonas aeruginosa PAO1 — the two most thoroughly
+  # described genomes in bacteriology), and two more again at 0.3. Read the
+  # class before panicking: every call added at 0.4 is a `cime_or_island`,
+  # mobility `passive`, confidence `low`, evidence_level `profile_hits_only` —
+  # an integrase and a T4SS-like protein in the same neighbourhood, claiming no
+  # mobility and carrying no tier. The tiering absorbs the extra noise, which is
+  # what it is for. At 0.3 that stops being true: a 21.6 kb IME is called in
+  # Staphylococcus aureus N315 at MEDIUM confidence with a real mobility claim.
+  # It may well be a genuine uncurated element — the same benchmark calls ICEBs1
+  # in Bacillus subtilis 168, which is a true positive ICEberg has not curated —
+  # but it is unverified, and it is the first negative-control call that asserts
+  # something.
+  #
+  # WHY THE GAIN IS SO SMALL, given that the raw evidence moves a lot. Lowering
+  # to 0.4 adds 5% more MacSyFinder hits and changes the hit table in 13 of 40
+  # benchmark genomes; 0.3 adds 12% and changes 19 of 40. Almost none of that
+  # reaches the element table, because the caller needs an integrase within
+  # 50 kb of conjugation machinery before it seeds anything. Profile coverage
+  # sits upstream of a much stronger constraint, and co-localisation is what
+  # actually binds. A worked case: the pilot's one Streptococcus salivarius IME
+  # is still missed at 0.3, and the audit TSV says why — its MOBT relaxases were
+  # already being found at 0.5 and sit 22 kb and 518 kb away from the integrase
+  # that marks the element, so coverage was never what was stopping it.
+  #
+  # WHEN TO LOWER IT ANYWAY. Across all 395 curated IMEs, 68 carry a relaxase hit
+  # that is clean on E-value and fails only this coverage rule — 60 of them the
+  # T4SS_MOBT family at about 0.32 profile coverage. If your isolates sit in that
+  # space, 0.4 is worth trying and the audit TSV is how you check what changed:
+  # it records a reason for every candidate dropped, so you can see whether the
+  # new calls are machinery-poor fragments or elements worth following up.
+  # Nothing here supports 0.3 for single isolates.
+  #
+  # The EBI mobilome-annotation-pipeline runs 0.3. That reflects a metagenome
+  # pipeline's priorities — recall first, because MAG proteins are fragmentary
+  # anyway — not a verdict on what a single-isolate workflow should do.
+  #
+  # Both machinery searches (CONJscan and, if enabled, ICEscan) use this one
+  # value. They must: their hit tables are merged, so different stringencies
+  # would make an element's class depend on which model set was more permissive.
+  coverage_profile: 0.5
 
   # ── Detection layer: a SECOND machinery model set, ICEscan ────────────────
   # OFF by default; leave it off and the module behaves exactly as it does today.

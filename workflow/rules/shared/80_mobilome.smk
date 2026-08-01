@@ -62,6 +62,85 @@
 # "../../envs/x.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/x.yaml.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── How much of an HMM profile a protein must match (--coverage-profile) ─────
+# Lives in this file rather than 00_common.smk for the same reason as the
+# ICEscan constants below: it is read by exactly the two MacSyFinder rules in
+# this file and by nothing else, so it reads best next to them.
+#
+# WHAT THE NUMBER IS. MacSyFinder finds machinery proteins with profile HMMs —
+# statistical descriptions of what a relaxase, a coupling protein or a VirB4
+# looks like across many species. A protein can score well against a profile
+# while aligning to only part of it, which happens for two very different
+# reasons: the protein really is a fragment or a decayed remnant, or it is a
+# genuine full-length member of a DIVERGENT family that only shares the
+# catalytic core. This threshold is the fraction of the PROFILE's length the
+# alignment must cover before the hit is kept. It is not identity and it is not
+# an E-value; a hit can be beyond doubt statistically and still be dropped here.
+#
+# WHY 0.5 IS THE DEFAULT. It is MacSyFinder's own default, and it is the value
+# every scored result in docs/ was measured at — the ICE pilot, the IME pilot,
+# the negative controls and the head-to-head against the EBI pipeline. Keeping
+# it the default means the shipped configuration is the validated one.
+#
+# WHAT LOWERING IT BUYS AND COSTS. Measured end to end at 0.5 / 0.4 / 0.3 over
+# the three benchmark sets — 18 curated ICEs, 12 curated IMEs, and 12 genomes
+# with no curated element (32.6 Mb). With the ICEscan layer on:
+#
+#                curated ICEs   curated IMEs   calls on the negative set
+#     0.5         15 of 18        5 of 12       5   (2 without ICEscan)
+#     0.4         15 of 18        6 of 12       7   (4 without ICEscan)
+#     0.3         15 of 18        6 of 12       9   (5 without ICEscan)
+#
+# One more curated element out of thirty, at double the calls on genomes that
+# should have none. The one gained is a 23 kb IME in Faecalibacterium duncaniae,
+# recovered in full and correctly classed — a real detection, not a scoring
+# artefact — and it arrives at 0.4 with nothing further at 0.3.
+#
+# The extra negative-control calls at 0.4 are all `cime_or_island`, mobility
+# `passive`, confidence `low`, evidence_level `profile_hits_only`: an integrase
+# and a T4SS-like protein near each other, claiming nothing and carrying no
+# mobility tier. The tiering absorbs them, which is its job. At 0.3 that stops
+# holding — a 21.6 kb IME appears in Staphylococcus aureus N315 at medium
+# confidence with an actual mobility claim, unverified either way.
+#
+# WHY THE GAIN IS SO SMALL WHEN THE RAW EVIDENCE MOVES A LOT. 0.4 adds 5% more
+# MacSyFinder hits and changes the hit table in 13 of 40 benchmark genomes; 0.3
+# adds 12% and changes 19 of 40. Almost none of it reaches the element table,
+# because conjscan_ice needs an integrase within 50 kb of conjugation machinery
+# before it seeds anything. Profile coverage sits upstream of a stronger
+# constraint, and CO-LOCALISATION is what actually binds. Concretely: the
+# pilot's one Streptococcus salivarius IME is still missed at 0.3, and its audit
+# TSV explains it — the MOBT relaxases were already found at 0.5 and sit 22 kb
+# and 518 kb from the integrase marking the element.
+#
+# The IME ceiling study still says 68 of 395 curated IMEs carry a relaxase hit
+# that is clean on E-value and fails only this rule (60 of them T4SS_MOBT at
+# ~0.32 coverage), so 0.4 is a reasonable thing to try on that biology — with
+# the audit TSV as the check on what changed. Nothing measured supports 0.3.
+#
+# The EBI mobilome-annotation-pipeline runs 0.3. That is evidence about a
+# metagenome pipeline's priorities — recall over precision, because a MAG's
+# proteins are fragmentary anyway — not about what a single-isolate workflow
+# reporting a regulatory-facing mobility tier should do.
+#
+# BOTH SEARCHES GET THE SAME VALUE, deliberately. conjscan and icescan hit
+# tables are UNIONED by the caller, so running them at different stringencies
+# would mean an element's class depended on which model set happened to be more
+# permissive, which nothing downstream could untangle.
+MOBILOME_COVERAGE_PROFILE = float(
+    (config.get("mobilome") or {}).get("coverage_profile", 0.5))
+
+# A fraction outside (0, 1] is a typo (a percentage, most likely). MacSyFinder
+# would accept 30 and then silently find nothing at all, which looks exactly
+# like a genome with no conjugative system - so fail here instead.
+if MOBILOME_RUN and not (0.0 < MOBILOME_COVERAGE_PROFILE <= 1.0):
+    sys.exit(
+        "[BacFlux] mobilome.coverage_profile must be a fraction greater than 0 "
+        f"and at most 1.0, but it is {MOBILOME_COVERAGE_PROFILE}. It is the "
+        "fraction of an HMM profile a protein must align to (0.5 = half), not a "
+        "percentage."
+    )
+
 # ── The ICEscan model set: switch, paths, and why they live here ─────────────
 # Every other mobilome path constant is declared in 00_common.smk. These four
 # stay in this file on purpose, so that the whole ICEscan layer — the config
@@ -108,7 +187,31 @@ MOBILOME_ICESCAN = MOBILOME_RUN and ICESCAN_ENABLED
 ICESCAN_MODELS_DIR = DIR_MOBILOME + "/icescan_models"   # a DIRECTORY (rule icescan_models)
 ICESCAN_DIR = MOBILOME_DIR + "/icescan"                 # a DIRECTORY (rule icescan)
 
+# ── What to expect on a DRAFT assembly (printed once, at parse time) ─────────
+# The same pattern as every other banner in this workflow: a plain print() next
+# to the constants it describes, so it lands in the log header before the DAG is
+# built (see the MODE and phage-caller banners in 00_common.smk).
+#
+# WHY IT EXISTS. Every validation this module had was on CLOSED genomes, where
+# spans_contigs was TRUE on 0 of 63 calls - so its fragmentation guards had
+# never been measured on the input BacFlux actually gets. They have now been:
+# 40 benchmark genomes were cut to ~150 kb, ~50 kb and ~20 kb N50, all 120
+# assemblies re-annotated and re-run end to end. The numbers below are from that
+# run, not from an estimate. Kept to one short paragraph on purpose - a wall of
+# text at every run gets skipped, and this one has to be read.
 if MOBILOME_RUN:
+
+    print(
+        "ICE/IME calling was validated on CLOSED genomes; measured on drafts it "
+        "degrades honestly. At ~50 kb N50 the CLASS still holds (ICE 15/18) but "
+        "the EXTENT does not (median 0.34x the true length) and high-confidence "
+        "calls fall from 24% to 10%. So read mge_class + confidence next to "
+        "spans_contigs and at_contig_boundary, and read boundary_method before "
+        "start/end: 'none' means the interval is only the machinery span, a "
+        "floor. Low-confidence calls on a draft are expected, not a fault. Each "
+        "sample's contig count and N50 head its _ice_discarded.tsv; details in "
+        "docs/mobilome_draft_assemblies.md."
+    )
 
     # ── Rule: contig_lengths — how long is every contig? ─────────────────────
     # Biology: nothing on its own — but every downstream honesty check needs it.
@@ -434,12 +537,22 @@ if MOBILOME_RUN:
     #
     # Most isolates carry no conjugative system at all, so a run finding nothing
     # is the common case and must not fail the pipeline.
+    #
+    # --coverage-profile is written out even though the default value BacFlux
+    # ships (0.5) is also MacSyFinder's own default. Two reasons: the number is
+    # now a config key a user may change, and it must be identical here and in
+    # rule icescan because the two hit tables get merged. Leaving it implicit
+    # would mean a MacSyFinder release could move it under us and only one of the
+    # two searches would notice. See MOBILOME_COVERAGE_PROFILE at the top of this
+    # file for what lowering it buys and costs.
     rule conjscan:
         input:
             bakta_dir = DIR_ANNOTATION + "/bakta/{sample}",
             models = CONJSCAN_MODELS_DIR,
         output:
             conjscan_dir = directory(CONJSCAN_DIR),
+        params:
+            coverage = MOBILOME_COVERAGE_PROFILE,
         conda:
             "../../envs/macsyfinder.yaml"
         threads: capped_cpus(8)
@@ -456,6 +569,7 @@ if MOBILOME_RUN:
               --sequence-db {input.bakta_dir}/{wildcards.sample}.faa \
               --db-type ordered_replicon \
               --models-dir {input.models} \
+              --coverage-profile {params.coverage} \
               --out-dir {output.conjscan_dir} \
               --worker {threads} \
               --force > {log} 2>&1 || {{
@@ -581,6 +695,44 @@ if MOBILOME_RUN:
                     echo "       not hold a MacSyFinder model package." >&2
                     exit 1
                 fi
+                # The file existing is not enough. ICEscan ships TWO IME
+                # definitions and they disagree about which relaxases count:
+                #
+                #   definitions/Chromosome/IME.xml  18 relaxase families,
+                #       including the eight Relaxase_* profiles ICEscan adds on
+                #       top of CONJScan (the Gram-positive and IME-specific ones);
+                #   IME_type.xml, at the package root   11 families, and NOT ONE
+                #       of those eight.
+                #
+                # MacSyFinder only ever reads the definitions/ tree - it lists
+                # <package>/definitions and recurses from there - so the root-level
+                # file is dead weight and we load the wide one. Two things confirm
+                # that rather than assume it: every model_fqn MacSyFinder writes is
+                # 'ICEscan/Chromosome/...', never 'ICEscan/IME_type', and the root
+                # AICE_type.xml names HMMs (AICE_rep1, AICE_tra) that the package
+                # does not even ship, so loading it would fail outright.
+                #
+                # We still check, because the download URL carries no version.
+                # Measured over the 395 curated ICEberg IMEs, the narrow set would
+                # cost 41 elements (10.4%) that the CONJScan leg does not rescue -
+                # mostly Streptococcus salivarius, found through
+                # Relaxase_firmi_Rep_2 - and would gain nothing, since its one
+                # exclusive family (T4SS_MOBL) matches none of the 395. That loss
+                # would surface as a thinner IME table, not as an error, so assert
+                # the shape of the definition instead of trusting the archive.
+                for PROFILE in Relaxase_firmi_Rep_2 Relaxase_PHA_IME_A1 Relaxase_profile_MOBT; do
+                    if ! grep -q "$PROFILE" {output.models}/ICEscan/definitions/Chromosome/IME.xml; then
+                        echo "ERROR: definitions/Chromosome/IME.xml does not list $PROFILE." >&2
+                        echo "       This looks like the NARROW IME definition (the 11-family" >&2
+                        echo "       one ICEscan also ships as IME_type.xml). Running it would" >&2
+                        echo "       silently drop roughly 10% of detectable IMEs, mostly in" >&2
+                        echo "       Gram-positives, with no other sign that anything changed." >&2
+                        echo "       The upstream package has probably been reorganised; check" >&2
+                        echo "       it before updating mobilome.icescan.sha256." >&2
+                        exit 1
+                    fi
+                done
+
                 if [ ! -d {output.models}/ICEscan/profiles ]; then
                     echo "ERROR: the ICEscan package has no profiles/ directory." >&2
                     exit 1
@@ -623,13 +775,11 @@ if MOBILOME_RUN:
         # Produces: 08.mobilome/{sample}/icescan/ (best_solution.tsv and friends).
         # Consumed by: conjscan_ice, which UNIONS this table with CONJscan's.
         #
-        # --coverage-profile 0.5 is written out although it is also MacSyFinder's
-        # default (and therefore what rule conjscan gets implicitly): the two
-        # searches are merged, so they must be run at the same stringency, and
-        # leaving that to a default the tool could change would be a silent trap.
-        # 0.5 is the value the union was validated at. The EBI pipeline uses 0.3,
-        # which finds more and is a separate question this workflow does not take
-        # a position on.
+        # --coverage-profile comes from the SAME config key rule conjscan reads
+        # (mobilome.coverage_profile, default 0.5). That is not tidiness: the two
+        # searches are merged by the caller, so running them at different
+        # stringencies would make an element's class depend on which model set was
+        # more permissive. See MOBILOME_COVERAGE_PROFILE at the top of this file.
         #
         # Same tolerance of a non-zero exit as rule conjscan: a genome with no
         # detectable IME or AICE is the ordinary result, not an error.
@@ -639,6 +789,8 @@ if MOBILOME_RUN:
                 models = ICESCAN_MODELS_DIR,
             output:
                 icescan_dir = directory(ICESCAN_DIR),
+            params:
+                coverage = MOBILOME_COVERAGE_PROFILE,
             conda:
                 "../../envs/macsyfinder.yaml"
             threads: capped_cpus(8)
@@ -655,7 +807,7 @@ if MOBILOME_RUN:
                   --sequence-db {input.bakta_dir}/{wildcards.sample}.faa \
                   --db-type ordered_replicon \
                   --models-dir {input.models} \
-                  --coverage-profile 0.5 \
+                  --coverage-profile {params.coverage} \
                   --out-dir {output.icescan_dir} \
                   --worker {threads} \
                   --force > {log} 2>&1 || {{

@@ -703,6 +703,16 @@ OUTPUT_COLUMNS = [
     "relaxase_type",              # MOBF, MOBP1, ... comma-joined if several
     "mpf_type",                   # F, T, FATA, ... from the CONJscan model name
     "mpf_typed_system",           # TRUE when a full T4SS_type*/dCONJ_type* system was called
+    # TRUE when the mating-pair apparatus that made this an ICE was NOT in this
+    # cluster at all: has_t4ss is FALSE, and the class rests entirely on the
+    # draft-assembly exemption in build_candidates (the tra operon landed on
+    # another contig). Purely informative - it changes no class and no
+    # confidence - but without it a reader has to reconstruct the system's
+    # contig set by hand to see that a tier-6 claim came from another contig.
+    # Measured on the fragmented benchmark: 9 of 191 draft calls (8 ice, 1
+    # conjugative_region), all of them already at low confidence, and 0 of 68
+    # closed-genome calls.
+    "mpf_from_other_contig",
     "integrase_products",         # the Bakta product text that matched, ' | '-joined
     "anchor_ids",                 # locus tags with their class, so a reader can look them up
     "conjscan_systems",           # sys_id list - the join key back to best_solution.tsv
@@ -763,7 +773,10 @@ AUDIT_COLUMNS = [
     "contig",
     "start",
     "end",
-    "action",     # input_missing | row_skipped | dropped | kept_flagged
+    # assembly_qc is the one action that describes the INPUT rather than a
+    # candidate: one row per sample recording how fragmented the assembly is.
+    "action",     # assembly_qc | input_missing | row_skipped | not_applicable |
+                  # dropped | kept_flagged | boundaries_resolved
     "reason",     # short machine-readable token
     "detail",     # human-readable explanation, with the numbers behind it
 ]
@@ -1042,6 +1055,107 @@ def read_contig_lengths(path):
             except ValueError:
                 continue          # header row, or a malformed line
     return lengths
+
+
+# ── Assembly contiguity: the context every call has to be read in ────────────
+#
+# WHY THIS IS HERE AT ALL. Everything this script reports is measured on one
+# contig at a time, so how long the contigs are decides what it can possibly
+# see. A 200 kb ICE on a 20 kb contig cannot be delimited by anything, however
+# good the machinery evidence is. The whole module was validated on CLOSED
+# genomes, and a fragmented-assembly validation (40 genomes cut to three
+# contiguities, 120 assemblies, re-annotated and re-run end to end) measured
+# what changes. In one line: the CLASS survives, the EXTENT does not.
+#
+#   N50 >= 150 kb  ICE detection identical to closed genomes (15/18); every
+#                  high-confidence call corroborated by the closed run.
+#   N50 ~  50 kb   detection still holds (ICE 15/18) and 91% of calls land on a
+#                  curated element, but the reported length falls to a median
+#                  0.34x the element's true length and 82% of calls have
+#                  boundary_method='none'. Read the class, not the length.
+#   N50 ~  20 kb   detection itself starts to go (ICE 12/18); 65% of calls are
+#                  low confidence. Still not wrong, but it says little.
+#
+# These two numbers pick which of those three sentences a sample gets. They are
+# NOT fitted thresholds - a genome at 140 kb is not meaningfully different from
+# one at 160 kb - they just place a sample on the table above.
+#
+# 150 kb is the top arm exactly: at or above it, the measured behaviour is the
+# closed-genome behaviour. The lower divider is 30 kb rather than 50 kb because
+# it has to sit BETWEEN the two arms it separates: detection held at the 50 kb
+# arm and broke at the 20 kb one, so an assembly at 49 kb belongs with the arm
+# that worked, not with the one that did not.
+CONTIGUITY_N50_TRUSTED_BP = 150000
+CONTIGUITY_N50_CLASS_ONLY_BP = 30000
+
+
+def assembly_contiguity(contig_lengths):
+    """Summarise how fragmented this assembly is.
+
+    Input:  {contig: length}, the same table every distance in this script is
+            measured against (from the ISEScan loader, or the GFF3's
+            ##sequence-region lines as a fallback).
+    Output: a dict with the contig count, the assembly size, the longest contig
+            and the N50 - the length such that half the assembly sits in contigs
+            at least that long. N50 is the usual one-number summary of
+            contiguity, and it is the number the fragmented-assembly validation
+            was stratified by, so it is what makes that table applicable here.
+    Consumed by: main(), which writes it as one audit row per sample and puts
+            the N50 in the summary line.
+
+    Returns None when there are no contigs, so the caller can stay silent rather
+    than write a row of zeros.
+    """
+    lengths = sorted((int(length) for length in contig_lengths.values() if int(length) > 0),
+                     reverse=True)
+    if not lengths:
+        return None
+
+    total_bp = sum(lengths)
+    half = total_bp / 2.0
+    running = 0
+    n50 = lengths[-1]
+    for length in lengths:
+        running += length
+        if running >= half:
+            n50 = length
+            break
+
+    return {
+        "n_contigs": len(lengths),
+        "total_bp": total_bp,
+        "longest_bp": lengths[0],
+        "n50_bp": n50,
+    }
+
+
+def contiguity_verdict(n50_bp):
+    """One plain sentence saying what this contiguity means for the calls.
+
+    Kept next to assembly_contiguity so the numbers and their interpretation
+    cannot drift apart. Every claim in it comes from the fragmented-assembly
+    validation described above; nothing here filters or changes any call.
+    """
+    if n50_bp >= CONTIGUITY_N50_TRUSTED_BP:
+        return (
+            "At this contiguity the validation found ICE detection unchanged "
+            "from closed genomes and every high-confidence call corroborated. "
+            "Element LENGTHS are still a floor wherever boundary_method='none'."
+        )
+    if n50_bp >= CONTIGUITY_N50_CLASS_ONLY_BP:
+        return (
+            "At this contiguity the CLASS is still reliable (ICE detection "
+            "held at 15/18 on the validation set) but the EXTENT is not: "
+            "reported lengths were a median 0.34x the true element and most "
+            "calls had boundary_method='none'. Read mge_class and confidence; "
+            "treat start/end/length_bp as a floor."
+        )
+    return (
+        "This is at or below the worst arm of the validation, where DETECTION "
+        "itself started to go: at ~20 kb N50, ICE recall fell to 12/18 and 65% "
+        "of calls were low confidence. Expect misses and very few "
+        "high-confidence calls; do not read element lengths at all."
+    )
 
 
 # ── Phase 0, input 2: the CONJscan result ────────────────────────────────────
@@ -2428,6 +2542,37 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         # more here than the closed-genome benchmark can show.
         has_mpf_apparatus = has_mpf_system and (has_t4ss or cluster_spans_contigs)
 
+        # Did the exemption above do the work? TRUE means "this is an ICE only
+        # because a typed system's OTHER hits are on a different contig" - the
+        # mating-pair genes are not in this cluster. Reported as a column of its
+        # own (mpf_from_other_contig) because the row otherwise contradicts
+        # itself in a way only an insider can decode: mobility says "predicted
+        # self-transmissible" while missing_components says "mating-pair
+        # apparatus", and nothing says why that is allowed.
+        #
+        # It changes NOTHING - not the class, not the confidence. The class is
+        # kept because the exemption is what stops real ICEs being demoted the
+        # moment an assembly breaks (see the paragraph above), and the
+        # confidence is already low: spans_contigs is TRUE by construction here,
+        # and that is an absolute cap. Measured on the fragmented benchmark:
+        # 9 of 191 draft calls, every one at low confidence, two of them on a
+        # curated element; 0 of 68 calls on the closed genomes.
+        mpf_from_other_contig = has_mpf_apparatus and not has_t4ss
+        if mpf_from_other_contig:
+            audit_rows.append(audit_row(
+                sample, "kept_flagged", "mpf_apparatus_on_another_contig",
+                "classified as an ICE (predicted self-transmissible) although no "
+                "mating-pair gene is in this cluster: CONJscan typed the system "
+                f"as MPF{'/'.join(sorted(cluster_mpf_types))} from hits on a "
+                "DIFFERENT contig. On a draft assembly the tra operon routinely "
+                "lands on another contig than the relaxase, so the class is kept "
+                "rather than demoted to IME - but the evidence for the mating "
+                "bridge is not on this contig and cannot be checked here. The row "
+                "carries mpf_from_other_contig=TRUE and spans_contigs=TRUE, so "
+                "the confidence is capped at low.",
+                contig=contig, start=start, end=end,
+            ))
+
         if has_t4ss and not has_mpf_apparatus:
             audit_rows.append(audit_row(
                 sample, "kept_flagged", "mpf_marker_without_typed_system",
@@ -2657,6 +2802,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
             "relaxase_type": ",".join(relaxase_types) if relaxase_types else "NA",
             "mpf_type": ",".join(mpf_types) if mpf_types else "NA",
             "mpf_typed_system": _tsv_bool(mpf_typed_system),
+            "mpf_from_other_contig": _tsv_bool(mpf_from_other_contig),
             # ' | ' rather than ',' because product text is full of commas.
             "integrase_products": " | ".join(integrase_products) if integrase_products else "NA",
             "anchor_ids": ",".join(anchor_ids),
@@ -2788,6 +2934,21 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
     trnas_by_contig = att_search.group_by_contig(
         att_search.parse_trna_features(gff3_path)) if gff3_path else {}
 
+    # How often does a candidate repeat occur in the WHOLE assembly? See the
+    # repeat-family guard further down for why this is asked across every contig
+    # and not just the one the element sits on. Cached because the same repeat
+    # can be proposed for several candidates and each answer is a full scan of
+    # the assembly.
+    assembly_copies_cache = {}
+
+    def copies_in_assembly(kmer):
+        if kmer not in assembly_copies_cache:
+            assembly_copies_cache[kmer] = sum(
+                att_search.count_repeat_copies(sequence, kmer)
+                for sequence in sequences.values()
+            )
+        return assembly_copies_cache[kmer]
+
     for row in rows:
         # An att site is the SCAR left by integrase-mediated site-specific
         # recombination: the element's attP and the host's attB recombine, and the
@@ -2877,6 +3038,64 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
         # a human to follow - which is what the spec's boundary_method column is
         # for. They just do not move the element.
         if result["boundary_method"] == "denovo":
+            # ── The repeat-family guard, widened from the contig to the whole
+            # assembly (added after the fragmented-assembly validation) ───────
+            #
+            # att_search already refuses a de novo repeat that occurs more than
+            # twice - a real integration scar exists in exactly two copies,
+            # attL and attR, so a third copy means we are looking at a repeat
+            # FAMILY (an IS end, a REP element, a duplicated operon) rather than
+            # an att site. But it counts those copies in the CONTIG it was given,
+            # and on a closed genome the contig IS the assembly, so the two
+            # questions were the same question and nobody noticed the difference.
+            #
+            # On a draft they are not the same question at all. A contig is a
+            # fraction of the genome, so a family with 30 copies genome-wide can
+            # easily show only two on one 170 kb contig and sail through.
+            # Measured on the fragmented benchmark (120 assemblies, 3
+            # contiguities): all 35 de novo repeats reported on drafts had
+            # exactly 2 copies on their own contig, but 10 of them had 3-30
+            # copies across the assembly. The worst was a 89 bp repeat with 30
+            # copies, attached to a HIGH-confidence call.
+            #
+            # So ask the assembly, not the contig. This is exactly the check the
+            # closed genomes were already getting: all 29 de novo repeats called
+            # on closed genomes have 2 assembly-wide copies, so this guard is a
+            # no-op there and only removes draft artefacts.
+            #
+            # What is rejected: the boundary CLAIM only. A de novo repeat never
+            # moved an element in the first place, so no coordinate changes -
+            # the row drops back to boundary_method='none', which is the honest
+            # statement that the extent is the machinery span.
+            att_kmer = result["att_sequence"]
+            n_copies = copies_in_assembly(att_kmer) if att_kmer else 0
+            if n_copies > att_search.DENOVO_MAX_CONTIG_COPIES:
+                audit_rows.append(audit_row(
+                    sample, "kept_flagged", "denovo_att_is_a_repeat_family",
+                    f"{row['mge_id']}: the de novo repeat "
+                    f"({result['att_length_bp']} bp) proposed at "
+                    f"{result['att_left']} / {result['att_right']} occurs "
+                    f"{n_copies} times in this assembly, more than the "
+                    f"{att_search.DENOVO_MAX_CONTIG_COPIES} copies an att site "
+                    "can have (attL and attR, nothing else). It is a repeat "
+                    "family, not an integration scar - most likely an IS end or "
+                    "another dispersed repeat that the IS mask did not cover, "
+                    "which is easy to miss on a fragmented assembly because only "
+                    "some copies are on this contig. The att columns are cleared "
+                    "and boundary_method returns to 'none'; the interval is "
+                    f"unchanged ({machinery_start}-{machinery_end}), because a de "
+                    "novo repeat never widened it.",
+                    contig=contig, start=row["start"], end=row["end"],
+                ))
+                row["boundary_method"] = "none"
+                row["attL"] = "NA"
+                row["attR"] = "NA"
+                row["att_sequence"] = "NA"
+                row["att_length_bp"] = "0"
+                row["att_mismatches"] = "0"
+                row["att_trna"] = "NA"
+                continue
+
             audit_rows.append(audit_row(
                 sample, "kept_flagged", "denovo_att_reported_not_applied",
                 f"{row['mge_id']}: a de novo direct repeat "
@@ -3319,13 +3538,18 @@ def build_parser():
     return parser
 
 
-def summarise(sample, rows, audit_rows, out_audit):
+def summarise(sample, rows, audit_rows, out_audit, contiguity=None):
     """Build the one-line summary printed to the run log.
 
     Not used for filtering by anything; it just makes the result visible without
     opening a file. It always names the classes separately, because "3 elements
     found" would be a misleading thing to read for a sample whose three elements
     are all passive islands.
+
+    `contiguity` is the dict from assembly_contiguity(), or None when contig
+    lengths were unavailable. Its N50 and contig count go in the same line as
+    the counts, because "4 ICEs" means something different off a closed genome
+    than off a 300-contig draft and the two facts should not be a file apart.
     """
     counts = {
         MGE_CLASS_ICE: 0,
@@ -3343,8 +3567,16 @@ def summarise(sample, rows, audit_rows, out_audit):
 
     n_dropped = sum(1 for row in audit_rows if row["action"] == "dropped")
 
+    assembly = ""
+    if contiguity is not None:
+        assembly = (
+            f"Assembly: {contiguity['n_contigs']} contig(s), N50 "
+            f"{contiguity['n50_bp']:,} bp. "
+        )
+
     return (
-        f"Sample {sample}: {len(rows)} candidate element(s) - "
+        assembly
+        + f"Sample {sample}: {len(rows)} candidate element(s) - "
         f"{counts[MGE_CLASS_ICE]} ICE (predicted self-transmissible), "
         f"{counts[MGE_CLASS_IME]} IME (mobilisable with a helper), "
         f"{counts[MGE_CLASS_ISLAND]} passive island, "
@@ -3369,13 +3601,17 @@ def main(argv=None):
 
     audit_rows = []
     rows = []
+    # Filled in once the contig lengths are known, below. Declared here because
+    # the early exits (no annotation, no CONJscan result) call finish() before
+    # that point and it must still have a value to read.
+    contiguity = None
 
     def finish(return_code=0):
         """Write both outputs and print the summary. Called from every exit
         path, so an empty result is still a complete, readable pair of files."""
         write_tsv(args.out_table, OUTPUT_COLUMNS, rows)
         write_tsv(args.out_audit, AUDIT_COLUMNS, audit_rows)
-        print(summarise(args.sample, rows, audit_rows, args.out_audit))
+        print(summarise(args.sample, rows, audit_rows, args.out_audit, contiguity))
         return return_code
 
     # --- the annotation, without which nothing can be placed ----------------
@@ -3415,6 +3651,23 @@ def main(argv=None):
                 f"'{args.contig_lengths}' was given but no contig/length pairs could "
                 "be read from it; fell back to the GFF3's ##sequence-region lines.",
             ))
+
+    # --- how fragmented is the assembly these calls came off? ---------------
+    # Written before any candidate, so the first thing in the audit file is the
+    # context the rest of it has to be read in. It filters nothing: a reader
+    # opening the element table has no way to tell a closed genome from a
+    # 300-contig draft, and every honest caveat in this module depends on that
+    # difference. See assembly_contiguity / contiguity_verdict above and
+    # docs/mobilome_draft_assemblies.md.
+    contiguity = assembly_contiguity(contig_lengths)
+    if contiguity is not None:
+        audit_rows.append(audit_row(
+            args.sample, "assembly_qc", "assembly_contiguity",
+            f"{contiguity['n_contigs']} contig(s), "
+            f"{contiguity['total_bp']:,} bp total, longest "
+            f"{contiguity['longest_bp']:,} bp, N50 {contiguity['n50_bp']:,} bp. "
+            + contiguity_verdict(contiguity["n50_bp"]),
+        ))
 
     # --- the CONJscan result ------------------------------------------------
     conjscan_path = resolve_conjscan_path(args.conjscan_tsv)

@@ -27,6 +27,7 @@ Run:
 
 import csv
 import os
+import random
 import sys
 
 # Import the script under test (and its sibling consumer) regardless of where
@@ -425,7 +426,10 @@ def test_ice_needs_all_three_anchor_classes(tmp_path):
     # 'integrase_attached_beyond_cluster_window' is expected: the integrase in
     # this fixture sits outside the machinery clustering window and is attached by
     # the wider integrase search, which is the whole point of that step.
+    # 'assembly_contiguity' is expected on EVERY sample: one row per run recording
+    # the contig count and N50 the calls came off.
     assert audit_reasons(audit) <= {
+        "assembly_contiguity",
         "no_genome_for_att_search",
         "integrase_attached_beyond_cluster_window",
     }
@@ -2795,3 +2799,284 @@ def test_an_ime_genuinely_inside_an_ice_is_not_collapsed():
     kept, _audit = ci.resolve_nested_calls("S1", [ice, ime], window_bp=15000)
 
     assert len(kept) == 2
+
+
+# ---------------------------------------------------------------------------
+# Fragmented (draft) assemblies.
+#
+# Everything below was written after the module was measured on drafts for the
+# first time. Until then every validation had been on CLOSED genomes, where
+# spans_contigs was TRUE on 0 of 63 calls - so the guards that exist for
+# fragmentation had never been exercised by a test or by a benchmark. The
+# fragmented-assembly validation cut 40 benchmark genomes to three contiguities
+# (~150 kb, ~50 kb and ~20 kb N50), re-annotated all 120 assemblies and re-ran
+# the whole chain; the numbers quoted in these tests come from it.
+# Full write-up: docs/mobilome_draft_assemblies.md.
+# ---------------------------------------------------------------------------
+
+
+def test_assembly_contiguity_reports_n50_and_contig_count():
+    """N50 as a reader expects it: half the assembly is in contigs this long or
+    longer. Checked on a hand-computable case so the arithmetic is visible.
+
+    100 + 50 + 30 + 20 = 200 kb total, half is 100 kb; the longest contig alone
+    reaches it, so N50 is 100 kb - not the median contig length (40 kb), which
+    is the usual way of getting this wrong.
+    """
+    stats = ci.assembly_contiguity({
+        "c1": 100000, "c2": 50000, "c3": 30000, "c4": 20000,
+    })
+
+    assert stats["n_contigs"] == 4
+    assert stats["total_bp"] == 200000
+    assert stats["longest_bp"] == 100000
+    assert stats["n50_bp"] == 100000
+
+
+def test_assembly_contiguity_of_a_closed_genome_is_the_genome():
+    """A single-contig genome: N50, longest and total are all the same number.
+    This is the input every earlier validation used, and it must not be a
+    special case in the code."""
+    stats = ci.assembly_contiguity({"chromosome": 5400000})
+
+    assert stats == {
+        "n_contigs": 1,
+        "total_bp": 5400000,
+        "longest_bp": 5400000,
+        "n50_bp": 5400000,
+    }
+
+
+def test_assembly_contiguity_is_none_when_there_are_no_contigs():
+    """No lengths means no claim - the caller stays silent rather than writing a
+    row of zeros that reads like a measurement."""
+    assert ci.assembly_contiguity({}) is None
+
+
+def test_contiguity_verdict_changes_at_the_two_validated_levels():
+    """The three sentences map onto the three arms the validation actually ran,
+    and each one has to say something a reader can act on."""
+    trusted = ci.contiguity_verdict(300000)
+    class_only = ci.contiguity_verdict(60000)
+    poor = ci.contiguity_verdict(20000)
+
+    assert trusted != class_only != poor
+    # The lower divider sits BETWEEN the two arms it separates: detection held
+    # at the 50 kb arm and broke at the 20 kb one, so an assembly a little under
+    # 50 kb must still get the "class is reliable" message, not the bottom one.
+    assert ci.contiguity_verdict(49000) == class_only
+    # At good contiguity the message is reassuring but still says lengths are a
+    # floor; below 150 kb it must say the extent is not reliable; at the bottom
+    # it must say detection itself suffers.
+    assert "floor" in trusted
+    assert "EXTENT is not" in class_only
+    assert "DETECTION" in poor
+
+
+def test_every_run_writes_one_assembly_contiguity_audit_row(tmp_path):
+    """The audit's first job is to say what the calls came off.
+
+    A reader opening the element table cannot tell a closed genome from a
+    300-contig draft, and every caveat in this module depends on that
+    difference - so the contig count and N50 are recorded once per sample,
+    unconditionally, for closed genomes too.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _rc, _rows, audit, _path = run_main(tmp_path, conjscan, gff)
+
+    qc = [row for row in audit if row["action"] == "assembly_qc"]
+    assert len(qc) == 1
+    assert qc[0]["reason"] == "assembly_contiguity"
+    assert "1 contig(s)" in qc[0]["detail"]
+    assert "N50 200,000 bp" in qc[0]["detail"]
+
+
+def test_the_contiguity_line_is_written_even_when_nothing_is_found(tmp_path):
+    """'No elements' off a closed genome and 'no elements' off a shattered draft
+    are different results. The audit has to distinguish them, so the QC row must
+    survive the early exit that a missing CONJscan file takes."""
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _rc, rows, audit, _path = run_main(tmp_path, conjscan=None, gff=gff)
+
+    assert rows == []
+    assert "assembly_contiguity" in audit_reasons(audit)
+
+
+def test_the_summary_line_carries_the_contig_count_and_n50(tmp_path, capsys):
+    """The log line is what a user reads without opening a file, so '4 ICEs' and
+    'off a 300-contig draft' should not be a file apart."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    run_main(tmp_path, conjscan, gff)
+    printed = capsys.readouterr().out
+
+    assert "Assembly: 1 contig(s), N50 200,000 bp." in printed
+    assert "Sample S1:" in printed
+
+
+def test_an_ice_resting_on_another_contigs_apparatus_says_so(tmp_path):
+    """The draft-assembly exemption is allowed, but it must be visible.
+
+    On a fragmented assembly the tra operon routinely lands on a different
+    contig from the relaxase, so a cluster with no mating-pair gene of its own
+    is still called an ICE when the typed system's other hits are elsewhere -
+    without that exemption real ICEs are demoted the moment an assembly breaks.
+
+    The cost is a row that contradicts itself to anyone who does not know the
+    rule: mobility says "predicted self-transmissible" while missing_components
+    says "mating-pair apparatus". mpf_from_other_contig is the column that
+    explains it. Measured on the fragmented benchmark: 9 of 191 draft calls,
+    every one already at low confidence, and 0 of 68 closed-genome calls.
+    """
+    contigs = {"contig_1": 200000, "contig_2": 200000}
+    cds = [
+        gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "Phage integrase family protein"),
+        gff_cds("contig_1", 55000, 56600, "+", "S1_00015", "TrwC relaxase domain-containing protein"),
+        # The mating bridge, on the OTHER contig - the assembly broke between them.
+        gff_cds("contig_2", 90000, 92000, "+", "S1_00620", "conjugal transfer protein TraB"),
+    ]
+    # One typed system, hits split across the break.
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id="S1_00015", gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id="S1_00620", gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", contigs, cds)
+
+    _rc, rows, audit, _path = run_main(
+        tmp_path, conjscan, gff, extra=["--min-element-bp", "1000"])
+
+    element = [row for row in rows if row["contig"] == "contig_1"][0]
+    # The exemption still does its job: this is an ICE, not a demoted IME...
+    assert element["mge_class"] == "ice"
+    assert element["has_t4ss"] == "FALSE"          # no mating-pair gene here
+    # ...and it now says out loud where that apparatus actually was.
+    assert element["mpf_from_other_contig"] == "TRUE"
+    assert element["spans_contigs"] == "TRUE"
+    assert element["confidence"] == "low"          # unchanged: spans_contigs caps it
+    assert "mpf_apparatus_on_another_contig" in audit_reasons(audit)
+
+
+def test_an_ice_with_its_own_apparatus_is_not_flagged(tmp_path):
+    """The complement: when the mating-pair genes are in the cluster, the new
+    column must be FALSE. A flag that is TRUE on every ICE tells a reader
+    nothing."""
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+        conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
+                     model_fqn="CONJScan/Chromosome/T4SS_typeF"),
+    ])
+    gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    _rc, rows, audit, _path = run_main(tmp_path, conjscan, gff)
+
+    assert rows[0]["mge_class"] == "ice"
+    assert rows[0]["mpf_from_other_contig"] == "FALSE"
+    assert "mpf_apparatus_on_another_contig" not in audit_reasons(audit)
+
+
+def test_a_denovo_repeat_family_is_rejected_using_the_whole_assembly(tmp_path):
+    """A repeat with copies on OTHER contigs is not an att site.
+
+    att_search already refuses a de novo repeat with more than two copies - attL
+    and attR and nothing else. But it counts copies on the contig it was handed,
+    and on a closed genome the contig IS the assembly, so nobody noticed the two
+    questions were different. On a draft they are not: a family with 30 copies
+    genome-wide can show only two on one contig.
+
+    Measured on the fragmented benchmark: all 35 de novo repeats reported on
+    drafts had exactly 2 copies on their own contig, but 10 had 3-30 across the
+    assembly - one of them an 89 bp repeat with 30 copies attached to a
+    high-confidence call. On closed genomes all 29 de novo repeats have 2
+    assembly-wide copies, so this guard is a no-op there.
+
+    The fixture: the same motif twice on the element's contig (the pair the
+    search finds) and twice more on a second contig - the copies a fragmented
+    assembly hides from a per-contig count.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=INTEGRASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+    ])
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    generator = random.Random(98)
+    element_contig = "".join(generator.choice("ACGT") for _ in range(200_000))
+    element_contig = plant_att_pair(element_contig, motif, 40_000, 70_000)
+    # A second contig carrying two more copies of the same motif. Nothing on it
+    # is a candidate; it exists only to make the repeat a family.
+    other_contig = "".join(generator.choice("ACGT") for _ in range(60_000))
+    other_contig = plant_att_pair(other_contig, motif, 10_000, 30_000)
+
+    genome = tmp_path / "genome.fna"
+    genome.write_text(
+        ">contig_1\n" + element_contig + "\n>contig_2\n" + other_contig + "\n")
+
+    _rc, rows, audit, _path = run_main(
+        tmp_path, conjscan=conjscan, gff=gff, extra=["--genome", str(genome)])
+
+    element = rows[0]
+    # The boundary CLAIM is withdrawn...
+    assert element["boundary_method"] == "none"
+    assert element["attL"] == "NA"
+    assert element["attR"] == "NA"
+    assert element["att_sequence"] == "NA"
+    assert "denovo_att_is_a_repeat_family" in audit_reasons(audit)
+    # ...and nothing else moves. A de novo repeat never widened an element, so
+    # rejecting one cannot change a coordinate.
+    assert element["start"] == element["machinery_start"]
+    assert element["end"] == element["machinery_end"]
+
+
+def test_a_denovo_repeat_unique_in_the_assembly_is_still_reported(tmp_path):
+    """The complement, and the proof this guard is not just switching Phase 3 off.
+
+    Same fixture with the extra copies removed: two copies in the whole
+    assembly, which is what a real attL/attR pair looks like. The repeat is
+    still reported as a lead for a human to follow - and still does not move the
+    element, which was always the rule for de novo boundaries.
+    """
+    conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
+        conjscan_row(hit_id=INTEGRASE_HIT, gene_name="T4SS_MOBF"),
+        conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
+    ])
+    gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS)
+
+    motif = "GGCTCGAACCCAGGACCTCTTGCAT"
+    generator = random.Random(98)
+    element_contig = "".join(generator.choice("ACGT") for _ in range(200_000))
+    element_contig = plant_att_pair(element_contig, motif, 40_000, 70_000)
+    other_contig = "".join(generator.choice("ACGT") for _ in range(60_000))
+
+    genome = tmp_path / "genome.fna"
+    genome.write_text(
+        ">contig_1\n" + element_contig + "\n>contig_2\n" + other_contig + "\n")
+
+    _rc, rows, audit, _path = run_main(
+        tmp_path, conjscan=conjscan, gff=gff, extra=["--genome", str(genome)])
+
+    element = rows[0]
+    assert element["boundary_method"] == "denovo"
+    assert element["attL"] == "40000..40024"
+    assert "denovo_att_is_a_repeat_family" not in audit_reasons(audit)
+    assert "denovo_att_reported_not_applied" in audit_reasons(audit)
+    assert element["start"] == element["machinery_start"]
