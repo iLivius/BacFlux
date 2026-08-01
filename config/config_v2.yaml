@@ -168,9 +168,9 @@ parameters:
     # the host. That is not exotic — plasmids cross genus boundaries constantly,
     # which is the entire reason this module exists, and the reference databases
     # are dense with near neighbours. `auto` mode uses BLAST bestsum, which
-    # follows database composition rather than biology: on K. pneumoniae KPNIH1
-    # it dropped a genuine plasmid because E. coli entries outnumbered Klebsiella
-    # ones 58,709 to 16,253.
+    # follows database composition rather than biology: on K. pneumoniae ATCC
+    # BAA-2146 it dropped a genuine plasmid (pMYS, NZ_CP006660.1, 2,014 bp)
+    # because E. coli entries outnumbered Klebsiella ones 58,709 to 16,253.
     #
     # HOW TO CHECK, in this order:
     #   1. Read 02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv
@@ -231,8 +231,16 @@ mobilome:
                                #   (1 = chromosomal/intrinsic candidate ... 6 = inside an
                                #   ICE or on a conjugative plasmid = PREDICTED
                                #   self-transmissible). Adds two tools (ISEScan,
-                               #   CONJscan/MacSyFinder), both bioconda; no database
-                               #   download to configure (nothing to set here).
+                               #   CONJscan/MacSyFinder), both bioconda.
+                               #   WHAT YOU HAVE TO SET: nothing beyond this switch.
+                               #   The module runs on the databases BacFlux already
+                               #   has, plus the CONJscan models it fetches itself.
+                               #   Everything else in this block is OPTIONAL and each
+                               #   layer is skipped in full when you leave its source
+                               #   empty: icescan (a second machinery model set),
+                               #   tncentral (names transposons, makes tier 4
+                               #   reachable), iceberg (names the ICEs), isosdb
+                               #   (counts the IS copies the assembly lost).
                                #   LICENCE: turning this on fetches the CONJscan MODELS,
                                #   which Institut Pasteur/CNRS license CC BY-NC-SA 4.0
                                #   (NON-COMMERCIAL). BacFlux never ships them - they are
@@ -311,9 +319,11 @@ mobilome:
   # already being found at 0.5 and sit 22 kb and 518 kb away from the integrase
   # that marks the element, so coverage was never what was stopping it.
   #
-  # WHEN TO LOWER IT ANYWAY. Across all 395 curated IMEs, 68 carry a relaxase hit
+  # WHEN TO LOWER IT ANYWAY. Across all 395 curated IMEs, 73 carry a relaxase hit
   # that is clean on E-value and fails only this coverage rule — 60 of them the
-  # T4SS_MOBT family at about 0.32 profile coverage. If your isolates sit in that
+  # T4SS_MOBT family at about 0.32 profile coverage. (73, not the 68 this comment
+  # gave until 2026-07-31: the 68 was stale in the script that builds the table,
+  # not in the table itself. 279 + 73 + 43 = 395.) If your isolates sit in that
   # space, 0.4 is worth trying and the audit TSV is how you check what changed:
   # it records a reason for every candidate dropped, so you can see whether the
   # new calls are machinery-poor fragments or elements worth following up.
@@ -343,23 +353,42 @@ mobilome:
   # whole plasmid model set, and applies a stricter quorum to the mating
   # apparatus. Swapping would have lost elements we currently detect.
   #
-  # WHAT IT BUYS YOU. Three things CONJScan 2.1.0 has no model for at all:
+  # WHAT IT BUYS YOU. Three model classes CONJScan 2.1.0 does not describe:
   #   * IME  — an element that integrates into the chromosome and carries a
   #            relaxase (the enzyme that nicks the DNA to start transfer) but no
   #            mating apparatus of its own, so it can only move when a
   #            conjugative element in the same cell lends it one. Ladder tier 5.
+  #            READ THIS CAREFULLY: ICEscan does NOT create the `ime` class.
+  #            BacFlux's own rules already call an element an IME whenever the
+  #            anchors are an integrase plus a relaxase with no mating apparatus,
+  #            and CONJscan's own MOB models supply plenty of those relaxases.
+  #            Measured over the 28 benchmark genomes run both ways: 10 IME rows
+  #            without ICEscan, 21 with. Turning this layer off roughly HALVES
+  #            the IME rows; it does not remove them.
+  #            (21, not the 22 this comment gave until 2026-08-01. Re-counted by
+  #            running the caller over the 28 genomes both ways at HEAD and
+  #            counting element_type. The `ime` row of the census table in
+  #            docs/methods_icescan_union.md §8.3 says 22 and several of its
+  #            other cells disagree with HEAD too, so that table needs a re-count
+  #            before it is quoted again -- the 10, and the union total of 63
+  #            calls, both reproduce exactly.)
   #   * AICE — the actinomycete elements (Streptomyces and relatives) that do not
   #            conjugate at all: they push single-stranded DNA between hyphae
   #            using an FtsK/SpoIIIE translocase. Reported with its own class and
   #            NO mobility tier, because tiers 5 and 6 are both statements about
-  #            conjugation and would be false claims here.
+  #            conjugation and would be false claims here. This class, unlike
+  #            `ime`, really is ICEscan-only — nothing else can produce it.
   #   * 21 extra profile HMMs, including integrase families the CONJScan set does
   #     not carry. Four of them are trusted as element integrases; the rest are
   #     deliberately ignored (see the caller — some are integron or chromosomal
   #     housekeeping recombinases that would anchor elements onto the wrong gene).
-  #   Measured over 12 curated IMEs: 3 detected before, 5 after — and, more to the
-  #   point, the detections whose called length is within a factor of two of the
-  #   published length went from 1 to 4.
+  #   Measured over the 12 curated IMEs of the pilot set: 2 detected before, 5
+  #   after — and, more to the point, the detections whose called length is
+  #   within a factor of two of the published length went from 1 to 4.
+  #   (2, not the 3 this comment gave until 2026-07-31. The 3 came from a run
+  #   made before the current nesting and size-floor rules, whose third
+  #   "detection" was a 181,279 bp call laid over an 11,112 bp IME — the scorer
+  #   counts any overlap, so it passed. Re-run with today's code it is 2.)
   #
   # WHAT IT DOES NOT BUY YOU. ICEscan DELIMITS NOTHING. MacSyFinder reports gene
   # ORDINALS ("the 41st protein in the file"), never base pairs, so every
@@ -403,10 +432,24 @@ mobilome:
   # units with its copies in DIRECT orientation, breaking the same-orientation
   # rule the pattern depends on. A TnCentral hit is not an inference: it matches
   # an element somebody characterised, named and deposited, whose architecture is
-  # already known, so it gets IS26 right for free. On the KPNIH1 positive control
-  # this moves blaCTX-M-15 from tier 2 ("an IS is next to it, so expression may
-  # change") to tier 4, inside TnEcp1.1 — which is the truth: ISEcp1 does not
-  # merely modulate blaCTX-M-15, it mobilises it.
+  # already known, so it gets IS26 right for free.
+  #
+  # THE INTENDED CASE, and how far it has actually got. On the K. pneumoniae
+  # positive control blaCTX-M-15 scores tier 2 — "an IS is next to it, so
+  # expression may change" — because IS*Ecp1* sits 48 bp upstream, correctly
+  # oriented. That is true but it sells the situation short: ISEcp1 does not
+  # merely modulate blaCTX-M-15, it MOBILISES it, and TnEcp1.1 is that unit.
+  # Tier 4 is what would say so.
+  #
+  # BE HONEST ABOUT THIS: turning the layer on has never actually delivered that
+  # tier. Reaching it needs a TnCentral URL *and* at least min_reference_coverage
+  # of the reference element present, and on the clinical hybrid runs that did
+  # have the layer on, every TnEcp1.1 candidate was refused at 12% and 49%
+  # coverage of a 3,417 bp reference. NO RUN KEPT ON DISK CONTAINS A TIER 4 ROW.
+  # Treat tier 4 as a working code path that is currently unexercised, not as
+  # something this switch is known to produce. (This comment claimed the KPNIH1
+  # positive control reached tier 4; it did not, and the control in question was
+  # ATCC BAA-2146 in any case. Corrected 2026-08-01.)
   #
   # LICENCE. BacFlux never ships this data. Setting a URL means YOU fetch it,
   # under your own agreement with the licensor — the same arrangement as
@@ -451,10 +494,18 @@ mobilome:
   # change any gene's tier — it changes "predicted self-transmissible element"
   # into "ICEKpnATCCBAA-2146-1", which is what lets you look the thing up.
   #
-  # It also reveals how far our boundaries fall short. On KPNIH1 the ICE call
-  # spans 40,486 bp while ICEberg's record for the same element spans 58,048 bp,
-  # and the audit says so — a concrete illustration of why an interval with
-  # boundary_method=none is a floor rather than a delimitation.
+  # It also reveals how far our boundaries fall short, which is the real reason
+  # to switch it on. On the K. pneumoniae ATCC BAA-2146 positive control our ICE
+  # call spans 54,943 bp against ICEberg's 58,048 bp for the same element: we
+  # recover 0.946 of it and stop 3,138 bp inside its far end. The audit says so
+  # in as many words. Any AMR gene in that last 3 kb is scored as though it were
+  # OUTSIDE the ICE, which is exactly why the interval is a floor rather than a
+  # delimitation — and this is the good case, a closed genome where the att
+  # search found a tRNA-anchored repeat. With boundary_method=none the interval
+  # is only the machinery span and the shortfall is far larger.
+  # (Until 2026-07-31 this comment gave 40,486 bp / boundary_method=none for the
+  # same element. That was the call before the att search was reworked; the
+  # numbers above are the current ones. See docs/mobilome_worked_example.md.)
   #
   # LICENCE. ICEberg 3.0 (Jun 2023) publishes NO licence or terms-of-use
   # statement; every page carries only "Copyright © 2023 All Rights Reserved by
@@ -469,6 +520,13 @@ mobilome:
                                #   the older bioinfo-mml.sjtu.edu.cn path 404s for
                                #   ICEberg 3.0 (it still serves ICEberg 2.0).
                                #   ICE_seq_all.fas is ~100 MB and the server is slow.
+                               #   NO sha256 KEY HERE, unlike icescan and tncentral:
+                               #   this is two files rather than one archive, and the
+                               #   big one has to be resumable over a slow link, so a
+                               #   single pinned digest is the wrong instrument. The
+                               #   observed checksum of the concatenated FASTA and the
+                               #   fetch date land in iceberg_db/PROVENANCE.txt, which
+                               #   is what a methods section needs.
     dir: ""                    # OPTIONAL — a directory of .fas files you already hold.
                                #   Takes precedence over `urls`; nothing is fetched.
     min_identity: 80.0         # identity floor for a name. Below this the elements are
@@ -480,7 +538,11 @@ mobilome:
                                #   strains, so demanding near-completeness would refuse
                                #   to name exactly the divergent elements a name helps
                                #   with most. Below 80% of the REFERENCE the name is
-                               #   suffixed "-like".
+                               #   suffixed "-like". That 80% is a separate number and
+                               #   is NOT a config key: it is EXACT_NAME_REFERENCE_
+                               #   COVERAGE in name_ice_elements.py, named here so you
+                               #   have something to grep for if you want to change how
+                               #   readily "-like" is applied.
 
   # ── How many IS copies did the assembly LOSE? (spec WP-C) ─────────────────
   # ILLUMINA AND HYBRID ONLY — it needs reads. Leave the URLs empty to skip it.
@@ -503,11 +565,18 @@ mobilome:
   # LICENCE. ISOSDB ships in the pseudoR repository under the MIT licence — the
   # one mobilome database with no redistribution question attached at all.
   # Cite Kirsch et al. 2024, Cell Host & Microbe.
+  #
+  # SET BOTH URLS OR NEITHER. fasta_url alone switches the leg on but leaves the
+  # family map with nowhere to come from; BacFlux stops at parse time and says so
+  # rather than letting the download fail an hour into the run. No sha256 key on
+  # this layer either: these are pinned GitHub raw paths under version control at
+  # the source, and isosdb_db/PROVENANCE.txt records what actually arrived.
   isosdb:
     fasta_url: ""              # e.g. https://raw.githubusercontent.com/joshuakirsch/pseudoR/main/ISOSDB.V3.fna.zip
                                #   ~9.9 MB zipped, 22,713 IS nucleotide sequences,
                                #   already dereplicated at 95% identity by CD-HIT.
     family_map_url: ""         # e.g. https://raw.githubusercontent.com/joshuakirsch/pseudoR/main/IS_fam_annot.txt
+                               #   REQUIRED whenever fasta_url is set (see above).
                                #   entry -> IS family (IS3, IS5, IS110 ...). Results are
                                #   reported per FAMILY as well as per entry, because the
                                #   family total is robust to which near-identical entry an
@@ -553,12 +622,57 @@ mobilome:
                                #   A high fraction means the assembly broke exactly where
                                #   the IS elements are - read the located IS count as a
                                #   floor, not a count.
-                               #   NOTE this is NOT the same number as the window used to
-                               #   CAP confidence in the mobility table. That one is a
-                               #   fixed 1000 bp (CONTIG_END_WINDOW_BP in colocalise.py)
-                               #   and answers a different question: was there enough
-                               #   flanking sequence to have SEEN a neighbouring element
-                               #   at all? An IS 500 bp from a contig end is not "at the
-                               #   edge", but you still could not have seen its partner
-                               #   2 kb away, so absence of evidence there is not
-                               #   evidence of absence. Deliberately separate knobs.
+                               #   THIS IS THE ONLY ONE OF THREE CONTIG-END WINDOWS YOU
+                               #   CAN SET, and they are deliberately separate knobs
+                               #   answering different questions on different objects:
+                               #     100 bp, this key -> is an IS call sitting ON the
+                               #       edge of its contig? Passed to isescan_to_table.py
+                               #       as --boundary-bp.
+                               #     1000 bp, fixed -> was there enough flanking sequence
+                               #       to have SEEN a neighbouring element at all? An IS
+                               #       500 bp from a contig end is not "at the edge", but
+                               #       you still could not have seen its partner 2 kb
+                               #       away, so absence of evidence is not evidence of
+                               #       absence. This one caps confidence in the mobility
+                               #       table (CONTIG_END_WINDOW_BP in colocalise.py).
+                               #     1000 bp, fixed -> same question again, for an ICE or
+                               #       IME candidate rather than an AMR gene. That is
+                               #       conjscan_to_ice.py's own --boundary-bp, which the
+                               #       workflow does not pass, so its default stands.
+                               #   Confusingly the first and third share the flag name
+                               #   --boundary-bp while meaning different things; only the
+                               #   first is wired to this key.
+
+  # ── The ICE/IME geometry thresholds are NOT config keys ───────────────────
+  # There is nothing to set below; this note exists because the question comes up
+  # and because docs/mobilome_tuning_guide.md §3.3 tabulates these as if they
+  # were knobs. They are knobs on the SCRIPT, not on the workflow: conjscan_ice
+  # passes none of them, so conjscan_to_ice.py's argparse defaults are what every
+  # measured result in docs/ was produced at. To change one you edit the rule's
+  # shell block in workflow/rules/shared/80_mobilome.smk, and you should re-run
+  # the benchmark afterwards.
+  #
+  #   --window-bp            15,000   how far apart two machinery genes may sit and
+  #                                   still be chained into one candidate element
+  #   --min-element-bp        8,000   floor on a candidate's length; below it the
+  #                                   cluster is dropped with a reason
+  #   --min-ime-element-bp    2,000   the same floor for the IME/AICE architecture,
+  #                                   which is genuinely smaller. The sharpest knob
+  #                                   in the module
+  #   --max-element-bp      500,000   ceiling, to stop a runaway chain of anchors
+  #                                   swallowing a whole replicon
+  #   --integrase-window-bp  50,000   how far from the machinery an integrase may
+  #                                   sit and still be taken as the element's own
+  #   --att-flank-window-bp  50,000   how much sequence either side of the machinery
+  #                                   the att-site search reads
+  #
+  # ONE ASYMMETRY WORTH KNOWING, because it is not obvious and it is not a bug.
+  # The att search is always given the 8,000 bp floor, never the 2,000 bp IME one,
+  # and it refuses any repeat pair implying an element outside its range. So an
+  # IME admitted at 3 kb can never have its boundaries resolved, however clean the
+  # repeat pair: it keeps boundary_method=none and reports the machinery span.
+  # Four of the five curated IMEs this module detects (machinery spans 3,840 /
+  # 4,959 / 5,942 / 6,252 / 8,164 bp) sit under that floor. The deliberate reading
+  # is that an att pair implying a 3 kb element is mostly noise; the honest
+  # reading is that IME boundaries are therefore largely unresolved. Making the
+  # floors agree per class would change results, so it has not been done quietly.

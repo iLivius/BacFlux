@@ -19,6 +19,11 @@
 #
 # ── Data flow ────────────────────────────────────────────────────────────────
 #
+# (WP-A, WP-C, WP-D below are the spec's "work package" labels — the order the
+# module was built in, kept because docs/mobilome_module_SPEC.md refers to them:
+# WP-A = surface the AMR calls, WP-C = find the IS elements, WP-D = intersect the
+# two and award a mobility tier. WP-B is the database layer, WP-E the ICE work.)
+#
 #   contigs_final.fasta ─┬─► contig_lengths ──────────────────┐
 #                        │                                     │
 #                        ├─► isescan ──► is_table ─────────────┤   (WP-C)
@@ -53,10 +58,17 @@
 #    "PREDICTED self-transmissible" — the confirmatory experiment is a filter or
 #    broth mating assay, not bioinformatics.
 #
-# Everything referenced here is defined once in 00_common.smk: MOBILOME_RUN,
-# MOBILOME_DIR and the per-file constants, MOBILOME_MAX_COMPOSITE_SPAN,
-# MOBILOME_BOUNDARY_BP, the three script paths, FINAL_CONTIGS, DIR_ANNOTATION,
-# DIR_TAXONOMY, PLATON_TABLE, LOGS, BAKTADB, capped_cpus.
+# WHERE THE NAMES IN THIS FILE COME FROM. Every constant used below — the on/off
+# switches (MOBILOME_RUN, MOBILOME_NAME_ELEMENTS, MOBILOME_NAME_ICE,
+# MOBILOME_COPY_NUMBER), every output path, all eight mobilome script paths, the
+# database URLs and thresholds, and the shared workflow names (FINAL_CONTIGS,
+# DIR_ANNOTATION, GTDBTK_DIR, PLATON_DIR, LOGS, BAKTADB, RAM, TRIM_R1/TRIM_R2,
+# PHAGE_CALLER, capped_cpus) — is defined once in the mobilome block of
+# 00_common.smk. Read that block before this file; nothing here re-derives a path
+# or re-reads the config, so producer and consumer can never drift apart. The
+# only exceptions are declared just below: MOBILOME_COVERAGE_PROFILE and the four
+# ICEscan constants, which are read here because nothing outside this file uses
+# them.
 #
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
 # "../../envs/x.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/x.yaml.
@@ -113,10 +125,13 @@
 # TSV explains it — the MOBT relaxases were already found at 0.5 and sit 22 kb
 # and 518 kb from the integrase marking the element.
 #
-# The IME ceiling study still says 68 of 395 curated IMEs carry a relaxase hit
-# that is clean on E-value and fails only this rule (60 of them T4SS_MOBT at
-# ~0.32 coverage), so 0.4 is a reasonable thing to try on that biology — with
-# the audit TSV as the check on what changed. Nothing measured supports 0.3.
+# The IME ceiling study says 73 of 395 curated IMEs carry a relaxase hit that is
+# clean on E-value and fails only this rule (60 of them T4SS_MOBT at ~0.32
+# coverage), so 0.4 is a reasonable thing to try on that biology — with the audit
+# TSV as the check on what changed. Nothing measured supports 0.3.
+# (73, not the 68 this comment carried until 2026-07-31: the 68 was stale in the
+# script that builds the table, not in the table. 279 + 73 + 43 = 395. See
+# docs/mobilome_tuning_guide.md §3.2.)
 #
 # The EBI mobilome-annotation-pipeline runs 0.3. That is evidence about a
 # metagenome pipeline's priorities — recall over precision, because a MAG's
@@ -219,8 +234,10 @@ if MOBILOME_RUN:
     # against the contig's length, and that question is what separates "there is
     # no IS next to this gene" from "the contig ended before we could tell".
     #
-    # Takes in: FINAL_CONTIGS, the one delivered genome (D2 hand-off), whichever
-    #           mode produced it.
+    # Takes in: FINAL_CONTIGS — the single delivered genome, contigs_final.fasta.
+    #           Every mode's front end ends by writing that one file (the
+    #           workflow calls this the "D2 hand-off"), so no rule from stage 03
+    #           onwards has to know which assembler produced it.
     # Does: a stdlib FASTA scan (no biopython) writing contig + length.
     # Produces: {sample}_contig_lengths.tsv.
     # Consumed by: isescan_table and amr_mge_colocalisation.
@@ -817,10 +834,16 @@ if MOBILOME_RUN:
                 """
 
     # ── Rule: conjscan_ice — turn machinery hits into ICE / IME candidates ───
-    # Takes in: CONJscan's best_solution.tsv, Bakta's GFF3 (for the genomic
-    #           coordinates of each protein hit, for integrase genes found by
-    #           product regex, AND for the tRNAs the att search anchors on), the
-    #           genome itself, the IS table, and the contig lengths.
+    # Takes in, and which rule produced each:
+    #   * CONJscan's best_solution.tsv and its hmmer_results/ directory  (conjscan)
+    #   * ICEscan's best_solution.tsv, ONLY when that layer is on        (icescan)
+    #   * Bakta's GFF3 — the genomic coordinates of every protein hit, the
+    #     integrase genes found by product regex, and the tRNAs the att search
+    #     anchors on                                                    (annotation)
+    #   * the genome itself, for the att-site sequence search            (D2 hand-off)
+    #   * the IS table, masked out of the att search (see below)         (isescan_table)
+    #   * the contig lengths, for the contig-edge flags                  (contig_lengths)
+    #   * chromosome-or-plasmid, per contig                       (mobilome_replicons)
     # Does: spec §8 Phases 0-4 — collect anchors (relaxase, coupling protein,
     #       T4SS, integrase), cluster them on one contig, and classify:
     #         integrase + relaxase + T4SS -> ICE  (predicted self-transmissible)
@@ -841,11 +864,12 @@ if MOBILOME_RUN:
     # The existing spans_contigs / at_contig_boundary flags already cap confidence
     # for exactly those cases.
     #
-    # The IS table is an input because it is MASKED OUT before the de novo half of
-    # the search: insertion sequences carry terminal repeats and duplicate target
-    # DNA when they transpose, so an IS-rich neighbourhood is full of direct
-    # repeats that have nothing to do with ICE integration. The spec names this as
-    # the most likely way to get Phase 3 wrong.
+    # The IS table is an input because every IS interval is MASKED OUT of the
+    # flanking sequence before the repeat search runs — all of it, not one half:
+    # insertion sequences carry terminal repeats and duplicate their target DNA
+    # when they transpose, so an IS-rich neighbourhood is full of direct repeats
+    # that have nothing to do with ICE integration. The spec names this as the
+    # most likely way to get Phase 3 wrong.
     #
     # Produces: the ICE/IME element table + its audit.
     # Consumed by: amr_mge_colocalisation, as a SECOND element source alongside
@@ -883,6 +907,12 @@ if MOBILOME_RUN:
                                if MOBILOME_REQUIRE_TRNA_BOUNDARY else ""),
             # Empty unless the ICEscan layer is on, so a user who left it off
             # gets exactly the behaviour this rule had before it existed.
+            #
+            # Only --icescan-tsv is passed, with no --icescan-hmmer-dir beside
+            # it. That is not an oversight: when the flag is omitted the script
+            # looks for hmmer_results/ next to the best_solution.tsv it was
+            # given, which is exactly the path we would have written. The
+            # CONJscan side passes both only because it was wired first.
             icescan_flag = lambda w: (
                 "--icescan-tsv " + ICESCAN_DIR.format(sample=w.sample) + "/best_solution.tsv"
                 if MOBILOME_ICESCAN else ""
@@ -930,8 +960,13 @@ if MOBILOME_RUN:
         #       actually fetched in PROVENANCE.txt because the endpoint is
         #       unversioned and otherwise there is no way to say later WHICH
         #       release a result came from.
-        # Produces: TNCENTRAL_BLAST_DB (a prefix) + PROVENANCE.txt.
-        # Consumed by: tncentral_blast.
+        # Produces: the directory TNCENTRAL_DB_DIR, holding tncentral.fa, the
+        #           BLAST index files under the prefix tncentral_v5, and
+        #           PROVENANCE.txt. Those filenames are written literally in the
+        #           shell block below because they are shell-side paths; the only
+        #           one another rule needs is the tncentral_v5 prefix, which
+        #           tncentral_blast rebuilds from input.db_dir.
+        # Consumed by: tncentral_blast. Fetched once and shared by all samples.
         rule tncentral_db:
             output:
                 db_dir = directory(TNCENTRAL_DB_DIR),
@@ -1046,12 +1081,20 @@ if MOBILOME_RUN:
                 """
 
         # ── Rule: tncentral_blast — where are the curated elements? ──────────
-        # Takes in: this sample's contigs + the v5 database above.
+        # Biology: a curated transposon or integron is a named architecture
+        # somebody characterised and deposited. Finding one on this genome is a
+        # much stronger statement than inferring a composite from two IS copies,
+        # which is why a hit here is what makes ladder tier 4 reachable.
+        #
+        # Takes in: this sample's contigs (the D2 hand-off) + the v5 BLAST
+        #           database from rule tncentral_db above.
         # Does: blastn the whole assembly against the curated set. The whole
         #       assembly rather than the ISEScan calls, because a transposon is
         #       bigger than the IS that bounds it and would be clipped otherwise.
         # Produces: TNCENTRAL_BLAST_HITS, tabular, with the exact columns
         #           name_transposons.py expects (BLAST_COLUMNS there).
+        # Consumed by: name_elements, which applies the naming thresholds. This
+        #           rule deliberately applies none of them — see the evalue note.
         rule tncentral_blast:
             input:
                 contigs = FINAL_CONTIGS,
@@ -1081,11 +1124,26 @@ if MOBILOME_RUN:
                 """
 
         # ── Rule: name_elements — turn BLAST hits into named elements ────────
+        # FOUR NAMES, ONE STEP, so nobody has to guess: the rule is
+        # `name_elements`, the script it runs is `name_transposons.py` (reached
+        # through the constant NAME_TRANSPOSONS_SCRIPT), the table it writes is
+        # NAMED_ELEMENTS_TABLE, and its log is mobilome_name_elements_*.log. The
+        # names have not been unified because renaming the rule or the script
+        # would change the job names and the log filenames on disk for no gain.
+        #
+        # Biology: a BLAST hit is not yet an element. One curated transposon
+        # usually matches as several high-scoring segments, and the same
+        # transposon may be present in two separate copies on the genome — those
+        # must stay two elements, not become one enormous one.
+        #
+        # Takes in: TNCENTRAL_BLAST_HITS from tncentral_blast above.
         # Does: merge HSPs into element COPIES (separate copies of one transposon
         #       must not be joined - see the script), apply the naming thresholds,
         #       drop plain IS entries that ISEScan already covers, and write the
         #       result in the element-table shape colocalise.py consumes.
-        # Produces: NAMED_ELEMENTS_TABLE + its discard audit.
+        # Produces: NAMED_ELEMENTS_TABLE + its discard audit, which records a
+        #       reason for every hit refused a name (identity, coverage, or being
+        #       a plain IS).
         # Consumed by: amr_mge_colocalisation, as a third --is-table.
         rule name_elements:
             input:
@@ -1123,7 +1181,19 @@ if MOBILOME_RUN:
         # Does: fetch each .fas, concatenate, index as a v5 BLAST database, and
         #       record provenance (ICEberg is versioned - 3.0, June 2023 - but the
         #       download URLs are not, so the fetch date is worth keeping).
-        # Produces: ICEBERG_BLAST_DB (a prefix) + PROVENANCE.txt.
+        # Produces: the directory ICEBERG_DB_DIR, holding iceberg.fa, the BLAST
+        #           index under the prefix iceberg_v5, and PROVENANCE.txt — the
+        #           same arrangement as tncentral_db, and for the same reason:
+        #           those are shell-side filenames, and iceberg_blast rebuilds the
+        #           one prefix it needs from input.db_dir.
+        # Consumed by: iceberg_blast. Fetched once and shared by all samples.
+        #
+        # NO CHECKSUM KEY, unlike the ICEscan and TnCentral layers. Not an
+        # omission: ICEberg serves two files rather than one archive, and the
+        # larger is ~100 MB over a slow link that the rule has to be allowed to
+        # resume — so a single pinned digest is not the right instrument here.
+        # PROVENANCE.txt records the observed sha256 of the concatenated FASTA
+        # and the fetch date, which is what a methods section needs.
         rule iceberg_db:
             output:
                 db_dir = directory(ICEBERG_DB_DIR),
@@ -1205,9 +1275,18 @@ if MOBILOME_RUN:
                 """
 
         # ── Rule: iceberg_blast — where do curated ICEs match this genome? ───
-        # The whole genome is searched, not the ICE intervals, so a curated
-        # element that OVERHANGS our interval still shows up - which is how the
-        # naming step can report that our boundaries fall short.
+        # Biology: ICEberg curates ICEs and IMEs that have been described and
+        # named in the literature. Matching one turns "a predicted
+        # self-transmissible element" into a name you can look up.
+        #
+        # Takes in: this sample's contigs (the D2 hand-off) + the v5 database from
+        #           rule iceberg_db above.
+        # Does: blastn the WHOLE genome, not our ICE intervals, so a curated
+        #       element that OVERHANGS our interval still shows up — which is how
+        #       the naming step can report that our boundaries fall short.
+        # Produces: ICEBERG_BLAST_HITS, the same tabular column set as the
+        #       TnCentral search, which is what name_ice_elements parses.
+        # Consumed by: name_ice_elements.
         rule iceberg_blast:
             input:
                 contigs = FINAL_CONTIGS,
@@ -1240,8 +1319,26 @@ if MOBILOME_RUN:
                 """
 
         # ── Rule: name_ice_elements — put the curated name on the candidate ──
-        # Produces ICE_TABLE_NAMED, which amr_mge_colocalisation reads instead of
-        # ICE_TABLE when this layer is on (see ICE_TABLE_FOR_COLOCALISE).
+        # Biology: this LABELS, it never DECIDES. conjscan_to_ice.py has already
+        # said what is an ICE and what class it is; all this step adds is which
+        # published element it looks like, and how much of that element our
+        # interval actually covers. It can change no gene's mobility tier.
+        #
+        # Takes in: the ICE/IME candidates (rule conjscan_ice) and the ICEberg
+        #           BLAST hits (rule iceberg_blast).
+        # Does: match each candidate interval to overlapping curated elements,
+        #       above the identity and overlap floors from the config. A name is
+        #       suffixed "-like" when less than 80% of the reference is present.
+        # Produces: ICE_TABLE_NAMED — the same rows and the same columns as
+        #       ICE_TABLE, with mge_name filled in — plus a naming audit that
+        #       records what each candidate matched and what was refused.
+        # Consumed by: amr_mge_colocalisation, which reads this table INSTEAD of
+        #       ICE_TABLE whenever this layer is on. That swap is decided once, in
+        #       00_common.smk, by ICE_TABLE_FOR_COLOCALISE.
+        #
+        # Its log is mobilome_name_ice_{sample}.log — shortened, where every other
+        # rule's log is "mobilome_" plus the rule name in full. Left alone because
+        # renaming it changes filenames on disk for no benefit.
         rule name_ice_elements:
             input:
                 ice_table = ICE_TABLE,
@@ -1272,12 +1369,49 @@ if MOBILOME_RUN:
     # Short-read modes only - it needs reads - and only when an ISOSDB source is
     # configured. Changes no AMR gene's tier: this is a quality metric on the IS
     # inventory, quantifying the collapse the module warns about everywhere else.
+    #
+    # THIS LEG NEEDS TWO FILES, and the switch that turns it on only looks for
+    # one. MOBILOME_COPY_NUMBER (00_common.smk) is satisfied by isosdb.fasta_url
+    # alone, but rule isosdb_db also downloads the IS family map. With the family
+    # URL left empty the download runs `curl -o ... ""`, which dies with a bare
+    # "curl: (3) URL using bad/illegal format" three quarters of the way through a
+    # run and never reaches the friendly message written for a missing family map.
+    # So say it here, at parse time, in the same way and for the same reason as
+    # the ICEscan check near the top of this file.
+    if MOBILOME_COPY_NUMBER and not ISOSDB_LOCAL and not ISOSDB_FAMILY_URL:
+        sys.exit(
+            "[BacFlux] mobilome.isosdb.fasta_url is set but "
+            "mobilome.isosdb.family_map_url is empty, so the IS family map "
+            "cannot be downloaded and every element would be reported as "
+            "'unassigned'. Set family_map_url (see config/config_v2.yaml for the "
+            "pseudoR link it sits beside), or point mobilome.isosdb.dir at a "
+            "directory already holding BOTH ISOSDB.V3.fna and IS_fam_annot.txt, "
+            "or clear fasta_url to leave the IS copy-number leg switched off."
+        )
+
     if MOBILOME_COPY_NUMBER:
 
         # ── Rule: isosdb_db — fetch the openly licensed IS sequence set ──────
+        # Biology: ISOSDB is a catalogue of IS nucleotide sequences, dereplicated
+        # at 95% identity, plus a map from each entry to its IS family. Reads are
+        # mapped against it in the next rules; the family map is what lets the
+        # answer be reported per FAMILY, which is the robust number.
+        #
         # ISOSDB lives in the pseudoR repository under the MIT licence, which
         # makes it the one mobilome database with no redistribution question. It
         # is still fetched rather than vendored, to keep one rule for all of them.
+        # For the same reason it carries no sha256 config key: the URLs are pinned
+        # GitHub raw paths under version control at the source, so PROVENANCE.txt
+        # recording the observed checksum and fetch date is enough.
+        #
+        # Takes in: nothing from the workflow — two URLs from the config, or a
+        #           directory the user already holds.
+        # Does: download and unzip the sequence set, fetch the family map beside
+        #       it, and refuse to continue if the family map did not arrive.
+        # Produces: the directory ISOSDB_DB_DIR, holding ISOSDB.V3.fna,
+        #           IS_fam_annot.txt and PROVENANCE.txt.
+        # Consumed by: isosdb_map (the sequences) and is_copy_number (the family
+        #           map). Fetched once and shared by all samples.
         rule isosdb_db:
             output:
                 db_dir = directory(ISOSDB_DB_DIR),
@@ -1338,10 +1472,21 @@ if MOBILOME_RUN:
                 """
 
         # ── Rule: assembly_depth — what does single-copy look like? ──────────
-        # The denominator. Mapping the same reads to the sample's OWN assembly
-        # gives the depth of ordinary single-copy sequence, which is what the IS
-        # depths are divided by. Without it a raw IS depth means nothing, because
-        # it scales with how deeply the sample happened to be sequenced.
+        # Biology: THE DENOMINATOR. Mapping the same reads to the sample's OWN
+        # assembly gives the depth of ordinary single-copy sequence. Without it a
+        # raw IS depth means nothing, because it scales with how deeply the
+        # sample happened to be sequenced — 200x over an IS is unremarkable in a
+        # 200x library and means four copies in a 50x one.
+        #
+        # Takes in: the sample's contigs (the D2 hand-off) and its trimmed
+        #           Illumina reads (rule trim_adapters, in the illumina/hybrid
+        #           front end).
+        # Does: BBMap the reads back onto the assembly. ambiguous=best and
+        #       secondary=f match rule isosdb_map exactly, so the two depths are
+        #       measured the same way and their ratio means something.
+        # Produces: ASSEMBLY_COVSTATS, BBMap's per-contig coverage table. The
+        #           BBMap index is a temp() directory and is deleted after.
+        # Consumed by: is_copy_number.
         rule assembly_depth:
             input:
                 contigs = FINAL_CONTIGS,
@@ -1369,11 +1514,21 @@ if MOBILOME_RUN:
                 """
 
         # ── Rule: isosdb_map — how deep are the IS elements? ─────────────────
-        # Same reads, same settings, against ISOSDB. ambiguous=best on purpose:
-        # ISOSDB is dereplicated at 95% but families remain similar, and letting
-        # one read count for every near-identical entry would multiply the totals.
-        # The cost is that the split BETWEEN near-identical entries is arbitrary,
-        # which is why the script reports the FAMILY sum as the headline.
+        # Biology: THE NUMERATOR. Reads are immune to assembly collapse — every
+        # copy of an IS contributes its own reads whether or not the assembler
+        # kept them apart — so an IS present in five copies attracts about five
+        # times the depth of single-copy sequence.
+        #
+        # Takes in: the ISOSDB sequences (rule isosdb_db) and the SAME trimmed
+        #           reads rule assembly_depth used.
+        # Does: BBMap with settings identical to assembly_depth. ambiguous=best on
+        #       purpose: ISOSDB is dereplicated at 95% but families remain
+        #       similar, and letting one read count for every near-identical entry
+        #       would multiply the totals. The cost is that the split BETWEEN
+        #       near-identical entries is arbitrary, which is why the next rule
+        #       reports the FAMILY sum as the headline.
+        # Produces: ISOSDB_COVSTATS, per-database-entry coverage.
+        # Consumed by: is_copy_number.
         rule isosdb_map:
             input:
                 db_dir = ISOSDB_DB_DIR,
@@ -1402,8 +1557,27 @@ if MOBILOME_RUN:
                 """
 
         # ── Rule: is_copy_number — located vs implied ────────────────────────
-        # Produces the comparison that is the point of the whole leg: what
-        # ISEScan found on the contigs, next to what the reads say was there.
+        # Biology: the point of the whole leg. Divide the IS depth by the genome
+        # depth and you get a copy number that the assembly could not collapse:
+        #
+        #     copy number  ~=  depth over the IS  /  depth over the genome
+        #
+        # Put that next to how many copies ISEScan actually LOCATED on the contigs
+        # and the difference is the assembler's collapse, measured rather than
+        # warned about.
+        #
+        # Takes in: both coverage tables (isosdb_map and assembly_depth), the
+        #           family map (isosdb_db), and the located IS calls
+        #           (isescan_table).
+        # Does: convert depths to copy numbers, discard entries covered over less
+        #       than --min-covered-percent of their length or sitting below
+        #       --min-copy-number (each with a reason in the audit), and report
+        #       both per entry and summed per IS family.
+        # Produces: IS_COPY_NUMBER + IS_COPY_NUMBER_AUDIT.
+        # Consumed by: NOBODY downstream — deliberately. This is a workflow target
+        #       in its own right, read by a person. It changes no AMR gene's tier
+        #       and must not: it says how many copies exist, never WHERE they are,
+        #       so it cannot place a gene inside anything.
         rule is_copy_number:
             input:
                 isosdb_covstats = ISOSDB_COVSTATS,
@@ -1443,7 +1617,15 @@ if MOBILOME_RUN:
     #       plus a plasmid mobility class.
     # Produces: MOBILOME_REPLICONS.
     # Consumed by: amr_mge_colocalisation, where it decides ladder tiers 5 and 6
-    #              for anything sitting on a plasmid.
+    #              for anything sitting on a plasmid, and by conjscan_ice, which
+    #              needs it to tell a conjugative PLASMID from an ICE.
+    #
+    # NO SEPARATE AUDIT FILE, and that is deliberate — it is the one mobilome
+    # rule without one. The project rule is that every decision states a reason,
+    # not that every reason lives in its own file: this step drops no rows (one
+    # row per contig, always), so there is nothing to explain the absence of.
+    # The reasons ride along on the table itself, in replicon_call_source and
+    # mobility_evidence.
     rule mobilome_replicons:
         input:
             platon_dir = PLATON_DIR,
@@ -1466,6 +1648,12 @@ if MOBILOME_RUN:
             replicons = MOBILOME_REPLICONS,
         params:
             script = REPLICONS_MOBILOME_SCRIPT,
+            # GENOMAD_PREFIX reads oddly here, since this is a Platon parser. It
+            # is not a geNomad-only constant: it is the basename of the input
+            # genome with the extension stripped (the literal "contigs_final"),
+            # and BOTH tools name every output file after their input's basename.
+            # One constant therefore names both tools' per-sample files, which is
+            # why 00_common.smk defines it once and reuses it deliberately.
             prefix = GENOMAD_PREFIX,
             # Empty string when geNomad was not run, so the script simply behaves
             # as it did before (Platon alone).
@@ -1500,11 +1688,28 @@ if MOBILOME_RUN:
     # An IS sitting INSIDE an AMR gene is reported separately as likely
     # inactivation — it must not be counted as mobilisation.
     #
-    # Takes in: the AMR calls, BOTH element sources (IS and ICE/IME — --is-table
-    #           is repeatable), the replicon calls, and the contig lengths.
+    # Takes in, and which rule produced each:
+    #   * the AMR calls with their coordinates                    (amrfinderplus)
+    #   * the IS elements                                         (isescan_table)
+    #   * the ICE/IME candidates — the NAMED copy when the ICEberg layer is on,
+    #     the raw one otherwise (ICE_TABLE_FOR_COLOCALISE decides)
+    #                                    (name_ice_elements or conjscan_ice)
+    #   * curated transposons and integrons, only when that layer is configured
+    #                                                             (name_elements)
+    #   * chromosome-or-plasmid per contig                  (mobilome_replicons)
+    #   * the contig lengths, for the contig-edge honesty flags  (contig_lengths)
+    #   --is-table is repeatable, which is how the three element sources arrive
+    #   as one pool of elements rather than three special cases in the script.
+    # Does: for every AMR gene, find the elements around it, apply the ladder
+    #       above top-down (highest rung that the evidence supports wins), and
+    #       record what capped the confidence.
     # Produces: MOBILITY_TABLE (the deliverable, one row per AMR gene) and
     #           MOBILITY_AUDIT (why every gene without context got none).
     # Consumed by: the user. This is the module's terminal product.
+    #
+    # Its log is mobilome_colocalisation_{sample}.log rather than the rule name
+    # in full; left alone, like name_ice_elements's, because renaming it only
+    # moves files on disk.
     rule amr_mge_colocalisation:
         input:
             amrfinder = AMRFINDER_TSV,
