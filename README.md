@@ -1,5 +1,5 @@
 # BacFlux
-A workflow for bacterial whole-genome assembly, QC, annotation, AMR and mobile genetic elements — from Illumina reads, Nanopore reads, both together, or pre-assembled contigs.
+A single workflow covering bacterial genome assembly, quality control, annotation and antimicrobial resistance — including, optionally, whether a resistance gene sits on something that can move.
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥9.10.1-brightgreen.svg)](https://snakemake.readthedocs.io/en/stable/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11143917.svg)](https://doi.org/10.5281/zenodo.11143917)
@@ -12,8 +12,7 @@ _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|  
 
 BacFlux v2.0.0
-Unified genomic analysis of bacterial genomes
-Illumina · Nanopore · Hybrid · Pre-assembled contigs
+Unified bacterial genome analysis
 
 Livio Antonielli, 2026
 ```
@@ -76,16 +75,20 @@ snakemake --sdm conda --snakefile workflow/FastaFlux --jobs 2 --cores 12
 becomes, in both cases:
 ```bash
 # v2 — the mode is set in the config file, not on the command line
-snakemake --sdm conda --snakefile workflow/Snakefile.v2 --configfile config/config_custom.yaml --cores 12
+snakemake --sdm conda --configfile config/config_custom.yaml --cores 12
 ```
 
-> ⚠ **Your existing `config/config_custom.yaml` is a v1 file and will not run v2.** The v1 config has no `mode:` key, and v2 stops at parse time without one:
+> ⚠ **Your existing `config/config_custom.yaml`, if you have one from before this
+> release, is a v1 file and will not run v2.** The v1 config has no `mode:` key,
+> and v2 stops at parse time without one:
 >
 > ```
 > KeyError in file ".../workflow/rules/shared/00_common.smk", line 55: 'mode'
 > ```
 >
-> This is expected, not a bug: `config/config_custom.yaml` is git-ignored, so it is *your* file and a `git pull` never touches it. Start again from the v2 example — `cp config/config_v2.yaml config/config_custom.yaml` — and copy your database paths across by hand. The v2 file is laid out differently (`mode`, `input`, `directories`, `links`, `resources`, `parameters`, `phage`, `mobilome`), so it is worth reading rather than pasting into.
+> This is expected, not a bug: `config/config_custom.yaml` is git-ignored, so it is *your* file and a `git pull` never touches it. Start again from the shipped example — `cp config/config.yaml config/config_custom.yaml` — and copy your database paths across by hand. The layout changed (`mode`, `input`, `directories`, `links`, `resources`, `parameters`, `phage`, `mobilome`), so it is worth reading rather than pasting into.
+>
+> *(If you cloned fresh, this does not apply to you — there is no old file to collide with.)*
 
 **`--jobs` is gone on purpose, and you should not add it back.** For a local run `--jobs`/`-j` is an alias for `--cores`, not an independent "N jobs of M cores each" setting. Combining the two was measured to allow real CPU oversubscription: two rules each declaring 8 threads, launched with `--jobs 2 --cores 8`, both got their full 8 threads and ran at the same time — 16 real threads against a declared budget of 8. Every CPU-bound rule in v2 declares Snakemake's built-in `threads:`, so **`--cores N` alone is now the complete and correct CPU ceiling**.
 
@@ -141,7 +144,7 @@ This gets you started with `BacFlux`. Quick guide:
   ```bash
   # config/config_custom.yaml is the convention here and is git-ignored.
   # Choose another name if you already have one you want to keep.
-  cp config/config_v2.yaml config/config_custom.yaml
+  cp config/config.yaml config/config_custom.yaml
   ```
   In it you must set: `mode` (which pipeline to run), the input directory for that mode, `output_dir`, and the paths to the databases that are **not** downloaded automatically:
 
@@ -153,7 +156,7 @@ This gets you started with `BacFlux`. Quick guide:
 
 - Launch the workflow from the repository root:
    ```bash
-  snakemake --sdm conda --snakefile workflow/Snakefile.v2 --configfile config/config_custom.yaml \
+  snakemake --sdm conda --configfile config/config_custom.yaml \
             --keep-going --ignore-incomplete --keep-incomplete --cores 24
   ```
 
@@ -161,7 +164,7 @@ This gets you started with `BacFlux`. Quick guide:
 
     - --sdm: uses conda for dependency management (one environment per rule, built on first use)
 
-    - --snakefile / --configfile: which workflow and which config to run (see the note below)
+    - --configfile: which config to run — `workflow/Snakefile` is picked up automatically, so it does not need naming on the command line
 
     - --keep-going: continues execution even if errors occur in some steps
 
@@ -170,8 +173,6 @@ This gets you started with `BacFlux`. Quick guide:
     - --keep-incomplete: keeps incomplete intermediate files
 
     - --cores 24: the total CPU budget for the run (adjust as needed). **Do not also pass `--jobs`/`-j`.**
-
-*NOTE ON FILE NAMES: while v2 lives on the `release/v2.0.0` branch, its files are staged under non-conflicting names so the v1 pipeline stays runnable side by side — the Snakefile is `workflow/Snakefile.v2` and the example config is `config/config_v2.yaml`. Passing both explicitly, as above, works either way. Once they take over the plain names (`workflow/Snakefile`, `config/config.yaml`) at the tagged release, `--snakefile` can simply be dropped.*
 
 Refer to the [installation](#installation), [configuration](#configuration) and [running BacFlux](#running-bacflux) sections for detailed instructions.
 
@@ -362,7 +363,7 @@ BacFlux downloads automatically all dependencies and several databases. However,
 [⬆ Back to Table of Contents](#table-of-contents)
 
 ## Configuration
-Before running `BacFlux`, copy `config/config_v2.yaml` and edit your copy with a text editor. The file is organized in sections: `mode`, `input`, `directories`, `links`, `resources`, `parameters`, `phage` and `mobilome`. Every key carries an inline comment saying which modes read it, so the file itself is the detailed reference; this section covers the choices that need explaining.
+Before running `BacFlux`, copy `config/config.yaml` and edit your copy with a text editor. The file is organized in sections: `mode`, `input`, `directories`, `links`, `resources`, `parameters`, `phage` and `mobilome`. Every key carries an inline comment saying which modes read it, so the file itself is the detailed reference; this section covers the choices that need explaining.
 
 - `mode`
 
@@ -499,7 +500,7 @@ Before running `BacFlux`, copy `config/config_v2.yaml` and edit your copy with a
 ## Running BacFlux
 `BacFlux` can be executed as simply as a Snakefile. Please refer to the official [Snakemake documentation](https://snakemake.readthedocs.io/en/stable/index.html) for more details.
 
-`config/config_custom.yaml` below is **your own copy of the v2 example**, made with `cp config/config_v2.yaml config/config_custom.yaml` as described in [Quick Start](#quick-start) — it is git-ignored so your edits survive a `git pull`. If you upgraded from v1 you may already have a file of that name; it is a v1 config and will not run v2 (see [what changed](#what-changed-in-v200)). You can equally point `--configfile` at any other copy you have made; just never edit `config/config_v2.yaml` itself.
+`config/config_custom.yaml` below is **your own copy of the shipped example**, made with `cp config/config.yaml config/config_custom.yaml` as described in [Quick Start](#quick-start) — it is git-ignored so your edits survive a `git pull`. If you upgraded from v1 you may already have a file of that name; it is a v1 config and will not run v2 (see [what changed](#what-changed-in-v200)). You can equally point `--configfile` at any other copy you have made; just never edit `config/config.yaml` itself.
 
 ```bash
 # first, activate the Snakemake Conda environment
@@ -508,15 +509,15 @@ conda activate snakemake
 # navigate inside the directory where the BacFlux archive was downloaded and decompressed
 
 # check what would run, without running it
-snakemake --sdm conda --snakefile workflow/Snakefile.v2 --configfile config/config_custom.yaml -n
+snakemake --sdm conda --configfile config/config_custom.yaml -n
 
 # launch the workflow
-snakemake --sdm conda --snakefile workflow/Snakefile.v2 --configfile config/config_custom.yaml --cores 24
+snakemake --sdm conda --configfile config/config_custom.yaml --cores 24
 ```
 
 The same command runs all four modes — which one you get is decided by `mode:` inside the config file. `BacFlux` prints the mode, the phage caller, the decontamination policy and whether the mobilome module is on as its first lines of output, so a glance at the header confirms you are running what you meant to run.
 
-*NOTE: starting from Snakemake version 8.4.7, the `--use-conda` option has been deprecated. Use `--software-deployment-method conda` or `--sdm conda` instead. While v2 lives on the `release/v2.0.0` branch, `--snakefile workflow/Snakefile.v2` and `--configfile` are both required, because the v1 `workflow/Snakefile` is still present and would otherwise be picked up. At the tagged release the v2 files take the plain names and `--snakefile` becomes unnecessary.*
+*NOTE: starting from Snakemake version 8.4.7, the `--use-conda` option has been deprecated. Use `--software-deployment-method conda` or `--sdm conda` instead.*
 
 **CPU budget.** `--cores N` is the one knob, and it is sufficient on its own: every CPU-bound rule declares Snakemake's built-in `threads:`, which `--cores` enforces automatically. Verified after the conversion from the older custom-resource mechanism: with `--cores 24` the per-rule caps are respected (the VirSorter2 database rule stays at 4, ONT QC and Medaka at 8, adapter trimming at 16, the rest 24); with `--cores 8` Snakemake caps every request at 8 by itself, except the rules whose own lower cap correctly wins. **Do not add `--jobs`/`-j`** — for local execution it is an alias for `--cores`, and passing both can silently reintroduce the oversubscription the ceiling exists to prevent.
 
