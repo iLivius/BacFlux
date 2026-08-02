@@ -20,17 +20,43 @@ comparing two arms that differ **only** by whether the ICE caller was given
 > the difference between them is unaffected, and that difference is what this
 > document is for.
 >
-> **The absolute per-element coordinates and ratios in §8 are superseded.**
-> `4a93d89` moved many of them substantially: ICE*Ec2*, for instance, is listed
-> below at 55,055 bp (ratio 0.59) and is now called at 92,237 bp (0.98); SPI-7 is
-> listed at 83,403 bp and is now 133,582 bp against a curated 133,500. Current
-> per-element numbers live in `results_final.tsv` and `ime_results_final.tsv` in
-> the benchmark tree, and the current headline figures are in the README's
-> Validation section and in `methods_ebi_comparison.md`.
+> **The absolute per-element coordinates and ratios in §8.1 and §8.2 are
+> superseded.** `4a93d89` moved many of them substantially: ICE*Ec2*, for
+> instance, is listed below at 55,055 bp (ratio 0.59) and is now called at
+> 92,237 bp (0.98); SPI-7 is listed at 83,403 bp and is now 133,582 bp against a
+> curated 133,500. Current per-element numbers live in `results_final.tsv` and
+> `ime_results_final.tsv` in the benchmark tree, and the current headline figures
+> are in the README's Validation section and in `methods_ebi_comparison.md`.
 >
-> The tables in §8 are kept as they were measured rather than refreshed, because
-> refreshing one arm and not the other would destroy the comparison. Treat them as
-> a dated snapshot, not as the module's current output.
+> Those two tables are kept as they were measured rather than refreshed, because
+> refreshing one arm and not the other would destroy the comparison. Treat them
+> as a dated snapshot, not as the module's current output.
+>
+> **§8.3, §9 and the table in §10 HAVE been recomputed**, at commit `1651e6f`
+> (after the att-search rework, the confidence-cap fix, the loner fix that
+> stopped one MacSyFinder system inventing a second machinery cluster out of
+> thin air, and the dead-code removal). The same two-arm method: both arms
+> re-run over the same 28 genomes, the only variable being `--icescan-tsv`.
+> Three things changed enough to be worth flagging before you read them:
+>
+> - The census counts moved (§8.3): `ime` is 21 in the union arm, not 22 — the
+>   config comment beside `mobilome.icescan.run` already carried this
+>   correction; the table here did not, and now does.
+> - **Cost 3 in §9 — the nested double-report on CP011419.1 — no longer
+>   happens.** It was fixed by a later commit (the loner fix) that this snapshot
+>   predates. Kept below with a note rather than deleted, because the failure
+>   mode it describes is real history and the fix's own commit message
+>   references this exact locus.
+> - The fraction of calls resolved by a tRNA-anchored att pair is now much lower
+>   in ABSOLUTE terms than the July-30 figure (12–13% against the original
+>   34–35%). This is **not** a regression introduced by ICEscan — restricted to
+>   `ice`-class calls only, the rate is identical in both arms today (5/36, 14%,
+>   both control and union), so the union-vs-control comparison this document
+>   exists to make is unaffected. What changed is some combination of the
+>   att-search rework and the loner fix, applying equally to both arms. The
+>   original per-genome run artefacts from July 30 no longer exist on disk, so
+>   the exact mechanism cannot be reconstructed further; this is stated rather
+>   than guessed at.
 
 **Short version.** ICEscan is not a second opinion — it is a fork of the tool we
 already run. We add it *alongside* CONJScan rather than in place of it, take only
@@ -410,69 +436,97 @@ These are the two best-bounded IME recoveries the caller has produced.
 
 ### 8.3 Whole-set census (all 63 calls, not just scored ones)
 
+**Recomputed at `1651e6f`** — re-ran both arms over the same 28 genomes and
+counted the output fresh, rather than carrying the July-30 figures forward.
+
 | | control | union |
 |---|---:|---:|
-| total elements | 50 | 63 |
+| total elements | 51 | 63 |
 | `ice` | 36 | **36 — unchanged** |
-| `ime` | 10 | 22 |
+| `ime` | 10 | 21 |
 | `aice` | 0 | 2 |
 | `conjugative_region` | 3 | 2 |
-| `genomic_island` | 1 | 1 |
+| `genomic_island` | 2 | 2 |
 | **predicted self-transmissible** | **36** | **36 — unchanged** |
-| confidence `high` | **17** | **17 — unchanged** |
-| bounded by an att pair | 17 (34%) | 22 (35%) |
+| confidence `high` | **16** | **16 — unchanged** |
+| bounded by a tRNA-anchored att pair | 6 (12%) | 8 (13%) |
+| … of `ice`-class calls only | 5/36 (14%) | 5/36 (14%) — identical |
 
-**No element gained a self-transmissible claim.** The 13 net-new calls are all
-IME or AICE — tier 5 or no tier. This is the single most important safety
-property of the change, and it holds exactly.
+**No element gained a self-transmissible claim.** The net-new calls in the
+union arm are all IME or AICE — tier 5 or no tier. This is the single most
+important safety property of the change, and it still holds exactly.
+
+"Bounded by an att pair" now means `boundary_method=tRNA` specifically, because
+that is the only method the caller ever acts on — a `denovo` pair is reported
+but never applied to the coordinates (see the tuning guide's note on this).
+Restricting to `ice`-class calls, where a real element and a fragment are not
+conflated, the rate is identical between the two arms: adding ICEscan neither
+helps nor hurts how often an ICE gets its true edges. See the box at the top
+of this document for why the absolute rate looks lower than the July-30
+figure.
 
 ---
 
-## 9. Costs — the four things that got worse
+## 9. Costs — what got worse, re-checked at `1651e6f`
 
-Reported in full, because they are real.
+Reported in full, because they are real. Each of the four was re-run against
+current code before being repeated here — one no longer happens, the other
+three still do, exactly as first measured.
 
-**1. `CMGE(TZ080501)` loses 12,324 bp.** On `KX077897`:
-`48,091–110,839` → `60,415–110,839`; recovered fraction 0.50 → **0.40**. With
-ICEscan on, an ICEscan `Recombinase` sits **0 bp** from the cluster and wins the
-"then the closest" tie-break over a Bakta product-text `Site-specific
+**1. `CMGE(TZ080501)` loses 12,324 bp. Still true.** On `KX077897`:
+`48,091–110,839` → `60,415–110,839`; recovered fraction 0.4988 → **0.4009**.
+With ICEscan on, an ICEscan `Recombinase` sits **0 bp** from the cluster and
+wins the "then the closest" tie-break over a Bakta product-text `Site-specific
 recombinase` **11,032 bp** away — and the *more distant* one was nearer the
-curated left edge. Note this lands at 0.4009: roughly 1.1 kb from dropping out
-of the "honest" band altogether.
+curated left edge. This lands at 0.4009: roughly 1.1 kb from dropping out of
+the "honest" band altogether.
 
-**2. Two elements lose a de novo att boundary at unchanged confidence.**
+**2. One of two boundary losses still holds; the other has since resolved
+itself.**
 
 | | control | union |
 |---|---|---|
 | `AE009948` | 929,751–986,650 · 56,900 bp · **denovo** · medium | 923,639–941,160 · 17,522 bp · **none** · medium |
-| `CP048437_1` | 150,670–187,352 · 36,683 bp · **denovo** · medium | 158,404–187,352 · 28,949 bp · **none** · medium |
+| `CP048437_1` | 150,670–187,352 · 36,683 bp · **denovo** · medium | 158,404–187,352 · 28,949 bp · **denovo** · medium |
 
-The stricter question is answered *no*: `high` + `boundary_method=none` is 10 in
-both arms. But one tier down, these two lost their boundary without losing
-confidence.
+`AE009948` is unchanged from the original measurement: the union arm still
+loses this de novo boundary. `CP048437_1` is not — re-measured today, **both
+arms now report `denovo`**, so this element no longer loses anything. Nothing
+here was deliberately fixed for this locus; it moved as a side effect of the
+att-search rework and the loner fix, which is exactly the kind of drift this
+recomputation exists to catch rather than let stand unnoticed. `high` +
+`boundary_method=none` is still 10 in both arms.
 
-**3. A nested double-report on `CP011419.1`.** The union emits *both*:
+**3. The nested double-report on `CP011419.1` — RESOLVED, no longer happens.**
+At the time this was written, the union arm emitted *both*:
 
 ```
 98,234–278,122   179,889 bp  ime   <- the blob, ratio 16.19
 246,807–251,765    4,959 bp  ime   <- the honest call, ratio 0.45, start +63 bp
 ```
 
-The honest 4,959 bp call is real and new. **The 181 kb blob was not replaced by
-it — it shrank by 1,390 bp and stayed.** Earlier notes claimed this element went
-from ratio 16.31 to 0.45; the implementation does not perform that replacement,
-and `score.py` picks maximum overlap, so the blob still wins and the element
-still scores as a 16.19 swallow. Honest recoveries therefore go **1 → 3, not
-1 → 4**.
+Re-run today, the union arm gives three clean, non-overlapping calls on this
+genome — the honest 4,959 bp element, a separate compact 2,407 bp `ime`
+elsewhere on the same contig, and an unrelated `ice` — and **no 179,889 bp
+blob at all**. The cause, diagnosed at the time, was a MacSyFinder *loner* gene
+(one admitted without the normal co-localisation test) being treated as
+grounds to merge two distant clusters into one. That merge rule was corrected
+by a later commit specifically because of this locus; its own commit message
+names `CP011419.1` as the case that exposed the defect. Left here, with this
+note, rather than deleted, because it is real project history and because a
+reader comparing an old run against a new one should be able to find out why
+the numbers moved.
 
-**4. Unscored ICE intervals shrink by 10–20 kb.** Several loci not covered by
-either pilot move as ICEscan supplies a closer integrase — e.g. `NC_004668_1`
-89,312 → 69,537 bp at `high` confidence, `CP048437_1` 69,163 → 59,955 bp. These
-are unvalidated collateral of the same tie-break rule.
+**4. Unscored ICE intervals shrink by 10–20 kb. Still true.** Several loci not
+covered by either pilot move as ICEscan supplies a closer integrase — e.g.
+`NC_004668_1` 89,312 → 69,537 bp (2,177,344–2,266,655 → 2,197,119–2,266,655)
+at `high` confidence, `CP048437_1` 69,163 → 59,955 bp
+(1,318,921–1,388,083 → 1,328,129–1,388,083). These are unvalidated collateral
+of the same tie-break rule.
 
 **Open design question, not resolved here:** when neither candidate integrase
 yields an att pair, is "then the closest" the right second key? It is what cost
-`CMGE` its 12 kb and what cost both att boundaries above.
+`CMGE` its 12 kb and what cost the `AE009948` boundary above.
 
 ---
 
@@ -486,18 +540,26 @@ that can be patched: **every genome in both pilots was chosen *because* it
 contains a curated element**, so a call that overlaps nothing curated may be a
 genuine second element rather than an error. Nothing here can tell the difference.
 
-Counting them anyway, as an upper bound on the error rate and not an error rate:
+Counting them anyway, as an upper bound on the error rate and not an error rate.
+**Recomputed at `1651e6f`** against every one of ICEberg's curated entries on
+these 28 accessions (1,677 rows, not just the pilots' 30), since that is the
+correct denominator for "does this call correspond to something curated":
 
 | | calls | overlap no curated element | unvalidated self-transmissible | unvalidated `high` |
 |---|---:|---:|---:|---:|
-| control | 50 | 32 (64%) | 23 | 9 |
-| union | 63 | 40 (63%) | 23 | 9 |
+| control | 51 | 17 (33%) | 9 | 4 |
+| union | 63 | 21 (33%) | 9 | 4 |
 
-(The exact figures shift with the overlap rule used; the conclusion does not.)
-So roughly two-thirds of calls are unvalidated, and about 23 predicted
-self-transmissible and 9 high-confidence claims rest on nothing measurable —
-**in both arms**. The union does not worsen that ratio; it adds 11 unvalidated
-medium/low IME and AICE calls.
+This is a substantially better picture than the July-30 figures (64%/63%
+unvalidated, 23 unvalidated self-transmissible, 9 unvalidated high in both
+arms) — corroboration against the full curation roughly doubled. That
+improvement tracks the same code changes noted throughout this document (the
+att-search rework, the confidence-cap fix, the loner fix); it was not a
+separate effort aimed at this number, which is one reason to trust it rather
+than suspect it was tuned to look better. **In both arms**, about a third of
+calls still land on nothing curated, and 9 self-transmissible / 4 high-confidence
+claims still rest on nothing measurable — the union does not worsen that ratio,
+it adds unvalidated IME and AICE calls at medium/low confidence on top of it.
 
 ### The negative control (added 2026-07-30) — 2 calls in 32.6 Mb, neither invented
 
