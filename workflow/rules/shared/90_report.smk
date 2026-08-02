@@ -3,7 +3,7 @@
 #
 # One rule: gather every QC artefact the run produced into a single MultiQC HTML
 # page, with sample names a human can read. This module is included LAST by
-# Snakefile.v2 (step 4 of the include order) so it sees every upstream rule.
+# Snakefile (step 4 of the include order) so it sees every upstream rule.
 #
 # What gets aggregated depends on what the mode actually produced, so the input
 # set is assembled from the CAPABILITY FLAGS (D7) rather than the mode name:

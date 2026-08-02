@@ -39,14 +39,14 @@ from snakemake.io import glob_wildcards
 
 
 # ─────────────────────────── 1. Mode dispatch ───────────────────────────────
-# The config is REQUIRED on the command line (Snakefile.v2 deliberately declares
+# The config is REQUIRED on the command line (Snakefile deliberately declares
 # no default `configfile:` — see the note there). Fail with an actionable message
 # rather than a bare KeyError if nothing was supplied.
 if not config:
     sys.exit(
         "[BacFlux] No configuration supplied. Pass one explicitly, e.g.:\n"
         "  snakemake --sdm conda --cores N "
-        "--configfile config/config_v2.yaml"
+        "--configfile config/config.yaml"
     )
 
 # The mode is REQUIRED. Bracket access means a config with no "mode" fails

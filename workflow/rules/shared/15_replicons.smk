@@ -27,7 +27,7 @@
 # be byte-identical in both — exactly the duplication this migration exists to
 # remove. `if HAS_LONG_READS:` is already the house pattern (`if HAS_READS:` in
 # 20_qc, `if NEEDS_FINAL_BLAST:` in 10_decontam, `if HAS_SHORT_READS:` in 50_amr),
-# and Snakefile.v2 globs rules/shared/*.smk, so nothing else needs changing.
+# and Snakefile globs rules/shared/*.smk, so nothing else needs changing.
 #
 # THE NUMBER 15 reads as "after decontamination, before QC", which is where this
 # sits in the DAG: in nanopore mode FINAL_CONTIGS only exists after stage 10.

@@ -134,8 +134,9 @@ Paste the results into §1.2 and delete the warning above.
 up in [`mobilome_wpA_ground_truth.md`](mobilome_wpA_ground_truth.md) instead of
 being pasted back into §1.2. Note also that these commands are themselves v1 —
 in v2 the rules live in `workflow/rules/{shared,illumina,nanopore,hybrid,contigs}/*.smk`
-rather than in one `workflow/Snakefile`, and the config to read is
-`config/config_v2.yaml`.)*
+rather than in one `workflow/Snakefile`. At the time this was written the config to
+read was `config/config_v2.yaml`; the v1/v2 cutover has since happened and it is
+simply `config/config.yaml` now — see `unification_migration_plan.md` Stage 1.)*
 
 ---
 

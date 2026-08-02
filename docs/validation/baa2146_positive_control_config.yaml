@@ -33,7 +33,7 @@ directories:
 links:
   dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
   checkv_link: https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz
-  # This validation config does NOT inherit config_v2.yaml's defaults - Snakemake
+  # This validation config does NOT inherit config.yaml's defaults - Snakemake
   # just loads whatever --configfile is given - so the Zenodo mirror has to be
   # named here explicitly or GENOMAD_LINK resolves empty and falls back to
   # geNomad's own NERSC downloader.

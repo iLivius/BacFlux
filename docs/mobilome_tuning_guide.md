@@ -128,7 +128,7 @@ generous.
 
 There are three places, and they differ in how much you are signing up for.
 
-### 2.1 Layer A — `config/config_v2.yaml`, `mobilome:` block
+### 2.1 Layer A — `config/config.yaml`, `mobilome:` block
 
 Supported, documented in the config file itself, survives a `git pull`. Anything
 here you can change with confidence.
@@ -205,7 +205,7 @@ steps:
    nothing in it;
 3. add it to the rule's `params:` and reference it in `shell:`;
 4. document the default **and the measurement behind it** in
-   `config/config_v2.yaml`, next to the key.
+   `config/config.yaml`, next to the key.
 
 Step 4 is the one that matters. Every threshold in this module is a convention
 rather than a biological constant, and the config file is where that gets said.
@@ -243,7 +243,7 @@ where the bacterial models have no business firing — and all three come out
 `cime_or_island` / `passive` / `low` / `evidence_level=profile_hits_only`, i.e.
 carrying no mobility claim and no tier. ICE recall is identical either way.
 
-> **A stale 3/12 is in circulation** — it appears in `config/config_v2.yaml`
+> **A stale 3/12 is in circulation** — it appears in `config/config.yaml`
 > ("3 detected before, 5 after") and in older notes. It came from a run made
 > before the current nesting and size-floor rules, whose third "detection" was a
 > **181,279 bp** call laid over the **11,112 bp** IME_SsuNSUI002_NS. `score.py`
@@ -320,7 +320,7 @@ isolates.
 > number in the docstring of the script that builds the table, not in the table.
 > Re-running `ime_ceiling/refutation/r07_final_tables.py` unchanged gives
 > `coverage_limited=73  no_clean_signal=43`, and 279 + 73 + 43 = 395. `68`
-> appears in `config/config_v2.yaml` and in earlier notes; prefer 73. The
+> appears in `config/config.yaml` and in earlier notes; prefer 73. The
 > `T4SS_MOBT` breakdown is unaffected — it is 60 of 73.
 
 ### 3.3 Element geometry — how anchors become an element
@@ -1144,4 +1144,4 @@ nothing" is a plausible-looking answer.
 - `methods_att_and_small_plasmids.md` — the *att*-site algorithm, its parameters and its licensing position
 - `methods_ebi_comparison.md` — head-to-head against the EBI mobilome-annotation-pipeline
 - `mobilome_module_SPEC.md` — the design this implements, including §11 on licensing
-- `config/config_v2.yaml` — the `mobilome:` block, where every Layer A default is documented next to its measurement
+- `config/config.yaml` — the `mobilome:` block, where every Layer A default is documented next to its measurement

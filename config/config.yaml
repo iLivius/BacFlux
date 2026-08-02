@@ -1,27 +1,678 @@
-links:
- card_link: https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2
- checkv_link: https://portal.nersc.gov/CheckV/checkv-db-v1.5.tar.gz
- dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
- phix_link: ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
+# ─────────────────────────────────────────────────────────────────────────────
+# BacFlux v2.0.0 — unified configuration
+#
+# ONE config drives all four input modes. Set `mode` first; then fill in only
+# the blocks that mode reads (each key below notes which modes use it). Keys a
+# mode does not read are harmless if left at their defaults.
+#
+# Quick start:
+#   1. mode:              which pipeline to run
+#   2. input.*_dir:       where the raw inputs live (per technology)
+#   3. directories.*:     where the reference databases live + the output dir
+#   4. links.*:           download URLs for the auto-fetched databases
+#   5. resources / parameters: tune threads, RAM, and per-mode options
+#
+# directories.output_dir is resolved to an absolute path automatically, so it
+# may be given as relative (e.g. "results/run1") and will still land where you
+# expect. Other paths (input.*_dir, directories.*_db, links.*_file) are used
+# as-is: give them as absolute paths unless you're sure what they're relative
+# to (the workflow's launch directory, not output_dir).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# REQUIRED. Which pipeline to run. Selects rules/<mode>/*.smk and the matching
+# sample-discovery logic.
+mode: illumina                 # Options: illumina | nanopore | hybrid | contigs
+
+# Raw input directories, split by technology. A mode reads only the dir(s) it
+# needs; the others may stay empty.
+input:
+  illumina_dir: ""             # required: illumina, hybrid   — expects {sample}_R1.<ext> + {sample}_R2.<ext>
+  nanopore_dir: ""             # required: nanopore, hybrid   — expects {sample}_ont.<ext>
+  contigs_dir:  ""             # required: contigs            — expects {sample}.<fasta|fa|fna>
+                               # (<ext> = fastq | fq | fastq.gz | fq.gz)
+
+# Reference databases (user-downloaded) and the output directory. Required for
+# every mode.
 directories:
-  input_dir: /path/to/input_dir
-  output_dir: /path/to/output_dir
-  bakta_db: /path/to/bakta/db
-  blast_db: /path/to/NCBI_core_nt
-  dbcan_db: /path/to/dbcan
-  eggnog_db: /path/to/eggnog
-  gtdbtk_db: /path/to/GTDB_R232/release232
-  platon_db: /path/to/platon/db
+  output_dir: ""               # all results are written here (created if absent)
+  bakta_db:   ""               # Bakta database (also holds amrfinderplus-db/)
+  blast_db:   ""               # NCBI nucleotide DB dir; the parameters.nt_version subfolder is used
+  eggnog_db:  ""               # eggNOG-mapper database
+  gtdbtk_db:  ""               # GTDB-Tk release database
+  platon_db:  ""               # Platon plasmid database
+  checkv_db:  ""               # OPTIONAL — a CheckV database you already hold. Give the PARENT
+                               #   directory containing the versioned folder, e.g.
+                               #   /path/to/checkv/ holding checkv-db-v1.5/.
+                               #   When set, NOTHING is downloaded: this overrides links.checkv_link
+                               #   AND CheckV's own downloader. Use it to stay independent of
+                               #   portal.nersc.gov, which is frequently unavailable.
+                               #   BacFlux only ever READS this path; it is never written or deleted.
+  vs2_db:       ""             # OPTIONAL — a VirSorter2 database you already hold: the directory
+                               #   `virsorter setup` produced (containing hmm/, group/, rbs/,
+                               #   Done_all_setup). Skips the ~10 GB download. Read by virsorter2
+                               #   mode only (phage.caller); ignored when phage.caller: genomad.
+  antismash_db: ""             # OPTIONAL — an antiSMASH database directory you already hold (what
+                               #   `download-antismash-databases` produces: clusterblast/, pfam/, ...).
+                               #   Skips the download. Read in all modes.
+  dbcan_db:     ""             # OPTIONAL — a dbCAN database directory you already hold, matching
+                               #   the version in links.dbcan_link (dbCAN.hmm, CAZy.dmnd, ...).
+                               #   Skips the download. Read in all modes.
+  card_db:      ""             # OPTIONAL — an extracted CARD database directory you already hold
+                               #   (aro_index.tsv, nucleotide_fasta_protein_homolog_model.fasta).
+                               #   Skips the download. Read by illumina, hybrid only (CARD read-
+                               #   mapping AMR leg).
+  genomad_db:   ""             # OPTIONAL — a geNomad database directory you already hold: what
+                               #   `genomad download-database <parent>` leaves in <parent>/genomad_db
+                               #   (genomad_db.dbtype, genomad_marker_metadata.tsv, ...). Read ONLY
+                               #   when phage.caller: genomad.
+                               #   STRONGLY RECOMMENDED if you opt in: geNomad downloads from
+                               #   portal.nersc.gov — the same host as CheckV's database, which is
+                               #   frequently unreachable — and its downloader has NO mirror option,
+                               #   so this path is the only fallback when that host is down.
+                               #
+                               # All four above follow the same rule as checkv_db: BacFlux only
+                               # ever READS these paths (via a local symlink view, never in place),
+                               # and each one, when set, overrides the matching download entirely.
+
+# Download URLs for databases the workflow fetches itself.
+links:
+  phix_link:   ""              # read by illumina, hybrid only (PhiX spike-in removal)
+  dbcan_link:  "https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz"  # REQUIRED, all modes — must be a .tar.gz (the .sha256 checksum URL and the extracted-DB folder name are derived from it)
+  card_link:   ""              # read by illumina, hybrid only (CARD read-mapping AMR leg)
+  checkv_link: "https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz"  # all modes — unmodified mirror of CheckV's own DB (portal.nersc.gov is frequently unreachable). Empty => CheckV downloads its own default DB (from that same NERSC host). IGNORED when directories.checkv_db is set.
+  # geNomad database — read ONLY when phage.caller: genomad.
+  # This is the Zenodo copy published by geNomad's OWN authors and linked from
+  # their README (record 14886553, database v1.9, CC BY 4.0), not a third-party
+  # re-upload. It exists here because `genomad download-database` is hard-coded to
+  # portal.nersc.gov — the same host as CheckV's DB — with no way to redirect it.
+  # Empty => fall back to geNomad's own downloader (that NERSC host).
+  # IGNORED when directories.genomad_db is set.
+  # Pick the genomad_db_*.tar.gz file, NOT the hmm/msa archives beside it.
+  genomad_link: "https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz"
+  genomad_md5:  "67244b528bb8bed464d1ca147136d33e"   # MD5 of the file above, as published on that Zenodo record. Zenodo gives an MD5 rather than the .sha256 sidecar the CheckV/dbCAN mirrors carry, so it is set here instead of derived from the URL. CHANGE THIS WHENEVER YOU CHANGE genomad_link — a mismatch stops the run. Empty = download without verification.
+
+# Compute limits.
 resources:
-  ram_gb: 256
-  threads: 24
+  threads: 16                  # all modes  (default 16 if omitted)
+  ram_gb:  64                  # read by illumina, hybrid (SPAdes / JVM tools); default 64 if omitted
+
+# Analysis parameters.
 parameters:
-  nt_version: "core_nt" #Options: core_nt, nt_prok
+  nt_version: core_nt          # all modes — which NCBI blast_db subfolder to screen against. Options: core_nt | nt_prok
+
+  # eggNOG-mapper functional annotation — the slowest tail rule on large genomes.
+  eggnog:
+    dbmem: false               # all modes. false (default): read eggnog.db from disk.
+                               #   true: load the 39 GB eggnog.db entirely into RAM to
+                               #   speed the annotation phase. Costs ~42 GB RAM PER
+                               #   concurrent eggNOG job. Requires resources.ram_gb >= 42
+                               #   (checked at parse time). When on, BacFlux prints the
+                               #   exact '--resources mem_gb=N' flag to add so Snakemake
+                               #   caps concurrent eggNOG jobs to what your RAM holds.
+
+  # Decontamination policy — SHARED across all four modes. After BlobTools
+  # assigns each contig a genus, the selector keeps/discards contigs per this
+  # policy and writes an audit TSV of every decision.
+  # ── Long-read QC — the biggest lever on SMALL PLASMID recovery ─────────────
+  # Read this before changing it, and read it again if a plasmid goes missing.
+  #
+  # WHAT WENT WRONG BEFORE THESE BECAME SETTINGS. length_weight was hard-coded to
+  # 10 — ten times filtlong's own default. Filtlong ranks reads by
+  #     (Length^length_weight x MeanQuality^mean_q_weight)^(1/(lw+mqw)) x WindowQ
+  # so at 10 the ranking is dominated by length, and --keep_percent then discards
+  # the bottom of that ranking. A small plasmid CANNOT produce reads longer than
+  # itself, so its reads sit at the bottom by construction and are deleted first.
+  #
+  # Measured on clinical K. pneumoniae TUM24772, whose 5,596 bp Col plasmid was
+  # missing from our assembly while sitting complete in the Illumina data:
+  #     614 raw ONT reads map to that plasmid
+  #      93 survive at length_weight 10   -> Flye never had enough to assemble it
+  #     602 survive at length_weight 1    -> 98% recovered
+  # Independently confirmed: Wick's Feb 2026 read-QC benchmark found
+  # length-weighted filtlong wiped out sub-10 kb plasmids in 3 of 5 genomes and
+  # produced MORE structural errors as a result.
+  # https://rrwick.github.io/2026/02/05/read_qc_testing.html
+  #
+  # Raising these is rarely worth it. Total bases barely move (208 -> 227 Mb in
+  # our test), so you are not gaining depth, only changing WHICH reads survive.
+  long_read_qc:
+    min_length: 1000       # discard ONT reads shorter than this outright.
+                           #   Lower it (e.g. 500) if you expect plasmids under
+                           #   ~2 kb; there is no filtlong default, so this is
+                           #   entirely our choice.
+    keep_percent: 95       # keep the best N% of BASES by the score above.
+                           #   Was 90. At typical bacterial ONT depth you are not
+                           #   short of data, so being selective costs more than
+                           #   it gains. Set to a blank value to disable
+                           #   subsetting entirely and keep everything above
+                           #   min_length — the safest setting for plasmids.
+    length_weight: 1       # HOW MUCH LENGTH DOMINATES THE RANKING.
+                           #   1 = filtlong's default = length and quality
+                           #   weighted comparably. Was 10.
+                           #   Only raise it if you are deliberately trading small
+                           #   replicons for chromosome contiguity, and say so in
+                           #   your methods if you do.
+
   decontamination:
-    mode: auto # Options: auto, include, exclude, off
-    discard_no_hit: true
-    include_genera:
-    include_genera_by_sample:
-    exclude_genera:
-    exclude_genera_file:
-    sample_overrides:
+    # ⚠ A TRAP WORTH KNOWING, especially in HYBRID mode: dropping a contig here
+    # can silently delete the ONT reads for it too, so the sequence disappears
+    # from the assembly rather than merely from the taxonomy table.
+    #
+    # The chain: decontamination selects contigs by assigned genus -> only the
+    # Illumina reads mapping to the SELECTED contigs become SEL_R1/SEL_R2 ->
+    # filtlong is given SEL_R1/SEL_R2 as its short-read reference and scores ONT
+    # reads by how well they are covered by it. Sequence absent from that
+    # reference scores as low quality and is discarded before Flye ever sees it.
+    #
+    # WHEN THIS BITES: a plasmid whose best BLAST hit is a DIFFERENT GENUS from
+    # the host. That is not exotic — plasmids cross genus boundaries constantly,
+    # which is the entire reason this module exists, and the reference databases
+    # are dense with near neighbours. `auto` mode uses BLAST bestsum, which
+    # follows database composition rather than biology: on K. pneumoniae ATCC
+    # BAA-2146 it dropped a genuine plasmid (pMYS, NZ_CP006660.1, 2,014 bp)
+    # because E. coli entries outnumbered Klebsiella ones 58,709 to 16,253.
+    #
+    # HOW TO CHECK, in this order:
+    #   1. Read 02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv
+    #      and look for any DISCARDED contig of plausible plasmid size (~2-200 kb)
+    #      whose assigned_genus differs from the sample's GTDB genus.
+    #   2. Compare the replicon count in 06.plasmids against what you expect.
+    #   3. If a plasmid is missing from the ASSEMBLY rather than merely from the
+    #      plasmid call, this chain — not the assembler — is the likely cause.
+    #
+    # HOW TO FIX, then re-run:
+    #   * mode: include with include_genera listing BOTH the host genus and the
+    #     genus the plasmid was assigned to; or
+    #   * mode: off to keep everything (fine for a clean clinical isolate, and
+    #     the safest choice when a plasmid is what you are after); or
+    #   * discard_no_hit: false, if the contig was dropped for having no hit
+    #     rather than the wrong one; or
+    #   * sample_overrides / include_genera_by_sample for a single awkward isolate.
+    # Snakemake will redo only the affected steps.
+    #
+    # Note this is INDEPENDENT of parameters.long_read_qc above. Both can delete a
+    # plasmid's ONT reads, for different reasons, and both must be ruled out.
+    mode: auto                 # Options: auto | include | exclude | off
+    discard_no_hit: true       # discard contigs with no taxonomic hit
+    include_genera:            # null | "GenusA;GenusB" | [GenusA, GenusB]   (inline genus list to KEEP)
+    include_genera_by_sample:  # null | PATH to a 2-column TSV (sample, genus)  ← a FILE PATH, not a mapping
+    exclude_genera:            # null | inline genus list to DISCARD
+    exclude_genera_file:       # null | PATH to a one-genus-per-line file        ← a FILE PATH
+    sample_overrides:          # null | PATH to a per-sample override TSV        ← a FILE PATH
+
+  # Long-read assembly / polishing options, namespaced per mode.
+  # The Medaka model is validated BEFORE assembly (rule check_medaka_model): a
+  # typo or an unsupported model fails in seconds with a flowcell/device/accuracy
+  # suggestion table, instead of after the assembler has run for an hour+.
+  nanopore:                    # read only when mode == nanopore
+    flye_input_mode: auto      # Options: auto | nano-raw | nano-hq
+    medaka_model: auto         # auto/TRUE/empty = infer from FASTQ headers; FALSE = skip Medaka; else an explicit model name
+    medaka_model_fallback_auto: false  # if an explicit model is INVALID: false = fail with suggestions (default); true = fall back to auto-inference
+  hybrid:                      # read only when mode == hybrid
+    flye_input_mode: auto      # Options: auto | nano-raw | nano-hq
+    medaka_model: auto         # auto/TRUE/empty = infer; FALSE = skip; else an explicit model name
+    medaka_model_fallback_auto: false  # if an explicit model is INVALID: false = fail with suggestions (default); true = fall back to auto-inference
+
+# Phage / virus caller (decision D8). Read by the shared phage module; CheckV runs
+# downstream of whichever caller.
+# Virus/prophage caller. Default VirSorter2 (permissive licence, commercial use OK).
+# geNomad is OPT-IN: it is licensed ACADEMIC / NON-COMMERCIAL-USE-ONLY (Berkeley Lab,
+# "accredited academic institution" only). Selecting it also turns on the Platon+
+# geNomad plasmid concordance. Only set `genomad` if you are entitled to use it.
+phage:
+  caller: virsorter2           # Options: virsorter2 (default) | genomad (opt-in, non-commercial licence)
+
+# Optional mobilome / AMR-mobility module (see docs/mobilome_module_SPEC.md).
+# Default OFF; when true, adds the 08.mobilome/ stage.
+mobilome:
+  run: false                   # master switch, default OFF. When true, adds stage
+                               #   08.mobilome/: for every AMR gene found, report the
+                               #   mobile-element context and a mobility tier
+                               #   (1 = chromosomal/intrinsic candidate ... 6 = inside an
+                               #   ICE or on a conjugative plasmid = PREDICTED
+                               #   self-transmissible). Adds two tools (ISEScan,
+                               #   CONJscan/MacSyFinder), both bioconda.
+                               #   WHAT YOU HAVE TO SET: nothing beyond this switch.
+                               #   The module runs on the databases BacFlux already
+                               #   has, plus the CONJscan models it fetches itself.
+                               #   Everything else in this block is OPTIONAL and each
+                               #   layer is skipped in full when you leave its source
+                               #   empty: icescan (a second machinery model set),
+                               #   tncentral (names transposons, makes tier 4
+                               #   reachable), iceberg (names the ICEs), isosdb
+                               #   (counts the IS copies the assembly lost).
+                               #   LICENCE: turning this on fetches the CONJscan MODELS,
+                               #   which Institut Pasteur/CNRS license CC BY-NC-SA 4.0
+                               #   (NON-COMMERCIAL). BacFlux never ships them - they are
+                               #   downloaded at your request, under your own agreement
+                               #   with the licensor, exactly like bakta_db and the other
+                               #   user-supplied databases - so BacFlux's own MIT licence
+                               #   is unaffected. Commercial users should leave this off
+                               #   or obtain permission from the model authors.
+                               #   READ THIS: on short-read (fragmented) assemblies the
+                               #   located IS count is a FLOOR, not a count — IS elements
+                               #   are the main cause of contig breaks, so the element you
+                               #   are looking for is often what broke the assembly. Every
+                               #   call carries a confidence tier and a contig-boundary
+                               #   flag; read them, never a bare count.
+                               #   The same applies to the ICE/IME calls, and it has now
+                               #   been MEASURED: 40 benchmark genomes cut to ~150, ~50 and
+                               #   ~20 kb N50, re-annotated and re-run. The class survives
+                               #   fragmentation; the EXTENT does not (median reported
+                               #   length falls to 0.34x the true element at ~50 kb N50).
+                               #   Which columns to read on a draft, and what NOT to
+                               #   conclude: docs/mobilome_draft_assemblies.md.
+  max_composite_span_bp: 20000 # two IS copies further apart than this are not called one
+                               #   composite transposon. A CONVENTION, not biology — the
+                               #   measured distance is always reported next to the call.
+
+  # ── How much of a machinery profile a protein must match ──────────────────
+  # MacSyFinder finds conjugation machinery with profile HMMs: statistical
+  # descriptions of what a relaxase, a coupling protein or a VirB4 looks like
+  # across many species. A protein can score convincingly against a profile while
+  # aligning to only PART of it, and that happens for two opposite reasons —
+  # either it really is a fragment or a decayed remnant, or it is a genuine
+  # full-length member of a divergent family that shares only the catalytic core.
+  # This number is the fraction of the PROFILE the alignment must cover before
+  # the hit is kept. It is not identity and it is not an E-value: a hit can be
+  # statistically beyond doubt and still be dropped by this rule alone.
+  #
+  # 0.5 is MacSyFinder's own default and the value every validated result in
+  # docs/ was measured at, so the shipped setting is the measured one.
+  #
+  # WHAT LOWERING IT DOES. Measured end to end at 0.5 / 0.4 / 0.3 over all three
+  # benchmark sets — 18 curated ICEs, 12 curated IMEs, and 12 genomes with no
+  # curated element at all (32.6 Mb). With the ICEscan layer on:
+  #
+  #                    curated ICEs   curated IMEs   calls on the negative set
+  #     0.5             15 of 18        5 of 12       5   (2 without ICEscan)
+  #     0.4             15 of 18        6 of 12       7   (4 without ICEscan)
+  #     0.3             15 of 18        6 of 12       9   (5 without ICEscan)
+  #
+  # So across 30 curated elements, lowering the threshold recovers exactly ONE
+  # more: a 23 kb IME in Faecalibacterium duncaniae, found in full (right edge
+  # 53 bp off the published one) and correctly classed. It appears at 0.4 and
+  # gains nothing further at 0.3, and it does not need the ICEscan layer.
+  #
+  # WHAT IT COSTS. Two more calls on the negative controls at 0.4 (Escherichia
+  # coli K-12 MG1655 and Pseudomonas aeruginosa PAO1 — the two most thoroughly
+  # described genomes in bacteriology), and two more again at 0.3. Read the
+  # class before panicking: every call added at 0.4 is a `cime_or_island`,
+  # mobility `passive`, confidence `low`, evidence_level `profile_hits_only` —
+  # an integrase and a T4SS-like protein in the same neighbourhood, claiming no
+  # mobility and carrying no tier. The tiering absorbs the extra noise, which is
+  # what it is for. At 0.3 that stops being true: a 21.6 kb IME is called in
+  # Staphylococcus aureus N315 at MEDIUM confidence with a real mobility claim.
+  # It may well be a genuine uncurated element — the same benchmark calls ICEBs1
+  # in Bacillus subtilis 168, which is a true positive ICEberg has not curated —
+  # but it is unverified, and it is the first negative-control call that asserts
+  # something.
+  #
+  # WHY THE GAIN IS SO SMALL, given that the raw evidence moves a lot. Lowering
+  # to 0.4 adds 5% more MacSyFinder hits and changes the hit table in 13 of 40
+  # benchmark genomes; 0.3 adds 12% and changes 19 of 40. Almost none of that
+  # reaches the element table, because the caller needs an integrase within
+  # 50 kb of conjugation machinery before it seeds anything. Profile coverage
+  # sits upstream of a much stronger constraint, and co-localisation is what
+  # actually binds. A worked case: the pilot's one Streptococcus salivarius IME
+  # is still missed at 0.3, and the audit TSV says why — its MOBT relaxases were
+  # already being found at 0.5 and sit 22 kb and 518 kb away from the integrase
+  # that marks the element, so coverage was never what was stopping it.
+  #
+  # WHEN TO LOWER IT ANYWAY. Across all 395 curated IMEs, 73 carry a relaxase hit
+  # that is clean on E-value and fails only this coverage rule — 60 of them the
+  # T4SS_MOBT family at about 0.32 profile coverage. (73, not the 68 this comment
+  # gave until 2026-07-31: the 68 was stale in the script that builds the table,
+  # not in the table itself. 279 + 73 + 43 = 395.) If your isolates sit in that
+  # space, 0.4 is worth trying and the audit TSV is how you check what changed:
+  # it records a reason for every candidate dropped, so you can see whether the
+  # new calls are machinery-poor fragments or elements worth following up.
+  # Nothing here supports 0.3 for single isolates.
+  #
+  # The EBI mobilome-annotation-pipeline runs 0.3. That reflects a metagenome
+  # pipeline's priorities — recall first, because MAG proteins are fragmentary
+  # anyway — not a verdict on what a single-isolate workflow should do.
+  #
+  # Both machinery searches (CONJscan and, if enabled, ICEscan) use this one
+  # value. They must: their hit tables are merged, so different stringencies
+  # would make an element's class depend on which model set was more permissive.
+  coverage_profile: 0.5
+
+  # ── Detection layer: a SECOND machinery model set, ICEscan ────────────────
+  # OFF by default; leave it off and the module behaves exactly as it does today.
+  # When on, MacSyFinder runs TWICE over the same Bakta proteins — once with
+  # CONJScan (as always) and once with ICEscan — and the two hit tables are
+  # merged before the ICE/IME caller sees them.
+  #
+  # WHAT ICEscan IS. Not a rival tool: it is a FORK of CONJScan by the same
+  # Institut Pasteur authors (its own metadata.yml still calls itself "CONJScan"),
+  # distributed with ICEfinder2 and used by the EBI mobilome-annotation-pipeline.
+  # It is one minor version BEHIND the CONJScan release BacFlux installs (2.0.1
+  # against 2.1.0), which is why it is added ALONGSIDE rather than instead of it:
+  # ICEscan drops the MOB relaxase models, the decayed-machinery models and the
+  # whole plasmid model set, and applies a stricter quorum to the mating
+  # apparatus. Swapping would have lost elements we currently detect.
+  #
+  # WHAT IT BUYS YOU. Three model classes CONJScan 2.1.0 does not describe:
+  #   * IME  — an element that integrates into the chromosome and carries a
+  #            relaxase (the enzyme that nicks the DNA to start transfer) but no
+  #            mating apparatus of its own, so it can only move when a
+  #            conjugative element in the same cell lends it one. Ladder tier 5.
+  #            READ THIS CAREFULLY: ICEscan does NOT create the `ime` class.
+  #            BacFlux's own rules already call an element an IME whenever the
+  #            anchors are an integrase plus a relaxase with no mating apparatus,
+  #            and CONJscan's own MOB models supply plenty of those relaxases.
+  #            Measured over the 28 benchmark genomes run both ways: 10 IME rows
+  #            without ICEscan, 21 with. Turning this layer off roughly HALVES
+  #            the IME rows; it does not remove them.
+  #            (21, not the 22 this comment gave until 2026-08-01. Re-counted by
+  #            running the caller over the 28 genomes both ways at HEAD and
+  #            counting element_type. The `ime` row of the census table in
+  #            docs/methods_icescan_union.md §8.3 says 22 and several of its
+  #            other cells disagree with HEAD too, so that table needs a re-count
+  #            before it is quoted again -- the 10, and the union total of 63
+  #            calls, both reproduce exactly.)
+  #   * AICE — the actinomycete elements (Streptomyces and relatives) that do not
+  #            conjugate at all: they push single-stranded DNA between hyphae
+  #            using an FtsK/SpoIIIE translocase. Reported with its own class and
+  #            NO mobility tier, because tiers 5 and 6 are both statements about
+  #            conjugation and would be false claims here. This class, unlike
+  #            `ime`, really is ICEscan-only — nothing else can produce it.
+  #   * 21 extra profile HMMs, including integrase families the CONJScan set does
+  #     not carry. Four of them are trusted as element integrases; the rest are
+  #     deliberately ignored (see the caller — some are integron or chromosomal
+  #     housekeeping recombinases that would anchor elements onto the wrong gene).
+  #   Measured over the 12 curated IMEs of the pilot set: 2 detected before, 5
+  #   after — and, more to the point, the detections whose called length is
+  #   within a factor of two of the published length went from 1 to 4.
+  #   (2, not the 3 this comment gave until 2026-07-31. The 3 came from a run
+  #   made before the current nesting and size-floor rules, whose third
+  #   "detection" was a 181,279 bp call laid over an 11,112 bp IME — the scorer
+  #   counts any overlap, so it passed. Re-run with today's code it is 2.)
+  #
+  # WHAT IT DOES NOT BUY YOU. ICEscan DELIMITS NOTHING. MacSyFinder reports gene
+  # ORDINALS ("the 41st protein in the file"), never base pairs, so every
+  # coordinate BacFlux prints still comes from its own Bakta GFF3 join, its own
+  # clustering and its own att-site search. ICEscan's IME "systems" are not even
+  # loci: both of their mandatory genes are declared loners, which exempts them
+  # from MacSyFinder's clustering, and across 28 benchmark genomes the widest
+  # single "IME" covered an entire 10.1 Mb chromosome. So its spans are never
+  # used as element boundaries and its quorum is never used to decide what counts
+  # as self-transmissible — only its integrase hits and its IME/AICE classes are.
+  #
+  # LICENCE: the ICEscan models are CC BY-NC-SA 4.0 (Institut Pasteur/CNRS) —
+  # academic and NON-COMMERCIAL use only, the same terms as the CONJscan models
+  # this module already fetches. BacFlux ships neither: setting `run: true` means
+  # YOU download them, under your own agreement with the licensor.
+  icescan:
+    run: false                 # master switch for this layer. Requires `url` or `dir`.
+    url: "https://ftp.ebi.ac.uk/pub/databases/metagenomics/pipelines/tool-dbs/icefinder2lite/icf2_dbs.tar.gz"
+                               #   ICEfinder2's whole database bundle (~61 MB); only
+                               #   macsydata/ICEscan is extracted from it, the rest
+                               #   (ICEfinder's own HMMs and a UniProt BLAST index)
+                               #   is discarded because nothing here uses it.
+                               #   Use the https:// form — the ftp:// spelling of the
+                               #   same path times out from behind many firewalls.
+    sha256: ""                 # OPTIONAL but recommended. The URL carries no version,
+                               #   so this is the only way to pin which release you
+                               #   analysed with. Leave empty to skip the check; the
+                               #   observed checksum is recorded either way, in
+                               #   08.mobilome/icescan_models/PROVENANCE.txt.
+    dir: ""                    # OPTIONAL — a MacSyFinder models directory you already
+                               #   hold, i.e. one CONTAINING an ICEscan/ folder. Takes
+                               #   precedence over `url`; nothing is downloaded.
+
+  # ── Naming layer: curated transposons and integrons (ladder tier 4) ────────
+  # Leave `url` and `dir` both empty and this whole layer is simply skipped —
+  # the module runs exactly as before, and tier 4 stays unreachable.
+  #
+  # WHAT IT BUYS YOU. Tier 3 is an INFERENCE: two IS copies of one family, the
+  # right distance apart, a gene between them, so we call it a composite
+  # transposon. That inference has known blind spots — IS26 forms translocatable
+  # units with its copies in DIRECT orientation, breaking the same-orientation
+  # rule the pattern depends on. A TnCentral hit is not an inference: it matches
+  # an element somebody characterised, named and deposited, whose architecture is
+  # already known, so it gets IS26 right for free.
+  #
+  # THE INTENDED CASE, and how far it has actually got. On the K. pneumoniae
+  # positive control blaCTX-M-15 scores tier 2 — "an IS is next to it, so
+  # expression may change" — because IS*Ecp1* sits 48 bp upstream, correctly
+  # oriented. That is true but it sells the situation short: ISEcp1 does not
+  # merely modulate blaCTX-M-15, it MOBILISES it, and TnEcp1.1 is that unit.
+  # Tier 4 is what would say so.
+  #
+  # BE HONEST ABOUT THIS: turning the layer on has never actually delivered that
+  # tier. Reaching it needs a TnCentral URL *and* at least min_reference_coverage
+  # of the reference element present, and on the clinical hybrid runs that did
+  # have the layer on, every TnEcp1.1 candidate was refused at 12% and 49%
+  # coverage of a 3,417 bp reference. NO RUN KEPT ON DISK CONTAINS A TIER 4 ROW.
+  # Treat tier 4 as a working code path that is currently unexercised, not as
+  # something this switch is known to produce. (This comment claimed the KPNIH1
+  # positive control reached tier 4; it did not, and the control in question was
+  # ATCC BAA-2146 in any case. Corrected 2026-08-01.)
+  #
+  # LICENCE. BacFlux never ships this data. Setting a URL means YOU fetch it,
+  # under your own agreement with the licensor — the same arrangement as
+  # bakta_db, gtdbtk_db and the CARD link. TnCentral carries an "All Rights
+  # Reserved" notice and its terms for commercial use are not stated; check
+  # before relying on it outside academic work. The `nc/tn` endpoint below is the
+  # transposon set only. TnCentral's other endpoints (tn_in_is, prot/tn_is)
+  # additionally carry ISfinder terms, which require written authorisation and
+  # forbid redistribution — they are deliberately NOT wired in here.
+  tncentral:
+    url: ""                    # e.g. https://tncentral.ncc.unesp.br/api/download_blast/nc/tn
+                               #   A ZIP holding tncentral.fa (~4.3 MB, ~512 curated
+                               #   transposons, integrons and IS). The server rejects
+                               #   the default curl user-agent, so the download rule
+                               #   sends a browser one; if that stops working the rule
+                               #   fails loudly rather than producing an empty database.
+    sha256: ""                 # OPTIONAL but recommended. The endpoint is unversioned,
+                               #   so this is the only way to know which release you
+                               #   analysed with. Leave empty to skip the check; the
+                               #   rule records the observed checksum either way, in
+                               #   tncentral_db/PROVENANCE.txt.
+    dir: ""                    # OPTIONAL — a directory holding tncentral.fa you already
+                               #   have. Takes precedence over `url`; nothing is fetched.
+    min_identity: 90.0         # percent identity a BLAST hit needs before it may confer
+                               #   a curated NAME. Below this the sequence may well be a
+                               #   RELATIVE of the element, but calling it by that name
+                               #   would claim more than the data shows.
+    min_reference_coverage: 0.8
+                               # fraction of the REFERENCE element that must be present.
+                               #   Measured against the reference, not your contig: the
+                               #   question is "is the whole of this known transposon
+                               #   here?", and a 7 kb element inside a 300 kb contig
+                               #   covers 2% of the contig and 100% of itself. A
+                               #   fragment of a transposon is not that transposon —
+                               #   on short reads a low value usually means the element
+                               #   is split across contigs.
+
+  # ── Naming layer: which ICE is it? ────────────────────────────────────────
+  # Leave `urls` empty and this is skipped. Independent of the TnCentral layer
+  # above: that one CREATES elements and so makes tier 4 reachable, this one only
+  # LABELS the ICE/IME candidates CONJscan already found. Turning it on cannot
+  # change any gene's tier — it changes "predicted self-transmissible element"
+  # into "ICEKpnATCCBAA-2146-1", which is what lets you look the thing up.
+  #
+  # It also reveals how far our boundaries fall short, which is the real reason
+  # to switch it on. On the K. pneumoniae ATCC BAA-2146 positive control our ICE
+  # call spans 54,943 bp against ICEberg's 58,048 bp for the same element: we
+  # recover 0.946 of it and stop 3,138 bp inside its far end. The audit says so
+  # in as many words. Any AMR gene in that last 3 kb is scored as though it were
+  # OUTSIDE the ICE, which is exactly why the interval is a floor rather than a
+  # delimitation — and this is the good case, a closed genome where the att
+  # search found a tRNA-anchored repeat. With boundary_method=none the interval
+  # is only the machinery span and the shortfall is far larger.
+  # (Until 2026-07-31 this comment gave 40,486 bp / boundary_method=none for the
+  # same element. That was the call before the att search was reworked; the
+  # numbers above are the current ones. See docs/mobilome_worked_example.md.)
+  #
+  # LICENCE. ICEberg 3.0 (Jun 2023) publishes NO licence or terms-of-use
+  # statement; every page carries only "Copyright © 2023 All Rights Reserved by
+  # Microbial Bioinformatics Group in MML, SJTU." As with TnCentral, BacFlux
+  # ships none of this data — setting a URL means you fetch it yourself. Cite
+  # Wang et al. 2024 (NAR) if you use it.
+  iceberg:
+    urls: []                   # e.g.
+                               #   - https://tool2-mml.sjtu.edu.cn/ICEberg3/data/download/ICE_seq_all.fas
+                               #   - https://tool2-mml.sjtu.edu.cn/ICEberg3/data/download/IME_seq_all.fas
+                               #   Concatenated into one BLAST database. NOTE the host:
+                               #   the older bioinfo-mml.sjtu.edu.cn path 404s for
+                               #   ICEberg 3.0 (it still serves ICEberg 2.0).
+                               #   ICE_seq_all.fas is ~100 MB and the server is slow.
+                               #   NO sha256 KEY HERE, unlike icescan and tncentral:
+                               #   this is two files rather than one archive, and the
+                               #   big one has to be resumable over a slow link, so a
+                               #   single pinned digest is the wrong instrument. The
+                               #   observed checksum of the concatenated FASTA and the
+                               #   fetch date land in iceberg_db/PROVENANCE.txt, which
+                               #   is what a methods section needs.
+    dir: ""                    # OPTIONAL — a directory of .fas files you already hold.
+                               #   Takes precedence over `urls`; nothing is fetched.
+    min_identity: 80.0         # identity floor for a name. Below this the elements are
+                               #   related but not the same, and the name would mislead.
+    min_overlap_fraction: 0.5  # how much of OUR candidate the curated element must
+                               #   cover before the two are treated as the same thing.
+                               #   Deliberately lenient next to the transposon cascade:
+                               #   ICEs are mosaic and their cargo varies between
+                               #   strains, so demanding near-completeness would refuse
+                               #   to name exactly the divergent elements a name helps
+                               #   with most. Below 80% of the REFERENCE the name is
+                               #   suffixed "-like". That 80% is a separate number and
+                               #   is NOT a config key: it is EXACT_NAME_REFERENCE_
+                               #   COVERAGE in name_ice_elements.py, named here so you
+                               #   have something to grep for if you want to change how
+                               #   readily "-like" is applied.
+
+  # ── How many IS copies did the assembly LOSE? (spec WP-C) ─────────────────
+  # ILLUMINA AND HYBRID ONLY — it needs reads. Leave the URLs empty to skip it.
+  #
+  # Everywhere else this module says "on a fragmented assembly the located IS
+  # count is a FLOOR, not a count". True, but unquantified: you cannot tell
+  # whether the floor is 2 short or 40 short. This leg puts a number on it.
+  #
+  # Reads are immune to assembly collapse — every copy of an IS contributes its
+  # own reads whether or not the assembler kept them apart — so an IS present in
+  # five copies attracts about five times the read depth of the single-copy
+  # chromosome. Divide the two and you have the copy number:
+  #
+  #     copy number  ~=  depth over the IS  /  depth over the genome
+  #
+  # It changes NO AMR gene's tier, and must not: it says nothing about WHERE the
+  # extra copies are, only that they exist. It is a quality metric on the IS
+  # inventory and the honest companion to the "floor" warning.
+  #
+  # LICENCE. ISOSDB ships in the pseudoR repository under the MIT licence — the
+  # one mobilome database with no redistribution question attached at all.
+  # Cite Kirsch et al. 2024, Cell Host & Microbe.
+  #
+  # SET BOTH URLS OR NEITHER. fasta_url alone switches the leg on but leaves the
+  # family map with nowhere to come from; BacFlux stops at parse time and says so
+  # rather than letting the download fail an hour into the run. No sha256 key on
+  # this layer either: these are pinned GitHub raw paths under version control at
+  # the source, and isosdb_db/PROVENANCE.txt records what actually arrived.
+  isosdb:
+    fasta_url: ""              # e.g. https://raw.githubusercontent.com/joshuakirsch/pseudoR/main/ISOSDB.V3.fna.zip
+                               #   ~9.9 MB zipped, 22,713 IS nucleotide sequences,
+                               #   already dereplicated at 95% identity by CD-HIT.
+    family_map_url: ""         # e.g. https://raw.githubusercontent.com/joshuakirsch/pseudoR/main/IS_fam_annot.txt
+                               #   REQUIRED whenever fasta_url is set (see above).
+                               #   entry -> IS family (IS3, IS5, IS110 ...). Results are
+                               #   reported per FAMILY as well as per entry, because the
+                               #   family total is robust to which near-identical entry an
+                               #   ambiguous read happened to land on and the per-entry
+                               #   split is not.
+    dir: ""                    # OPTIONAL — a directory already holding both files.
+                               #   Takes precedence over the URLs; nothing is fetched.
+    min_covered_percent: 90.0  # a database entry must be covered end to end before its
+                               #   depth is believed. A partially covered entry is usually
+                               #   a conserved domain shared with another family, and
+                               #   averaging it in would inflate every estimate.
+    min_copy_number: 0.5       # below this multiple of the genome baseline, the element is
+                               #   treated as absent. Deliberately under 1.0: a real
+                               #   single-copy IS sits near 1x, and sampling noise plus
+                               #   mapping loss routinely pushes it to 0.6-0.8x.
+
+  require_trna_boundary_for_high: false
+                               # How strict to be before an ICE/IME candidate may be
+                               #   labelled HIGH confidence.
+                               #   false (default): confidence answers "how sure are we
+                               #     this IS an ICE?" — from the number of anchor classes
+                               #     (integrase / relaxase / coupling protein / T4SS),
+                               #     whether the machinery is intact, and whether it all
+                               #     sits on one contig. Where the element ENDS is
+                               #     reported separately, in boundary_method.
+                               #   true: also demand that a tRNA-anchored att pair fixed
+                               #     the element's ends (the strict reading of spec §8
+                               #     Phase 6). On a fragmented short-read assembly the
+                               #     flanking sequence is usually missing, so this caps
+                               #     nearly every call at medium no matter how good the
+                               #     machinery evidence is — it conflates "is this an
+                               #     ICE?" with "where does it stop?". Sensible on CLOSED
+                               #     long-read assemblies, where an unresolved boundary
+                               #     really is a warning sign rather than the norm.
+                               #   EITHER WAY: cargo is never assigned from an unresolved
+                               #   boundary. A de novo direct repeat is reported but never
+                               #   widens an element (~16% of arbitrary spans on a real
+                               #   chromosome throw one up by chance), so the interval
+                               #   stays the machinery span — a floor, never an invention.
+  contig_boundary_bp: 100      # how close to a contig end counts as "at the boundary"
+                               #   when FLAGGING an IS call (columns at_contig_boundary
+                               #   and fraction_at_contig_boundary in the IS summary).
+                               #   A high fraction means the assembly broke exactly where
+                               #   the IS elements are - read the located IS count as a
+                               #   floor, not a count.
+                               #   THIS IS THE ONLY ONE OF THREE CONTIG-END WINDOWS YOU
+                               #   CAN SET, and they are deliberately separate knobs
+                               #   answering different questions on different objects:
+                               #     100 bp, this key -> is an IS call sitting ON the
+                               #       edge of its contig? Passed to isescan_to_table.py
+                               #       as --boundary-bp.
+                               #     1000 bp, fixed -> was there enough flanking sequence
+                               #       to have SEEN a neighbouring element at all? An IS
+                               #       500 bp from a contig end is not "at the edge", but
+                               #       you still could not have seen its partner 2 kb
+                               #       away, so absence of evidence is not evidence of
+                               #       absence. This one caps confidence in the mobility
+                               #       table (CONTIG_END_WINDOW_BP in colocalise.py).
+                               #     1000 bp, fixed -> same question again, for an ICE or
+                               #       IME candidate rather than an AMR gene. That is
+                               #       conjscan_to_ice.py's own --boundary-bp, which the
+                               #       workflow does not pass, so its default stands.
+                               #   Confusingly the first and third share the flag name
+                               #   --boundary-bp while meaning different things; only the
+                               #   first is wired to this key.
+
+  # ── The ICE/IME geometry thresholds are NOT config keys ───────────────────
+  # There is nothing to set below; this note exists because the question comes up
+  # and because docs/mobilome_tuning_guide.md §3.3 tabulates these as if they
+  # were knobs. They are knobs on the SCRIPT, not on the workflow: conjscan_ice
+  # passes none of them, so conjscan_to_ice.py's argparse defaults are what every
+  # measured result in docs/ was produced at. To change one you edit the rule's
+  # shell block in workflow/rules/shared/80_mobilome.smk, and you should re-run
+  # the benchmark afterwards.
+  #
+  #   --window-bp            15,000   how far apart two machinery genes may sit and
+  #                                   still be chained into one candidate element
+  #   --min-element-bp        8,000   floor on a candidate's length; below it the
+  #                                   cluster is dropped with a reason
+  #   --min-ime-element-bp    2,000   the same floor for the IME/AICE architecture,
+  #                                   which is genuinely smaller. The sharpest knob
+  #                                   in the module
+  #   --max-element-bp      500,000   ceiling, to stop a runaway chain of anchors
+  #                                   swallowing a whole replicon
+  #   --integrase-window-bp  50,000   how far from the machinery an integrase may
+  #                                   sit and still be taken as the element's own
+  #   --att-flank-window-bp  50,000   how much sequence either side of the machinery
+  #                                   the att-site search reads
+  #
+  # ONE ASYMMETRY WORTH KNOWING, because it is not obvious and it is not a bug.
+  # The att search is always given the 8,000 bp floor, never the 2,000 bp IME one,
+  # and it refuses any repeat pair implying an element outside its range. So an
+  # IME admitted at 3 kb can never have its boundaries resolved, however clean the
+  # repeat pair: it keeps boundary_method=none and reports the machinery span.
+  # Four of the five curated IMEs this module detects (machinery spans 3,840 /
+  # 4,959 / 5,942 / 6,252 / 8,164 bp) sit under that floor. The deliberate reading
+  # is that an att pair implying a 3 kb element is mostly noise; the honest
+  # reading is that IME boundaries are therefore largely unresolved. Making the
+  # floors agree per class would change results, so it has not been done quietly.

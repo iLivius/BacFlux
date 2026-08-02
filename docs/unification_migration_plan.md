@@ -387,6 +387,17 @@ sample names (all modes); `CPUS`/`RAM`/`nt_version` now default instead of KeyEr
 illumina now checks R2 mates at parse time; `dbcan_link`/`checkv_link` `.tar.gz`-validated
 in all modes; dbCAN DB folder name now derived from the link (was hard-coded).
 
+> **CUTOVER DONE — the non-conflicting names above are gone.** The v1
+> `workflow/Snakefile` and `config/config.yaml` this paragraph describes
+> co-existing with are retired (recoverable from git history and the `v1.3.0`
+> tag, not from the working tree). `workflow/Snakefile.v2` and
+> `config/config_v2.yaml` now carry the plain names, `workflow/Snakefile` and
+> `config/config.yaml`. `snakemake --sdm conda --configfile config/config.yaml`
+> now runs v2 with no `--snakefile` flag needed. Every reference to the
+> `.v2`-suffixed names elsewhere in this document is a historical record of
+> what was true when that stage was written, not current instruction — the
+> file paths above are the ones this project actually ran at the time.
+
 **Stage 2a — annotation + AMR (Tier S). ✓ DONE 2026-07-21 (gate passed).**
 Split from the fuller Stage 2 below because `60_plasmid`/`70_phage` grew new-tool work
 (geNomad, D8/D9) that `40_annotation`/`50_amr` do not have. Delivered on `release/v2.0.0`:

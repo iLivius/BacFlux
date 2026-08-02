@@ -191,7 +191,7 @@ if MOBILOME_RUN and ICESCAN_ENABLED and not (ICESCAN_URL or ICESCAN_LOCAL):
     sys.exit(
         "[BacFlux] mobilome.icescan.run is true but neither mobilome.icescan.url "
         "nor mobilome.icescan.dir is set, so there is no model package to use. "
-        "Set the url (see config/config_v2.yaml for the ICEfinder2 bundle it "
+        "Set the url (see config/config.yaml for the ICEfinder2 bundle it "
         "comes in), point dir at a MacSyFinder models directory that already "
         "holds ICEscan/, or set run: false."
     )
@@ -1383,7 +1383,7 @@ if MOBILOME_RUN:
             "[BacFlux] mobilome.isosdb.fasta_url is set but "
             "mobilome.isosdb.family_map_url is empty, so the IS family map "
             "cannot be downloaded and every element would be reported as "
-            "'unassigned'. Set family_map_url (see config/config_v2.yaml for the "
+            "'unassigned'. Set family_map_url (see config/config.yaml for the "
             "pseudoR link it sits beside), or point mobilome.isosdb.dir at a "
             "directory already holding BOTH ISOSDB.V3.fna and IS_fam_annot.txt, "
             "or clear fasta_url to leave the IS copy-number leg switched off."

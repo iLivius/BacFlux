@@ -391,7 +391,7 @@ is a BAA-2146 replicon, and KPNIH1 is `CP008827.1`.)
 `length_weight`. Both mechanisms must be ruled out separately.
 
 **How to check, then fix:** see the annotated `decontamination:` block in
-`config/config_v2.yaml`. In short: read
+`config/config.yaml`. In short: read
 `contig_taxonomy_decisions.tsv` for a discarded plasmid-sized contig whose genus
 differs from the sample's; then re-run with `mode: include` naming both genera,
 or `mode: off`, or `discard_no_hit: false`. Snakemake redoes only what changed.

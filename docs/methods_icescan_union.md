@@ -677,7 +677,7 @@ non-commercial use only. This is the same licence as the CONJScan models the
 module already fetches.
 
 **BacFlux ships neither.** Both are fetched at run time from a URL in
-`config/config_v2.yaml`, default `run: false`, exactly as the spec's hard rule
+`config/config.yaml`, default `run: false`, exactly as the spec's hard rule
 (§11) requires for every licence-encumbered database. Setting `run: true` means
 *you* download them under your own agreement with the licensor. Commercial users
 should leave this off or obtain permission from the model authors.
