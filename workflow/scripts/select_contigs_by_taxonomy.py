@@ -38,7 +38,7 @@ FALSE_VALUES = {"false", "0", "no", "off"}
 TRUE_VALUES = {"true", "1", "yes", "on"}
 
 # Some bacterial genera are frequently split across related names in BLAST /
-# BlobTools output, for example Bacillus/Paenibacillus,
+# BlobTools output, for example Bacillus/Paenibacillus/Peribacillus/Priestia,
 # Arthrobacter/Pseudarthrobacter, or Burkholderia/Paraburkholderia. Curated
 # aliases cover high-confidence cases observed in real runs. The prefix tuple
 # below preserves a limited part of the old BacFlux empirical regex behavior.
@@ -46,8 +46,9 @@ TRUE_VALUES = {"true", "1", "yes", "on"}
 # formal taxonomic reconciliation system.
 GENUS_EQUIVALENCE_ALIASES = {
     "paenibacillus": ("bacillus",),
+    "peribacillus": ("bacillus",),
+    "priestia": ("bacillus",),
     "pseudarthrobacter": ("arthrobacter",),
-    "pseudoarthrobacter": ("arthrobacter",),
     "paenarthrobacter": ("arthrobacter",),
     "paraburkholderia": ("burkholderia",),
 }
@@ -92,6 +93,8 @@ def genus_aliases(value):
     prefixes retained from the original BacFlux selector. For example:
 
     - Paenibacillus -> paenibacillus, bacillus
+    - Peribacillus -> peribacillus, bacillus
+    - Priestia -> priestia, bacillus
     - Pseudarthrobacter -> pseudarthrobacter, arthrobacter
     - Paenarthrobacter -> paenarthrobacter, arthrobacter
     - Paraburkholderia -> paraburkholderia, burkholderia
@@ -393,16 +396,115 @@ def decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus):
     raise ValueError(f"Unsupported decontamination mode '{mode}'.")
 
 
-def write_composition(path, counts, total):
+def write_composition(path, counts, total, bases=None, total_bases=0):
     """Write genus composition as relative frequencies for quick inspection.
 
     The output is not used for filtering. It is a human-readable summary that
     helps decide whether auto/include/exclude settings make biological sense.
+
+    Two figures are given per genus, and the difference between them matters:
+
+      bases   - the share of the assembly's DNA carried by that genus
+      contigs - the share of the contig COUNT assigned to that genus
+
+    Auto mode picks its target genus on the contig count, so a genus can win the
+    vote on many short contigs while another genus holds far more of the actual
+    genome. When that happens the two columns disagree and the file says so at a
+    glance. A real case: one isolate listed Bacillus first on contig share (0.30
+    vs 0.26) while Aneurinibacillus held more DNA (0.40 vs 0.29) — the wrong half
+    of a single genome was kept, and the count-only report gave no hint of it.
+
+    Sorted by DNA, because that is the more honest ranking of "what is this
+    sample mostly made of".
     """
     with open(path, "w", encoding="utf-8") as handle:
-        # Sort by decreasing abundance so the dominant assignments appear first.
-        for genus, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
-            handle.write(f"{genus}: {count / total:.2f}\n")
+        if bases and total_bases:
+            for genus, bp in sorted(bases.items(), key=lambda item: (-item[1], item[0])):
+                handle.write(
+                    f"{genus}: bases {bp / total_bases:.2f}  "
+                    f"contigs {counts.get(genus, 0) / total:.2f}\n"
+                )
+        else:
+            # Fallback used when sequence lengths were not available.
+            for genus, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
+                handle.write(f"{genus}: {count / total:.2f}\n")
+
+
+# A genus must hold at least this share of the assembly's DNA before it counts
+# as a "major" assignment, and at least this many major genera make the sample
+# worth a second look. Both are REPORTING thresholds — they change no keep/remove
+# decision, they only decide whether a warning is printed.
+#
+# Two is deliberate, and measured. A clean isolate has ONE genus holding
+# essentially all of its DNA: 54 of 56 isolates in the batch these numbers came
+# from looked exactly like that, so the second major genus is already abnormal.
+# The two exceptions were the only two problem samples in the batch, and they
+# failed in opposite directions — which is why the warning names both causes:
+#   - one genome split across related genera (Aneurinibacillus 40% / Bacillus 29%
+#     / Paenibacillus 16% / Brevibacillus 11%; ended up 28% complete, 0% contaminated)
+#   - a genuine two-organism culture (Priestia 61% / Bacillus 39%; 100% complete
+#     and 104% CONTAMINATED, i.e. two genomes in one assembly)
+# Zero false positives against the other 54. Still only one batch, so treat it as
+# a well-supported starting point rather than a universal constant.
+MAJOR_GENUS_BASE_FRACTION = 0.05
+CONFUSED_GENUS_COUNT = 2
+
+# Removing more than this share of the assembly is worth announcing. A genuinely
+# contaminated culture can legitimately exceed it; so can a filter that has just
+# thrown away the target genome. The warning does not distinguish them — it asks
+# a human to look.
+LARGE_REMOVAL_BASE_FRACTION = 0.20
+
+
+def warn_if_selection_looks_wrong(bases, total_bases, removed_bases):
+    """Print a warning when the genus assignment, or the amount being discarded,
+    suggests the keep/remove call should be checked by a human.
+
+    Why this exists. Auto mode assumes one genus dominates and everything else is
+    contamination. That assumption breaks when BLAST spreads ONE genome across
+    several related genera — which happens when the organism is thinly
+    represented in the nucleotide database, so different contigs match different
+    relatives. The selector cannot tell that apart from real contamination, and
+    without this warning it proceeds silently either way.
+
+    Measured on a 56-isolate batch: 55 samples had a single genus holding
+    essentially all the DNA and discarded almost nothing (<3%). The one failure
+    had FOUR genera above 5% and discarded 52% of the assembly — half of a single
+    Aneurinibacillus genome that BLAST had scattered across 14 genus labels.
+    The separation was total, but it is one bad sample against 55 good ones, so
+    treat these numbers as a first cut rather than a calibrated cutoff.
+
+    Input:  per-genus base counts, the assembly total, and how much is being
+            removed (all in bp).
+    Output: nothing; prints to stdout, which the Snakemake rule captures into
+            logs/select_contigs_{sample}.log.
+    """
+    if not total_bases:
+        return
+
+    major = [g for g, bp in bases.items() if bp / total_bases >= MAJOR_GENUS_BASE_FRACTION]
+    removed_fraction = removed_bases / total_bases
+
+    if len(major) >= CONFUSED_GENUS_COUNT:
+        listed = ", ".join(
+            f"{g} {bases[g] / total_bases:.0%}"
+            for g in sorted(major, key=lambda g: -bases[g])
+        )
+        print(
+            f"WARNING: {len(major)} genera each hold at least "
+            f"{MAJOR_GENUS_BASE_FRACTION:.0%} of this assembly ({listed}). "
+            "Either the sample is a mixed culture, or one genome is being split "
+            "across related genera by the BLAST assignment. Check the kept/removed "
+            "split in contig_taxonomy_decisions.tsv before trusting this assembly."
+        )
+
+    if removed_fraction > LARGE_REMOVAL_BASE_FRACTION:
+        print(
+            f"WARNING: decontamination is discarding {removed_fraction:.0%} of the "
+            f"assembly ({removed_bases:,} of {total_bases:,} bp). If the kept "
+            "assembly then looks incomplete but NOT contaminated, the filter has "
+            "most likely removed genome rather than contamination."
+        )
 
 
 def main():
@@ -467,11 +569,27 @@ def main():
     # trail that explains every keep/remove call made by the workflow.
     kept = []
     seen = set()
+    # Track how much SEQUENCE each genus holds, and how much is being removed.
+    # The keep/remove decision is unchanged and still count-based; these totals
+    # only feed the composition report and the warnings below. Lengths come from
+    # the FASTA that was already loaded, so nothing extra is read.
+    bases_by_genus = Counter()
+    total_bases = 0
+    removed_bases = 0
     with open(args.decisions, "w", encoding="utf-8") as decisions:
         decisions.write("contig\tassigned_genus\taction\treason\n")
         for contig, genus in records:
             action, reason = decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus)
             decisions.write(f"{contig}\t{genus}\t{action}\t{reason}\n")
+
+            # A contig with no FASTA record contributes no sequence, so it is
+            # skipped here; the missing-contig warning further down reports those.
+            if contig in fasta_by_id:
+                length = len(fasta_by_id[contig][1])
+                bases_by_genus[genus] += length
+                total_bases += length
+                if action != "keep":
+                    removed_bases += length
 
             # A contig is added to the output only if it was marked keep, exists
             # in the FASTA, and has not already been added. The seen set prevents
@@ -483,7 +601,11 @@ def main():
     # The composition report is written after decisions so it is generated even
     # when the selected contig list is small; it summarizes the original input
     # taxonomy, not only the kept contigs.
-    write_composition(args.composition, counts, total)
+    write_composition(args.composition, counts, total, bases_by_genus, total_bases)
+
+    # Announce a taxonomically confused sample, or an unusually large removal,
+    # before the run moves on. Purely advisory: no decision above depends on it.
+    warn_if_selection_looks_wrong(bases_by_genus, total_bases, removed_bases)
 
     # Write the list of kept contig IDs for tools that prefer a text selection.
     with open(args.output_list, "w", encoding="utf-8") as handle:
