@@ -1,5 +1,6 @@
-# ─────────────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════
 # BacFlux v2.0.0 — unified configuration
+# ═══════════════════════════════════════════════════════════════════════
 #
 # ONE config drives all four input modes. Set `mode` first; then fill in only
 # the blocks that mode reads (each key below notes which modes use it). Keys a
@@ -12,23 +13,31 @@
 #   4. links.*:           download URLs for the auto-fetched databases
 #   5. resources / parameters: tune threads, RAM, and per-mode options
 #
+# How this file is marked up:
+#   [nanopore|hybrid]     the modes that READ a key or a section. Every other
+#                         mode ignores it entirely.
+#   REQUIRED              the run stops at parse time (in seconds, before any
+#                         job starts) if it is missing.
+#   OPTIONAL              leave it empty and the workflow does without it, or
+#                         fetches the thing itself.
+#
 # directories.output_dir is resolved to an absolute path automatically, so it
 # may be given as relative (e.g. "results/run1") and will still land where you
-# expect. Other paths (input.*_dir, directories.*_db, links.*_file) are used
-# as-is: give them as absolute paths unless you're sure what they're relative
-# to (the workflow's launch directory, not output_dir).
-# ─────────────────────────────────────────────────────────────────────────────
+# expect. Other paths (input.*_dir, directories.*_db) are used as-is: give them
+# as absolute paths unless you're sure what they're relative to (the workflow's
+# launch directory, not output_dir).
 
 # REQUIRED. Which pipeline to run. Selects rules/<mode>/*.smk and the matching
 # sample-discovery logic.
 mode: illumina                 # Options: illumina | nanopore | hybrid | contigs
 
 # Raw input directories, split by technology. A mode reads only the dir(s) it
-# needs; the others may stay empty.
+# needs; the others may stay empty. Sample names are discovered from the file
+# names below, so every sample in one batch must share one extension.
 input:
-  illumina_dir: ""             # required: illumina, hybrid   — expects {sample}_R1.<ext> + {sample}_R2.<ext>
-  nanopore_dir: ""             # required: nanopore, hybrid   — expects {sample}_ont.<ext>
-  contigs_dir:  ""             # required: contigs            — expects {sample}.<fasta|fa|fna>
+  illumina_dir: ""             # REQUIRED [illumina|hybrid] — expects {sample}_R1.<ext> + {sample}_R2.<ext>
+  nanopore_dir: ""             # REQUIRED [nanopore|hybrid] — expects {sample}_ont.<ext>
+  contigs_dir:  ""             # REQUIRED [contigs]         — expects {sample}.<fasta|fa|fna>
                                # (<ext> = fastq | fq | fastq.gz | fq.gz)
 
 # Reference databases (user-downloaded) and the output directory. Required for
@@ -49,8 +58,8 @@ directories:
                                #   BacFlux only ever READS this path; it is never written or deleted.
   vs2_db:       ""             # OPTIONAL — a VirSorter2 database you already hold: the directory
                                #   `virsorter setup` produced (containing hmm/, group/, rbs/,
-                               #   Done_all_setup). Skips the ~10 GB download. Read by virsorter2
-                               #   mode only (phage.caller); ignored when phage.caller: genomad.
+                               #   Done_all_setup). Skips the ~10 GB download. Read ONLY when
+                               #   phage.caller: virsorter2 (the default); ignored under genomad.
   antismash_db: ""             # OPTIONAL — an antiSMASH database directory you already hold (what
                                #   `download-antismash-databases` produces: clusterblast/, pfam/, ...).
                                #   Skips the download. Read in all modes.
@@ -75,11 +84,19 @@ directories:
                                # and each one, when set, overrides the matching download entirely.
 
 # Download URLs for databases the workflow fetches itself.
+#
+# phix_link and card_link are REQUIRED in the short-read modes and ignored in the
+# other two. Both are checked at parse time and name the missing key, rather than
+# failing inside a download rule an hour into the run.
 links:
-  phix_link:   ""              # read by illumina, hybrid only (PhiX spike-in removal)
-  dbcan_link:  "https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz"  # REQUIRED, all modes — must be a .tar.gz (the .sha256 checksum URL and the extracted-DB folder name are derived from it)
-  card_link:   ""              # read by illumina, hybrid only (CARD read-mapping AMR leg)
-  checkv_link: "https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz"  # all modes — unmodified mirror of CheckV's own DB (portal.nersc.gov is frequently unreachable). Empty => CheckV downloads its own default DB (from that same NERSC host). IGNORED when directories.checkv_db is set.
+  phix_link:   ""              # REQUIRED [illumina|hybrid] — the PhiX genome Illumina spikes
+                               #   into nearly every lane; those reads are real sequence from
+                               #   another organism and are mapped out before assembly.
+  dbcan_link:  "https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz"  # REQUIRED [all modes] — must be a .tar.gz (the .sha256 checksum URL and the extracted-DB folder name are derived from it)
+  card_link:   ""              # REQUIRED [illumina|hybrid] — CARD, for the read-mapping AMR leg.
+                               #   Reads are immune to assembly collapse, so this leg sees
+                               #   determinants the contig-based ABRicate leg can miss.
+  checkv_link: "https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz"  # OPTIONAL [all modes] — unmodified mirror of CheckV's own DB (portal.nersc.gov is frequently unreachable). Empty => CheckV downloads its own default DB (from that same NERSC host). IGNORED when directories.checkv_db is set.
   # geNomad database — read ONLY when phage.caller: genomad.
   # This is the Zenodo copy published by geNomad's OWN authors and linked from
   # their README (record 14886553, database v1.9, CC BY 4.0), not a third-party
@@ -91,18 +108,27 @@ links:
   genomad_link: "https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz"
   genomad_md5:  "67244b528bb8bed464d1ca147136d33e"   # MD5 of the file above, as published on that Zenodo record. Zenodo gives an MD5 rather than the .sha256 sidecar the CheckV/dbCAN mirrors carry, so it is set here instead of derived from the URL. CHANGE THIS WHENEVER YOU CHANGE genomad_link — a mismatch stops the run. Empty = download without verification.
 
-# Compute limits.
+# Compute limits — what each rule ASKS for, not what the machine sets aside.
+# Snakemake enforces only the CPU side: `--cores N` caps every rule's request at
+# N (pass --cores on its own, never --jobs alongside it). ram_gb is just handed to
+# the tools, so two big jobs running at once can each take it. eggNOG is the one
+# rule Snakemake will schedule on memory, and only if you add --resources mem_gb=N.
 resources:
-  threads: 16                  # all modes  (default 16 if omitted)
-  ram_gb:  64                  # read by illumina, hybrid (SPAdes / JVM tools); default 64 if omitted
+  threads: 16                  # [all modes] default 16 if omitted. Rules whose tool stops
+                               #   scaling ask for fewer (capped_cpus, defined in
+                               #   shared/00_common.smk).
+  ram_gb:  64                  # [all modes] default 64 if omitted. SPAdes takes it as a
+                               #   hard ceiling [illumina|hybrid]; Qualimap and the BBMap
+                               #   read-mapping legs cap themselves against it; and it is
+                               #   the budget parameters.eggnog.dbmem is checked against.
 
 # Analysis parameters.
 parameters:
-  nt_version: core_nt          # all modes — which NCBI blast_db subfolder to screen against. Options: core_nt | nt_prok
+  nt_version: core_nt          # [all modes] which NCBI blast_db subfolder the contamination screen blasts against. Options: core_nt | nt_prok
 
   # eggNOG-mapper functional annotation — the slowest tail rule on large genomes.
   eggnog:
-    dbmem: false               # all modes. false (default): read eggnog.db from disk.
+    dbmem: false               # [all modes] false (default): read eggnog.db from disk.
                                #   true: load the 39 GB eggnog.db entirely into RAM to
                                #   speed the annotation phase. Costs ~42 GB RAM PER
                                #   concurrent eggNOG job. Requires resources.ram_gb >= 42
@@ -110,13 +136,18 @@ parameters:
                                #   exact '--resources mem_gb=N' flag to add so Snakemake
                                #   caps concurrent eggNOG jobs to what your RAM holds.
 
-  # Decontamination policy — SHARED across all four modes. After BlobTools
-  # assigns each contig a genus, the selector keeps/discards contigs per this
-  # policy and writes an audit TSV of every decision.
-  # ── Long-read QC — the biggest lever on SMALL PLASMID recovery ─────────────
-  # Read this before changing it, and read it again if a plasmid goes missing.
+  # ── Long-read QC — the biggest lever on SMALL PLASMID recovery ──
+  # [nanopore|hybrid] Read this before changing it, and read it again if a
+  # plasmid goes missing.
   #
-  # WHAT WENT WRONG BEFORE THESE BECAME SETTINGS. length_weight was hard-coded to
+  # Which key reaches which mode: min_length and keep_percent are handed to
+  # filtlong in both long-read modes. length_weight reaches filtlong only in
+  # HYBRID mode — nanopore's filtlong call carries no --length_weight and caps
+  # its total output with --target_bases 500000000 instead, a fixed number that
+  # is not a config key (rule filter_long_reads, in rules/nanopore/10_reads.smk
+  # and rules/hybrid/30_ont_reads.smk).
+  #
+  # What went wrong before these became settings. length_weight was hard-coded to
   # 10 — ten times filtlong's own default. Filtlong ranks reads by
   #     (Length^length_weight x MeanQuality^mean_q_weight)^(1/(lw+mqw)) x WindowQ
   # so at 10 the ranking is dominated by length, and --keep_percent then discards
@@ -126,14 +157,14 @@ parameters:
   # Measured on clinical K. pneumoniae TUM24772, whose 5,596 bp Col plasmid was
   # missing from our assembly while sitting complete in the Illumina data:
   #     614 raw ONT reads map to that plasmid
-  #      93 survive at length_weight 10   -> Flye never had enough to assemble it
-  #     602 survive at length_weight 1    -> 98% recovered
+  #      93 survive at length_weight 10   → Flye never had enough to assemble it
+  #     602 survive at length_weight 1    → 98% recovered
   # Independently confirmed: Wick's Feb 2026 read-QC benchmark found
   # length-weighted filtlong wiped out sub-10 kb plasmids in 3 of 5 genomes and
   # produced MORE structural errors as a result.
   # https://rrwick.github.io/2026/02/05/read_qc_testing.html
   #
-  # Raising these is rarely worth it. Total bases barely move (208 -> 227 Mb in
+  # Raising these is rarely worth it. Total bases barely move (208 → 227 Mb in
   # our test), so you are not gaining depth, only changing WHICH reads survive.
   long_read_qc:
     min_length: 1000       # discard ONT reads shorter than this outright.
@@ -143,9 +174,12 @@ parameters:
     keep_percent: 95       # keep the best N% of BASES by the score above.
                            #   Was 90. At typical bacterial ONT depth you are not
                            #   short of data, so being selective costs more than
-                           #   it gains. Set to a blank value to disable
-                           #   subsetting entirely and keep everything above
-                           #   min_length — the safest setting for plasmids.
+                           #   it gains. There is no "off" spelling: the number is
+                           #   handed straight to filtlong's --keep_percent, so a
+                           #   BLANK value arrives there as the literal None and
+                           #   filtlong refuses to start. Set 100 to keep
+                           #   everything above min_length — the safest setting
+                           #   for plasmids.
     length_weight: 1       # HOW MUCH LENGTH DOMINATES THE RANKING.
                            #   1 = filtlong's default = length and quality
                            #   weighted comparably. Was 10.
@@ -153,18 +187,25 @@ parameters:
                            #   replicons for chromosome contiguity, and say so in
                            #   your methods if you do.
 
+  # ── Decontamination policy [all modes] ──
+  # After BlobTools assigns every contig a genus, the selector keeps or discards
+  # contigs per this policy and writes an audit TSV of every decision. One policy
+  # covers all four modes; it runs on the draft assembly, before annotation, so a
+  # contaminant never reaches CheckM or Bakta.
+  # The `mode` key below is the FILTERING policy — nothing to do with the
+  # pipeline `mode` at the top of this file.
   decontamination:
-    # ⚠ A TRAP WORTH KNOWING, especially in HYBRID mode: dropping a contig here
+    # A trap worth knowing, especially in HYBRID mode: dropping a contig here
     # can silently delete the ONT reads for it too, so the sequence disappears
     # from the assembly rather than merely from the taxonomy table.
     #
-    # The chain: decontamination selects contigs by assigned genus -> only the
-    # Illumina reads mapping to the SELECTED contigs become SEL_R1/SEL_R2 ->
+    # The chain: decontamination selects contigs by assigned genus → only the
+    # Illumina reads mapping to the SELECTED contigs become SEL_R1/SEL_R2 →
     # filtlong is given SEL_R1/SEL_R2 as its short-read reference and scores ONT
     # reads by how well they are covered by it. Sequence absent from that
     # reference scores as low quality and is discarded before Flye ever sees it.
     #
-    # WHEN THIS BITES: a plasmid whose best BLAST hit is a DIFFERENT GENUS from
+    # When this bites: a plasmid whose best BLAST hit is a DIFFERENT GENUS from
     # the host. That is not exotic — plasmids cross genus boundaries constantly,
     # which is the entire reason this module exists, and the reference databases
     # are dense with near neighbours. `auto` mode uses BLAST bestsum, which
@@ -172,15 +213,15 @@ parameters:
     # BAA-2146 it dropped a genuine plasmid (pMYS, NZ_CP006660.1, 2,014 bp)
     # because E. coli entries outnumbered Klebsiella ones 58,709 to 16,253.
     #
-    # HOW TO CHECK, in this order:
+    # How to check, in this order:
     #   1. Read 02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv
-    #      and look for any DISCARDED contig of plausible plasmid size (~2-200 kb)
+    #      and look for any DISCARDED contig of plausible plasmid size (~2–200 kb)
     #      whose assigned_genus differs from the sample's GTDB genus.
     #   2. Compare the replicon count in 06.plasmids against what you expect.
     #   3. If a plasmid is missing from the ASSEMBLY rather than merely from the
     #      plasmid call, this chain — not the assembler — is the likely cause.
     #
-    # HOW TO FIX, then re-run:
+    # How to fix, then re-run:
     #   * mode: include with include_genera listing BOTH the host genus and the
     #     genus the plasmid was assigned to; or
     #   * mode: off to keep everything (fine for a clean clinical isolate, and
@@ -190,7 +231,7 @@ parameters:
     #   * sample_overrides / include_genera_by_sample for a single awkward isolate.
     # Snakemake will redo only the affected steps.
     #
-    # Note this is INDEPENDENT of parameters.long_read_qc above. Both can delete a
+    # This is INDEPENDENT of parameters.long_read_qc above. Both can delete a
     # plasmid's ONT reads, for different reasons, and both must be ruled out.
     mode: auto                 # Options: auto | include | exclude | off
     discard_no_hit: true       # discard contigs with no taxonomic hit
@@ -200,10 +241,25 @@ parameters:
     exclude_genera_file:       # null | PATH to a one-genus-per-line file        ← a FILE PATH
     sample_overrides:          # null | PATH to a per-sample override TSV        ← a FILE PATH
 
-  # Long-read assembly / polishing options, namespaced per mode.
+  # ── Long-read assembly and polishing [nanopore|hybrid] ──
+  # Namespaced per mode: the run reads only the block named after its own mode.
+  #
   # The Medaka model is validated BEFORE assembly (rule check_medaka_model): a
   # typo or an unsupported model fails in seconds with a flowcell/device/accuracy
   # suggestion table, instead of after the assembler has run for an hour+.
+  #
+  # The two keys are coupled, which nobody expects. With flye_input_mode: auto,
+  # an explicit medaka_model whose name contains "fast" also switches the
+  # ASSEMBLER to --nano-raw (fast basecalling means noisier reads); anything else
+  # gives --nano-hq. Naming a fast model therefore changes the assembly, not only
+  # the polishing — the v1 long-read baseline was assembled with --nano-raw by
+  # exactly this route. To pin the polisher and leave the assembler alone, set
+  # flye_input_mode explicitly instead of leaving it on auto.
+  #
+  # And `auto` for the model reads the basecaller name out of the FASTQ headers,
+  # so it fails outright on reads that carry no basecaller tag — common in public
+  # or re-headered data. Name the model explicitly for such a dataset.
+  # Both traps are written up in docs/README_notes.md §7 and §8.
   nanopore:                    # read only when mode == nanopore
     flye_input_mode: auto      # Options: auto | nano-raw | nano-hq
     medaka_model: auto         # auto/TRUE/empty = infer from FASTQ headers; FALSE = skip Medaka; else an explicit model name
@@ -213,17 +269,29 @@ parameters:
     medaka_model: auto         # auto/TRUE/empty = infer; FALSE = skip; else an explicit model name
     medaka_model_fallback_auto: false  # if an explicit model is INVALID: false = fail with suggestions (default); true = fall back to auto-inference
 
-# Phage / virus caller (decision D8). Read by the shared phage module; CheckV runs
-# downstream of whichever caller.
-# Virus/prophage caller. Default VirSorter2 (permissive licence, commercial use OK).
-# geNomad is OPT-IN: it is licensed ACADEMIC / NON-COMMERCIAL-USE-ONLY (Berkeley Lab,
-# "accredited academic institution" only). Selecting it also turns on the Platon+
-# geNomad plasmid concordance. Only set `genomad` if you are entitled to use it.
+# ── Virus / prophage caller [all modes] ──
+# Which tool finds viruses and prophages in stage 07.phages. CheckV then scores
+# whatever that caller found, so this changes CheckV's input, not the QC itself.
+#
+# VirSorter2 is the DEFAULT because its licence, like BacFlux's own MIT, puts no
+# restriction on downstream users. geNomad is OPT-IN: Berkeley Lab
+# licenses it for ACADEMIC / NON-COMMERCIAL use only ("User must be an accredited
+# academic institution"). Only set `genomad` if you are entitled to use it.
+#
+# Choosing geNomad changes the PLASMID stage as well: one geNomad run calls
+# viruses and plasmids together, so it also switches on the Platon + geNomad
+# concordance in 06.plasmids. On the default, that stage is Platon alone and
+# geNomad never runs. Its database comes from directories.genomad_db, or
+# links.genomad_link above. (Decision D8/D9 — docs/unification_migration_plan.md.)
 phage:
   caller: virsorter2           # Options: virsorter2 (default) | genomad (opt-in, non-commercial licence)
 
-# Optional mobilome / AMR-mobility module (see docs/mobilome_module_SPEC.md).
-# Default OFF; when true, adds the 08.mobilome/ stage.
+# ── Mobilome / AMR-mobility module (stage 08) [all modes] ──
+# Everything from here to the end of the file belongs to this block, and all of it
+# is inert while run is false. What the module is FOR: supporting evidence for the
+# intrinsic-versus-acquired distinction, which is what a regulator asks of an AMR
+# gene list. Design record: docs/mobilome_module_SPEC.md; rules:
+# workflow/rules/shared/80_mobilome.smk.
 mobilome:
   run: false                   # master switch, default OFF. When true, adds stage
                                #   08.mobilome/: for every AMR gene found, report the
@@ -232,7 +300,7 @@ mobilome:
                                #   ICE or on a conjugative plasmid = PREDICTED
                                #   self-transmissible). Adds two tools (ISEScan,
                                #   CONJscan/MacSyFinder), both bioconda.
-                               #   WHAT YOU HAVE TO SET: nothing beyond this switch.
+                               #   What you have to set: nothing beyond this switch.
                                #   The module runs on the databases BacFlux already
                                #   has, plus the CONJscan models it fetches itself.
                                #   Everything else in this block is OPTIONAL and each
@@ -243,10 +311,10 @@ mobilome:
                                #   (counts the IS copies the assembly lost).
                                #   LICENCE: turning this on fetches the CONJscan MODELS,
                                #   which Institut Pasteur/CNRS license CC BY-NC-SA 4.0
-                               #   (NON-COMMERCIAL). BacFlux never ships them - they are
+                               #   (NON-COMMERCIAL). BacFlux never ships them — they are
                                #   downloaded at your request, under your own agreement
                                #   with the licensor, exactly like bakta_db and the other
-                               #   user-supplied databases - so BacFlux's own MIT licence
+                               #   user-supplied databases — so BacFlux's own MIT licence
                                #   is unaffected. Commercial users should leave this off
                                #   or obtain permission from the model authors.
                                #   READ THIS: on short-read (fragmented) assemblies the
@@ -266,7 +334,7 @@ mobilome:
                                #   composite transposon. A CONVENTION, not biology — the
                                #   measured distance is always reported next to the call.
 
-  # ── How much of a machinery profile a protein must match ──────────────────
+  # ── How much of a machinery profile a protein must match ──
   # MacSyFinder finds conjugation machinery with profile HMMs: statistical
   # descriptions of what a relaxase, a coupling protein or a VirB4 looks like
   # across many species. A protein can score convincingly against a profile while
@@ -280,7 +348,7 @@ mobilome:
   # 0.5 is MacSyFinder's own default and the value every validated result in
   # docs/ was measured at, so the shipped setting is the measured one.
   #
-  # WHAT LOWERING IT DOES. Measured end to end at 0.5 / 0.4 / 0.3 over all three
+  # What lowering it does. Measured end to end at 0.5 / 0.4 / 0.3 over all three
   # benchmark sets — 18 curated ICEs, 12 curated IMEs, and 12 genomes with no
   # curated element at all (32.6 Mb). With the ICEscan layer on:
   #
@@ -294,7 +362,7 @@ mobilome:
   # 53 bp off the published one) and correctly classed. It appears at 0.4 and
   # gains nothing further at 0.3, and it does not need the ICEscan layer.
   #
-  # WHAT IT COSTS. Two more calls on the negative controls at 0.4 (Escherichia
+  # What it costs. Two more calls on the negative controls at 0.4 (Escherichia
   # coli K-12 MG1655 and Pseudomonas aeruginosa PAO1 — the two most thoroughly
   # described genomes in bacteriology), and two more again at 0.3. Read the
   # class before panicking: every call added at 0.4 is a `cime_or_island`,
@@ -308,7 +376,7 @@ mobilome:
   # but it is unverified, and it is the first negative-control call that asserts
   # something.
   #
-  # WHY THE GAIN IS SO SMALL, given that the raw evidence moves a lot. Lowering
+  # Why the gain is so small, given that the raw evidence moves a lot. Lowering
   # to 0.4 adds 5% more MacSyFinder hits and changes the hit table in 13 of 40
   # benchmark genomes; 0.3 adds 12% and changes 19 of 40. Almost none of that
   # reaches the element table, because the caller needs an integrase within
@@ -319,7 +387,7 @@ mobilome:
   # already being found at 0.5 and sit 22 kb and 518 kb away from the integrase
   # that marks the element, so coverage was never what was stopping it.
   #
-  # WHEN TO LOWER IT ANYWAY. Across all 395 curated IMEs, 73 carry a relaxase hit
+  # When to lower it anyway. Across all 395 curated IMEs, 73 carry a relaxase hit
   # that is clean on E-value and fails only this coverage rule — 60 of them the
   # T4SS_MOBT family at about 0.32 profile coverage. (73, not the 68 this comment
   # gave until 2026-07-31: the 68 was stale in the script that builds the table,
@@ -338,7 +406,7 @@ mobilome:
   # would make an element's class depend on which model set was more permissive.
   coverage_profile: 0.5
 
-  # ── Detection layer: a SECOND machinery model set, ICEscan ────────────────
+  # ── Detection layer: a SECOND machinery model set, ICEscan ──
   # OFF by default; leave it off and the module behaves exactly as it does today.
   # When on, MacSyFinder runs TWICE over the same Bakta proteins — once with
   # CONJScan (as always) and once with ICEscan — and the two hit tables are
@@ -353,12 +421,12 @@ mobilome:
   # whole plasmid model set, and applies a stricter quorum to the mating
   # apparatus. Swapping would have lost elements we currently detect.
   #
-  # WHAT IT BUYS YOU. Three model classes CONJScan 2.1.0 does not describe:
+  # What it buys you. Three model classes CONJScan 2.1.0 does not describe:
   #   * IME  — an element that integrates into the chromosome and carries a
   #            relaxase (the enzyme that nicks the DNA to start transfer) but no
   #            mating apparatus of its own, so it can only move when a
   #            conjugative element in the same cell lends it one. Ladder tier 5.
-  #            READ THIS CAREFULLY: ICEscan does NOT create the `ime` class.
+  #            Read this carefully: ICEscan does NOT create the `ime` class.
   #            BacFlux's own rules already call an element an IME whenever the
   #            anchors are an integrase plus a relaxase with no mating apparatus,
   #            and CONJscan's own MOB models supply plenty of those relaxases.
@@ -390,7 +458,7 @@ mobilome:
   #   "detection" was a 181,279 bp call laid over an 11,112 bp IME — the scorer
   #   counts any overlap, so it passed. Re-run with today's code it is 2.)
   #
-  # WHAT IT DOES NOT BUY YOU. ICEscan DELIMITS NOTHING. MacSyFinder reports gene
+  # What it does not buy you. ICEscan DELIMITS NOTHING. MacSyFinder reports gene
   # ORDINALS ("the 41st protein in the file"), never base pairs, so every
   # coordinate BacFlux prints still comes from its own Bakta GFF3 join, its own
   # clustering and its own att-site search. ICEscan's IME "systems" are not even
@@ -422,11 +490,11 @@ mobilome:
                                #   hold, i.e. one CONTAINING an ICEscan/ folder. Takes
                                #   precedence over `url`; nothing is downloaded.
 
-  # ── Naming layer: curated transposons and integrons (ladder tier 4) ────────
-  # Leave `url` and `dir` both empty and this whole layer is simply skipped —
+  # ── Naming layer: curated transposons and integrons (ladder tier 4) ──
+  # Leave `url` and `dir` both empty and this whole layer is skipped outright —
   # the module runs exactly as before, and tier 4 stays unreachable.
   #
-  # WHAT IT BUYS YOU. Tier 3 is an INFERENCE: two IS copies of one family, the
+  # What it buys you. Tier 3 is an INFERENCE: two IS copies of one family, the
   # right distance apart, a gene between them, so we call it a composite
   # transposon. That inference has known blind spots — IS26 forms translocatable
   # units with its copies in DIRECT orientation, breaking the same-orientation
@@ -434,14 +502,14 @@ mobilome:
   # an element somebody characterised, named and deposited, whose architecture is
   # already known, so it gets IS26 right for free.
   #
-  # THE INTENDED CASE, and how far it has actually got. On the K. pneumoniae
+  # The intended case, and how far it has actually got. On the K. pneumoniae
   # positive control blaCTX-M-15 scores tier 2 — "an IS is next to it, so
   # expression may change" — because IS*Ecp1* sits 48 bp upstream, correctly
   # oriented. That is true but it sells the situation short: ISEcp1 does not
   # merely modulate blaCTX-M-15, it MOBILISES it, and TnEcp1.1 is that unit.
   # Tier 4 is what would say so.
   #
-  # BE HONEST ABOUT THIS: turning the layer on has never actually delivered that
+  # Be honest about this: turning the layer on has never actually delivered that
   # tier. Reaching it needs a TnCentral URL *and* at least min_reference_coverage
   # of the reference element present, and on the clinical hybrid runs that did
   # have the layer on, every TnEcp1.1 candidate was refused at 12% and 49%
@@ -487,7 +555,7 @@ mobilome:
                                #   on short reads a low value usually means the element
                                #   is split across contigs.
 
-  # ── Naming layer: which ICE is it? ────────────────────────────────────────
+  # ── Naming layer: which ICE is it? ──
   # Leave `urls` empty and this is skipped. Independent of the TnCentral layer
   # above: that one CREATES elements and so makes tier 4 reachable, this one only
   # LABELS the ICE/IME candidates CONJscan already found. Turning it on cannot
@@ -544,8 +612,8 @@ mobilome:
                                #   have something to grep for if you want to change how
                                #   readily "-like" is applied.
 
-  # ── How many IS copies did the assembly LOSE? (spec WP-C) ─────────────────
-  # ILLUMINA AND HYBRID ONLY — it needs reads. Leave the URLs empty to skip it.
+  # ── How many IS copies did the assembly LOSE? (spec WP-C) [illumina|hybrid] ──
+  # [illumina|hybrid] only — it needs reads. Leave the URLs empty to skip it.
   #
   # Everywhere else this module says "on a fragmented assembly the located IS
   # count is a FLOOR, not a count". True, but unquantified: you cannot tell
@@ -566,7 +634,7 @@ mobilome:
   # one mobilome database with no redistribution question attached at all.
   # Cite Kirsch et al. 2024, Cell Host & Microbe.
   #
-  # SET BOTH URLS OR NEITHER. fasta_url alone switches the leg on but leaves the
+  # Set both URLs or neither. fasta_url alone switches the leg on but leaves the
   # family map with nowhere to come from; BacFlux stops at parse time and says so
   # rather than letting the download fail an hour into the run. No sha256 key on
   # this layer either: these are pinned GitHub raw paths under version control at
@@ -577,7 +645,7 @@ mobilome:
                                #   already dereplicated at 95% identity by CD-HIT.
     family_map_url: ""         # e.g. https://raw.githubusercontent.com/joshuakirsch/pseudoR/main/IS_fam_annot.txt
                                #   REQUIRED whenever fasta_url is set (see above).
-                               #   entry -> IS family (IS3, IS5, IS110 ...). Results are
+                               #   entry → IS family (IS3, IS5, IS110 ...). Results are
                                #   reported per FAMILY as well as per entry, because the
                                #   family total is robust to which near-identical entry an
                                #   ambiguous read happened to land on and the per-entry
@@ -620,22 +688,22 @@ mobilome:
                                #   when FLAGGING an IS call (columns at_contig_boundary
                                #   and fraction_at_contig_boundary in the IS summary).
                                #   A high fraction means the assembly broke exactly where
-                               #   the IS elements are - read the located IS count as a
+                               #   the IS elements are — read the located IS count as a
                                #   floor, not a count.
-                               #   THIS IS THE ONLY ONE OF THREE CONTIG-END WINDOWS YOU
-                               #   CAN SET, and they are deliberately separate knobs
+                               #   This is the only one of three contig-end windows you
+                               #   can set, and they are deliberately separate knobs
                                #   answering different questions on different objects:
-                               #     100 bp, this key -> is an IS call sitting ON the
+                               #     100 bp, this key → is an IS call sitting ON the
                                #       edge of its contig? Passed to isescan_to_table.py
                                #       as --boundary-bp.
-                               #     1000 bp, fixed -> was there enough flanking sequence
+                               #     1000 bp, fixed → was there enough flanking sequence
                                #       to have SEEN a neighbouring element at all? An IS
                                #       500 bp from a contig end is not "at the edge", but
                                #       you still could not have seen its partner 2 kb
                                #       away, so absence of evidence is not evidence of
                                #       absence. This one caps confidence in the mobility
                                #       table (CONTIG_END_WINDOW_BP in colocalise.py).
-                               #     1000 bp, fixed -> same question again, for an ICE or
+                               #     1000 bp, fixed → same question again, for an ICE or
                                #       IME candidate rather than an AMR gene. That is
                                #       conjscan_to_ice.py's own --boundary-bp, which the
                                #       workflow does not pass, so its default stands.
@@ -643,7 +711,7 @@ mobilome:
                                #   --boundary-bp while meaning different things; only the
                                #   first is wired to this key.
 
-  # ── The ICE/IME geometry thresholds are NOT config keys ───────────────────
+  # ── The ICE/IME geometry thresholds are NOT config keys ──
   # There is nothing to set below; this note exists because the question comes up
   # and because docs/mobilome_tuning_guide.md §3.3 tabulates these as if they
   # were knobs. They are knobs on the SCRIPT, not on the workflow: conjscan_ice
@@ -666,7 +734,7 @@ mobilome:
   #   --att-flank-window-bp  50,000   how much sequence either side of the machinery
   #                                   the att-site search reads
   #
-  # ONE ASYMMETRY WORTH KNOWING, because it is not obvious and it is not a bug.
+  # One asymmetry worth knowing, because it is not obvious and it is not a bug.
   # The att search is always given the 8,000 bp floor, never the 2,000 bp IME one,
   # and it refuses any repeat pair implying an element outside its range. So an
   # IME admitted at 3 kb can never have its boundaries resolved, however clean the

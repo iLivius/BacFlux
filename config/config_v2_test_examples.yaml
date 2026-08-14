@@ -1,33 +1,51 @@
-# =============================================================================
-# BacFlux v2.0.0 — Stage-1 dry-run test configs (one per mode)
+# ═══════════════════════════════════════════════════════════════════════
+# BacFlux v2.0.0 — dry-run test configs (one per mode)
+# ═══════════════════════════════════════════════════════════════════════
 #
 # Four MINIMAL, INDEPENDENT configs. Use them ONE AT A TIME: copy a single block
 # into config/config.yaml, then run `snakemake -n`. They are NOT one YAML file —
 # each block is a complete standalone config for its mode.
 #
-# ALL PATHS ARE PLACEHOLDERS — replace before running. Three rules the dry run
-# actually enforces:
-#   * Use ABSOLUTE paths. 00_common sets `workdir: <output_dir>` at parse time,
-#     which changes the working directory, so a RELATIVE input path would be
-#     resolved under the output dir instead of your launch dir.
-#   * directories.output_dir must be a CREATABLE, WRITABLE absolute path. The
-#     `workdir:` directive creates it and chdir's into it at parse time — even
-#     for `snakemake -n` — so a non-writable placeholder (e.g. /abs/...) makes
-#     the dry run die with PermissionError before it can parse.
+# ALL PATHS ARE PLACEHOLDERS — replace before running. Use absolute ones: they
+# are taken as given, and a relative path is resolved against wherever you
+# launched snakemake from.
+#
+# What a dry run actually touches, since that is all these configs have to
+# satisfy:
 #   * input.<mode>_dir must be an EXISTING directory holding >=1 correctly-named
-#     sample file — discovery (as in v1) exits on an empty/absent input dir.
-#   For a pure parse check, stub real dirs first, e.g.:
-#         mkdir -p /tmp/bf/out/illumina
+#     sample file. Sample discovery globs it while the workflow is being parsed
+#     and exits when it finds nothing, so a placeholder input path stops even
+#     `snakemake -n`.
+#   * directories.output_dir is only resolved to an absolute path. Nothing is
+#     created or written at parse time, so a placeholder is fine here.
+#   * The database DIRECTORIES (bakta_db, blast_db, …) are not opened at parse
+#     time either, so placeholders are fine. The OPTIONAL local-database keys
+#     (directories.checkv_db, vs2_db, antismash_db, dbcan_db, card_db,
+#     genomad_db) are the exception — each is validated the moment it is set, so
+#     leave them out unless they point at a real copy.
+#   * The links each mode requires ARE validated: dbcan_link in every mode,
+#     phix_link and card_link wherever there are short reads. That is why the
+#     nanopore and contigs blocks below are shorter, not an oversight.
+#   For a pure parse check, stub the input dirs first, e.g.:
 #         mkdir -p /tmp/bf/in/illumina && touch /tmp/bf/in/illumina/S1_R1.fastq.gz /tmp/bf/in/illumina/S1_R2.fastq.gz
 #         mkdir -p /tmp/bf/in/nanopore && touch /tmp/bf/in/nanopore/S1_ont.fastq.gz
 #         mkdir -p /tmp/bf/in/contigs  && touch /tmp/bf/in/contigs/S1.fasta
-#   then point output_dir / input.<mode>_dir at those real dirs.
-#   The database dirs (bakta_db, blast_db, …) are NOT checked at parse time, so
-#   placeholder paths there are fine for a dry run.
-# =============================================================================
+#   then point input.<mode>_dir at those real dirs.
+#
+# None of the blocks sets `phage:` or `mobilome:`, so every dry run below uses
+# the defaults: VirSorter2 as the virus caller, and the mobilome module off.
+#
+# (Written for Stage 1 of the migration — docs/unification_migration_plan.md —
+# when this header also required a creatable, writable output_dir and warned that
+# a relative input path would resolve under the output dir. Both were true while
+# 00_common.smk still used Snakemake's `workdir:` directive, which entered the
+# output directory at parse time. It does not any more — it resolves one absolute
+# output root and never changes the working directory, so neither rule survives.
+# See section 2 of rules/shared/00_common.smk.)
+# ═══════════════════════════════════════════════════════════════════════
 
 
-# ====================== BEGIN CONFIG: mode = illumina ========================
+# ════════════════ BEGIN CONFIG: mode = illumina ════════════════
 # Illumina paired-end short reads. Copy this block to config/config.yaml.
 mode: illumina
 input:
@@ -52,13 +70,14 @@ parameters:
   decontamination:
     mode: auto
     discard_no_hit: true
-# ======================= END CONFIG: mode = illumina =========================
+# ═════════════════ END CONFIG: mode = illumina ═════════════════
 
 
-# ====================== BEGIN CONFIG: mode = nanopore ========================
+# ════════════════ BEGIN CONFIG: mode = nanopore ════════════════
 # Oxford Nanopore long reads. Copy this block to config/config.yaml.
-# (No phix_link / card_link / ram_gb: nanopore has no short-read leg and never
-#  reads them — 00_common supplies safe defaults for the omitted keys.)
+# (No phix_link / card_link: nanopore has no short-read leg, so neither is
+#  required or read. ram_gb is left out too — omitted keys fall back to the
+#  defaults in 00_common.smk, 64 GB here.)
 mode: nanopore
 input:
   nanopore_dir: /abs/placeholder/in/nanopore   # expects {sample}_ont.<ext>
@@ -79,16 +98,21 @@ parameters:
   decontamination:
     mode: auto
     discard_no_hit: true
+  # These two are coupled while flye_input_mode is auto: an explicit medaka_model
+  # with "fast" in its name also switches the ASSEMBLER to --nano-raw. The
+  # shipped config/config.yaml spells the trap out.
   nanopore:
     flye_input_mode: auto     # auto | nano-raw | nano-hq
     medaka_model: auto        # auto/TRUE/empty = infer; FALSE = skip; else explicit model
-# ======================= END CONFIG: mode = nanopore =========================
+# ═════════════════ END CONFIG: mode = nanopore ═════════════════
 
 
-# ======================= BEGIN CONFIG: mode = hybrid =========================
+# ═════════════════ BEGIN CONFIG: mode = hybrid ═════════════════
 # Illumina + ONT (ONT-first assembly). Copy this block to config/config.yaml.
-# Hybrid reads TWO input dirs; point both keys at the same dir to reproduce the
-# v1 single-directory layout.
+# Hybrid reads TWO input dirs and every sample must appear in both: if any sample
+# is missing its ONT or its Illumina file the run stops and lists them, rather
+# than quietly analysing the overlap. Point both keys at the same dir to
+# reproduce the v1 single-directory layout.
 mode: hybrid
 input:
   illumina_dir: /abs/placeholder/in/illumina   # expects {sample}_R1.<ext> + {sample}_R2.<ext>
@@ -113,15 +137,18 @@ parameters:
   decontamination:
     mode: auto
     discard_no_hit: true
+  # Same coupling as in the nanopore block above: a "fast" medaka_model changes
+  # the assembler too while flye_input_mode is auto.
   hybrid:
     flye_input_mode: auto     # auto | nano-raw | nano-hq
     medaka_model: auto        # auto/TRUE/empty = infer; FALSE = skip; else explicit model
-# ======================== END CONFIG: mode = hybrid ==========================
+# ══════════════════ END CONFIG: mode = hybrid ══════════════════
 
 
-# ======================= BEGIN CONFIG: mode = contigs ========================
+# ════════════════ BEGIN CONFIG: mode = contigs ═════════════════
 # Pre-assembled genomes. Copy this block to config/config.yaml.
-# (No read-based keys at all; contigs mode starts from FASTA.)
+# (No read-based keys at all; contigs mode starts from FASTA, so there is no
+#  read QC, no assembler and no read-mapping AMR leg.)
 mode: contigs
 input:
   contigs_dir: /abs/placeholder/in/contigs     # expects {sample}.<fasta|fa|fna>
@@ -142,4 +169,4 @@ parameters:
   decontamination:
     mode: auto
     discard_no_hit: true
-# ======================== END CONFIG: mode = contigs =========================
+# ═════════════════ END CONFIG: mode = contigs ══════════════════

@@ -1,8 +1,7 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # BacFlux v2.0.0 — Stage 08 mobilome / AMR-mobility module
 # (rules/shared/80_mobilome.smk)
 #
-# THE QUESTION THIS MODULE ANSWERS, once per sample:
+# The question this module answers, once per sample:
 #
 #     For each AMR gene we found, is it embedded in a mobile genetic element,
 #     and if so, how transferable is that element?
@@ -14,10 +13,14 @@
 # docs/mobilome_module_SPEC.md; the empirically verified tool contracts are in
 # docs/mobilome_wpA_ground_truth.md.
 #
-# OPT-IN. Everything here is gated on `config.mobilome.run` (default false), so a
-# normal BacFlux run never builds these envs or executes these rules.
+# OPT-IN, and gated twice on `config.mobilome.run` (default false). Every rule
+# below sits inside `if MOBILOME_RUN:`, so on a default run they are not even
+# defined and no conda env is built; and their outputs are added to `rule all`
+# only when the same key is true — see _downstream_targets() in 00_common.smk.
+# Four further layers have their own switches inside this file, and the roster
+# below says which switch each rule waits on.
 #
-# ── Data flow ────────────────────────────────────────────────────────────────
+# ── Data flow ──
 #
 # (WP-A, WP-C, WP-D below are the spec's "work package" labels — the order the
 # module was built in, kept because docs/mobilome_module_SPEC.md refers to them:
@@ -44,7 +47,40 @@
 #                                                              │
 #   06.plasmids/…/platon ─► replicon calls (chromosome|plasmid)┘
 #
-# ── Two things a reader must keep in mind about the OUTPUT ───────────────────
+# ── The 22 rules, in file order, and what switches each one on ──
+#
+# contig_lengths         : contig name and length — the yardstick every
+#                          contig-edge flag downstream is measured against.
+# amrfinder_organism     : GTDB-Tk species → an AMRFinderPlus --organism, or none.
+# amrfinderplus          : the AMR calls, with coordinates and a method column.
+# isescan                : insertion sequences on the contigs.
+# isescan_table          : ISEScan's output tree → one tidy row per IS, plus how
+#                          many of those calls sit at a contig end.
+# conjscan_models        : fetch the CONJScan model package once for all samples.
+# conjscan               : conjugation machinery on this genome.
+#     only when mobilome.icescan.run (a second, non-commercial model set):
+# icescan_models         : fetch the ICEscan model package once for all samples.
+# icescan                : the second machinery search — IME and AICE classes.
+#     always:
+# conjscan_ice           : anchors → clusters → att sites → ICE/IME candidates.
+#     only when mobilome.tncentral.url or .dir is set (MOBILOME_NAME_ELEMENTS):
+# tncentral_db           : fetch, repair and index the curated transposon set.
+# tncentral_blast        : where curated transposons and integrons match.
+# name_elements          : those hits → named element copies (ladder tier 4).
+#     only when mobilome.iceberg.urls or .dir is set (MOBILOME_NAME_ICE):
+# iceberg_db             : fetch, repair and index the curated ICE catalogue.
+# iceberg_blast          : where curated ICEs match.
+# name_ice_elements      : put the curated name on our candidates. Labels only.
+#     only with short reads AND mobilome.isosdb configured (MOBILOME_COPY_NUMBER):
+# isosdb_db              : fetch the openly licensed IS sequences + family map.
+# assembly_depth         : reads vs this assembly — the single-copy denominator.
+# isosdb_map             : reads vs ISOSDB — the IS depth numerator.
+# is_copy_number         : the depth ratio → how many copies the assembly lost.
+#     always:
+# mobilome_replicons     : chromosome or plasmid, per contig.
+# amr_mge_colocalisation : THE deliverable — one mobility row per AMR gene.
+#
+# ── Two things a reader must keep in mind about the OUTPUT ──
 #
 # 1. ON A FRAGMENTED (short-read) ASSEMBLY THE IS COUNT IS A FLOOR, NOT A COUNT.
 #    IS elements are the single biggest cause of contig breaks, because multiple
@@ -58,7 +94,7 @@
 #    "PREDICTED self-transmissible" — the confirmatory experiment is a filter or
 #    broth mating assay, not bioinformatics.
 #
-# WHERE THE NAMES IN THIS FILE COME FROM. Every constant used below — the on/off
+# Where the names in this file come from. Every constant used below — the on/off
 # switches (MOBILOME_RUN, MOBILOME_NAME_ELEMENTS, MOBILOME_NAME_ICE,
 # MOBILOME_COPY_NUMBER), every output path, all eight mobilome script paths, the
 # database URLs and thresholds, and the shared workflow names (FINAL_CONTIGS,
@@ -66,20 +102,28 @@
 # PHAGE_CALLER, capped_cpus) — is defined once in the mobilome block of
 # 00_common.smk. Read that block before this file; nothing here re-derives a path
 # or re-reads the config, so producer and consumer can never drift apart. The
-# only exceptions are declared just below: MOBILOME_COVERAGE_PROFILE and the four
+# only exceptions are declared just below: MOBILOME_COVERAGE_PROFILE and the
 # ICEscan constants, which are read here because nothing outside this file uses
 # them.
 #
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
-# "../../envs/x.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/x.yaml.
-# ─────────────────────────────────────────────────────────────────────────────
-
-# ── How much of an HMM profile a protein must match (--coverage-profile) ─────
-# Lives in this file rather than 00_common.smk for the same reason as the
-# ICEscan constants below: it is read by exactly the two MacSyFinder rules in
-# this file and by nothing else, so it reads best next to them.
+# "../../envs/x.yaml" climbs shared/ → rules/ → workflow/ → workflow/envs/x.yaml.
 #
-# WHAT THE NUMBER IS. MacSyFinder finds machinery proteins with profile HMMs —
+# priority: the shared database fetches carry 4 and every per-sample rule carries
+# 3, so when several jobs are ready at once Snakemake starts a download ahead of
+# the per-sample work that will wait on it — the same ordering rule download_amr_db
+# uses in 50_amr.smk. The numbers only rank jobs against each other, and the front
+# end deliberately outranks everything here: assembly runs at 9–10 (see
+# illumina/20_assembly.smk and its siblings).
+
+
+# ── How much of an HMM profile a protein must match (--coverage-profile) ──
+# Set by mobilome.coverage_profile (default 0.5) and passed to rules conjscan and
+# icescan. Lives in this file rather than 00_common.smk for the same reason as
+# the ICEscan constants below: it is read by exactly those two MacSyFinder rules
+# and by nothing else, so it reads best next to them.
+#
+# What the number is. MacSyFinder finds machinery proteins with profile HMMs —
 # statistical descriptions of what a relaxase, a coupling protein or a VirB4
 # looks like across many species. A protein can score well against a profile
 # while aligning to only part of it, which happens for two very different
@@ -94,7 +138,7 @@
 # the negative controls and the head-to-head against the EBI pipeline. Keeping
 # it the default means the shipped configuration is the validated one.
 #
-# WHAT LOWERING IT BUYS AND COSTS. Measured end to end at 0.5 / 0.4 / 0.3 over
+# What lowering it buys and costs. Measured end to end at 0.5 / 0.4 / 0.3 over
 # the three benchmark sets — 18 curated ICEs, 12 curated IMEs, and 12 genomes
 # with no curated element (32.6 Mb). With the ICEscan layer on:
 #
@@ -115,7 +159,7 @@
 # holding — a 21.6 kb IME appears in Staphylococcus aureus N315 at medium
 # confidence with an actual mobility claim, unverified either way.
 #
-# WHY THE GAIN IS SO SMALL WHEN THE RAW EVIDENCE MOVES A LOT. 0.4 adds 5% more
+# Why the gain is so small when the raw evidence moves a lot. 0.4 adds 5% more
 # MacSyFinder hits and changes the hit table in 13 of 40 benchmark genomes; 0.3
 # adds 12% and changes 19 of 40. Almost none of it reaches the element table,
 # because conjscan_ice needs an integrase within 50 kb of conjugation machinery
@@ -138,7 +182,7 @@
 # proteins are fragmentary anyway — not about what a single-isolate workflow
 # reporting a regulatory-facing mobility tier should do.
 #
-# BOTH SEARCHES GET THE SAME VALUE, deliberately. conjscan and icescan hit
+# Both searches get the same value, deliberately. conjscan and icescan hit
 # tables are UNIONED by the caller, so running them at different stringencies
 # would mean an element's class depended on which model set happened to be more
 # permissive, which nothing downstream could untangle.
@@ -147,7 +191,7 @@ MOBILOME_COVERAGE_PROFILE = float(
 
 # A fraction outside (0, 1] is a typo (a percentage, most likely). MacSyFinder
 # would accept 30 and then silently find nothing at all, which looks exactly
-# like a genome with no conjugative system - so fail here instead.
+# like a genome with no conjugative system — so fail here instead.
 if MOBILOME_RUN and not (0.0 < MOBILOME_COVERAGE_PROFILE <= 1.0):
     sys.exit(
         "[BacFlux] mobilome.coverage_profile must be a fraction greater than 0 "
@@ -156,14 +200,14 @@ if MOBILOME_RUN and not (0.0 < MOBILOME_COVERAGE_PROFILE <= 1.0):
         "percentage."
     )
 
-# ── The ICEscan model set: switch, paths, and why they live here ─────────────
-# Every other mobilome path constant is declared in 00_common.smk. These four
-# stay in this file on purpose, so that the whole ICEscan layer — the config
-# switch, the two output paths and the two rules that write them — can be read
-# in one place. Move them into 00_common.smk if you prefer the convention;
-# nothing else refers to them.
+# ── The ICEscan model set: switch, paths, and why they live here ──
+# Every other mobilome path constant is declared in 00_common.smk. These stay in
+# this file on purpose, so that the whole ICEscan layer — the config switch, the
+# url/dir it is fetched from, the two output paths and the two rules that write
+# them — can be read in one place. Move them into 00_common.smk if you prefer the
+# convention; nothing else refers to them.
 #
-# WHAT THIS LAYER IS. ICEscan is a SECOND MacSyFinder model package, run over the
+# What this layer is. ICEscan is a SECOND MacSyFinder model package, run over the
 # same Bakta proteins as CONJscan and merged with it. It is a fork of CONJScan by
 # the same Institut Pasteur authors, one minor version behind the release BacFlux
 # installs, so it is added ALONGSIDE and never instead of it (a swap loses the MOB
@@ -202,18 +246,21 @@ MOBILOME_ICESCAN = MOBILOME_RUN and ICESCAN_ENABLED
 ICESCAN_MODELS_DIR = DIR_MOBILOME + "/icescan_models"   # a DIRECTORY (rule icescan_models)
 ICESCAN_DIR = MOBILOME_DIR + "/icescan"                 # a DIRECTORY (rule icescan)
 
-# ── What to expect on a DRAFT assembly (printed once, at parse time) ─────────
+# ── What to expect on a DRAFT assembly (printed once, at parse time) ──
 # The same pattern as every other banner in this workflow: a plain print() next
 # to the constants it describes, so it lands in the log header before the DAG is
 # built (see the MODE and phage-caller banners in 00_common.smk).
 #
-# WHY IT EXISTS. Every validation this module had was on CLOSED genomes, where
-# spans_contigs was TRUE on 0 of 63 calls - so its fragmentation guards had
+# Why it exists. Every validation this module had was on CLOSED genomes, where
+# spans_contigs was TRUE on 0 of 63 calls — so its fragmentation guards had
 # never been measured on the input BacFlux actually gets. They have now been:
 # 40 benchmark genomes were cut to ~150 kb, ~50 kb and ~20 kb N50, all 120
 # assemblies re-annotated and re-run end to end. The numbers below are from that
-# run, not from an estimate. Kept to one short paragraph on purpose - a wall of
+# run, not from an estimate. Kept to one short paragraph on purpose — a wall of
 # text at every run gets skipped, and this one has to be read.
+#
+# This `if` opens the WHOLE module: everything from here to the end of the file
+# is indented inside it.
 if MOBILOME_RUN:
 
     print(
@@ -228,7 +275,7 @@ if MOBILOME_RUN:
         "docs/mobilome_draft_assemblies.md."
     )
 
-    # ── Rule: contig_lengths — how long is every contig? ─────────────────────
+    # ── contig_lengths — how long is every contig? ──
     # Biology: nothing on its own — but every downstream honesty check needs it.
     # "Is this AMR gene 200 bp from the end of its contig?" is only answerable
     # against the contig's length, and that question is what separates "there is
@@ -240,7 +287,14 @@ if MOBILOME_RUN:
     #           onwards has to know which assembler produced it.
     # Does: a stdlib FASTA scan (no biopython) writing contig + length.
     # Produces: {sample}_contig_lengths.tsv.
-    # Consumed by: isescan_table and amr_mge_colocalisation.
+    # Consumed by: isescan_table, conjscan_ice and amr_mge_colocalisation.
+    #
+    # The script is isescan_to_table.py, which looks wrong for a rule that never
+    # touches ISEScan. It is the same FASTA scanner the IS table already needed,
+    # exposed as a second mode: given --genome-fasta and --out-contig-lengths it
+    # writes the lengths and returns before any ISEScan parsing starts. One
+    # scanner, one set of tests, and no way for the two rules to disagree about
+    # how long a contig is.
     #
     # conda: NONE — plain Python from the launch environment, like the other
     # small helper steps in this workflow.
@@ -261,7 +315,7 @@ if MOBILOME_RUN:
               --out-contig-lengths {output.lengths} > {log} 2>&1
             """
 
-    # ── Rule: amrfinder_organism — can we ask for point mutations? ───────────
+    # ── amrfinder_organism — can we ask for point mutations? ──
     # Biology: AMRFinderPlus can additionally report RESISTANCE-CONFERRING POINT
     # MUTATIONS, but only when told which organism it is looking at, because those
     # mutations are curated per species. Point mutations are precisely the
@@ -276,9 +330,13 @@ if MOBILOME_RUN:
     # of the six isolates screened in this project map to a curated organism.
     # A no-match is therefore the COMMON case and must be silent and graceful.
     #
-    # Takes in: the GTDB-Tk output directory for this sample (03.taxonomy).
+    # Takes in: the GTDB-Tk output directory for this sample (03.taxonomy, from
+    #           rule taxonomic_assignment in shared/30_taxonomy.smk).
     # Does: map the GTDB classification to a curated AMRFinderPlus --organism, or
-    #       to nothing at all.
+    #       to nothing at all. The mapping is data, not code: the curated species
+    #       equivalences and the genus-level rules sit in two TSVs beside
+    #       scripts/80_mobilome/gtdb_amrfinder_organism.py, which is where to add a
+    #       species rather than in this rule.
     # Produces: a one-line file holding the organism name (or an EMPTY file), plus
     #           an audit TSV recording the decision and its reason.
     # Consumed by: amrfinderplus (below).
@@ -302,7 +360,7 @@ if MOBILOME_RUN:
               --out-audit {output.audit} > {log} 2>&1
             """
 
-    # ── Rule: amrfinderplus — the structured AMR input (WP-A) ────────────────
+    # ── amrfinderplus — the structured AMR input (WP-A) ──
     # Biology: Bakta already runs AMRFinderPlus internally, but surfaces only the
     # gene name and product. The full report adds five things this module needs:
     #   1. the Method column (EXACTX / BLASTX / PARTIALX / HMM / POINTX …) — a
@@ -316,10 +374,14 @@ if MOBILOME_RUN:
     # This costs NO new conda env and NO new database: amrfinder ships inside the
     # Bakta env, and its database ships inside the Bakta database. Verified by
     # running it for real (see docs/mobilome_wpA_ground_truth.md): the 22-column
-    # schema there is the contract the co-localisation parser keys on.
+    # schema there is the contract the co-localisation parser keys on, and it is
+    # the doc rather than the spec that is right about the column NAMES — 4.2.7
+    # calls them "Element symbol"/"Element name" where older versions said "Gene
+    # symbol", and a parser looking for the old name finds nothing and says so.
     #
-    # ABRicate is NOT replaced. The three AMR legs are complementary and stay:
-    #   BBMap->CARD (reads)   — immune to assembly collapse
+    # ABRicate is NOT replaced. The three AMR legs are complementary and stay
+    # (the first two live in shared/50_amr.smk):
+    #   BBMap→CARD (reads)    — immune to assembly collapse
     #   ABRicate (contigs)    — multi-database breadth + the EFSA-threshold report
     #   AMRFinderPlus         — structured, coordinate-bearing input for THIS module
     # EFSA thresholds stay on the ABRicate leg only; imposing a blanket 80/70 cut
@@ -392,7 +454,7 @@ if MOBILOME_RUN:
             fi
             """
 
-    # ── Rule: isescan — find insertion sequences on the genome (WP-C) ────────
+    # ── isescan — find insertion sequences on the genome (WP-C) ──
     # Biology: IS elements are the workhorse of the bacterial mobilome — small,
     # self-mobile, and present in many copies. They matter here for two reasons:
     # an IS beside an AMR gene can supply a promoter (raising expression without
@@ -404,11 +466,15 @@ if MOBILOME_RUN:
     #       DELIBERATELY WITHOUT --removeShortIS: that flag drops partial copies,
     #       and on a fragmented assembly a "partial" IS is usually a real IS the
     #       contig ran out on. We keep them and tier them honestly instead.
-    # Produces: 07/08 ISESCAN_DIR — declared a DIRECTORY because ISEScan writes a
-    #       tree, not one file (see the two gotchas below).
-    # Consumed by: isescan_table.
+    # Produces: ISESCAN_DIR — 08.mobilome/{sample}/isescan, declared a DIRECTORY
+    #       because ISEScan writes a tree, not one file. It nests the results
+    #       under the name of the INPUT's parent directory, which here is the
+    #       sample: 08.mobilome/{sample}/isescan/{sample}/contigs_final.fasta.tsv.
+    #       Predictable today, but not to be hard-coded — the moment the input
+    #       layout moves, that path moves with it.
+    # Consumed by: isescan_table, which is given the directory and searches it.
     #
-    # THREE VERIFIED GOTCHAS, each handled in the shell below:
+    # Three verified gotchas, each handled in the shell below:
     #  1. ISEScan writes NO FILES AT ALL when it finds no IS. A genome with no
     #     detectable IS is a perfectly ordinary result, so the rule creates the
     #     output directory itself and never depends on the tool having written
@@ -449,20 +515,28 @@ if MOBILOME_RUN:
               }}
             """
 
-    # ── Rule: isescan_table — tidy the IS calls and measure the honesty ──────
-    # Takes in: the ISEScan output directory and the contig lengths.
+    # ── isescan_table — tidy the IS calls and measure the honesty ──
+    # Takes in: the ISEScan output directory (rule isescan) and the contig lengths
+    #           (rule contig_lengths).
     # Does: normalise ISEScan's 24-column table to one tidy row per IS, and
     #       compute the QC that keeps this module truthful — how many IS calls
     #       sit within MOBILOME_BOUNDARY_BP of a contig end, and what fraction of
     #       the total that is.
     # Produces: IS_TABLE (rows), IS_SUMMARY (the QC line), IS_AUDIT (dropped rows
     #       with a reason).
-    # Consumed by: amr_mge_colocalisation; IS_SUMMARY is also a rule-all target,
-    #       so the QC is always produced, never optional.
+    # Consumed by: amr_mge_colocalisation and conjscan_ice, which masks these
+    #       intervals out of its att-site search; IS_SUMMARY is also a rule-all
+    #       target, so the QC is always produced, never optional.
     #
-    # WHY THE QC MATTERS: IS elements are the main cause of contig breaks, so a
+    # Why the QC matters: IS elements are the main cause of contig breaks, so a
     # high boundary fraction means the assembly fragmented exactly where the
     # elements are, and the located count is a FLOOR rather than a count.
+    #
+    # --boundary-bp is mobilome.contig_boundary_bp, 100 bp by default: an IS whose
+    # end lands within 100 bp of a contig end is flagged as sitting at the
+    # boundary. A convention, not a biological distance. Two scripts take a flag
+    # of that name and they do NOT share a value — conjscan_to_ice.py defaults to
+    # 1000 bp and applies it to whole elements, which is a far bigger object.
     rule isescan_table:
         input:
             isescan_dir = ISESCAN_DIR,
@@ -489,13 +563,13 @@ if MOBILOME_RUN:
               --out-audit {output.audit} > {log} 2>&1
             """
 
-    # ── Rule: conjscan_models — fetch the CONJscan model package once ────────
+    # ── conjscan_models — fetch the CONJscan model package once ──
     # Biology: CONJscan is a set of profile models describing the machinery a
     # cell needs to conjugate — a relaxase (nicks the DNA), a coupling protein,
     # and a type IV secretion system (the mating apparatus). Which of those are
     # present is what separates "can be moved by a helper" from "moves itself".
     #
-    # ⚠ LICENCE (verified from the package's own metadata.yml): the CONJscan
+    # LICENCE (verified from the package's own metadata.yml): the CONJscan
     # MODELS are CC BY-NC-SA 4.0 (Institut Pasteur / CNRS) — academic and
     # non-commercial use only. BacFlux never vendors them: they are fetched here,
     # at the user's request, under the user's own agreement with the licensor,
@@ -534,8 +608,9 @@ if MOBILOME_RUN:
             fi
             """
 
-    # ── Rule: conjscan — conjugation machinery on THIS genome ────────────────
-    # Takes in: Bakta's proteins (.faa) and the CONJscan models.
+    # ── conjscan — conjugation machinery on THIS genome ──
+    # Takes in: Bakta's proteins (.faa, from rule annotation in
+    #           shared/40_annotation.smk) and the CONJscan models.
     # Does: MacSyFinder with the CONJScan/Chromosome model set. Chromosome, not
     #       Plasmids, because that is the question nothing else in BacFlux can
     #       answer: Platon already reports plasmid mobility from its own table,
@@ -595,15 +670,18 @@ if MOBILOME_RUN:
               }}
             """
 
-    # ══ The ICEscan model set (a second machinery search) ════════════════════
-    # Only exists when the user opted in. Without it the module behaves exactly
-    # as it did before: CONJscan alone, no IME class, no AICE class.
+    # ── The ICEscan model set (a second machinery search) ──
+    # Both rules below exist only when mobilome.icescan.run is true AND a source
+    # is configured (MOBILOME_ICESCAN, declared at the top of this file). With it
+    # off they are never defined, conjscan_ice simply does not receive the extra
+    # input, and the module behaves exactly as it did before this layer existed:
+    # CONJscan alone, no IME class, no AICE class.
     if MOBILOME_ICESCAN:
 
-        # ── Rule: icescan_models — fetch the ICEscan model package once ──────
+        # ── icescan_models — fetch the ICEscan model package once ──
         # Biology: the same kind of package as CONJscan — profile models of the
-        # proteins an element needs in order to move — but covering two classes
-        # CONJScan 2.1.0 does not model at all:
+        # proteins that let an element move — but covering two classes CONJScan
+        # 2.1.0 does not model at all:
         #   IME  = integrates into the chromosome and carries a relaxase (the
         #          enzyme that nicks the DNA to start transfer) but NO mating
         #          apparatus, so it moves only by borrowing one from a
@@ -615,7 +693,7 @@ if MOBILOME_RUN:
         # are trusted as element integrases — that judgement lives in the caller
         # (conjscan_to_ice.py), not here.
         #
-        # ⚠ LICENCE (from the package's own LICENSE file): CC BY-NC-SA 4.0,
+        # LICENCE (from the package's own LICENSE file): CC BY-NC-SA 4.0,
         # Institut Pasteur / CNRS — academic and non-commercial use only, the
         # same terms as the CONJscan models. BacFlux never vendors either: they
         # are fetched here, at the user's request, under the user's own agreement
@@ -782,13 +860,13 @@ if MOBILOME_RUN:
                 echo "ICEscan ready: version $VERSION, $N_PROFILES profiles."
                 """
 
-        # ── Rule: icescan — the second machinery search on THIS genome ───────
+        # ── icescan — the second machinery search on THIS genome ──
         # Takes in: the same Bakta proteins (.faa) rule conjscan reads, and the
         #           ICEscan models above.
         # Does: MacSyFinder again, with the ICEscan package. `--models ICEscan
         #       all` (not ICEscan/Chromosome, the form conjscan uses) because
-        #       ICEscan ships only a Chromosome set - the plasmid models were
-        #       removed in the fork - so `all` is the whole package.
+        #       ICEscan ships only a Chromosome set — the plasmid models were
+        #       removed in the fork — so `all` is the whole package.
         # Produces: 08.mobilome/{sample}/icescan/ (best_solution.tsv and friends).
         # Consumed by: conjscan_ice, which UNIONS this table with CONJscan's.
         #
@@ -833,7 +911,7 @@ if MOBILOME_RUN:
                   }}
                 """
 
-    # ── Rule: conjscan_ice — turn machinery hits into ICE / IME candidates ───
+    # ── conjscan_ice — turn machinery hits into ICE / IME candidates ──
     # Takes in, and which rule produced each:
     #   * CONJscan's best_solution.tsv and its hmmer_results/ directory  (conjscan)
     #   * ICEscan's best_solution.tsv, ONLY when that layer is on        (icescan)
@@ -844,12 +922,12 @@ if MOBILOME_RUN:
     #   * the IS table, masked out of the att search (see below)         (isescan_table)
     #   * the contig lengths, for the contig-edge flags                  (contig_lengths)
     #   * chromosome-or-plasmid, per contig                       (mobilome_replicons)
-    # Does: spec §8 Phases 0-4 — collect anchors (relaxase, coupling protein,
+    # Does: spec §8 Phases 0–4 — collect anchors (relaxase, coupling protein,
     #       T4SS, integrase), cluster them on one contig, and classify:
-    #         integrase + relaxase + T4SS -> ICE  (predicted self-transmissible)
-    #         integrase + relaxase        -> IME  (mobilisable, needs a helper)
-    #         integrase only              -> passive island
-    #         relaxase + T4SS, no integrase -> conjugative region, NOT an ICE
+    #         integrase + relaxase + T4SS   → ICE  (predicted self-transmissible)
+    #         integrase + relaxase          → IME  (mobilisable, needs a helper)
+    #         integrase only                → passive island
+    #         relaxase + T4SS, no integrase → conjugative region, NOT an ICE
     #       then Phase 3, the att-site search: look for the attL/attR direct
     #       repeats that mark where the element really starts and stops, and
     #       widen the interval to them when they are found.
@@ -871,9 +949,13 @@ if MOBILOME_RUN:
     # that have nothing to do with ICE integration. The spec names this as the
     # most likely way to get Phase 3 wrong.
     #
-    # Produces: the ICE/IME element table + its audit.
-    # Consumed by: amr_mge_colocalisation, as a SECOND element source alongside
-    #              the IS table.
+    # Produces: ICE_TABLE ({sample}_ice_candidates.tsv) and ICE_AUDIT
+    #           ({sample}_ice_discarded.tsv), which carries a reason for every
+    #           candidate dropped and is headed by this assembly's contig count
+    #           and N50 — the context the call has to be read against.
+    # Consumed by: name_ice_elements when the ICEberg layer is on, otherwise
+    #              straight to amr_mge_colocalisation, as a SECOND element source
+    #              alongside the IS table.
     rule conjscan_ice:
         input:
             conjscan_dir = CONJSCAN_DIR,
@@ -881,7 +963,7 @@ if MOBILOME_RUN:
             # opted in to the ICEscan model set; unpacking a dict keeps the input
             # list valid either way. The script UNIONS the two hit tables and
             # takes from ICEscan only its integrase hits and its IME/AICE
-            # classes - never its spans (MacSyFinder reports gene ordinals, not
+            # classes — never its spans (MacSyFinder reports gene ordinals, not
             # base pairs) and never its quorum for the mating apparatus.
             **({"icescan_dir": ICESCAN_DIR} if MOBILOME_ICESCAN else {}),
             bakta_dir = DIR_ANNOTATION + "/bakta/{sample}",
@@ -923,7 +1005,7 @@ if MOBILOME_RUN:
         shell:
             # best_solution.tsv is absent when MacSyFinder found nothing; the
             # script treats a missing file as "no systems" and still writes a
-            # well-formed empty table, so no guard is needed here - and that
+            # well-formed empty table, so no guard is needed here — and that
             # holds for the ICEscan table too.
             """
             python {params.script} \
@@ -941,12 +1023,16 @@ if MOBILOME_RUN:
               --out-audit {output.audit} > {log} 2>&1
             """
 
-    # ══ The TnCentral naming layer (ladder tier 4) ═══════════════════════════
-    # Only exists when the user configured a TnCentral source. Without it the
-    # module behaves exactly as before and tier 4 stays unreachable.
+    # ── The TnCentral naming layer (ladder tier 4) ──
+    # All three rules below exist only when mobilome.tncentral.url or .dir is set
+    # (MOBILOME_NAME_ELEMENTS, in 00_common.smk). With neither set they are never
+    # defined, amr_mge_colocalisation is given no named-element table, and the
+    # module behaves exactly as before: tier 4 stays unreachable, because tier 4
+    # means "inside an element somebody has curated and named" and nothing else
+    # in this module can supply a curated name.
     if MOBILOME_NAME_ELEMENTS:
 
-        # ── Rule: tncentral_db — fetch and index the curated transposon set ──
+        # ── tncentral_db — fetch and index the curated transposon set ──
         # Biology: TnCentral catalogues transposons and integrons that people have
         #          characterised and named. Matching one is qualitatively different
         #          from inferring a composite from two IS copies: the architecture
@@ -954,12 +1040,15 @@ if MOBILOME_RUN:
         #          free (spec §7).
         # Takes in: nothing from the workflow — a URL from the config, or a
         #           directory the user already holds.
-        # Does: download, verify, unpack, and rebuild the BLAST database.
-        #       The shipped index is BLAST v4; we dump to FASTA and rebuild as v5
-        #       so it works with current blast+ (spec §5.3), and record what was
-        #       actually fetched in PROVENANCE.txt because the endpoint is
-        #       unversioned and otherwise there is no way to say later WHICH
-        #       release a result came from.
+        # Does: download, verify, unpack, repair, and index. The ZIP holds
+        #       tncentral.fa — a plain FASTA — sitting next to a BLAST v4 index.
+        #       That shipped index is deleted and rebuilt as v5 from the repaired
+        #       FASTA, for two reasons: current blast+ wants v5 (spec §5.3), and
+        #       the shipped one was built before the repair the shell does below,
+        #       so it is missing the same 21 records. PROVENANCE.txt records what
+        #       was actually fetched, because the endpoint is unversioned and
+        #       otherwise there is no way to say later WHICH release a result
+        #       came from.
         # Produces: the directory TNCENTRAL_DB_DIR, holding tncentral.fa, the
         #           BLAST index files under the prefix tncentral_v5, and
         #           PROVENANCE.txt. Those filenames are written literally in the
@@ -976,7 +1065,7 @@ if MOBILOME_RUN:
                 local_dir = TNCENTRAL_LOCAL,
                 # TnCentral's server 403s the default curl user-agent. This is a
                 # bot block rather than a wall, so we identify as a browser. If
-                # they tighten it the rule fails loudly - it never leaves an empty
+                # they tighten it the rule fails loudly — it never leaves an empty
                 # database behind that would silently produce zero named elements.
                 user_agent = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
                               "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"),
@@ -1025,7 +1114,7 @@ if MOBILOME_RUN:
                     rm -f {output.db_dir}/tncentral.zip
                 fi
 
-                # REPAIR MALFORMED RECORDS BEFORE INDEXING. The upstream FASTA has
+                # Repair malformed records before indexing. The upstream FASTA has
                 # deflines glued onto the END of a sequence line instead of
                 # starting their own, e.g.
                 #     ...gtgcagccgtcttctgaaaacgaca>In1223-KX784502
@@ -1080,7 +1169,7 @@ if MOBILOME_RUN:
                 echo "TnCentral ready: $N_SEQ sequences."
                 """
 
-        # ── Rule: tncentral_blast — where are the curated elements? ──────────
+        # ── tncentral_blast — where are the curated elements? ──
         # Biology: a curated transposon or integron is a named architecture
         # somebody characterised and deposited. Finding one on this genome is a
         # much stronger statement than inferring a composite from two IS copies,
@@ -1103,8 +1192,9 @@ if MOBILOME_RUN:
                 hits = TNCENTRAL_BLAST_HITS,
             params:
                 db = lambda w, input: os.path.join(input.db_dir, "tncentral_v5"),
-                # Loose enough that the naming thresholds in the script - not the
-                # search - decide what counts, so every near miss is auditable.
+                # Loose enough that the naming thresholds in the script — not the
+                # search — decide what counts, so every near miss reaches the
+                # discard audit with a reason instead of vanishing at this step.
                 evalue = "1e-20",
             conda:
                 "../../envs/tncentral.yaml"
@@ -1123,8 +1213,8 @@ if MOBILOME_RUN:
                   -out {output.hits} > {log} 2>&1
                 """
 
-        # ── Rule: name_elements — turn BLAST hits into named elements ────────
-        # FOUR NAMES, ONE STEP, so nobody has to guess: the rule is
+        # ── name_elements — turn BLAST hits into named elements ──
+        # Four names, one step, so nobody has to guess: the rule is
         # `name_elements`, the script it runs is `name_transposons.py` (reached
         # through the constant NAME_TRANSPOSONS_SCRIPT), the table it writes is
         # NAMED_ELEMENTS_TABLE, and its log is mobilome_name_elements_*.log. The
@@ -1138,13 +1228,20 @@ if MOBILOME_RUN:
         #
         # Takes in: TNCENTRAL_BLAST_HITS from tncentral_blast above.
         # Does: merge HSPs into element COPIES (separate copies of one transposon
-        #       must not be joined - see the script), apply the naming thresholds,
+        #       must not be joined — see the script), apply the naming thresholds,
         #       drop plain IS entries that ISEScan already covers, and write the
         #       result in the element-table shape colocalise.py consumes.
         # Produces: NAMED_ELEMENTS_TABLE + its discard audit, which records a
         #       reason for every hit refused a name (identity, coverage, or being
         #       a plain IS).
         # Consumed by: amr_mge_colocalisation, as a third --is-table.
+        #
+        # The two thresholds are mobilome.tncentral.min_identity (90%) and
+        # .min_reference_coverage (0.80): a hit names an element when it is at
+        # least 90% identical over at least 80% of the curated sequence. That is
+        # the naming cascade's convention (spec §5.4), not a biological boundary —
+        # anything weaker is refused a name and recorded in the audit, never
+        # quietly promoted.
         rule name_elements:
             input:
                 hits = TNCENTRAL_BLAST_HITS,
@@ -1169,17 +1266,22 @@ if MOBILOME_RUN:
                   --out-audit {output.audit} > {log} 2>&1
                 """
 
-    # ══ The ICEberg naming layer (which ICE is it?) ══════════════════════════
-    # Only exists when the user configured an ICEberg source. This layer adds NO
-    # elements and can change NO tier: conjscan_to_ice.py decides what is an ICE,
-    # and this only says which one.
+    # ── The ICEberg naming layer (which ICE is it?) ──
+    # All three rules below exist only when mobilome.iceberg.urls or .dir is set
+    # (MOBILOME_NAME_ICE, in 00_common.smk). This layer adds NO elements and can
+    # change NO tier: conjscan_to_ice.py decides what is an ICE, and this only
+    # says which published element it looks like. With it off, the constant
+    # ICE_TABLE_FOR_COLOCALISE (also 00_common.smk) simply points
+    # amr_mge_colocalisation at the unnamed candidate table instead.
     if MOBILOME_NAME_ICE:
 
-        # ── Rule: iceberg_db — fetch and index the curated ICE catalogue ─────
+        # ── iceberg_db — fetch and index the curated ICE catalogue ──
         # Takes in: nothing from the workflow — URLs from the config, or a
         #           directory the user already holds.
-        # Does: fetch each .fas, concatenate, index as a v5 BLAST database, and
-        #       record provenance (ICEberg is versioned - 3.0, June 2023 - but the
+        # Does: fetch each .fas, concatenate, repair the deflines exactly as
+        #       tncentral_db does (the same defect, one record instead of 21 —
+        #       see the shell below), index as a v5 BLAST database, and record
+        #       provenance (ICEberg is versioned — 3.0, June 2023 — but the
         #       download URLs are not, so the fetch date is worth keeping).
         # Produces: the directory ICEBERG_DB_DIR, holding iceberg.fa, the BLAST
         #           index under the prefix iceberg_v5, and PROVENANCE.txt — the
@@ -1188,7 +1290,7 @@ if MOBILOME_RUN:
         #           one prefix it needs from input.db_dir.
         # Consumed by: iceberg_blast. Fetched once and shared by all samples.
         #
-        # NO CHECKSUM KEY, unlike the ICEscan and TnCentral layers. Not an
+        # No checksum key, unlike the ICEscan and TnCentral layers. Not an
         # omission: ICEberg serves two files rather than one archive, and the
         # larger is ~100 MB over a slow link that the rule has to be allowed to
         # resume — so a single pinned digest is not the right instrument here.
@@ -1200,6 +1302,8 @@ if MOBILOME_RUN:
             params:
                 urls = " ".join(ICEBERG_URLS),
                 local_dir = ICEBERG_LOCAL,
+                # The same browser user-agent tncentral_db sends — see the bot-block
+                # note there for what that is working around.
                 user_agent = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
                               "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"),
             conda:
@@ -1274,7 +1378,7 @@ if MOBILOME_RUN:
                 echo "ICEberg ready: $N_SEQ sequences."
                 """
 
-        # ── Rule: iceberg_blast — where do curated ICEs match this genome? ───
+        # ── iceberg_blast — where do curated ICEs match this genome? ──
         # Biology: ICEberg curates ICEs and IMEs that have been described and
         # named in the literature. Matching one turns "a predicted
         # self-transmissible element" into a name you can look up.
@@ -1318,7 +1422,7 @@ if MOBILOME_RUN:
                   -out {output.hits} > {log} 2>&1
                 """
 
-        # ── Rule: name_ice_elements — put the curated name on the candidate ──
+        # ── name_ice_elements — put the curated name on the candidate ──
         # Biology: this LABELS, it never DECIDES. conjscan_to_ice.py has already
         # said what is an ICE and what class it is; all this step adds is which
         # published element it looks like, and how much of that element our
@@ -1327,8 +1431,14 @@ if MOBILOME_RUN:
         # Takes in: the ICE/IME candidates (rule conjscan_ice) and the ICEberg
         #           BLAST hits (rule iceberg_blast).
         # Does: match each candidate interval to overlapping curated elements,
-        #       above the identity and overlap floors from the config. A name is
-        #       suffixed "-like" when less than 80% of the reference is present.
+        #       above two floors from the config — mobilome.iceberg.min_identity
+        #       (80%) and .min_overlap_fraction (0.50, how much of OUR candidate
+        #       the curated element has to cover). A name is then suffixed "-like"
+        #       when less than 80% of the REFERENCE is present, i.e. we have part
+        #       of a known element rather than the whole of it. That last 80% is
+        #       not a config key: it is EXACT_NAME_REFERENCE_COVERAGE in
+        #       scripts/80_mobilome/name_ice_elements.py, which is the only thing
+        #       controlling the suffix.
         # Produces: ICE_TABLE_NAMED — the same rows and the same columns as
         #       ICE_TABLE, with mge_name filled in — plus a naming audit that
         #       records what each candidate matched and what was refused.
@@ -1365,12 +1475,15 @@ if MOBILOME_RUN:
                   --out-audit {output.audit} > {log} 2>&1
                 """
 
-    # ══ How many IS copies did the assembly lose? (spec WP-C) ═══════════════
-    # Short-read modes only - it needs reads - and only when an ISOSDB source is
-    # configured. Changes no AMR gene's tier: this is a quality metric on the IS
-    # inventory, quantifying the collapse the module warns about everywhere else.
+    # ── How many IS copies did the assembly lose? (spec WP-C) ──
+    # The four rules below exist only when MOBILOME_COPY_NUMBER is true, which
+    # needs both an ISOSDB source (mobilome.isosdb.fasta_url or .dir) and a mode
+    # that has short reads — illumina or hybrid, since the whole leg is built on
+    # mapping reads back. In nanopore and contigs mode there are none, so the leg
+    # is simply absent. It changes no AMR gene's tier: it is a quality metric on
+    # the IS inventory, quantifying the collapse the module warns about elsewhere.
     #
-    # THIS LEG NEEDS TWO FILES, and the switch that turns it on only looks for
+    # This leg needs two files, and the switch that turns it on only looks for
     # one. MOBILOME_COPY_NUMBER (00_common.smk) is satisfied by isosdb.fasta_url
     # alone, but rule isosdb_db also downloads the IS family map. With the family
     # URL left empty the download runs `curl -o ... ""`, which dies with a bare
@@ -1391,7 +1504,7 @@ if MOBILOME_RUN:
 
     if MOBILOME_COPY_NUMBER:
 
-        # ── Rule: isosdb_db — fetch the openly licensed IS sequence set ──────
+        # ── isosdb_db — fetch the openly licensed IS sequence set ──
         # Biology: ISOSDB is a catalogue of IS nucleotide sequences, dereplicated
         # at 95% identity, plus a map from each entry to its IS family. Reads are
         # mapped against it in the next rules; the family map is what lets the
@@ -1471,7 +1584,7 @@ if MOBILOME_RUN:
                 echo "ISOSDB ready: $N_SEQ sequences."
                 """
 
-        # ── Rule: assembly_depth — what does single-copy look like? ──────────
+        # ── assembly_depth — what does single-copy look like? ──
         # Biology: THE DENOMINATOR. Mapping the same reads to the sample's OWN
         # assembly gives the depth of ordinary single-copy sequence. Without it a
         # raw IS depth means nothing, because it scales with how deeply the
@@ -1496,6 +1609,9 @@ if MOBILOME_RUN:
                 covstats = ASSEMBLY_COVSTATS,
                 ref_dir = temp(directory(MOBILOME_DIR + "/assembly_depth_ref")),
             params:
+                # BBMap's -Xmx, in GB. min(RAM, 32) rather than a hard-coded 32,
+                # which fails outright on a smaller machine — the same ceiling
+                # the CARD mapping leg uses (shared/50_amr.smk).
                 max_ram = min(RAM, 32),
             conda:
                 "../../envs/bbmap.yaml"
@@ -1513,7 +1629,7 @@ if MOBILOME_RUN:
                   covstats={output.covstats} > {log} 2>&1
                 """
 
-        # ── Rule: isosdb_map — how deep are the IS elements? ─────────────────
+        # ── isosdb_map — how deep are the IS elements? ──
         # Biology: THE NUMERATOR. Reads are immune to assembly collapse — every
         # copy of an IS contributes its own reads whether or not the assembler
         # kept them apart — so an IS present in five copies attracts about five
@@ -1538,7 +1654,7 @@ if MOBILOME_RUN:
                 covstats = ISOSDB_COVSTATS,
                 ref_dir = temp(directory(MOBILOME_DIR + "/isosdb_ref")),
             params:
-                max_ram = min(RAM, 32),
+                max_ram = min(RAM, 32),      # as in assembly_depth above
                 fasta = lambda w, input: os.path.join(input.db_dir, "ISOSDB.V3.fna"),
             conda:
                 "../../envs/bbmap.yaml"
@@ -1556,7 +1672,7 @@ if MOBILOME_RUN:
                   covstats={output.covstats} > {log} 2>&1
                 """
 
-        # ── Rule: is_copy_number — located vs implied ────────────────────────
+        # ── is_copy_number — located vs implied ──
         # Biology: the point of the whole leg. Divide the IS depth by the genome
         # depth and you get a copy number that the assembly could not collapse:
         #
@@ -1578,6 +1694,15 @@ if MOBILOME_RUN:
         #       in its own right, read by a person. It changes no AMR gene's tier
         #       and must not: it says how many copies exist, never WHERE they are,
         #       so it cannot place a gene inside anything.
+        #
+        # Both cutoffs come from the config and both are conventions:
+        # mobilome.isosdb.min_covered_percent (90%) refuses to believe the depth
+        # of an entry that is only partly covered, because a partial hit is
+        # usually a conserved domain shared with another family; and
+        # mobilome.isosdb.min_copy_number (0.5) treats anything below half the
+        # genome baseline as absent — set under 1.0 on purpose, since a real
+        # single-copy IS sits near 1x and sampling noise plus mapping loss
+        # routinely drags it to 0.6–0.8x.
         rule is_copy_number:
             input:
                 isosdb_covstats = ISOSDB_COVSTATS,
@@ -1609,9 +1734,10 @@ if MOBILOME_RUN:
                   --out-audit {output.audit} > {log} 2>&1
                 """
 
-    # ── Rule: mobilome_replicons — is each contig chromosome or plasmid? ─────
-    # Takes in: the Platon directory this sample's plasmid stage already produced,
-    #           plus the genome (so contigs Platon skipped are still listed).
+    # ── mobilome_replicons — is each contig chromosome or plasmid? ──
+    # Takes in: the Platon directory this sample's plasmid stage already produced
+    #           (06.plasmids, rule plasmid_search in shared/60_plasmid.smk), plus
+    #           the genome, so that contigs Platon skipped are still listed.
     # Does: read Platon's chromosome/plasmid split and its own # Conjugation /
     #       # Mobilization / # OriT counts, and turn them into a per-contig call
     #       plus a plasmid mobility class.
@@ -1620,7 +1746,7 @@ if MOBILOME_RUN:
     #              for anything sitting on a plasmid, and by conjscan_ice, which
     #              needs it to tell a conjugative PLASMID from an ICE.
     #
-    # NO SEPARATE AUDIT FILE, and that is deliberate — it is the one mobilome
+    # No separate audit file, and that is deliberate — it is the one mobilome
     # rule without one. The project rule is that every decision states a reason,
     # not that every reason lives in its own file: this step drops no rows (one
     # row per contig, always), so there is nothing to explain the absence of.
@@ -1640,7 +1766,7 @@ if MOBILOME_RUN:
             #
             # Why it matters here: Platon decides tiers 5 and 6 on its own, and a
             # plasmid it misses becomes "chromosomal, intrinsic candidate" for
-            # every AMR gene on it - the one error direction that HIDES
+            # every AMR gene on it — the one error direction that HIDES
             # transferability. The concordance table already knew better; until
             # now nothing read it.
             **({"concordance": PLASMID_CONCORDANCE} if PHAGE_CALLER == "genomad" else {}),
@@ -1675,18 +1801,19 @@ if MOBILOME_RUN:
               --out {output.replicons} > {log} 2>&1
             """
 
-    # ── Rule: amr_mge_colocalisation — the deliverable (WP-D) ────────────────
+    # ── amr_mge_colocalisation — the deliverable (WP-D) ──
     # Biology: this is where the module answers its question. For every AMR gene
     # AMRFinderPlus found, look at what mobile elements sit around it and decide
     # where it lands on the mobility ladder:
-    #   1 chromosomal, nothing nearby      -> intrinsic candidate
-    #   2 IS adjacent, pointing at it      -> expression change, NOT mobilisation
-    #   3 between two copies of one IS     -> composite transposon, moves in-cell
-    #   4 in a named transposon / integron -> mobilisable, named architecture
-    #   5 on a mobilisable plasmid         -> transferable with a helper
-    #   6 in an ICE, or on a conjugative plasmid -> PREDICTED self-transmissible
-    # An IS sitting INSIDE an AMR gene is reported separately as likely
-    # inactivation — it must not be counted as mobilisation.
+    #   1 chromosomal, nothing nearby       → intrinsic candidate
+    #   2 IS adjacent, pointing at it       → expression change, NOT mobilisation
+    #   3 between two copies of one IS      → composite transposon, moves in-cell
+    #   4 in a named transposon / integron  → mobilisable, named architecture
+    #   5 on a mobilisable plasmid, or in an IME → transferable with a helper
+    #   6 in an ICE, or on a conjugative plasmid → PREDICTED self-transmissible
+    # The highest rung the evidence supports wins. An IS sitting INSIDE an AMR
+    # gene is reported separately as likely inactivation — it must not be counted
+    # as mobilisation.
     #
     # Takes in, and which rule produced each:
     #   * the AMR calls with their coordinates                    (amrfinderplus)
@@ -1701,8 +1828,7 @@ if MOBILOME_RUN:
     #   --is-table is repeatable, which is how the three element sources arrive
     #   as one pool of elements rather than three special cases in the script.
     # Does: for every AMR gene, find the elements around it, apply the ladder
-    #       above top-down (highest rung that the evidence supports wins), and
-    #       record what capped the confidence.
+    #       above from the top down, and record what capped the confidence.
     # Produces: MOBILITY_TABLE (the deliverable, one row per AMR gene) and
     #           MOBILITY_AUDIT (why every gene without context got none).
     # Consumed by: the user. This is the module's terminal product.
@@ -1726,6 +1852,11 @@ if MOBILOME_RUN:
             audit = MOBILITY_AUDIT,
         params:
             script = COLOCALISE_SCRIPT,
+            # The widest a composite transposon may be called: two IS copies
+            # further apart than mobilome.max_composite_span_bp (20 kb) are not
+            # treated as bracketing the gene between them. A working limit, not a
+            # biological one (spec §5.1), which is why the measured distance is
+            # reported on the row beside the tier.
             max_span = MOBILOME_MAX_COMPOSITE_SPAN,
             # Third element table, empty unless the TnCentral naming layer is on.
             # --is-table is `action="append"`, so extra tables just add elements.

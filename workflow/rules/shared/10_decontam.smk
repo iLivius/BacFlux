@@ -1,61 +1,48 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# BacFlux v2.0.0 — Stage 10 decontamination module (rules/shared/10_decontam.smk)
+# BacFlux v2.0.0 — contamination screening of the draft assembly: reads mapped
+# back for coverage, megablast against NCBI nt for taxonomy, BlobTools to join
+# the two, and a Python selector that applies the user's keep/drop policy and
+# records every decision.
 #
-# The biology this module does: a bacterial isolate assembly is not guaranteed to
-# be one organism. Culture contaminants, index hopping, carry-over from a
-# neighbouring library and adapter/vector debris all end up as extra contigs. We
-# therefore ask, per contig, "what does this look like taxonomically, and how
-# well is it covered by this sample's own reads?" and drop the contigs that do
-# not belong to the isolate. Doing this BEFORE annotation matters: contaminant
-# contigs inflate CheckM's contamination estimate, pull GTDB-Tk off the right
-# lineage, and pollute every downstream annotation and AMR call.
+# An isolate assembly is not guaranteed to be one organism. Culture contaminants,
+# index hopping, carry-over from a neighbouring library and adapter/vector debris
+# all arrive as extra contigs. Asking two questions per contig — what does it look
+# like taxonomically, and how deeply is it covered by this sample's own reads —
+# separates the isolate from everything else. Doing it BEFORE annotation matters:
+# contaminant contigs inflate CheckM's contamination estimate, pull GTDB-Tk off
+# the right lineage, and pollute every downstream annotation and AMR call.
 #
-# How that is done (BlobTools' classic recipe):
-#   1. map this sample's reads back onto its own draft assembly  -> coverage
-#   2. megablast every contig against NCBI nt                    -> taxonomy
-#   3. BlobTools joins the two into one per-contig table
-#   4. a small Python selector applies the user's decontamination policy and
-#      writes the kept contigs plus an audit trail of every decision
+# Chain: DRAFT_CONTIGS → map_contigs (coverage) + blast_contigs (taxonomy) →
+# blob_json → blob_table → select_contigs → DECONTAM_CONTIGS + the audit files.
 #
-# Data flow (top to bottom):
+# index_contigs      : bowtie2-build over the draft. Short-read modes only, and
+#                      only because map_contigs needs an index to map against.
+# map_contigs        : this sample's own reads back onto its own draft, giving the
+#                      per-contig depth track. Three alternative rule bodies, one
+#                      per read type — see the section prose below.
+# blast_contigs      : megablast of every draft contig against NCBI nt.
+# blast_final_contigs: the same screen re-run on the DELIVERED genome. Long-read
+#                      modes only, and it exists for the plasmid check in
+#                      shared/60_plasmid.smk, not for decontamination.
+# blob_json          : BlobTools joins coverage and taxonomy into one database.
+# blob_table         : collapses each contig's many BLAST hits into one call per
+#                      taxonomic rank.
+# select_contigs     : applies the decontamination policy, writes the kept contigs
+#                      and the per-contig audit trail.
 #
-#   DRAFT_CONTIGS ──┬─► index_contigs ─► map_contigs ─► {sample}_map.bam ──┐
-#   (from Stage 4)  │   (short reads only)                    │            │
-#                   │                                          ▼           │
-#                   │                                  map_evaluation      │
-#                   │                                  (Qualimap, 20_qc)   │
-#                   ├─► blast_contigs ─► {sample}_blastout ────────────────┤
-#                   │        │                                             ▼
-#                   │        └────────► plasmid_search (60_plasmid) ─► blob_json
-#                   │            (non-hybrid modes)                        │
-#                   │                                                      ▼
-#                   │                                                 blob_table
-#                   │                                                      │
-#                   └──────────────────────────────────────────────► select_contigs
-#                                                                          │
-#              ┌───────────────────────────────────────────────────────────┤
-#              ▼                    ▼                   ▼                  ▼
-#     {sample}_composition   contigs.list   contig_taxonomy_    DECONTAM_CONTIGS
-#      -> Bakta --genus                     decisions.tsv        -> see below
-#         (40_annotation)                    (audit trail)
-#
-#   HYBRID ONLY: blast_final_contigs ─► {sample}_final_blastout
-#                (FINAL_CONTIGS)          -> plasmid_search (60_plasmid)
-#
-# WHERE DECONTAMINATION SITS PER MODE (decision D3 — v1 order preserved exactly):
+# Where decontamination sits per mode (decision D3 — v1 order preserved exactly):
 #
 #   mode      DRAFT_CONTIGS (screened)        DECONTAM_CONTIGS (written)
 #   ────────  ──────────────────────────────  ──────────────────────────────────
 #   illumina  SPAdes contigs_filt.fasta       = FINAL_CONTIGS (decontam is last)
 #   contigs   filtered input contigs_filt     = FINAL_CONTIGS (decontam is last)
-#   nanopore  reoriented {sample}_fixed       assembly_decontam.fasta -> Medaka
-#   hybrid    the ILLUMINA SPAdes draft       contigs_sel.fasta -> Snippy ref +
-#                                             the QC comparator genome
+#   nanopore  reoriented {sample}_fixed       assembly_decontam.fasta → Medaka
+#   hybrid    the ILLUMINA SPAdes draft       contigs_sel.fasta → Snippy reference
+#                                             + the QC comparator genome
 #
-# That is why select_contigs writes DECONTAM_CONTIGS, not FINAL_CONTIGS: in
-# nanopore and hybrid the delivered genome is produced LATER by Stage 4, and
-# hard-coding FINAL_CONTIGS here would make nanopore circular
-# (select -> final -> Medaka -> select).
+# That is why select_contigs writes DECONTAM_CONTIGS and not FINAL_CONTIGS: in
+# nanopore and hybrid the delivered genome is produced later by the mode's front
+# end (rules/nanopore/, rules/hybrid/), and hard-coding FINAL_CONTIGS here would
+# make nanopore circular (select → final → Medaka → select).
 #
 # Everything referenced here is defined once in 00_common.smk and never
 # re-derived: DRAFT_CONTIGS, DECONTAM_CONTIGS, FINAL_CONTIGS, DECONTAM_DIR,
@@ -65,31 +52,30 @@
 # CPUS, capped_cpus, and the capability flags.
 #
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
-# "../../envs/x.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/x.yaml.
+# "../../envs/x.yaml" climbs shared/ → rules/ → workflow/ → workflow/envs/x.yaml.
 #
 # Resource convention: cpu-bound rules declare Snakemake's built-in
 # `threads: capped_cpus(N)` and refer to `{threads}` in the shell. Using the
 # BUILT-IN keyword (rather than a custom `resources: cpus`) is what makes
 # `--cores N` actually enforce the limit, so a plain `snakemake --cores N` is
 # safe on its own and no extra `--resources` flag is needed.
-# ─────────────────────────────────────────────────────────────────────────────
 
 
-# ── The read-mapping leg: one rule, three possible bodies ────────────────────
-# map_contigs produces the SAME two files in every mode (DECONTAM_BAM + its .bai)
-# but gets there with a different aligner, from a different read type, in a
-# different conda environment. The choice is made HERE, at parse time, with a
-# plain if/elif/else that defines exactly ONE rule body. MODE is fixed for the
-# whole run, so a reader working in nanopore mode sees exactly one 15-line
-# map_contigs and nothing else.
+# ────────────── Coverage track (Bowtie2 / minimap2) ────────────
+# map_contigs produces the SAME two files in every mode (DECONTAM_BAM plus its
+# .bai) but gets there with a different aligner, from a different read type, in a
+# different conda environment. The choice is made here at parse time — while
+# Snakemake reads the workflow, before any job runs — with a plain if/elif/else
+# that defines exactly ONE rule body. MODE is fixed for the whole run, so a reader
+# working in nanopore mode sees one 15-line map_contigs and nothing else.
 #
-# Why not one rule with an input function? Because the branches differ in their
-# `conda:` environment (bowtie.yaml vs minimap.yaml), and Snakemake resolves a
-# rule's conda env when it deploys environments — an input function cannot reach
-# it. The other alternative, a single rule with a union env carrying bowtie2 AND
-# minimap2 plus a branchy shell, would make every mode build a bigger environment
-# and turn a short shell into a conditional block. This also matches the house
-# pattern already used for `if PHAGE_CALLER == "genomad":` in 60/70.
+# Why not one rule with an input function? The branches differ in their `conda:`
+# environment (bowtie.yaml vs minimap.yaml), and Snakemake resolves a rule's conda
+# env when it deploys environments — an input function cannot reach it. The other
+# alternative, a single rule with a union env carrying bowtie2 AND minimap2 plus a
+# branchy shell, would make every mode build a bigger environment and turn a short
+# shell into a conditional block. This matches the house pattern already used for
+# `if PHAGE_CALLER == "genomad":` in shared/60_plasmid.smk and shared/70_phage.smk.
 
 if HAS_SHORT_READS:
 
@@ -100,8 +86,10 @@ if HAS_SHORT_READS:
     # off DECONTAM_DIR, so no stage number is re-derived.
     _BT2_PREFIX = DECONTAM_DIR + "/{sample}_contigs"
 
-    # ── Rule: index_contigs — build the Bowtie2 index of the draft assembly ──
-    # Takes in:  DRAFT_CONTIGS, the mode's draft assembly (from Stage 4).
+    # ── index_contigs — the Bowtie2 index of the draft assembly ──
+    # Takes in:  DRAFT_CONTIGS — the length/coverage-filtered SPAdes contigs
+    #            written by rule filter_contigs in illumina/20_assembly.smk or
+    #            hybrid/20_assembly.smk.
     # Does:      bowtie2-build, which writes six binary index files.
     # Produces:  six temp() .bt2 files; they exist only to let the next rule map.
     # Consumed by: map_contigs.
@@ -136,20 +124,21 @@ if HAS_SHORT_READS:
               {params.basename} > {log} 2>&1
             """
 
-    # ── Rule: map_contigs (short-read modes) — reads back onto the draft ─────
-    # Biology: mapping the sample's own trimmed reads onto its own assembly gives
-    # per-contig read depth. A contig from a minor contaminant is usually covered
-    # at a very different depth from the isolate's chromosome, which is the second
-    # axis (alongside taxonomy) that BlobTools separates organisms on.
+    # ── map_contigs (short-read modes) — reads back onto the draft ──
+    # Mapping the sample's own trimmed reads onto its own assembly gives per-contig
+    # read depth. A contig from a minor contaminant is usually covered at a very
+    # different depth from the isolate's chromosome, and that depth is the second
+    # axis — alongside taxonomy — that BlobTools separates organisms on.
     #
-    # Takes in: the six Bowtie2 index files (the DAG edge to index_contigs) and
-    #           the fastp-trimmed pairs TRIM_R1/TRIM_R2 from the Stage-4 front end.
-    # Does:     bowtie2 -> SAM, converted to BAM, coordinate-sorted, then indexed.
+    # Takes in: the six Bowtie2 index files (the DAG edge back to index_contigs)
+    #           and the fastp-trimmed pairs TRIM_R1/TRIM_R2 written by the mode's
+    #           read front end (illumina/10_reads.smk, hybrid/10_reads.smk).
+    # Does:     bowtie2 → SAM, converted to BAM, coordinate-sorted, then indexed.
     # Produces: DECONTAM_BAM + .bai, both temp().
     # Consumed by: blob_json (the coverage leg) and map_evaluation (Qualimap, in
     #              shared/20_qc.smk). temp() keeps the BAM alive until both are done.
     #
-    # v1->v2: `--write-index` is dropped from samtools sort. It wrote a .csi index
+    # v1→v2: `--write-index` is dropped from samtools sort. It wrote a .csi index
     # alongside the .bai that `samtools index -b` writes on the next line, and
     # BlobTools only reads the .bai. One fewer temp output, no functional change;
     # this unifies on the BacFluxL+ form.
@@ -200,18 +189,20 @@ if HAS_SHORT_READS:
 
 elif HAS_LONG_READS:
 
-    # ── Rule: map_contigs (nanopore) — ONT reads back onto the draft ─────────
+    # ── map_contigs (nanopore) — ONT reads back onto the draft ──
     # Same purpose as the short-read version: a per-contig depth track for
     # BlobTools. minimap2's map-ont preset handles the higher error rate of raw
-    # ONT reads, which bowtie2 cannot.
+    # ONT reads, which bowtie2 cannot. No Bowtie2 index rule here — minimap2
+    # indexes the reference on the fly.
     #
-    # Takes in: FILT_LONG (filtlong-filtered ONT reads) and DRAFT_CONTIGS (the
-    #           reoriented Flye assembly), both from the Stage-4 front end.
+    # Takes in: FILT_LONG (filtlong-filtered ONT reads, from nanopore/10_reads.smk)
+    #           and DRAFT_CONTIGS (the dnaapler-reoriented Flye assembly, from
+    #           nanopore/20_assembly.smk).
     # Produces: DECONTAM_BAM + .bai, both temp().
     # Consumed by: blob_json and map_evaluation (Qualimap, shared/20_qc.smk).
     #
     # (v1 message: "--- Minimap2: Map reads against contigs. ---";
-    #  v1 rule was also called map_contigs, its Qualimap rule map_qc -> D5 renames
+    #  v1 rule was also called map_contigs, its Qualimap rule map_qc → D5 renames
     #  that one to map_evaluation everywhere.)
     rule map_contigs:
         input:
@@ -247,19 +238,22 @@ elif HAS_LONG_READS:
 
 else:
 
-    # ── Rule: map_contigs (contigs mode) — a deliberate FAKE coverage track ──
-    # There are no reads in this mode: the user hands us finished assemblies. But
-    # `blobtools create -b` still wants a BAM, so we map the contigs against
+    # ── map_contigs (contigs mode) — a deliberate FAKE coverage track ──
+    # There are no reads in this mode: the user hands over finished assemblies.
+    # `blobtools create -b` still wants a BAM, so the contigs are mapped against
     # THEMSELVES. The resulting depth is near-uniform and carries no information.
     #
-    # This is preserved from v1 on purpose, and the consequence must be understood
-    # before anyone tries to "use" this BAM: coverage-based separation in
-    # BlobTools is MEANINGLESS in contigs mode. Only the taxonomy leg (blastn ->
-    # BlobTools -> selector) is doing real work here. That is also why this mode
-    # has no Qualimap rule — a mapping-quality report on a self-alignment would be
-    # a chart of nothing.
+    # Preserved from v1 on purpose, and the consequence has to be understood before
+    # anyone tries to "use" this BAM: coverage-based separation in BlobTools is
+    # MEANINGLESS in contigs mode. Only the taxonomy leg (blastn → BlobTools →
+    # selector) is doing real work. That is also why this mode has no Qualimap
+    # rule — map_evaluation in shared/20_qc.smk is gated on HAS_READS, and a
+    # mapping-quality report on a self-alignment would be a chart of nothing.
     #
-    # Takes in: DRAFT_CONTIGS (the header-fixed / length-filtered input contigs).
+    # Takes in: DRAFT_CONTIGS — the input contigs after rule filter_contigs in
+    #           contigs/20_assembly.smk: short and low-coverage records are dropped
+    #           only if the headers are SPAdes-style (length and coverage are read
+    #           out of them); any other style just gets its headers trimmed.
     # Produces: DECONTAM_BAM + .bai, both temp().
     # Consumed by: blob_json only.
     #
@@ -297,23 +291,27 @@ else:
             """
 
 
-# ── Rule: blast_contigs — taxonomic identity of every draft contig (megablast) ─
-# Biology: megablast each contig against the NCBI nucleotide database and keep the
-# top hits WITH their taxids and subject titles. This is the taxonomy leg that
-# BlobTools turns into a per-contig genus call. megablast (not blastn) because we
-# expect near-identical matches to known genomes, and it is far faster.
+# ─────────────── Taxonomy screen (megablast vs nt) ─────────────
+# blast_contigs — megablast every draft contig against the NCBI nucleotide
+# database, keeping the top hits WITH their taxids and subject titles. This is the
+# taxonomy leg BlobTools turns into a per-contig genus call. megablast rather than
+# plain blastn because near-identical matches to known genomes are what an isolate
+# assembly is expected to produce, and it is far faster.
 #
 # Takes in: DRAFT_CONTIGS — the mode's draft assembly, i.e. the same contigs the
 #           selector will filter. The screen is structurally pinned to the draft:
 #           BlobTools must see every contig it is being asked to judge, including
-#           the ones we are about to throw away.
-# Does:     one blastn -task megablast per sample against {blast_db}/{nt_version}.
+#           the ones about to be thrown away.
+# Does:     one blastn -task megablast per sample against {blast_db}/{nt_version}
+#           (nt_version comes from parameters.nt_version, defaulting to core_nt).
 # Produces: BLASTOUT — 15 tab-separated columns, subject title (stitle) LAST.
-# Consumed by: blob_json (all modes) and, in every mode EXCEPT hybrid, the
-#              supplementary "does the nt hit say plasmid?" check in
-#              shared/60_plasmid.smk (which greps that last column).
+# Consumed by: blob_json in every mode, and — in ILLUMINA AND CONTIGS MODE ONLY —
+#              the supplementary "does the nt hit say plasmid?" check in
+#              shared/60_plasmid.smk, which greps that last column. The two
+#              long-read modes grep blast_final_contigs' output instead; see
+#              NEEDS_FINAL_BLAST in 00_common.smk for why.
 #
-# DO NOT CHANGE THE -outfmt STRING. All four v1 modes agree on it, and the plasmid
+# Do NOT change the -outfmt string. All four v1 modes agree on it, and the plasmid
 # check greps the subject title for the word "plasmid". Drop or move stitle and
 # that grep silently matches nothing: every Platon call comes back "not verified
 # by BLAST search", with no error and no warning.
@@ -351,26 +349,36 @@ rule blast_contigs:
         """
 
 
-# ── Hybrid only: the same BLAST screen re-run on the DELIVERED genome ─────────
-# In hybrid mode the decontamination screen above runs on the ILLUMINA draft,
-# because that is what is being decontaminated, but Platon runs on the ONT genome.
+# ────────── Second nt screen of the delivered genome ───────────
+# Defined only when NEEDS_FINAL_BLAST is true, which 00_common.smk sets to
+# HAS_LONG_READS — so nanopore and hybrid get this rule and illumina and contigs
+# never see it (there PLASMID_BLASTOUT simply IS BLASTOUT and no second rule
+# enters the DAG).
+#
+# Both long-read modes need it for the same reason: plasmid_search looks each
+# Platon-called contig up in a BLAST table BY CONTIG ID, so the table has to have
+# been computed over the contigs Platon actually reported on. In hybrid the screen
+# above runs on the ILLUMINA draft while Platon runs on the delivered ONT genome —
 # SPAdes names its contigs NODE_1_length_… and Flye names them contig_1, so
-# plasmid_search's `grep -m 1 "$contig" <blastout>` would never match a single
-# contig ID and every plasmid would be reported as "not verified by BLAST search".
+# plasmid_search's `grep -m 1 "$contig" <blastout>` would never match a single ID
+# and every plasmid would be reported as "not verified by BLAST search". In
+# nanopore the screen runs on the pre-Medaka assembly while Platon runs on the
+# post-Medaka consensus, and nothing guarantees Medaka preserves contig headers.
+#
 # v1 BacFluxL+ solved this by running its own blastn inside plasmid_search; v2
 # keeps the second BLAST but defines it here, next to the identical command it
 # duplicates, and routes it through the PLASMID_BLASTOUT constant.
 #
-# Cost note: the long-read modes therefore BLAST against nt twice per sample
-# (draft + final). For hybrid that is exactly what v1 did — not a new cost. For
-# nanopore it is one extra blastn, buying immunity from an unverified assumption
-# that Medaka preserves contig headers (see NEEDS_FINAL_BLAST in 00_common).
+# Cost: the long-read modes therefore BLAST against nt twice per sample (draft +
+# final). For hybrid that is exactly what v1 did — not a new cost. For nanopore it
+# is one extra blastn, buying immunity from an unverified assumption about Medaka.
 if NEEDS_FINAL_BLAST:
 
-    # ── Rule: blast_final_contigs — nt screen of the DELIVERED genome ────────
-    # Takes in: FINAL_CONTIGS — the genome the Stage-4 long-read front end
-    #           actually delivers (hybrid: ONT+Polypolish; nanopore: the Medaka
-    #           consensus) — NOT the draft that blast_contigs screened.
+    # ── blast_final_contigs — nt screen of the DELIVERED genome ──
+    # Takes in: FINAL_CONTIGS — the genome the long-read front end actually
+    #           delivers (nanopore: the Medaka consensus, via finalize_contigs in
+    #           nanopore/30_polish.smk; hybrid: the ONT+Polypolish genome) — NOT
+    #           the draft that blast_contigs screened.
     # Produces: PLASMID_BLASTOUT, same 15-column outfmt as blast_contigs.
     # Consumed by: plasmid_search in shared/60_plasmid.smk, and nothing else —
     #              BlobTools always uses the draft table.
@@ -404,10 +412,10 @@ if NEEDS_FINAL_BLAST:
             """
 
 
-# ── Rule: blob_json — join coverage + taxonomy into one BlobTools database ────
-# Biology: BlobTools takes the assembly, the read-depth track and the BLAST hits
-# and builds the "blobplot" database — per contig: length, GC, coverage, and a
-# taxonomic assignment resolved through the NCBI taxonomy dump.
+# ────────────── Blob database and per-contig table ─────────────
+# blob_json — BlobTools takes the assembly, the read-depth track and the BLAST
+# hits and builds the "blobplot" database: per contig, its length, GC, coverage
+# and a taxonomic assignment resolved through the NCBI taxonomy dump.
 #
 # Takes in:
 #   contigs     = DRAFT_CONTIGS   (the same contigs both other legs used)
@@ -459,8 +467,7 @@ rule blob_json:
         """
 
 
-# ── Rule: blob_table — collapse the hits into one call per contig ─────────────
-# Biology: a contig usually has many BLAST hits pointing at several taxa. The
+# blob_table — a contig usually has many BLAST hits pointing at several taxa. The
 # "bestsum" tax rule sums bitscores per taxon and keeps the winner, at every rank.
 # The result is the flat table the selector reads: one row per contig with its
 # length, coverage, GC and its assigned taxonomy from superkingdom down to species.
@@ -471,8 +478,8 @@ rule blob_json:
 #           keep/discard decision and is worth being able to re-read).
 # Consumed by: select_contigs.
 #
-# This rule is completely mode-independent: same input shape, same command, same
-# output, in all four modes.
+# Completely mode-independent: same input shape, same command, same output, in all
+# four modes.
 #
 # (v1 message: "--- BlobTools: Collapse taxonomic assignment of BLAST hits
 #  according to sum of best scores. ---")
@@ -501,46 +508,78 @@ rule blob_table:
         """
 
 
-# ── Rule: select_contigs — apply the decontamination policy, and record why ───
-# Biology: this is where contigs are actually kept or dropped. The helper script
+# ──────────────── Contig selection and audit trail ─────────────
+# select_contigs — where contigs are actually kept or dropped. The helper script
 # reads the BlobTools table, resolves each contig to a genus, and applies the
-# policy the user configured:
-#   auto     — infer the isolate's genus from the assembly itself and keep it
+# policy the user configured in parameters.decontamination.mode:
+#   auto     — keep the genus carried by the most CONTIGS. A count, not base
+#              pairs: many short contigs can outvote the genus that holds the
+#              genome, and choose_auto_genus() records a case where that sent a
+#              4.5 Mb chromosome out as contamination.
 #   include  — keep only the listed genera
 #   exclude  — drop only the listed genera
 #   off      — keep everything (still writes the audit files)
 # plus discard_no_hit, which decides what happens to contigs nt could not place.
 #
+# Genus matching is deliberately fuzzy, and it is worth knowing before reading an
+# audit file: the selector treats a curated set of split genera as one target
+# (Paenibacillus/Peribacillus/Priestia → Bacillus, Pseudarthrobacter/
+# Paenarthrobacter → Arthrobacter, Paraburkholderia → Burkholderia) and also
+# strips the prefixes brady/meso/neo/sino/aeri/caldi/geo. BLAST and BlobTools
+# routinely scatter one organism across those related names, and without the
+# aliases a genuine isolate contig gets dropped as a contaminant. It is a
+# safeguard against false removal, not taxonomic reconciliation — see
+# GENUS_EQUIVALENCE_ALIASES and GENUS_EQUIVALENCE_PREFIXES in
+# scripts/10_decontam/select_contigs_by_taxonomy.py.
+#
+# In HYBRID mode this rule can cost more than a taxonomy row. Only the Illumina
+# reads mapping to the SELECTED contigs become SEL_R1/SEL_R2, and filtlong scores
+# ONT reads against those, so a contig dropped here can take its ONT reads with it
+# and vanish from the assembly entirely. Plasmids are the usual casualty, because
+# their best nt hit is often a different genus from the host. The full worked case
+# and the fixes are in the decontamination block of config/config.yaml.
+#
 # Takes in:
 #   bestscore = BLOB_TABLE    (the per-contig taxonomy + coverage table)
 #   contigs   = DRAFT_CONTIGS (the sequences themselves)
-# Produces (all four are the same in every mode except the last path):
-#   abund     = COMPOSITION       "Genus: 0.87" lines -> read by Bakta (40) to
-#                                 pick --genus
+# Produces (all four paths are the same in every mode except the last):
+#   abund     = COMPOSITION       one line per genus, with its share of the DNA
+#                                 and its share of the contig count —
+#                                 "Bacillus: bases 0.29  contigs 0.30" — over
+#                                 EVERY contig in the BlobTools table, kept or
+#                                 dropped → read by rule annotation in
+#                                 shared/40_annotation.smk as Bakta's --genus
+#                                 hint. Read that rule's shell preface before
+#                                 trusting the hint: the two labelled figures
+#                                 broke its numeric sort.
 #   list      = CONTIG_LIST       the kept contig IDs, one per line
 #   decisions = CONTIG_DECISIONS  the audit TSV: every contig, its genus, and the
 #                                 REASON it was kept or dropped. Required by the
 #                                 project convention that every filtering decision
 #                                 is auditable (CLAUDE.md).
-#   contigs   = DECONTAM_CONTIGS  the kept sequences (see the per-mode table in
-#                                 this file's banner for who consumes them next)
+#   contigs   = DECONTAM_CONTIGS  the kept sequences — the per-mode table in this
+#                                 file's header says who consumes them next
 #
 # conda: NONE — inherited from all four v1 modes. The selector is stdlib-only
 # Python and runs in the environment Snakemake was launched from. Adding an env
 # would be new behaviour; it is the same deferred decision as cazyme_db_download
 # (see docs/README_notes.md item 3).
 #
-# All 14 selector flags are passed verbatim from the DECONTAMINATION dict resolved
-# once in 00_common, with {...:q} quoting so a genus list containing spaces or a
-# path with odd characters survives the shell intact.
+# The seven policy values — mode, discard_no_hit and the five genus/override
+# fields — come verbatim from the DECONTAMINATION dict that _decontam_settings()
+# resolves once in 00_common.smk. Two of them are the per-sample escape hatch:
+# include_genera_by_sample and sample_overrides are FILE PATHS keyed by sample
+# name, which is how one awkward isolate deviates without changing the batch
+# policy. All 14 flags are passed with {...:q} quoting, so a genus list containing
+# spaces or a path with odd characters survives the shell intact.
 #
-# v1->v2 (additive): v1 had no log:, so the selector's warnings — notably
+# v1→v2 (additive): v1 had no log:, so the selector's warnings — notably
 # "WARNING: N contigs from the BlobTools table were not found in the FASTA" and
 # the per-sample kept/dropped counts — went to the console and were lost on a
 # large batch. They now go to the log file instead. Trade-off worth knowing: you
 # have to open the log to see them.
 #
-# v1->v2 (removed): FastaFlux used to re-linearise the FASTA into
+# v1→v2 (removed): FastaFlux used to re-linearise the FASTA into
 # contigs_filt_lin.fasta before calling the selector. That was redundant — the
 # selector's read_fasta() accumulates sequence chunks and joins them, so it
 # already handles wrapped FASTA, and it always writes 80-column-wrapped output

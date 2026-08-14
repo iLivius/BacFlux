@@ -5,8 +5,11 @@
 #   nanopore → Oxford Nanopore long reads        (rules/nanopore/*.smk)
 #   hybrid   → Illumina + ONT, ONT-first         (rules/hybrid/*.smk)
 #   contigs  → pre-assembled genomes             (rules/contigs/*.smk)
-# Shared downstream analysis (taxonomy → annotation → AMR → plasmids → phages →
-# report) is identical for every mode and lives in rules/shared/*.smk.
+# Everything downstream of assembly is shared — one copy of each rule in
+# rules/shared/*.smk, used by all four modes: decontamination → assembly QC →
+# taxonomy → annotation → AMR → plasmids → phages → (mobilome) → report.
+# Parentheses mark the one optional stage — the mobilome module runs only when
+# config.mobilome.run is true (see rules/shared/80_mobilome.smk).
 #
 # Run from the repository root:
 #   snakemake --sdm conda --cores N --configfile config/config.yaml
@@ -32,32 +35,41 @@ Livio Antonielli, 2026
 
 # NO default `configfile:` here — this is deliberate.
 #
-# Snakemake MERGES a hard-coded `configfile:` with any --configfile given on the
-# command line (it does not replace it). With a default pointing at the v1
-# config/config.yaml, a v2 run that omitted a key would silently inherit the v1
-# value — a stale database path or download link — instead of failing. That
-# defeats the guarantee 00_common documents: a missing key must stop the run, not
-# default to something wrong. So the config is REQUIRED on the command line:
+# Snakemake MERGES a hard-coded `configfile:` with whatever --configfile is given
+# on the command line; it does not replace it. A default pointing at the shipped
+# config/config.yaml would therefore quietly fill in every key the user's own copy
+# happens to omit — with the example file's own empty-string placeholders
+# (`bakta_db: ""` and friends) or its default download links — and the run would
+# carry on against a path that does not exist instead of stopping. That defeats
+# the guarantee 00_common.smk documents: a missing key must stop the run, not
+# default to something wrong. So the config is REQUIRED on the command line, and
+# 00_common.smk exits with a clear message when none is supplied:
 #
-#   snakemake --sdm conda --cores N --configfile config/config_v2.yaml
+#   snakemake --sdm conda --cores N --configfile config/config.yaml
 #
 # `--cores N` is the ONE knob for CPU. Every cpu-bound rule declares Snakemake's
 # built-in `threads:`, so --cores enforces the ceiling on its own. Do NOT also
 # pass `--jobs`/`-j`: for a local run it is an alias for --cores, and combining
 # the two can silently let rules oversubscribe the machine.
-#
-# 00_common.smk exits with a clear message if no config was supplied.
 
-# 1) Foundation. 00_common.smk validates config["mode"], sets the working
-#    directory, discovers samples, and defines every shared helper/constant —
-#    including MODE and all_targets(), both used just below. It MUST be first:
-#    the two include loops and rule all all depend on names it creates.
+# 1) Foundation. 00_common.smk validates config["mode"], resolves the output root
+#    and the database paths, discovers the samples for the ACTIVE mode only, and
+#    defines every shared constant and helper — including MODE and all_targets(),
+#    both used just below. It MUST come first: the two include loops and rule all
+#    can only resolve names it has already created.
+#    It deliberately does NOT set a working directory. v1 used Snakemake's
+#    `workdir:`; v2 builds every path off an absolute OUT instead, so the process
+#    never leaves the launch directory and a relative input path means what a user
+#    expects it to mean (reasoning in 00_common.smk section 2).
 include: "rules/shared/00_common.smk"
 
 # 2) The active mode's front-end rule modules (read QC, assembly, polishing).
 #    A sorted glob preserves numeric order (10_, 20_, …). During early migration
 #    the rules/<mode>/ directory may not exist yet — glob.glob then returns an
 #    empty list, nothing is included, and the workflow still parses.
+#    The other half of that safety is in 00_common.smk: _rule_modules_present()
+#    globs this same directory, and all_targets() returns nothing while it is
+#    empty (see rule all at the bottom).
 for _smk in sorted(glob.glob(os.path.join(workflow.basedir, "rules", MODE, "*.smk"))):
     include: _smk
 
@@ -65,12 +77,19 @@ for _smk in sorted(glob.glob(os.path.join(workflow.basedir, "rules", MODE, "*.sm
 #    Globbed (not hard-coded) so the skeleton parses before these files exist.
 #    00_common is already included above; 90_report is included last (step 4) so
 #    it sees every upstream rule's outputs — both are skipped here.
+#    Two files in rules/shared/ are long-read-only despite living here:
+#    12_medaka_check and 15_replicons. They sit in shared/ because nanopore and
+#    hybrid would otherwise hold byte-identical copies of them, and each wraps its
+#    rules in a HAS_LONG_READS gate, so including them unconditionally defines
+#    nothing at all in illumina and contigs mode.
 for _smk in sorted(glob.glob(os.path.join(workflow.basedir, "rules", "shared", "*.smk"))):
     if os.path.basename(_smk) in ("00_common.smk", "90_report.smk"):
         continue
     include: _smk
 
-# 4) Report module last, once it exists.
+# 4) Report module last. 90_report.smk gathers every QC artefact the run produced
+#    into one MultiQC page, so it is included after everything that produces one.
+#    The exists() guard is the same skeleton safety as the globs above.
 _report_smk = os.path.join(workflow.basedir, "rules", "shared", "90_report.smk")
 if os.path.exists(_report_smk):
     include: _report_smk

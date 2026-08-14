@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # BacFlux v2.0.0 — Stage 90 report module (rules/shared/90_report.smk)
 #
 # One rule: gather every QC artefact the run produced into a single MultiQC HTML
@@ -6,7 +5,10 @@
 # Snakefile (step 4 of the include order) so it sees every upstream rule.
 #
 # What gets aggregated depends on what the mode actually produced, so the input
-# set is assembled from the CAPABILITY FLAGS (D7) rather than the mode name:
+# set is assembled from the capability flags (HAS_SHORT_READS / HAS_LONG_READS /
+# HAS_READS, defined in 00_common.smk) rather than from the mode name. That is
+# decision D7 of the unification — gate on what a mode produces, not on what it is
+# called — see docs/unification_migration_plan.md:
 #
 #   input                        illumina  nanopore  hybrid  contigs
 #   ───────────────────────────  ────────  ────────  ──────  ───────
@@ -19,8 +21,8 @@
 #   Bakta (annotation)               y         y        y        y
 #                                                    (2) = two genomes per sample
 #
-# TWO THINGS IN HERE ARE EASY TO BREAK; both are explained in full at the point of
-# use, because getting either wrong fails silently rather than loudly:
+# Two things in here are easy to break, and both fail SILENTLY rather than loudly,
+# so each is explained in full at its point of use:
 #   1. the `cd $OUT` + relative-path trick that makes MultiQC's -d prefixes short
 #      and machine-independent (see the params block);
 #   2. the single-vs-double brace rule for awk (see the staging block).
@@ -28,15 +30,21 @@
 # Everything referenced here is defined once in 00_common.smk and never
 # re-derived: OUT, DIR_REPORT, DIR_ANNOTATION, LOGS, SAMPLES, CHECKM_STATS,
 # GTDBTK_DIR, QUAST_DIR, QUALIMAP_DIR, FASTP_JSON, NANOPLOT_RAW_DIR,
-# NANOPLOT_FILT_DIR, CHECKM_RELABEL_AWK, GTDBTK_RELABEL_AWK, IS_HYBRID and the
-# capability flags.
+# NANOPLOT_FILT_DIR, CHECKM_RELABEL_AWK, GTDBTK_RELABEL_AWK, QC_GENOMES,
+# IS_HYBRID and the capability flags.
+#
+# "the D1 layout", which the rename map refers to, is v2's unified stage
+# numbering: all technology-specific work is grouped under 01.reads and
+# 02.assembly, so every shared stage lands on the same number in every mode
+# (03.taxonomy, 04.annotation, …). That is why v1's rename regexes needed only
+# their path components changed, not their form — see
+# docs/unification_migration_plan.md.
 #
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
-# "../../envs/multiqc.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/.
-# ─────────────────────────────────────────────────────────────────────────────
+# "../../envs/multiqc.yaml" climbs shared/ → rules/ → workflow/ → workflow/envs/multiqc.yaml.
 
 
-# ── Which QC artefacts exist in THIS mode ────────────────────────────────────
+# ── Which QC artefacts exist in THIS mode ──
 def multiqc_qc_inputs():
     """Every QC artefact MultiQC aggregates, for the ACTIVE mode only.
 
@@ -60,10 +68,15 @@ def multiqc_qc_inputs():
     return paths
 
 
+# Built once at parse time (while Snakemake reads the workflow, before any job
+# runs): the rule needs this SAME list in two shapes — absolute paths in input:,
+# where Snakemake needs real ones to build the DAG, and their output-root-relative
+# twins in params.qc_rel, which is what MultiQC is handed after the cd. Both are
+# derived from this one list, so they cannot disagree.
 MULTIQC_QC_INPUTS = multiqc_qc_inputs()
 
 
-# ── The sample-name rewrite map ──────────────────────────────────────────────
+# ── The sample-name rewrite map ──
 def multiqc_replace_block():
     """The body of MultiQC's `sample_names_replace:` mapping, as YAML text.
 
@@ -137,17 +150,24 @@ def multiqc_replace_block():
 MULTIQC_REPLACE_BLOCK = multiqc_replace_block()
 
 
-# ── NanoPlot's duplicate-stats guard (long-read modes only) ──────────────────
-# NanoPlot writes both NanoStats.txt and NanoStats_post_filtering.txt when it is
-# given a filtering threshold. MultiQC would read both and report the same sample
-# twice, so v1 told it to ignore the second — but only when such a file actually
-# exists, since --ignore on a non-existent pattern is harmless but the guard makes
-# the intent explicit. Preserved verbatim, including v1's habit of leaving
-# $IGNORE_ARG unquoted so it word-splits into two arguments.
+# ── NanoPlot's duplicate-stats guard (long-read modes only) ──
+# Given a filtering threshold, NanoPlot writes NanoStats.txt AND
+# NanoStats_post_filtering.txt into the same directory. MultiQC reads both and
+# reports the sample twice, so v1 told it to ignore the second, and v2 keeps that.
+# The find is only a readability guard: --ignore on a pattern that matches nothing
+# is harmless, so this exists to make the intent visible, not to prevent an error.
 #
-# Baked into a parse-time STRING because a Snakemake shell: block is static: in
-# illumina or contigs mode there are no NanoPlot directories to name, so the guard
-# must not exist in the shell text at all.
+# Preserved verbatim from v1, INCLUDING the unquoted $IGNORE_ARG at the use site.
+# That is load-bearing, not an oversight: unquoted, the value word-splits into the
+# two arguments MultiQC expects (--ignore, then the pattern), and an empty
+# IGNORE_ARG vanishes from the command line altogether. Quoted, it would arrive as
+# a single argument — and as a single EMPTY one in every mode where the guard
+# never fires.
+#
+# The whole guard is baked into a parse-time STRING because a Snakemake shell:
+# block is static text. In illumina or contigs mode there are no NanoPlot
+# directories to name, so the guard must not be in that text at all — hence the
+# else branch, which substitutes a shell comment and nothing else.
 if HAS_LONG_READS:
     _nanoplot_dirs = " ".join(
         expand(NANOPLOT_RAW_DIR, sample=SAMPLES) + expand(NANOPLOT_FILT_DIR, sample=SAMPLES)
@@ -162,7 +182,7 @@ else:
     MULTIQC_IGNORE_GUARD = "# (this mode has no long reads: nothing for MultiQC to ignore)"
 
 
-# ── Rule: multiqc — one HTML report for the whole run ────────────────────────
+# ── multiqc — one HTML report for the whole run ──
 # Takes in:
 #   checkm_stats / gtdbtk_dir — NAMED, because the shell loops over them to
 #       rewrite bin ids before MultiQC sees them. Present in ALL four modes, so
@@ -179,11 +199,14 @@ else:
 #                  _downstream_targets() requests
 #   multiqc_yaml = the generated config, kept so the rename rules are inspectable
 #   staging      = a temp() directory holding the relabelled CheckM/GTDB-Tk copies
-# Consumed by: the user.
+# Consumed by: the user. Runs in every mode — nothing switches this rule off.
 #
-# v1->v2: v1 also declared `multiqc_dir = directory("09.report")` as an output.
-# Dropped — making the whole report directory a directory() output means it cannot
-# also contain the staging directory as a separate declared output.
+# The report directory itself is deliberately NOT a declared output. v1 declared
+# `multiqc_dir = directory("09.report")`, which cannot work here: a directory()
+# output may not also contain the staging directory as a separate declared output,
+# and Snakemake wipes a directory() output before re-running its rule, taking
+# anything else the user kept in 09.report with it. See the --force paragraph in
+# the shell body — it is the other half of the same decision.
 rule multiqc:
     input:
         checkm_stats = expand(CHECKM_STATS, sample=SAMPLES),
@@ -194,7 +217,7 @@ rule multiqc:
         multiqc_yaml = DIR_REPORT + "/multiqc_config.yaml",
         staging = temp(directory(DIR_REPORT + "/multiqc_inputs")),
     params:
-        # ── Why the relative twins below exist ───────────────────────────────
+        # ── Why the relative twins below exist ──
         # v1 got short, stable MultiQC sample names for free: `workdir:` made the
         # process CWD equal to output_dir, so every path handed to MultiQC was
         # relative and -d produced prefixes like "02.assembly | S1 | eval | quast".
@@ -208,11 +231,17 @@ rule multiqc:
         # output-root-relative twins computed here. The prefixes are then exactly
         # the ones the regexes above are written for, on any machine.
         #
-        # Rejected alternatives: --dirs-depth N (one N cannot normalise tools that
-        # sit at different depths — fastp is 3 levels down, QUAST 4); staging every
-        # input into one flat directory (would copy whole Qualimap/QUAST/Bakta trees).
+        # Rejected alternatives: --dirs-depth N (one N cannot normalise tools
+        # sitting at different depths — fastp is 3 levels down, QUAST 4); staging
+        # every input into one flat directory (would copy whole Qualimap, QUAST
+        # and Bakta trees).
         out_root = OUT,
         report_dir = DIR_REPORT,
+        # qc_rel is a single space-joined STRING, not a list, so it lands in the
+        # shell command as separate words. That is safe here because none of
+        # these paths can contain a space: the stage and sub-directory names are
+        # fixed literals, and 00_common.smk's BAD_CHARS check rejects any sample
+        # name with a space in it before the run starts.
         qc_rel = " ".join(os.path.relpath(path, OUT) for path in MULTIQC_QC_INPUTS),
         staging_rel = os.path.relpath(DIR_REPORT + "/multiqc_inputs", OUT),
         # Parse-time text blocks (see the helpers at the top of this file).
@@ -242,6 +271,11 @@ rule multiqc:
         # 1. Write the MultiQC config. printf lays down the two display options,
         #    then a QUOTED heredoc ('EOF' — no shell expansion) appends the rename
         #    rules exactly as written.
+        #    The heredoc body and its EOF terminator sit at column 0 on purpose and
+        #    must stay there: those lines ARE the file content, and MultiQC needs
+        #    sample_names_replace and friends as top-level YAML keys. There is no
+        #    <<- to strip leading whitespace, so indenting them to match the block
+        #    around them writes an invalid config.
         mkdir -p "{params.report_dir}"
 
         printf "%s\n" "show_analysis_paths: False" "show_analysis_time: False" > "{output.multiqc_yaml}"
@@ -261,6 +295,9 @@ EOF
         #    "completeness ONT | S1" for a hybrid sample's two genomes). The awk
         #    body comes from QC_GENOMES, the same list that named the staged FASTAs
         #    in the first place.
+        #    The staging tree is rebuilt from scratch each time: MultiQC is pointed
+        #    at the whole directory further down, so a per-sample table left behind
+        #    by an interrupted run would otherwise be aggregated into this report.
         REPORT_INPUT_DIR="{output.staging}"
         rm -rf "$REPORT_INPUT_DIR"
         mkdir -p "$REPORT_INPUT_DIR/checkm" "$REPORT_INPUT_DIR/gtdbtk"
@@ -302,6 +339,10 @@ EOF
         done
 
         # 3. Run MultiQC from the output root, on relative paths (see params).
+        #    Only the INPUT paths below are relative — that is the entire point of
+        #    the cd. The config, the outdir and the log redirect stay absolute
+        #    (00_common.smk builds all three off OUT), so they still resolve after
+        #    the working directory moves.
         cd "{params.out_root}"
 
         IGNORE_ARG=""
@@ -311,14 +352,16 @@ EOF
         # refuses to overwrite an existing multiqc_report.html and silently writes
         # multiqc_report_1.html instead ("Existing reports found, adding suffix to
         # filenames"). The rule then fails on a missing declared output even though
-        # MultiQC exited 0 - so the workflow works on a clean directory and breaks
-        # the moment you re-run it, which is the normal case when adding a sample.
+        # MultiQC exited 0 — so the workflow works on a clean directory and breaks
+        # on the first re-run, which is the normal case when a sample is added.
+        # It stayed invisible through the whole v2 validation for exactly that
+        # reason: every earlier run went into an empty output directory.
         #
-        # v1 avoided this only by declaring the whole 09.report/ as a directory()
-        # output, so Snakemake wiped it before every re-run. That is the same
-        # nested-directory data-loss hazard fixed elsewhere in v2 (it also deleted
-        # anything else the user had put in 09.report), so v2 declares the real
-        # files instead and lets --force do the overwriting.
+        # v1 never hit this only because it declared the whole 09.report/ as a
+        # directory() output, which Snakemake wipes before each re-run — the same
+        # data-loss hazard fixed elsewhere in v2 (it also deleted anything else the
+        # user kept in 09.report). v2 declares the real files instead and lets
+        # --force do the overwriting.
         multiqc \
           $IGNORE_ARG \
           --config "{output.multiqc_yaml}" \

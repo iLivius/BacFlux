@@ -1,75 +1,89 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# BacFlux v2.0.0 — Stage 07 phage module (rules/shared/70_phage.smk)  [D8]
+# BacFlux v2.0.0 — virus and prophage detection on the finished genome (stage
+# 07.phages), followed by CheckV quality grading. Like the rest of the shared tail
+# this module reads only FINAL_CONTIGS (the D2 hand-off), so it behaves identically
+# in all four modes.
 #
-# This module finds viruses / prophages in every finished genome and grades their
-# quality. Like the rest of the shared tail it consumes only FINAL_CONTIGS (D2),
-# so it is identical in all four modes.
+# Two callers are wired in and exactly one of them is defined per run, chosen by
+# config phage.caller (resolved into PHAGE_CALLER in 00_common.smk; the choice
+# itself is decision D8 in docs/unification_migration_plan.md):
+#   virsorter2 (DEFAULT) — permissively licensed (GPLv2, commercial use OK), so it
+#                          is what an out-of-the-box run gets. Its conda env is the
+#                          fragile part — the whole story is at the VirSorter2
+#                          caller section of this file.
+#   genomad    (OPT-IN)  — actively maintained, and calls viruses AND plasmids in a
+#                          single run, but Berkeley Lab licenses it for academic /
+#                          non-commercial use only. BacFlux is MIT and must not
+#                          push that restriction onto its users, so geNomad is
+#                          never the default — see README Licensing. Opting in also
+#                          switches on the plasmid concordance in
+#                          shared/60_plasmid.smk (decision D9).
+#   CheckV     (ALWAYS)  — neither caller reports completeness or contamination, so
+#                          CheckV 1.0.3 grades whatever the caller produced.
 #
-# Two callers, one QC step:
-#   - VirSorter2 (DEFAULT) — permissively licensed (GPLv2, commercial use OK), so
-#     it is the out-of-the-box caller. Its conda env is fragile (see the fix note
-#     at its rules), so its two rules are defined behind an
-#     `if PHAGE_CALLER == "virsorter2":` guard.
-#   - geNomad (OPT-IN) — actively maintained and does viruses AND plasmids in one
-#     end-to-end run, BUT is licensed ACADEMIC / NON-COMMERCIAL-USE-ONLY (Berkeley
-#     Lab). BacFlux is MIT and must not force a non-commercial restriction on
-#     users, so geNomad is opt-in (config.phage.caller: genomad), NEVER the
-#     default: its rules are defined behind an `if PHAGE_CALLER == "genomad":`
-#     guard, so on a default run geNomad never builds its env or runs. When opted
-#     in, that same run also feeds the plasmid module's D9 concordance
-#     (60_plasmid.smk) — see PHAGE_CALLER in 00_common.smk.
-#   - CheckV (ALWAYS) — neither caller reports completeness/contamination, so
-#     CheckV runs unconditionally on whichever caller's virus FASTA was produced.
+# The callers sit behind mutually exclusive `if PHAGE_CALLER == ...` guards, so only
+# one set of rules is ever defined and there is never a question about who produced
+# the virus FASTA.
 #
-# Exactly ONE caller's rules are defined per run (the guards are mutually
-# exclusive), so there is never an ambiguity over who produces the virus FASTA.
+#   contigs_final.fasta
+#     ├─(genomad)─► genomad_end_to_end ─► 07.phages/genomad/{sample}/
+#     │                …_summary/contigs_final_virus.fna ─────────────┐
+#     │                …_summary/…_plasmid_summary.tsv → 60_plasmid.smk
+#     │                                                               │
+#     └─(virsorter2, default)─► viral_identification_virsorter2 ──────┤
+#                07.phages/virsorter/{sample}/final-viral-combined.fa │
+#                                                                     ▼
+#          viral_quality (CheckV) ─► 07.phages/checkv/{sample}/quality_summary.tsv
 #
-# Data flow (top to bottom):
+# genomad_db                      : download geNomad's marker database once, from
+#                                   the configured mirror or geNomad's own
+#                                   downloader.
+# genomad_db_local                : symlink view of a geNomad database you already
+#                                   hold.
+# genomad_end_to_end              : virus + plasmid calling in one run, per sample.
+# virsorter2_db                   : download VirSorter2's reference database once.
+# virsorter2_db_local             : symlink view of a VirSorter2 database you
+#                                   already hold.
+# viral_identification_virsorter2 : VirSorter2 virus calling, per sample.
+# checkv_db_local                 : local view of a CheckV database you already
+#                                   hold, with the DIAMOND index rebuilt here.
+# checkv_db                       : download, checksum and index CheckV's database.
+# viral_quality                   : CheckV completeness/contamination on whichever
+#                                   caller ran.
 #
-#   contigs_final.fasta ─(caller==genomad)─► genomad_end_to_end ─► 07.phages/genomad/{sample}/
-#          │                       │  (…_summary/contigs_final_virus.fna  → CheckV)
-#          │                       └  (…_summary/contigs_final_plasmid_summary.tsv
-#          │                          → consumed by 60_plasmid.smk, the D9 concordance)
-#          │
-#          └(caller==virsorter2, default)─► viral_identification_virsorter2 ─►
-#                                          07.phages/virsorter/{sample}/final-viral-combined.fa
-#                                                        │
-#          whichever caller ran ─────────────────────────┴─► viral_quality (CheckV)
-#                                          ─► 07.phages/checkv/{sample}/quality_summary.tsv
+# Every database therefore comes in a matched pair of rules — one that downloads
+# it, one that builds a view of a copy the user already holds — and exactly one of
+# each pair is defined, gated on the matching directories.* config key. v1 fused
+# all of this into a single `viral_db` rule, which meant the default path built
+# another tool's conda env just to get CheckV.
 #
-# Databases: separate one-off downloads (checkv_db always; genomad_db OR
-# virsorter2_db depending on the caller), each in its OWN conda env — replacing
-# v1's single fused `viral_db` rule, so the default path never builds geNomad's or
-# VirSorter2's env unnecessarily.
+# One cross-stage edge: when geNomad is opted in, shared/60_plasmid.smk (stage 06)
+# reads a file that physically lives under THIS stage's 07.phages/genomad/{sample}/
+# directory. Reading "backwards" from 06 into 07 is safe: the stage numbers group
+# tools for the reader (D1), and Snakemake orders work by the input/output DAG.
 #
-# CROSS-STAGE NOTE: when geNomad is opted in, 60_plasmid.smk (stage 06) reads a file
-# that physically lives under THIS stage's 07.phages/genomad/{sample}/ directory.
-# That backwards-numbered 06←07 edge is safe: stage numbers here are organisational
-# only (D1 groups by tool family); Snakemake orders work by the input/output DAG.
+# Defined once in 00_common.smk and never re-derived here: FINAL_CONTIGS,
+# DIR_PHAGES, PHAGE_CALLER, GENOMAD_DB_DIR, GENOMAD_DIR, GENOMAD_PREFIX,
+# GENOMAD_LINK, GENOMAD_MD5, VS2_DB_DIR, VS2_DIR, CHECKV_DB_DIR, CHECKV_LINK,
+# CHECKV_SHA_URL, CHECKV_DB_ID, LOGS, capped_cpus.
 #
-# Everything referenced here is defined once in 00_common.smk (never re-derived):
-# FINAL_CONTIGS, DIR_PHAGES, PHAGE_CALLER, GENOMAD_DB_DIR, GENOMAD_DIR,
-# GENOMAD_PREFIX, VS2_DB_DIR, VS2_DIR, CHECKV_DB_DIR, CHECKV_LINK, CHECKV_DB_ID,
-# LOGS, capped_cpus.
-#
-# conda: paths resolve relative to THIS file (workflow/rules/shared/), so
-# "../../envs/x.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/x.yaml.
+# conda: env paths resolve relative to THIS file (workflow/rules/shared/), so
+# "../../envs/x.yaml" climbs shared/ → rules/ → workflow/ → workflow/envs/x.yaml.
 #
 # Resource convention: cpu-bound rules declare Snakemake's built-in
 # `threads: capped_cpus(N)` and refer to `{threads}` in the shell. Using the
 # BUILT-IN keyword (rather than a custom `resources: cpus`) is what makes
-# `--cores N` actually enforce the limit, so a plain `snakemake --cores N` is
-# safe on its own and no extra `--resources` flag is needed.
-# ─────────────────────────────────────────────────────────────────────────────
+# `--cores N` actually enforce the limit, so a plain `snakemake --cores N` is safe
+# on its own and no extra `--resources` flag is needed.
 
 
-# ── Parse-time caller selection for CheckV ───────────────────────────────────
+# ─────────────────── CheckV input selection ────────────────────
 # CheckV takes the SAME command whichever caller ran; only the input virus FASTA
-# differs. Resolve that choice ONCE here (PHAGE_CALLER comes from 00_common), so
-# the CheckV rule below stays caller-agnostic. CHECKV_CALLER_DIR is the {sample}-
-# templated DIRECTORY output of the chosen caller; CHECKV_VIRAL_REL is the fixed
-# relative path of the virus FASTA inside it (NON-templated — no {sample} — so it
-# is safe to pass as a plain params string, which Snakemake does not expand).
+# differs. That choice is resolved ONCE here, at parse time (before any job runs),
+# so the CheckV rule itself stays caller-agnostic. CHECKV_CALLER_DIR is the
+# {sample}-templated DIRECTORY output of the chosen caller; CHECKV_VIRAL_REL is the
+# fixed relative path of the virus FASTA inside it — NON-templated, no {sample}, so
+# it is safe to hand to the rule as a plain params string, which Snakemake does not
+# expand.
 if PHAGE_CALLER == "genomad":
     CHECKV_CALLER_DIR = GENOMAD_DIR
     CHECKV_VIRAL_REL = GENOMAD_PREFIX + "_summary/" + GENOMAD_PREFIX + "_virus.fna"
@@ -78,61 +92,57 @@ else:  # virsorter2 (default)
     CHECKV_VIRAL_REL = "final-viral-combined.fa"
 
 
-# ── geNomad OPT-IN path (only defined when PHAGE_CALLER == "genomad") ─────────
-# Wrapping both geNomad rules in this guard means that on the default (VirSorter2)
-# path they are never defined — geNomad's env is never built and it never runs, so
-# a non-academic / commercial user is never forced to execute a non-commercial
-# tool. Opting in (config.phage.caller: genomad) is the user's own informed choice.
+# ─────────────────── geNomad caller (opt-in) ───────────────────
+# Wrapping the geNomad rules in this guard is the whole mechanism behind "opt-in":
+# on the default (VirSorter2) path they are never defined, geNomad's env is never
+# built and it never runs, so a commercial user is never made to execute a
+# non-commercial tool. Setting config phage.caller: genomad is that user's own
+# informed choice, and it also turns on the plasmid concordance in
+# shared/60_plasmid.smk.
 if PHAGE_CALLER == "genomad":
 
-    # ── Rule: genomad_db — one-off geNomad reference download ────────────────
-    # Biology: geNomad classifies sequences with marker-gene profiles bundled in a
-    # versioned database it must fetch once (~1.5 GB extracted). geNomad's own
-    # downloader pulls the Zenodo tarball and extracts it.
+    # ── geNomad database, downloaded here ──
+    # geNomad (v1.12.0, pinned in envs/genomad.yaml) classifies sequences against
+    # marker-gene profiles bundled in a versioned database it must fetch once
+    # (~1.5 GB extracted). Consumed by genomad_end_to_end, which every sample waits
+    # on.
     #
-    # Takes in: nothing (pure download).
-    # Does: `genomad download-database <parent>` — geNomad always creates the
-    #       subfolder "genomad_db" inside <parent>, so we point <parent> at
-    #       DIR_PHAGES and declare the output as DIR_PHAGES/genomad_db.
-    # Produces: 07.phages/genomad_db/ — the shared geNomad DB directory.
-    # Consumed by: genomad_end_to_end (every sample waits on this DB).
+    # Two ways to get it, chosen by whether links.genomad_link is set:
     #
-    # VERIFIED 2026-07-24: `genomad download-database DESTINATION` does create the
-    # "genomad_db" subfolder inside DESTINATION, so pointing it at DIR_PHAGES and
-    # declaring DIR_PHAGES/genomad_db is right.
-    #
-    # DEFINED ONLY when BacFlux is the one downloading — mutually exclusive with
-    # genomad_db_local below, same reasoning as checkv_db / virsorter2_db.
-    #
-    # Two ways to get the database, chosen by whether links.genomad_link is set:
-    #
-    #   links.genomad_link SET (the shipped default) - we fetch the archive
+    #   links.genomad_link SET (the shipped default) — we fetch the archive
     #     ourselves from the mirror. geNomad's authors publish the same database on
     #     Zenodo and link to it from their own README, so this is the same data,
     #     just from a host that is actually up. The archive expands to a top-level
-    #     "genomad_db/" directory, which is exactly GENOMAD_DB_DIR, so it is
+    #     genomad_db/ directory, which is exactly GENOMAD_DB_DIR, so it is
     #     extracted into DIR_PHAGES (verified against the real archive).
     #
-    #   links.genomad_link EMPTY - fall back to `genomad download-database`, whose
+    #   links.genomad_link EMPTY — fall back to `genomad download-database`, whose
     #     URL is hard-coded to portal.nersc.gov inside the package. That host is
     #     frequently unreachable and there is no --url option, so if this branch
     #     fails with "No route to host", set links.genomad_link (or
     #     directories.genomad_db) rather than retrying.
     #
+    # VERIFIED 2026-07-24: `genomad download-database DESTINATION` does create the
+    # genomad_db subfolder inside DESTINATION, so pointing it at DIR_PHAGES and
+    # declaring DIR_PHAGES/genomad_db as the output is right.
+    #
     # Integrity: Zenodo publishes an MD5 per file rather than the .sha256 sidecar
-    # the CheckV/dbCAN mirrors carry, so the expected hash comes from
+    # the CheckV and dbCAN mirrors carry, so the expected hash comes from
     # links.genomad_md5. A mismatch is fatal (same discipline as checkv_db and
-    # cazyme_db_download - a truncated archive must never reach `tar`). An empty
+    # cazyme_db_download — a truncated archive must never reach `tar`). An empty
     # hash downloads unverified and SAYS so in the log.
+    #
+    # Defined only when BacFlux is the one downloading — mutually exclusive with
+    # genomad_db_local, same reasoning as checkv_db / virsorter2_db.
     if not GENOMADDB:
 
         rule genomad_db:
             output:
                 genomad_db = directory(GENOMAD_DB_DIR),
             params:
-                # geNomad appends "genomad_db" to this parent path; see GENOMAD_DB_DIR.
-                # The Zenodo archive also expands to genomad_db/, so both branches
-                # land in the same place.
+                # geNomad appends "genomad_db" to this parent path; see
+                # GENOMAD_DB_DIR. The Zenodo archive also expands to genomad_db/,
+                # so both branches land in the same place.
                 parent = DIR_PHAGES,
                 link = GENOMAD_LINK,
                 md5 = GENOMAD_MD5,
@@ -183,19 +193,26 @@ if PHAGE_CALLER == "genomad":
                 fi
                 """
 
-    # ── Rule: genomad_db_local — use an already-downloaded geNomad database ───
-    # Defined ONLY when directories.genomad_db is set. Symlinks the database files
+
+    # ── geNomad database, a copy you already hold ──
+    # Defined only when directories.genomad_db is set. Symlinks the database files
     # into BacFlux's own directory rather than reading the user's path directly,
     # because a directory() output is WIPED before its rule reruns — pointing that
-    # at a shared database would delete it. Same shape as virsorter2_db_local.
+    # at a shared database would delete it for everyone. Same shape as
+    # virsorter2_db_local.
     #
     # No index is rebuilt (unlike checkv_db_local): geNomad's files are MMseqs2
     # databases and plain tables, which MMseqs2 reads through symlinks without
-    # complaint, and none of geNomad's steps writes into the database directory.
+    # complaint, and no geNomad step writes into the database directory.
     #
-    # Takes in: the user's geNomad database directory (read-only; never written).
-    # Produces: 07.phages/genomad_db/ — the same path the download rule produces,
-    #           so genomad_end_to_end is identical either way.
+    # A database that is present can still fail in two ways, and 00_common.smk
+    # catches both at parse time rather than an hour into the run: a copy that is
+    # only partly readable (11 of 27 files mode 0640, seen for real here), and a
+    # copy too old for the installed geNomad (which parses its marker metadata
+    # positionally and dies on "invalid literal for int()").
+    #
+    # Produces 07.phages/genomad_db/ — the same path the download rule produces, so
+    # genomad_end_to_end is identical either way.
     if GENOMADDB:
 
         rule genomad_db_local:
@@ -207,11 +224,12 @@ if PHAGE_CALLER == "genomad":
                 LOGS + "/genomad_db_local.log"
             priority: 9
             shell:
-                # The symlink TARGET must be absolute. A relative directories.genomad_db
-                # would put a relative target inside the view directory, where it would
-                # resolve against the VIEW's location instead of the launch directory -
-                # i.e. every link dangles, and geNomad fails on a database that is
-                # actually there. `cd … && pwd` resolves it before any link is made.
+                # The symlink TARGET must be absolute. A relative
+                # directories.genomad_db would put a relative target inside the view
+                # directory, where it would resolve against the VIEW's location
+                # instead of the launch directory — i.e. every link dangles, and
+                # geNomad fails on a database that is actually there. `cd ... && pwd`
+                # resolves it before any link is made.
                 """
                 mkdir -p {output.genomad_db}
                 src_abs=$(cd "{input.src}" && pwd)
@@ -225,35 +243,31 @@ if PHAGE_CALLER == "genomad":
                 done
                 """
 
-    # ── Rule: genomad_end_to_end — virus + plasmid calling in one run ────────
-    # Biology: geNomad scans the finished genome and, in a single end-to-end run,
-    # reports which contigs (or contig regions) are viral and which are plasmids.
-    # When opted in, its virus output feeds CheckV here, and its plasmid summary
-    # feeds the D9 concordance in 60_plasmid.smk.
+
+    # ── Virus and plasmid calling in one run ──
+    # geNomad scans the finished genome and reports, in a single end-to-end run,
+    # which contigs (or contig regions) are viral and which are plasmids. The virus
+    # output feeds CheckV here; the plasmid summary feeds the concordance in
+    # shared/60_plasmid.smk. Default presets (neither --conservative nor --relaxed)
+    # match the standard geNomad→CheckV combination, and --cleanup deletes the
+    # intermediates. If a huge input ever needs a RAM lever, `--splits N` caps peak
+    # memory at a speed cost; isolate-sized genomes do not need it.
     #
-    # Takes in:
-    #   contigs    = FINAL_CONTIGS — the finished, decontaminated assembly (D4: all
-    #                modes scan decontaminated contigs; v1 illumina scanned the
-    #                pre-decontam contigs_filt.fasta — flagged in the changelog).
-    #   genomad_db = the geNomad DB directory (from genomad_db).
-    # Does: `genomad end-to-end` with positional args INPUT OUTPUT DATABASE. Default
-    #       presets (neither --conservative nor --relaxed) match the standard
-    #       geNomad→CheckV combo; --cleanup deletes intermediates for disk hygiene.
-    #       (RAM lever if ever needed on a huge input: `--splits N` caps peak memory
-    #       at a speed cost — not needed for isolate-sized genomes.)
-    # Produces: 07.phages/genomad/{sample}/ — declared a DIRECTORY so a failed/rerun
-    #       job is wiped clean, stopping geNomad from resuming on stale
-    #       intermediates. geNomad names every output after the input basename
-    #       (contigs_final), so the key files land at:
-    #         …/contigs_final_summary/contigs_final_virus.fna          (→ CheckV)
-    #         …/contigs_final_summary/contigs_final_plasmid_summary.tsv (→ 60_plasmid)
-    # Consumed by: viral_quality (CheckV) and plasmid_concordance (60_plasmid.smk) —
-    #              each depends on this DIRECTORY and reaches inside for its file,
-    #              keeping the inner-file edge off the DAG (as 40_annotation does for
-    #              the Bakta directory).
-    # VERIFY on the first real geNomad run: that end-to-end runs fresh into the
-    # Snakemake-managed output dir (no unwanted resume); if it resumes, add
-    # `--restart`. Output filenames follow the basename pattern above — confirm.
+    # Input is FINAL_CONTIGS, the decontaminated assembly (D4: all four modes scan
+    # decontaminated contigs, where v1 illumina scanned the pre-decontam
+    # contigs_filt.fasta — flagged in the changelog).
+    #
+    # The output is declared a DIRECTORY so a failed or rerun job is wiped clean and
+    # geNomad cannot resume on stale intermediates. geNomad names every output after
+    # the input basename (contigs_final), so the two files that matter land at
+    #   …/contigs_final_summary/contigs_final_virus.fna           → viral_quality
+    #   …/contigs_final_summary/contigs_final_plasmid_summary.tsv → 60_plasmid.smk
+    # Both consumers depend on this DIRECTORY and reach inside for their file, which
+    # keeps the inner-file edge off the DAG (as 40_annotation.smk does for Bakta).
+    #
+    # The CLI contract — positional INPUT OUTPUT DATABASE, that summary layout, and
+    # a clean run into the directory Snakemake pre-creates — was checked against the
+    # real tool on the first geNomad run, 2026-07-25, and matches.
     rule genomad_end_to_end:
         input:
             contigs = FINAL_CONTIGS,
@@ -277,45 +291,43 @@ if PHAGE_CALLER == "genomad":
             """
 
 
-# ── VirSorter2 DEFAULT path (only defined when PHAGE_CALLER == "virsorter2") ──
-# VS2 2.2.4 (Jan 2023) is itself a Snakemake workflow, and it manages its OWN
-# nested conda env at runtime. That nesting is what crashed every v1.3.1 phage run
-# (an ancient transitive `mamba` against a modern `conda` -> "No module named
-# 'conda._vendor.auxlib'", the `virsorter_deps_env` saga).
+# ───────────────── VirSorter2 caller (default) ─────────────────
+# VirSorter2 2.2.4 (Jan 2023) is itself a Snakemake workflow, and it manages its
+# OWN nested conda envs at runtime. That nesting is what crashed every v1.3.1 phage
+# run: an ancient transitive `mamba` against a modern `conda`, failing with
+# "No module named 'conda._vendor.auxlib'" — the `virsorter_deps_env` saga.
 #
 # The fix is to switch the nesting OFF entirely and make our single env carry
-# everything VS2 needs. Three parts, applied below and in envs/virsorter.yaml:
-#   1. envs/virsorter.yaml installs VS2's OWN internal dependency list (copied
-#      from the `envs/vs2.yaml` that ships inside the virsorter package) next to
-#      virsorter itself, so the one env is self-sufficient.
-#   2. `virsorter setup --skip-deps-install` downloads only the DB and does NOT
-#      build VS2's per-rule nested dependency envs.
+# everything VS2 needs. Three parts, applied in the rules that follow and in
+# envs/virsorter.yaml:
+#   1. envs/virsorter.yaml installs VS2's OWN internal dependency list (copied from
+#      the envs/vs2.yaml that ships inside the virsorter package) next to virsorter
+#      itself, so the one env is self-sufficient.
+#   2. `virsorter setup --skip-deps-install` downloads only the database and does
+#      NOT build VS2's per-rule nested dependency envs.
 #   3. `virsorter run --use-conda-off`, plus exporting the env's own bin onto PATH,
 #      makes VS2 subprocesses resolve OUR in-env binaries instead of nested envs.
 #
-# VERIFIED 2026-07-22 on the v2 illumina validation run. The check this comment
-# used to ask for has been done, and the answer was NOT the comfortable one: the
-# bioconda `virsorter=2.2.4` package does NOT pin the runtime tool closure. With
-# only `virsorter` in the env, screed, hmmer, prodigal, last, pandas,
-# scikit-learn, numpy, seaborn, imbalanced-learn and ncbi-genome-download were ALL
-# absent, and the run died at the first internal rule on `No module named
-# 'screed'`. Hence part 1 above. If VS2 is ever unpinned from 2.2.4, re-read its
+# VERIFIED 2026-07-22 on the v2 illumina validation run, and the answer was NOT the
+# comfortable one: the bioconda `virsorter=2.2.4` package does NOT pin the runtime
+# tool closure. With only `virsorter` in the env, screed, hmmer, prodigal, last,
+# pandas, scikit-learn, numpy, seaborn, imbalanced-learn and ncbi-genome-download
+# were ALL absent, and the run died at the first internal rule on "No module named
+# 'screed'". Hence part 1 above. If VS2 is ever unpinned from 2.2.4, re-read its
 # packaged envs/vs2.yaml and re-sync envs/virsorter.yaml against it.
 if PHAGE_CALLER == "virsorter2":
 
-    # ── Rule: virsorter2_db — one-off VirSorter2 reference download ──────────
-    # Biology: VirSorter2 scores contigs against curated viral HMM groups from a
-    # database it fetches once.
-    # Takes in: nothing (pure download).
-    # Does: `virsorter setup` to download the DB; --skip-deps-install skips the
-    #       fragile nested-env build (fix part 2 above).
-    # Produces: 07.phages/vs2_db/ (VS2_DB_DIR).
-    # Consumed by: viral_identification_virsorter2.
+    # ── VirSorter2 database, downloaded here ──
+    # VirSorter2 scores contigs against curated viral HMM groups held in a database
+    # it fetches once (~10 GB). `virsorter setup` does the download;
+    # --skip-deps-install keeps it from building the fragile nested envs (fix part 2
+    # above). Produces 07.phages/vs2_db/, consumed by
+    # viral_identification_virsorter2.
     #
-    # DEFINED ONLY when BacFlux is the one downloading the database — mutually
-    # exclusive with virsorter2_db_local below, same safety reasoning as
-    # checkv_db/checkv_db_local (directory() outputs get wiped before a rule
-    # reruns, so a shared user directory must never be one).
+    # Defined only when BacFlux is the one downloading — mutually exclusive with
+    # virsorter2_db_local, same safety reasoning as checkv_db / checkv_db_local: a
+    # directory() output is wiped before its rule reruns, so it must never point at
+    # a database someone else shares.
     if not VS2DB:
 
         rule virsorter2_db:
@@ -335,15 +347,17 @@ if PHAGE_CALLER == "virsorter2":
                   --skip-deps-install > {log} 2>&1
                 """
 
-    # ── Rule: virsorter2_db_local — use an already-downloaded VS2 database ───
-    # Defined ONLY when directories.vs2_db is set. Symlinks the setup output
-    # (hmm/, group/, rbs/, Done_all_setup) into BacFlux's own directory rather
-    # than reading the user's path directly, so the directory()-wipe-on-rerun
-    # hazard above can never reach it. No index is rebuilt here (unlike
-    # checkv_db_local) — no cross-build incompatibility has been found for VS2's
-    # HMM files, so this is a plain, cheap view.
-    # Produces: 07.phages/vs2_db/ — the same path the download rule would
-    #           produce, so viral_identification_virsorter2 is identical either way.
+
+    # ── VirSorter2 database, a copy you already hold ──
+    # Defined only when directories.vs2_db is set. Symlinks what `virsorter setup`
+    # produced (hmm/, group/, rbs/, Done_all_setup) into BacFlux's own directory
+    # rather than reading the user's path directly, so the wipe-on-rerun hazard
+    # described at virsorter2_db can never reach it. Nothing is rebuilt here,
+    # unlike checkv_db_local — no cross-build incompatibility has turned up for
+    # VS2's HMM files, so this is a plain, cheap view.
+    #
+    # Produces 07.phages/vs2_db/ — the same path the download rule produces, so
+    # viral_identification_virsorter2 is identical either way.
     if VS2DB:
 
         rule virsorter2_db_local:
@@ -355,8 +369,8 @@ if PHAGE_CALLER == "virsorter2":
                 LOGS + "/virsorter2_db_local.log"
             priority: 9
             shell:
-                # Absolute target, for the same reason as genomad_db_local below:
-                # a relative directories.vs2_db would produce links that resolve
+                # Absolute target, for the same reason as in genomad_db_local: a
+                # relative directories.vs2_db would produce links that resolve
                 # against the view directory and therefore dangle.
                 """
                 mkdir -p {output.vs2_db}
@@ -371,15 +385,22 @@ if PHAGE_CALLER == "virsorter2":
                 done
                 """
 
-    # ── Rule: viral_identification_virsorter2 — VS2 virus calling ────────────
-    # Biology: identify phages / prophages on the finished genome. Faithful port
-    # of v1's `viral_identification` (VS2 half) onto the 00_common API.
-    # Takes in: contigs = FINAL_CONTIGS (D4 change: v1 illumina used the
-    #           pre-decontam contigs_filt.fasta), vs2_db = the VS2 DB directory.
-    # Does: `virsorter run ... all`, over the same viral groups and min-score as
-    #       v1, with --use-conda-off and a PATH preamble (fix part 3 above).
-    # Produces: 07.phages/virsorter/{sample}/ — key file final-viral-combined.fa.
-    # Consumed by: viral_quality (CheckV).
+
+    # ── VirSorter2 virus calling ──
+    # Identify phages and prophages on the finished genome — a faithful port of v1's
+    # `viral_identification` (VS2 half) onto the 00_common.smk paths, with the same
+    # viral groups and the same score cutoff. Input is FINAL_CONTIGS (D4 change: v1
+    # illumina used the pre-decontam contigs_filt.fasta) plus the VS2 database.
+    #
+    # min_score 0.5 and the five viral groups come from the VirSorter2 SOP the
+    # workflow follows (protocols.io, linked from README 07.phages): a deliberately
+    # loose cutoff, taken for maximal sensitivity — CheckV downstream is what grades
+    # the result. --keep-original-seq preserves the original sequence of
+    # circular and near-fully-viral contigs instead of VS2's trimmed version, so
+    # CheckV sees the real contig.
+    #
+    # Produces 07.phages/virsorter/{sample}/ — key file final-viral-combined.fa,
+    # consumed by viral_quality.
     rule viral_identification_virsorter2:
         input:
             contigs = FINAL_CONTIGS,
@@ -396,7 +417,9 @@ if PHAGE_CALLER == "virsorter2":
             LOGS + "/viral_identification_{sample}.log"
         priority: 8
         shell:
-            # Put the env's own bin first so VS2 subprocesses resolve in-env tools.
+            # Put the env's own bin first so VS2 subprocesses resolve in-env tools
+            # (fix part 3 above); without it they hunt for the nested envs that
+            # --use-conda-off just told VS2 not to build.
             """
             export PATH="$CONDA_PREFIX/bin:$PATH"
             virsorter run \
@@ -412,45 +435,24 @@ if PHAGE_CALLER == "virsorter2":
             """
 
 
-# ── Rule: checkv_db — one-off CheckV reference download ──────────────────────
-# Biology: CheckV grades viral genome completeness/contamination against a
-# reference database. Faithful port of v1 `viral_db` (CheckV half) onto its OWN
-# env (envs/checkv.yaml), so the default path never builds another tool's env just
-# to get CheckV. CheckV is permissively licensed (LBNL BSD), commercial use OK.
+# ───────────── CheckV database, a copy you already hold ────────
+# Defined only when directories.checkv_db is set. BacFlux does not simply point
+# CheckV at that path, for a reason worth remembering: the DIAMOND index inside a
+# shared database was built by whatever DIAMOND that site had, DIAMOND's database
+# format is versioned, and CheckV then fails deep into the completeness stage with
+# "DIAMOND task failed". Shared databases are also usually read-only to the person
+# running the workflow. (The longer version of this note is in 00_common.smk, where
+# directories.checkv_db is resolved.)
 #
-# Takes in: nothing (pure download).
-# Does: if CHECKV_LINK is empty, let CheckV download its own default DB (CheckV's
-#       own tool is responsible for its own integrity there); otherwise wget the
-#       given .tar.gz AND its .sha256, hard-fail if the computed hash does not
-#       match the expected one (same discipline as dbCAN's cazyme_db_download —
-#       a truncated or tampered download must never be silently extracted), then
-#       extract and (re)build the diamond DB. Link, sha256 URL, and the derived
-#       folder id (CHECKV_DB_ID) all come from 00_common.
-# Produces: 07.phages/checkv_db/ (CHECKV_DB_DIR).
-# Consumed by: viral_quality.
+# So the versioned folder is recreated locally, every large file symlinked (no
+# gigabytes copied), and the DIAMOND index rebuilt with THIS workflow's DIAMOND so
+# it is guaranteed compatible. genome_db/ must be a REAL directory, because the new
+# index is written into it; hmm_db/ can be one symlink for the whole tree because
+# nothing writes there. Disk cost: the index only (~950 MB), against ~6.4 GB for a
+# full downloaded copy.
 #
-# threads: the diamond index build is the one real CPU cost here; capped_cpus(8)
-# matches the sibling checkv_db_local rule, which does the identical diamond
-# makedb step for a user-provided database.
-# ── Rule: checkv_db_local — build a usable VIEW of the user's own database ───
-# Defined ONLY when directories.checkv_db is set. See the long note in
-# 00_common.smk for why BacFlux does not simply point CheckV at that path: the
-# DIAMOND index inside a shared database was built by whatever DIAMOND that site
-# had, and DIAMOND's database format is versioned, so CheckV can fail deep into
-# the completeness stage with "DIAMOND task failed". Shared databases are also
-# usually read-only to the person running the workflow.
-#
-# Takes in: the user's CheckV database directory (read-only; never written).
-# Does: recreate the versioned folder locally, symlinking every large file so no
-#       gigabytes are copied, then build the DIAMOND index with THIS workflow's
-#       DIAMOND so it is guaranteed compatible.
-#       genome_db/ must be a REAL directory (the new index is written into it);
-#       hmm_db/ can be a single symlink because nothing writes there.
-# Produces: 07.phages/checkv_db/ — the same path the download rule would produce,
-#       so viral_quality is identical either way.
-# Consumed by: viral_quality.
-#
-# Disk cost: the index only (~950 MB), versus ~6.4 GB for a full downloaded copy.
+# Produces 07.phages/checkv_db/ — the same path the download rule produces, so
+# viral_quality is identical either way.
 if CHECKVDB:
 
     rule checkv_db_local:
@@ -506,14 +508,29 @@ if CHECKVDB:
             """
 
 
-# DEFINED ONLY when BacFlux is the one downloading the database.
-#
-# Keeping these two mutually exclusive is a safety requirement, not tidiness. The
-# output below is a `directory()`, and Snakemake DELETES a directory output before
-# re-running its rule. Both rules therefore write to BacFlux's own
-# 07.phages/checkv_db and never to the user's directory — if a rule's output ever
+# ─────────────── CheckV database, downloaded here ──────────────
+# CheckV grades viral genome completeness and contamination against a reference
+# database. Defined only when directories.checkv_db is NOT set, which makes it
+# mutually exclusive with checkv_db_local — and that exclusivity is a safety
+# requirement, not tidiness. The output is a `directory()`, and Snakemake DELETES a
+# directory output before re-running its rule, so both rules write to BacFlux's own
+# 07.phages/checkv_db and never to the user's directory. If a rule's output ever
 # pointed at a shared database, any re-run trigger (a changed env file, a
 # --forcerun, an interrupted job) would wipe it for everyone using it.
+#
+# With links.checkv_link empty, CheckV downloads its own default database and is
+# responsible for its own integrity. With a link set, the .tar.gz AND its .sha256
+# are fetched, the hash must match or the rule hard-fails (same discipline as
+# dbCAN's cazyme_db_download — a truncated or tampered download must never be
+# silently extracted), and the archive is then extracted and its DIAMOND index
+# built. The link, the .sha256 URL and the derived folder id (CHECKV_DB_ID) are all
+# resolved in 00_common.smk.
+#
+# CheckV is permissively licensed (LBNL BSD, commercial use OK), so running it on
+# every path imposes nothing on the user — unlike geNomad.
+#
+# The DIAMOND index build is the one real CPU cost here, and capped_cpus(8) matches
+# checkv_db_local, which does the identical makedb step.
 if not CHECKVDB:
 
     rule checkv_db:
@@ -561,28 +578,23 @@ if not CHECKVDB:
             """
 
 
-# ── Rule: viral_quality — completeness/contamination of virus calls (CheckV) ──
-# Biology: CheckV estimates how complete each predicted viral sequence is and
-# flags host contamination. It is caller-agnostic: the SAME `checkv end_to_end`
-# command grades geNomad's virus FASTA or VirSorter2's, so this single rule serves
-# both paths (the input FASTA was chosen once at parse time, above).
+# ─────────────────── Viral quality (CheckV) ────────────────────
+# CheckV estimates how complete each predicted viral sequence is and flags host
+# contamination in it. The same `checkv end_to_end` command grades geNomad's virus
+# FASTA or VirSorter2's, so one rule serves both paths: the caller's output
+# DIRECTORY arrives as CHECKV_CALLER_DIR and the shell reaches inside for the virus
+# FASTA at CHECKV_VIRAL_REL, both fixed at parse time in the CheckV input selection
+# block at the top of this file.
 #
-# Takes in:
-#   caller_dir = CHECKV_CALLER_DIR — the chosen caller's {sample} output DIRECTORY.
-#                The shell reaches inside for the virus FASTA at the fixed relative
-#                path CHECKV_VIRAL_REL (params.viral_rel).
-#   checkv_db  = the CheckV DB directory (from checkv_db).
-# Does: resolve the actual DB sub-directory at runtime (ported verbatim from v1),
-#       then run `checkv end_to_end`.
-# Produces: 07.phages/checkv/{sample}/ — key file quality_summary.tsv. This is the
-#       rule-all leaf that "pulls in whichever caller ran".
-# Consumed by: the report / the user (a terminal phage product).
+# Produces 07.phages/checkv/{sample}/ — key file quality_summary.tsv. This is the
+# last phage step, and the file rule all asks for: asking for it is what pulls in
+# whichever caller ran.
 #
-# GRACEFUL EMPTY-INPUT HANDLING (BacFlux "degrade, don't hard-fail" convention):
-# a virus-free genome is common, and both callers can emit an EMPTY (or absent)
-# virus FASTA. `checkv end_to_end` errors on an empty input, which would fail the
-# whole sample. So we test the FASTA first: if it has no sequences, we write a
-# header-only quality_summary.tsv and skip CheckV, rather than crash the run.
+# GRACEFUL EMPTY-INPUT HANDLING (BacFlux "degrade, don't hard-fail" convention): a
+# virus-free genome is common, and both callers can emit an empty or absent virus
+# FASTA. `checkv end_to_end` errors on an empty input, which would fail the whole
+# sample. So we test the FASTA first and, if it holds no sequences, write a
+# header-only quality_summary.tsv and skip CheckV instead of crashing the run.
 rule viral_quality:
     input:
         caller_dir = CHECKV_CALLER_DIR,
@@ -598,9 +610,11 @@ rule viral_quality:
         LOGS + "/viral_quality_{sample}.log"
     priority: 7
     shell:
-        # Runtime DB-dir resolution (verbatim from v1): find the single
-        # genome_db/checkv_reps.faa, assert exactly one, then take its
-        # grandparent as the DB directory CheckV expects.
+        # The database directory is resolved at runtime rather than being passed in
+        # (ported verbatim from v1): find the single genome_db/checkv_reps.faa,
+        # insist there is exactly one, and take its grandparent as the directory
+        # CheckV expects. That is what lets checkv_db and checkv_db_local produce
+        # differently-named versioned folders without this rule knowing.
         """
         mkdir -p {output.checkv_dir}
         viral_fasta="{input.caller_dir}/{params.viral_rel}"

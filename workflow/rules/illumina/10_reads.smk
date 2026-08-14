@@ -1,74 +1,65 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# BacFlux v2.0.0 — illumina front end, read preparation (rules/illumina/10_reads.smk)
+# BacFlux v2.0.0 — illumina front end, read preparation.
 #
-# The biology: an Illumina run is not just the isolate's DNA. Every Illumina lane
-# carries a PhiX spike-in (a small bacteriophage genome added as a sequencing
-# control), and every read may still carry sequencing-adapter tails and a
-# low-quality 3' end. Both would be assembled into junk contigs, so we remove
-# the PhiX reads first and then quality/adapter-trim what is left.
+# An Illumina run is not just the isolate's DNA. Every lane carries a PhiX
+# spike-in (a small bacteriophage genome added as a sequencing control), and every
+# read may still carry an adapter tail and a low-quality 3' end. Both would be
+# assembled into junk contigs, so the PhiX reads go first and what survives is
+# trimmed.
 #
-# Data flow through this module:
+# Stage chain: raw {sample}_R1/R2 → map_phix → trim_adapters → TRIM_R1/TRIM_R2.
+# The PhiX reference is fetched and indexed ONCE per run, not per sample:
+# download_phix → build_phix → six Bowtie2 index files shared by every sample.
 #
-#   NCBI ──► download_phix ──► build_phix ──► (6 bowtie2 index files)
-#                                                     │
-#   {sample}_R1/R2.fastq[.gz] ─────────────────────────┴──► map_phix
-#   (raw input, config input.illumina_dir)                     │
-#                                                              ▼
-#                                        {sample}.1.fastq / {sample}.2.fastq
-#                                        (the reads that did NOT map to PhiX)
-#                                                              │
-#                                                              ▼
-#                                                        trim_adapters (fastp)
-#                                                              │
-#                        ┌─────────────────────────────────────┤
-#                        ▼                                     ▼
-#                 TRIM_R1 / TRIM_R2                    FASTP_JSON / FASTP_HTML
-#                        │                             (MultiQC / human reading)
-#     ┌──────────────────┼──────────────────┐
-#     ▼                  ▼                  ▼
-# illumina_assembly  map_contigs        map_amr_db
-# (20_assembly)      (shared/10_decontam) (shared/50_amr, CARD leg)
+# download_phix  : wget the PhiX genome named by links.phix_link.
+# build_phix     : bowtie2-build over it — six index files sharing one prefix.
+# map_phix       : bowtie2 --local per sample, keeping the pairs that do NOT
+#                  align to PhiX.
+# trim_adapters  : fastp adapter detection, sliding-window quality trimming and a
+#                  100 bp minimum length. Writes TRIM_R1/TRIM_R2 plus the fastp
+#                  JSON (read by MultiQC) and HTML (read by a human) reports.
 #
-# OWNERSHIP NOTE — read before adding a rule here. `index_contigs` and
-# `map_contigs` (trimmed reads back onto the draft assembly, for BlobTools
-# coverage) are NOT in this module: they are owned by shared/10_decontam.smk,
-# which defines them inside its `if HAS_SHORT_READS:` branch. This front end's
-# only obligation to that module is to PRODUCE TRIM_R1 and TRIM_R2.
+# OWNERSHIP — read before adding a rule here. index_contigs and map_contigs (the
+# trimmed reads mapped back onto the draft assembly, giving BlobTools its coverage
+# track) are NOT in this module: they live in the `if HAS_SHORT_READS:` branch of
+# shared/10_decontam.smk. This front end's only obligation to that module is to
+# PRODUCE TRIM_R1 and TRIM_R2.
 #
 # Every path comes from 00_common.smk (TRIM_R1, TRIM_R2, FASTP_JSON, FASTP_HTML,
 # PHIX_LINK, PHIX_FASTA, PHIX_BT2_PREFIX, ILLUMINA_DIR, R1, R2, LOGS, CPUS,
 # capped_cpus). Nothing here re-derives a stage number or an output root.
 #
 # conda: paths resolve relative to THIS file (workflow/rules/illumina/), so
-# "../../envs/x.yaml" climbs illumina/ -> rules/ -> workflow/ -> workflow/envs/.
+# "../../envs/x.yaml" climbs illumina/ → rules/ → workflow/ → workflow/envs/.
 #
-# Resource convention: cpu-bound rules declare Snakemake's built-in
-# `threads: capped_cpus(N)` and refer to `{threads}` in the shell. Using the
-# BUILT-IN keyword (rather than a custom `resources: cpus`) is what makes
-# `--cores N` actually enforce the limit, so a plain `snakemake --cores N` is
-# safe on its own and no extra `--resources` flag is needed.
-# ─────────────────────────────────────────────────────────────────────────────
+# Resource convention: cpu-bound rules declare Snakemake's BUILT-IN `threads:` —
+# CPUS, or capped_cpus(N) where a tool stops scaling past N — and refer to
+# {threads} in the shell. Using the built-in keyword rather than a `resources:
+# cpus` of our own is what makes `--cores N` actually enforce the limit, so a
+# plain `snakemake --cores N` is safe on its own, with no extra --resources flag.
 
 
 # Where this mode's per-sample read files live. DERIVED from TRIM_R1 rather than
-# retyped, the same anti-drift trick 00_common uses for BLOB_COV and SPADES_DIR:
-# these intermediates must sit beside the trimmed reads, and if TRIM_R1 ever
-# moves they follow automatically. Module-local (only the rules below use it), so
-# it does not belong in 00_common.
+# retyped: these intermediates must sit beside the trimmed reads, and if TRIM_R1
+# ever moves they follow automatically. The same anti-drift trick 00_common.smk
+# uses for BLOB_COV. Module-local — only the rules below use it — so it does not
+# belong in 00_common.
 _READS_DIR = os.path.dirname(TRIM_R1)
 
 
-# ── Rule: download_phix — fetch the PhiX control genome ──────────────────────
-# Takes in:  nothing (the URL is config links.phix_link, validated in 00_common).
-# Does:      one wget into 01.reads/phix/.
-# Produces:  PHIX_FASTA, temp() — it is only needed until the index is built.
-# Consumed by: build_phix.
+# ──────────────────────── PhiX reference (NCBI) ────────────────
+# Takes in: nothing on disk. The address is PHIX_LINK, which 00_common.smk reads
+#           from the config key links.phix_link and validates at parse time.
+# Does:     one wget of the PhiX control genome into 01.reads/phix/.
+# Produces: phix = PHIX_FASTA (01.reads/phix/phix.fna.gz), temp() — the FASTA is
+#           wanted only until build_phix has indexed it.
+# Consumed by: build_phix, below.
 #
-# Runs ONCE per run, not once per sample: there is no {sample} in the path.
+# Runs once per RUN, not once per sample — there is no {sample} in the path, so
+# every sample in the batch screens against this one download.
 #
-# conda: NONE — deliberately inherited from v1, which used the system `wget`.
-# Same deferred decision as cazyme_db_download in shared/40_annotation.smk: if we
-# ever give the download rules an env, all of them should get it together.
+# conda: NONE — deliberately inherited from v1, which used the system `wget`. Same
+# deferred decision as cazyme_db_download in shared/40_annotation.smk: if the
+# download rules ever get an env, they should all get one together.
 #
 # (v1 message: "--- Download PhiX genome from NCBI. ---")
 rule download_phix:
@@ -85,12 +76,21 @@ rule download_phix:
         """
 
 
-# ── Rule: build_phix — index the PhiX genome for Bowtie2 ─────────────────────
-# Takes in:  PHIX_FASTA from download_phix.
-# Does:      bowtie2-build, which writes six binary index files sharing a prefix.
-# Produces:  the six index files, all temp() — cheaper to rebuild than to keep,
-#            and useless once every sample has been screened.
-# Consumed by: map_phix.
+# ──────────────────────── PhiX index (Bowtie2) ─────────────────
+# Takes in: phix = PHIX_FASTA, the genome fetched by rule download_phix.
+# Does:     bowtie2-build over it, once per run. The tool is handed the shared
+#           PREFIX the index files will have (params.basename = PHIX_BT2_PREFIX),
+#           not a filename, and works out the six names itself.
+# Produces:
+#   idx1, idx2, idx3, idx4 = PHIX_BT2_PREFIX + ".1.bt2" through ".4.bt2", the
+#                            forward index plus bowtie2's own packed copy of the
+#                            reference sequence, all temp()
+#   ridx1, ridx2           = PHIX_BT2_PREFIX + ".rev.1.bt2" and ".rev.2.bt2", the
+#                            mirror index of the same genome, also temp()
+# Consumed by: map_phix, below.
+#
+# All six are temp() because they are cheaper to rebuild than to keep, and useless
+# once every sample has been screened.
 #
 # (v1 message: "--- Bowtie2: Build PhiX genome db. ---")
 rule build_phix:
@@ -119,19 +119,27 @@ rule build_phix:
         """
 
 
-# ── Rule: map_phix — throw away the reads that are PhiX ──────────────────────
-# Biology: the spike-in is a real, different genome. Leaving its reads in would
-# put a ~5.4 kb phage contig in the assembly and skew the coverage statistics
-# BlobTools later uses to separate organisms.
+# ──────────────────────── PhiX screening (Bowtie2) ─────────────
+# Throws away the reads that are PhiX. The spike-in is a real, different genome:
+# leaving its reads in puts a ~5.4 kb phage contig in the assembly and skews the
+# coverage statistics BlobTools later uses to separate organisms.
 #
-# Takes in: the six PhiX index files (the DAG edge to build_phix) and this
-#           sample's RAW read pair from config input.illumina_dir.
-# Does:     bowtie2 in --local mode against PhiX. The trick is --un-conc, which
-#           writes the pairs that did NOT align concordantly to PhiX — i.e. the
-#           reads we want to keep. The SAM of the reads that DID align is
-#           produced only because bowtie2 must write one somewhere; it is temp().
-# Produces: {sample}.1.fastq / {sample}.2.fastq (PhiX-free pairs, temp()).
-# Consumed by: trim_adapters.
+# Takes in:
+#   idx1–idx4,   = the six Bowtie2 index files from rule build_phix. They are
+#   ridx1, ridx2   listed only to create the DAG edge to that rule; bowtie2 itself
+#                  is handed their shared prefix in params.db.
+#   r1, r2       = this sample's RAW read pair, os.path.join(ILLUMINA_DIR, R1) and
+#                  os.path.join(ILLUMINA_DIR, R2) — the files found in the config
+#                  key input.illumina_dir, untouched by any earlier rule.
+# Does:     bowtie2 in --local mode against the PhiX index. --un-conc is what does
+#           the work: it writes out the pairs that did NOT align concordantly to
+#           PhiX, i.e. the reads we keep.
+# Produces:
+#   sam = {sample}_contam.sam, the alignments of the reads that DID match PhiX.
+#         temp(), and it exists only because bowtie2 must write a SAM somewhere.
+#   r1  = {sample}.1.fastq, temp() — the PhiX-free forward reads
+#   r2  = {sample}.2.fastq, temp() — the PhiX-free reverse reads
+# Consumed by: trim_adapters, below, which takes r1 and r2. Nothing reads the SAM.
 #
 # --un-conc NAMING, preserved verbatim from v1 and load-bearing: given the
 # basename "{sample}.fastq", bowtie2 inserts ".1"/".2" BEFORE the final extension
@@ -177,21 +185,36 @@ rule map_phix:
         """
 
 
-# ── Rule: trim_adapters — adapter removal and quality trimming (fastp) ───────
-# Biology: adapter read-through and low-quality tails create false k-mers, which
-# SPAdes turns into short spurious contigs and mis-assemblies. fastp detects the
-# adapter from the pairing itself (--detect_adapter_for_pe), trims a sliding
-# window from both ends (--cut_front --cut_right) and drops anything shorter than
-# 100 bp, which is the length below which a read stops helping a 127-mer assembly.
+# ──────────────────── Adapter and quality trim (fastp) ─────────
+# Adapter read-through and low-quality tails create false k-mers, which SPAdes
+# turns into short spurious contigs and mis-assemblies. This is where both are cut
+# off, before the reads ever reach the assembler.
 #
-# Takes in: the PhiX-free pairs from map_phix.
-# Produces: TRIM_R1 / TRIM_R2 (temp() — Snakemake keeps them until the LAST
-#           consumer is done, i.e. SPAdes, map_contigs and the CARD leg), plus
-#           the fastp JSON (MultiQC) and HTML (for a human) reports, both kept.
-# Consumed by: illumina_assembly (20_assembly.smk), map_contigs
-#              (shared/10_decontam.smk), map_amr_db (shared/50_amr.smk).
+# Takes in: r1, r2 = {sample}.1.fastq and {sample}.2.fastq, the PhiX-free pairs
+#           from rule map_phix.
+# Does:     fastp adapter removal and quality trimming. --detect_adapter_for_pe
+#           infers the adapter from the pairing itself, --cut_front and --cut_right
+#           trim a sliding quality window from each end, and --length_required 100
+#           drops whatever is left of a read shorter than 100 bp — the length below
+#           which a read stops helping a 127-mer assembly. The 100 is the v1 value,
+#           hard-coded here rather than exposed in the config.
+# Produces:
+#   r1   = TRIM_R1, temp() — the trimmed, PhiX-free forward reads
+#   r2   = TRIM_R2, temp() — the trimmed, PhiX-free reverse reads
+#   html = FASTP_HTML, fastp's own report, kept for a human to open
+#   json = FASTP_JSON, the same numbers in parsable form, kept for MultiQC
+# Consumed by: TRIM_R1/TRIM_R2 by illumina_assembly (illumina/20_assembly.smk),
+#              map_contigs (shared/10_decontam.smk), map_amr_db — the CARD
+#              read-mapping leg — (shared/50_amr.smk) and, when the IS copy-number
+#              leg is on (MOBILOME_COPY_NUMBER — mobilome.run AND a configured
+#              ISOSDB source), assembly_depth and isosdb_map (80_mobilome.smk).
+#              FASTP_JSON by MultiQC (shared/90_report.smk). FASTP_HTML by the
+#              user only: no rule reads it.
 #
-# v1 -> v2: `resources: cpus` was a hard-coded 16, which asked for 16 threads even
+# Because TRIM_R1/TRIM_R2 are temp(), Snakemake keeps them on disk until the LAST
+# of those consumers is done and then deletes them. The two fastp reports are kept.
+#
+# v1 → v2: `resources: cpus` was a hard-coded 16, which asked for 16 threads even
 # on an 8-core machine. capped_cpus(16) requests min(CPUS, 16) instead — the same
 # ceiling, but never more than the run was given.
 #

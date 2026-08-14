@@ -7,7 +7,7 @@
 # what lets BacFlux tier its calls honestly on fragmented short-read assemblies.
 #
 # Pinned so a future ISEScan release cannot silently change the output columns
-# the parser (scripts/mobilome/isescan_to_table.py) keys on.
+# the parser (scripts/80_mobilome/isescan_to_table.py) keys on.
 name: isescan
 channels:
   - conda-forge

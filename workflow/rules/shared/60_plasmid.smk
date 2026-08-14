@@ -1,113 +1,99 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# BacFlux v2.0.0 — Stage 06 plasmid module (rules/shared/60_plasmid.smk)  [D9]
+# BacFlux v2.0.0 — plasmid calling on the finished genome (stage 06.plasmids).
+# Platon is the primary caller; geNomad is an optional second opinion. Like the
+# rest of the shared tail this module reads only FINAL_CONTIGS (the D2 hand-off),
+# so it behaves identically in all four modes.
 #
-# This module decides which contigs are plasmids and how confident that call is.
-# Like the rest of the shared tail it consumes only FINAL_CONTIGS (D2), so it is
-# identical in all four modes.
+# Which file is the terminal deliverable depends on config phage.caller, because
+# geNomad calls viruses and plasmids in ONE run and only runs when it was opted in
+# as the phage caller (shared/70_phage.smk):
+#   virsorter2 (default) — Platon alone, and Platon's verified_plasmids.txt is the
+#                          deliverable, exactly as in v1.
+#   genomad    (opt-in)  — Platon and geNomad are joined into a per-contig
+#                          concordance table (decision D9, see
+#                          docs/unification_migration_plan.md).
 #
-# The plasmid deliverable depends on whether the user opted in to geNomad
-# (config.phage.caller: genomad — see PHAGE_CALLER in 00_common.smk):
-#   - DEFAULT (VirSorter2 phage caller, geNomad OFF): Platon alone. The terminal
-#     deliverable is Platon's verified_plasmids.txt (v1 behaviour). geNomad does
-#     not run, so there is no second opinion to concord with.
-#   - geNomad OPT-IN: a Platon + geNomad CONCORDANCE table (D9). geNomad — a
-#     completely different, gene-content method — gives a second opinion, and the
-#     two are joined into a per-contig confidence-tiered table. geNomad is run ONCE
-#     in 70_phage.smk (genomad_end_to_end); this module only CONSUMES its plasmid
-#     summary. (geNomad is academic/non-commercial-licensed, which is exactly why
-#     the concordance is opt-in and not the default — see 00_common.smk §1b.)
-#
-# Platon always runs and always keeps v1's supplementary "does the nt BLAST hit say
-# plasmid?" check as one visible, non-authoritative annotation (D9) — never the
-# decision. When the concordance runs, that check rides along as one column.
-#
-# Data flow (top to bottom):
+# geNomad is opt-in and never the default because Berkeley Lab licenses it for
+# academic / non-commercial use only, and BacFlux is MIT — so the concordance is
+# opt-in too (00_common.smk §1b, decision D8).
+# Platon runs either way, and either way v1's supplementary "does the nt BLAST hit
+# call this contig a plasmid?" check rides along as one visible annotation — never
+# as the decision.
 #
 #   contigs_final.fasta ─► plasmid_search (Platon) ─► 06.plasmids/{sample}/platon/
-#          │                                            (contigs_final.tsv,
-#          │                                             contigs_final.chromosome.fasta,
-#          │                                             verified_plasmids.txt ← default deliverable)
-#          │                                                     │
-#          │   (only if geNomad opted in)                        │
-#   07.phages/genomad/{sample}/…_plasmid_summary.tsv ───┐        │
-#          (from genomad_end_to_end in 70_phage.smk)     ▼        ▼
-#                                       plasmid_concordance (plasmid_concordance.py)
-#                                       ─► 06.plasmids/{sample}/{sample}_plasmid_concordance.tsv
+#                                                    verified_plasmids.txt ──┐
+#   07.phages/genomad/{sample}/…_plasmid_summary.tsv ─────┐                  │
+#          (only when geNomad was opted in)               ▼                  ▼
+#                                   plasmid_concordance (plasmid_concordance.py)
+#                         ─► 06.plasmids/{sample}/{sample}_plasmid_concordance.tsv
 #
-# CROSS-STAGE NOTE (concordance path only): the geNomad plasmid summary this module
-# reads physically lives under 07.phages/. That backwards-numbered 06←07 edge is
-# safe — stage numbers are organisational only (D1 groups by tool family);
-# Snakemake orders work by the input/output DAG, not by directory number.
+# plasmid_search      : Platon over the finished contigs, plus the kept v1
+#                       BLAST-text check. Always runs.
+# plasmid_concordance : joins Platon's and geNomad's calls into one
+#                       confidence-tiered table. Defined only when geNomad was
+#                       opted in as the phage caller.
 #
-# Everything referenced here is defined once in 00_common.smk (never re-derived):
-# FINAL_CONTIGS, DIR_PLASMIDS, PLATONDB, PLASMID_BLASTOUT, PLATON_DIR, PLATON_VERIFIED,
+# The geNomad summary the concordance reads physically lives under 07.phages/.
+# Reading "backwards" from stage 06 into stage 07 is safe: the stage numbers group
+# tools for the reader (D1), and Snakemake orders work by the input/output DAG,
+# not by directory name.
+#
+# Defined once in 00_common.smk and never re-derived here: FINAL_CONTIGS,
+# DIR_PLASMIDS, PLATONDB, PLASMID_BLASTOUT, PLATON_DIR, PLATON_VERIFIED,
 # GENOMAD_DIR, GENOMAD_PREFIX, PLASMID_CONCORDANCE, PLASMID_CONCORDANCE_SCRIPT,
 # PHAGE_CALLER, LOGS, capped_cpus.
 #
-# conda: paths resolve relative to THIS file (workflow/rules/shared/), so
-# "../../envs/x.yaml" climbs shared/ -> rules/ -> workflow/ -> workflow/envs/x.yaml.
-# ─────────────────────────────────────────────────────────────────────────────
+# conda: env paths resolve relative to THIS file (workflow/rules/shared/), so
+# "../../envs/x.yaml" climbs shared/ → rules/ → workflow/ → workflow/envs/x.yaml.
 
 
-# ── Rule: plasmid_search — primary plasmid calling + kept v1 check (Platon) ───
-# ALWAYS runs (both the default and the geNomad-opt-in paths need Platon).
+# ────────────────── Plasmid calling (Platon) ───────────────────
+# Platon (v1.7, pinned in envs/platon.yaml) sorts every contig of the finished
+# assembly into plasmid or chromosome from replicon-distribution scores — protein
+# families weighted by how often they sit on a plasmid rather than a chromosome.
+# Always runs: the default path and the geNomad path both need its calls.
 #
-# Biology: Platon classifies each assembly contig as plasmid or chromosome from
-# replicon-distribution scores. BacFlux then keeps v1's supplementary check: for
-# each Platon-plasmid contig, grep the general contamination-screen BLAST hits for
-# the word "plasmid" in the subject title. That check is a WEAK, non-authoritative
-# signal (D9) — it stays as one visible annotation, never the decision.
+# On top of that call the rule keeps v1's supplementary check: look each
+# Platon-plasmid contig up in the contamination-screen BLAST hits and see whether
+# the subject title contains the word "plasmid". It stays an annotation and never
+# a filter, because a mobile element carried by a genuinely chromosomal contig can
+# push Platon's score AND that contig's best nt hit the same wrong way — so
+# agreement here is weaker evidence than it looks (D9).
 #
-# Takes in:
-#   contigs = FINAL_CONTIGS — the finished, decontaminated assembly (D2). (v1 used
-#             contigs_sel.fasta; the new input is contigs_final.fasta, so Platon
-#             now names its outputs contigs_final.* instead of contigs_sel.*.)
-#   blast   = PLASMID_BLASTOUT — a BLAST-vs-nt table computed over THE SAME contigs
-#             Platon reported on, which is what the `grep -m 1 "$i"` contig-ID
-#             lookup below requires. CROSS-STAGE edge into shared/10_decontam.smk:
-#               * illumina / nanopore / contigs — PLASMID_BLASTOUT IS the
-#                 decontamination screen's BLASTOUT (rule blast_contigs), because
-#                 in those modes the screen already ran on this same contig set.
-#               * hybrid — the screen ran on the ILLUMINA draft while Platon runs
-#                 on the delivered ONT genome, and the two use completely
-#                 different contig names (SPAdes NODE_… vs Flye contig_…). So in
-#                 hybrid PLASMID_BLASTOUT is a SECOND blastn over FINAL_CONTIGS
-#                 (rule blast_final_contigs), exactly as v1 BacFluxL+ did with its
-#                 own in-rule blastn. Without this, every hybrid plasmid would come
-#                 back "not verified by BLAST search", silently.
-#             Both sides use the one PLASMID_BLASTOUT constant from 00_common so
-#             they cannot drift (same pattern as COMPOSITION). CONTRACT: the table
-#             must carry subject titles (BLAST outfmt 6 with stitle last) or the
-#             `grep -q "plasmid"` check below has nothing to match.
-# Does: run Platon over the contigs, then run the two-phase BLAST-text check
-#       verbatim from v1 (only the input filename changes contigs_sel→contigs_final).
-# Produces:
-#   platon_dir = 06.plasmids/{sample}/platon/ (a DIRECTORY). v1 wrote Platon output
-#                straight into {sample}/; moving it into platon/ lets the
-#                concordance TSV sit as a clean SIBLING, so no second rule writes
-#                inside this rule's directory() output.
-#   plasmids   = verified_plasmids.txt — the kept v1 check. On the DEFAULT path this
-#                IS the terminal plasmid deliverable (rule-all requests it); on the
-#                geNomad path it becomes an intermediate feeding the concordance.
-# Consumed by: plasmid_concordance when geNomad is opted in (reaches into platon_dir
-#              for contigs_final.tsv, contigs_final.chromosome.fasta, and
-#              verified_plasmids.txt); otherwise the user directly.
+# Platon's own output lands in a platon/ SUB-directory of the sample directory (v1
+# wrote it straight into {sample}/) so the concordance TSV can sit beside it as a
+# sibling. Otherwise a second rule would be writing inside this rule's directory()
+# output, which Snakemake forbids.
 #
-# (v1 message: "--- Platon: Plasmid identification. ---")
+# verified_plasmids.txt is the terminal plasmid product on the default path, and an
+# intermediate feeding plasmid_concordance when geNomad is opted in.
+# (v1 announced this stage as "--- Platon: Plasmid identification. ---".)
 rule plasmid_search:
     input:
         contigs = FINAL_CONTIGS,
+        # The BLAST table is searched BY CONTIG ID (`grep -m 1 -F` below), so it
+        # only works if it was computed over the same contigs Platon reported on.
+        # Which table that is depends on the mode, and PLASMID_BLASTOUT resolves it
+        # once in 00_common.smk: in illumina and contigs it is the decontamination
+        # screen's own BLASTOUT (rule blast_contigs, shared/10_decontam.smk),
+        # because the screen already ran on this contig set; in nanopore and hybrid
+        # it is a second blastn over FINAL_CONTIGS (rule blast_final_contigs),
+        # because nothing guarantees Medaka preserves headers and the hybrid screen
+        # runs on the Illumina draft, whose SPAdes NODE_… names can never match
+        # Flye's contig_… names. Feed the wrong table in and every plasmid comes
+        # back "not verified by BLAST search" — silently, with no error.
+        # CONTRACT: BLAST outfmt 6 with the subject title (stitle) LAST, or the
+        # `grep -qi "plasmid"` below has nothing to match.
         blast = PLASMID_BLASTOUT,
     output:
         platon_dir = directory(PLATON_DIR),
         plasmids = PLATON_VERIFIED,
     params:
         platon_db = PLATONDB,
-        # Platon names every output file after the INPUT basename. Our input is
-        # FINAL_CONTIGS (contigs_final.fasta), so Platon writes contigs_final.*.
-        # GENOMAD_PREFIX holds that shared basename ("contigs_final") — the same
-        # constant single-sources the geNomad output names — so this shell and the
-        # concordance rule cannot drift onto a different stem.
+        # Platon names every output file after the INPUT basename. The input is
+        # FINAL_CONTIGS (contigs_final.fasta), so Platon writes contigs_final.*
+        # where v1's contigs_sel.fasta gave contigs_sel.*. GENOMAD_PREFIX holds
+        # that basename, and geNomad names its files the same way, so one constant
+        # covers both tools and this shell cannot drift onto a different stem.
         contigs_prefix = GENOMAD_PREFIX,
     conda:
         "../../envs/platon.yaml"
@@ -131,8 +117,10 @@ rule plasmid_search:
         #     unnamed1"), which a case-sensitive grep silently misses.
         #   * `: > {output.plasmids}` truncates first, so a re-run does not append
         #     to a stale verified_plasmids.txt.
-        # Platon itself is wrapped so a non-zero exit reports an explanatory line
-        # instead of killing the job (v1 BacFluxL+ behaviour).
+        # Platon itself runs with errors trapped (set +e … platon_rc): a non-zero
+        # exit writes one explanatory line into verified_plasmids.txt instead of
+        # killing the sample (v1 BacFluxL+ behaviour). That line is also how
+        # plasmid_concordance.py tells "Platon crashed" from "Platon found nothing".
         """
         set +e
         platon \
@@ -162,31 +150,41 @@ rule plasmid_search:
         """
 
 
-# ── geNomad concordance (only defined when PHAGE_CALLER == "genomad") ─────────
-# Defined behind the same guard as the geNomad rules in 70_phage.smk, so it only
-# exists when geNomad was opted in (and therefore genomad_end_to_end actually
-# produced a plasmid summary to concord with). On the default path this rule does
-# not exist, and rule-all's terminal plasmid target is verified_plasmids.txt above.
+# ──────────────── Platon + geNomad concordance ─────────────────
+# Defined only when geNomad was opted in as the phage caller (config
+# phage.caller: genomad) — the same guard the geNomad rules in shared/70_phage.smk
+# sit behind, so this rule exists exactly when genomad_end_to_end has a plasmid
+# summary to compare against. On the default path the rule is never defined and
+# rule all asks for verified_plasmids.txt instead (see 00_common.smk).
 if PHAGE_CALLER == "genomad":
 
-    # ── Rule: plasmid_concordance — join Platon + geNomad plasmid calls (D9) ──
-    # Biology: build the per-contig concordance table. Confidence is driven by
-    # whether the two INDEPENDENT callers agree (both plasmid → high; one only →
-    # medium; disagreement → low, flagged not discarded). The kept v1 BLAST-text
-    # state rides along as one visible, clearly-supplementary column. The file
-    # itself is the audit trail, in the spirit of contig_taxonomy_decisions.tsv.
+    # ── Join the two callers into one per-contig table (D9) ──
+    # The two callers fail differently — Platon scores protein families by how
+    # plasmid-like they are, geNomad classifies from gene content with its own
+    # marker set — so genuine agreement between them is far stronger evidence than
+    # Platon agreeing with a screening BLAST that was run for another purpose.
+    # Agreement is what drives the confidence column: both callers → high, one
+    # only → medium, a real clash (Platon says chromosome, geNomad says plasmid)
+    # → low. Nothing is dropped; a disagreement is flagged and kept, so the table
+    # is its own audit trail, in the spirit of contig_taxonomy_decisions.tsv. The
+    # kept v1 BLAST-text state rides along as one clearly supplementary column.
     #
-    # Takes in (both {sample} DIRECTORIES; the shell reaches inside for files):
-    #   platon_dir  = PLATON_DIR — for contigs_final.tsv (plasmid calls + RDS),
-    #                 contigs_final.chromosome.fasta (chromosome IDs), and
-    #                 verified_plasmids.txt (kept BLAST-text check).
-    #   genomad_dir = GENOMAD_DIR — for the plasmid summary produced by
-    #                 genomad_end_to_end in 70_phage.smk.
-    # Does: run plasmid_concordance.py (stdlib-only Python — no new dependency, so
-    #       it reuses Platon's pinned Python via the platon env).
-    # Produces: 06.plasmids/{sample}/{sample}_plasmid_concordance.tsv.
-    # Consumed by: the report / the user (the terminal plasmid product on this path;
-    #              requested by rule all, transitively pulling in both callers).
+    # Both inputs are per-sample DIRECTORIES and the shell reaches inside them for
+    # the individual files, which keeps those inner files off the DAG (the same
+    # arrangement shared/40_annotation.smk uses for Bakta's output directory). Four
+    # files are read, and each carries one part of the picture:
+    #   contigs_final.tsv               — Platon's plasmid calls and their RDS score
+    #   contigs_final.chromosome.fasta  — the contig IDs Platon called chromosome
+    #   verified_plasmids.txt           — the kept v1 BLAST-text state per contig
+    #   …_plasmid_summary.tsv           — geNomad's calls, score and FDR, from
+    #                                     genomad_end_to_end in shared/70_phage.smk
+    # The join, the column contract and the tie rules live in
+    # scripts/60_plasmid/plasmid_concordance.py — stdlib-only Python, so it borrows Platon's
+    # pinned interpreter through the platon env instead of adding a dependency.
+    #
+    # Produces 06.plasmids/{sample}/{sample}_plasmid_concordance.tsv, the terminal
+    # plasmid deliverable on this path — rule all asks for this file, and asking for
+    # it is what pulls both callers into the run.
     rule plasmid_concordance:
         input:
             platon_dir = PLATON_DIR,
@@ -206,8 +204,10 @@ if PHAGE_CALLER == "genomad":
             LOGS + "/plasmid_concordance_{sample}.log"
         priority: 3
         shell:
-            # {wildcards.sample} is used for --sample so the name is substituted
-            # reliably. PLASMID_CONCORDANCE_SCRIPT is a 00_common global.
+            # PLASMID_CONCORDANCE_SCRIPT is a plain 00_common.smk global, which
+            # Snakemake substitutes into the shell string like any other name, so
+            # the script path needs no params entry. The sample name comes from
+            # {wildcards.sample} rather than being parsed out of a path.
             """
             python {PLASMID_CONCORDANCE_SCRIPT} \
               --sample {wildcards.sample} \

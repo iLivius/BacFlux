@@ -1,28 +1,18 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# BacFlux v2.0.0 — nanopore front end, polishing (rules/nanopore/30_polish.smk)
+# BacFlux v2.0.0 — nanopore front end, polishing and the delivered genome.
 #
-# The biology: ONT reads are excellent at telling you the STRUCTURE of a genome
-# and still imperfect at telling you the exact base, especially in homopolymers.
-# Medaka re-reads the raw signal-derived reads against the draft assembly with a
-# neural network trained on the same basecaller, and rewrites the consensus. This
-# is the step that turns a structurally-correct ONT assembly into one whose gene
-# calls can be trusted.
+# ONT reads are excellent at telling you the STRUCTURE of a genome and still
+# imperfect at telling you the exact base, especially in homopolymers. Medaka
+# re-reads the ONT reads against the draft assembly with a neural network trained
+# on the same basecaller and rewrites the consensus. This is the step that turns a
+# structurally-correct ONT assembly into one whose gene calls can be trusted.
 #
-# Data flow through this module:
+# Stage chain: DECONTAM_CONTIGS + FILT_LONG → long_read_consensus →
+# MEDAKA_CONSENSUS → finalize_contigs → FINAL_CONTIGS.
 #
-#   DECONTAM_CONTIGS ──┐
-#   (shared/10_decontam)│
-#   FILT_LONG ──────────┼──► long_read_consensus (Medaka) ──► MEDAKA_CONSENSUS ─┐
-#   raw ONT FASTQ ──────┘        [only when USE_MEDAKA]                          │
-#                                                                                ▼
-#                                                              finalize_contigs (cp)
-#                                                                                │
-#                                                                                ▼
-#                                                                       FINAL_CONTIGS
-#                                                                (the D2 hand-off:
-#                                                                 QC, taxonomy,
-#                                                                 annotation, AMR,
-#                                                                 plasmids, phages)
+# long_read_consensus : Medaka. Exists only when Medaka is enabled, and polishes
+#                       the DECONTAMINATED assembly.
+# finalize_contigs    : copies whichever file ended the chain to one canonical
+#                       name and logs which file that was.
 #
 # D3 ORDERING: Medaka polishes the DECONTAMINATED assembly, not the raw one. That
 # is v1 nanopore behaviour and it is deliberate — polishing a contaminant contig
@@ -31,54 +21,60 @@
 #
 # WHY finalize_contigs EXISTS AT ALL: whether Medaka runs is a config choice, so
 # the last file in this mode's chain is either the Medaka consensus or the
-# decontaminated assembly. `cp`ing whichever it is to ONE canonical name means
+# decontaminated assembly. Copying whichever it is to ONE canonical name means
 # every downstream module can depend on FINAL_CONTIGS and never ask the question.
 #
-# v1 -> v2 changes in this file:
+# v1 → v2 changes in this file:
 #  * v1 nanopore had a PAIR of anonymous rules (`rule:` with no name), selected by
-#    an if/else on the config. v2 has ONE named rule under `if USE_MEDAKA:`, with
-#    the explicit-model and auto-inference paths as a bash if/else inside it —
-#    i.e. the hybrid v1 form, which is easier to read and easier to log about.
-#  * The model pre-flight check (validate the model name BEFORE starting) is kept
-#    from v1 nanopore; the post-failure hint text is kept from v1 hybrid.
-#  * Auto-inference now reads the RAW ONT file rather than the filtlong output,
-#    because the basecaller tag lives in the original read headers and filtlong
-#    is not guaranteed to keep a read that carries it. This is v1 hybrid's choice,
-#    adopted here too.
+#    an if/else on the config. v2 has ONE named rule under `if USE_MEDAKA:`.
+#  * The model pre-flight check that v1 ran inside the polish rule has MOVED OUT
+#    to check_medaka_model (shared/12_medaka_check.smk), which validates an
+#    explicit model or infers one right after read filtering, gates the assembler
+#    on the result, and writes the resolved name to a file. A bad model now fails
+#    in seconds instead of after Flye, and this rule is a plain Medaka call that
+#    reads the name back. The post-failure hint text in its shell is v1 hybrid's,
+#    kept word for word.
 #  * v1's `final_contigs(wc)` input FUNCTION (which re-read the config at DAG
 #    build time) is replaced by the parse-time constant FINALIZE_SOURCE.
 #
-# Everything referenced here comes from 00_common.smk: USE_MEDAKA, MEDAKA_MODEL,
-# MEDAKA_INPUT (= DECONTAM_CONTIGS in this mode), MEDAKA_DIR, MEDAKA_CONSENSUS,
-# FINALIZE_SOURCE, FINAL_CONTIGS, FILT_LONG, NANOPORE_DIR, ONT, LOGS, capped_cpus.
-# ─────────────────────────────────────────────────────────────────────────────
+# Everything referenced here comes from 00_common.smk: USE_MEDAKA,
+# MEDAKA_MODEL_RESOLVED, MEDAKA_INPUT (= DECONTAM_CONTIGS in this mode),
+# MEDAKA_DIR, MEDAKA_CONSENSUS, FINALIZE_SOURCE, FINAL_CONTIGS, FILT_LONG, LOGS,
+# capped_cpus.
 
 
-# The rule below exists ONLY when Medaka is enabled. USE_MEDAKA is resolved once
-# at parse time in 00_common section 8: it is False only when the user explicitly
-# set parameters.nanopore.medaka_model to a false-like value. A missing or "auto"
-# value means "run Medaka and work the model out yourself", NOT "skip".
+# The rule below exists ONLY when Medaka is enabled — with Medaka off it is not in
+# the DAG at all and FINALIZE_SOURCE points straight at DECONTAM_CONTIGS.
+# USE_MEDAKA is resolved once at parse time in 00_common.smk section 8: it is
+# False only when the user explicitly set parameters.nanopore.medaka_model to a
+# false-like value. A missing or "auto" value means "run Medaka and work the model
+# out yourself", NOT "skip".
 if USE_MEDAKA:
 
-    # ── Rule: long_read_consensus — ONT consensus polishing (Medaka) ─────────
+    # ── Consensus polishing (Medaka) ──
     # Takes in:
-    #   reads    = FILT_LONG        the same reads Flye assembled
-    #   contigs  = MEDAKA_INPUT     which in nanopore mode is DECONTAM_CONTIGS,
-    #                               i.e. the assembly AFTER the contamination
-    #                               screen (D3)
+    #   reads   = FILT_LONG             the same reads Flye assembled, from rule
+    #                                   filter_long_reads (nanopore/10_reads.smk).
+    #   contigs = MEDAKA_INPUT          in nanopore mode that is DECONTAM_CONTIGS,
+    #                                   the assembly AFTER the contamination screen
+    #                                   (D3), written by rule select_contigs
+    #                                   (shared/10_decontam.smk).
+    #   model   = MEDAKA_MODEL_RESOLVED the one-line file holding the model NAME,
+    #                                   from check_medaka_model
+    #                                   (shared/12_medaka_check.smk) — see the
+    #                                   inline note on the input below.
+    # Does:     medaka_consensus aligns those reads back to that draft and rewrites
+    #           the consensus with the network trained on the matching basecaller.
+    # Produces:
+    #   consensus_dir     = MEDAKA_DIR, 02.assembly/{sample}/medaka/
+    #   consensus_contigs = MEDAKA_CONSENSUS, consensus.fasta — the filename is
+    #                       Medaka's choice, not ours
+    # Consumed by: finalize_contigs below, which reaches it through FINALIZE_SOURCE.
     #
-    # Model auto-inference reads the basecaller tag from FILT_LONG (the same reads
-    # being polished), exactly as v1 BacFluxL did. An earlier draft pointed it at
-    # the RAW ONT file instead: that is both a fidelity change and a new failure
-    # mode, because the raw input may be gzipped (BacFluxL accepts fastq.gz/fq.gz)
-    # while the filtlong output is always plain uncompressed FASTQ.
-    # Produces: MEDAKA_DIR and MEDAKA_CONSENSUS (consensus.fasta, the name Medaka
-    #           chooses itself).
-    # Consumed by: finalize_contigs.
-    #
-    # params.model is the explicit model name from the config, or "" when the
-    # user asked for automatic inference — that empty string is what the bash
-    # if/else below branches on.
+    # WHY the model is inferred from FILT_LONG and not from the raw ONT file (that
+    # happens in check_medaka_model, not here): the raw input may be gzipped, while
+    # the filtlong output is always plain uncompressed FASTQ, and the basecaller tag
+    # in the read headers is the same in both. v1 BacFluxL did it this way too.
     #
     # (v1 message: "--- Medaka: Improve contig consensus with long reads. ---")
     rule long_read_consensus:
@@ -124,18 +120,26 @@ if USE_MEDAKA:
             """
 
 
-# ── Rule: finalize_contigs — publish the delivered genome under one name ─────
-# Takes in: FINALIZE_SOURCE, a PARSE-TIME constant from 00_common that is
-#           MEDAKA_CONSENSUS when Medaka is enabled and DECONTAM_CONTIGS when it
-#           is not. Because it is resolved at parse time, the DAG is fixed before
-#           the run starts and `snakemake -n` shows the real chain.
-# Does:     copies the file and records, in the log, WHICH file it copied. That
-#           one line is the provenance of the delivered genome.
-# Produces: FINAL_CONTIGS — the single canonical hand-off (D2) that every shared
-#           downstream module consumes.
-# Consumed by: shared/15_replicons.smk, 20_qc, 30_taxonomy, 40_annotation,
-#              50_amr, 60_plasmid, 70_phage, and blast_final_contigs in
-#              shared/10_decontam.smk.
+# ──────────────────────── Final contigs hand-off ───────────────
+# Takes in: contigs = FINALIZE_SOURCE, a PARSE-TIME constant from 00_common.smk:
+#           MEDAKA_CONSENSUS (from long_read_consensus above) when Medaka is
+#           enabled, DECONTAM_CONTIGS (from select_contigs, shared/10_decontam.smk)
+#           when it is not. Because it is resolved before the run starts, the DAG
+#           is fixed and `snakemake -n` shows the real chain.
+# Does:     copies that file to one canonical name, and logs WHICH file it copied
+#           — that one line is the provenance of the delivered genome.
+# Produces: final = FINAL_CONTIGS, 02.assembly/{sample}/contigs_final.fasta, the
+#           single canonical hand-off (D2).
+# Consumed by: build_replicons (shared/15_replicons.smk); stage_qc_genomes
+#              (shared/20_qc.smk), which is also how taxonomic_assignment
+#              (shared/30_taxonomy.smk) gets it; annotation
+#              (shared/40_annotation.smk); amr_contigs (shared/50_amr.smk);
+#              plasmid_search (shared/60_plasmid.smk); the phage caller
+#              (viral_identification_virsorter2, or genomad_end_to_end when
+#              PHAGE_CALLER is genomad — shared/70_phage.smk);
+#              blast_final_contigs (shared/10_decontam.smk); and, when the
+#              mobilome module is on, amrfinderplus, isescan and six more rules
+#              in shared/80_mobilome.smk.
 #
 # conda: NONE — cp and echo only, as in v1.
 rule finalize_contigs:

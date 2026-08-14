@@ -1,51 +1,46 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# BacFlux v2.0.0 — nanopore front end, read preparation (rules/nanopore/10_reads.smk)
+# BacFlux v2.0.0 — nanopore front end, read preparation.
 #
-# The biology: an ONT run produces reads of wildly varying length and quality,
-# and far more data than a bacterial isolate needs. Assembling everything is
-# slower AND worse: short, poor reads add errors without adding contiguity. So we
-# keep the longest, best subset, and we look at the length/quality distribution
-# before and after so the choice is visible in the report.
+# An ONT run produces reads of wildly varying length and quality, and far more
+# data than a bacterial isolate needs. Assembling everything is slower AND worse:
+# short, poor reads add errors without adding contiguity. So filtlong keeps the
+# longest, best subset, and NanoPlot runs on both sides of it so the choice is
+# visible in the report rather than hidden.
 #
-# Data flow through this module:
+# Stage chain: raw {sample}_ont → filter_long_reads → FILT_LONG, with a NanoPlot
+# profile hanging off either side.
 #
-#   {sample}_ont.fastq[.gz] ──┬──► raw_long_read_qc ──► NANOPLOT_RAW_DIR ──┐
-#   (raw input, config          │                                          │
-#    input.nanopore_dir)        └──► filter_long_reads (filtlong)          │
-#                                              │                           │
-#                                              ▼                           │
-#                                          FILT_LONG                       │
-#                                    ┌─────────┼─────────┐                 ▼
-#                                    ▼         ▼         ▼             multiqc
-#                          filtered_long_    Flye    map_contigs      (shared/90)
-#                            read_qc      (20_asm)  (shared/10_decontam)
-#                                    │
-#                                    ▼
-#                           NANOPLOT_FILT_DIR ──────────────────────────► multiqc
+# raw_long_read_qc      : NanoPlot over the raw FASTQ → NANOPLOT_RAW_DIR.
+# filter_long_reads     : filtlong length/quality selection → FILT_LONG.
+# filtered_long_read_qc : the same NanoPlot over FILT_LONG → NANOPLOT_FILT_DIR.
 #
 # There is NO PhiX step here: PhiX is an Illumina spike-in and does not exist in
 # an ONT library.
 #
 # Everything referenced here comes from 00_common.smk: NANOPORE_DIR, ONT,
-# FILT_LONG, NANOPLOT_RAW_DIR, NANOPLOT_FILT_DIR, LOGS, capped_cpus.
+# FILT_LONG, NANOPLOT_RAW_DIR, NANOPLOT_FILT_DIR, FILTLONG_MIN_LENGTH,
+# FILTLONG_KEEP_PERCENT, LOGS, capped_cpus.
 #
 # conda: paths resolve relative to THIS file (workflow/rules/nanopore/), so
-# "../../envs/x.yaml" climbs nanopore/ -> rules/ -> workflow/ -> workflow/envs/.
-# ─────────────────────────────────────────────────────────────────────────────
+# "../../envs/x.yaml" climbs nanopore/ → rules/ → workflow/ → workflow/envs/.
 
 
-# ── Rule: raw_long_read_qc — length/quality profile BEFORE filtering ─────────
-# Takes in: this sample's raw ONT FASTQ from config input.nanopore_dir.
-# Does:     NanoPlot, which summarises read length, quality and yield.
-# Produces: NANOPLOT_RAW_DIR (a DIRECTORY of plots plus {sample}_NanoStats.txt).
+# ──────────────────────── Raw read profile (NanoPlot) ──────────
+# Takes in: fastq = os.path.join(NANOPORE_DIR, ONT), this sample's raw ONT FASTQ.
+#           No rule produces it — NANOPORE_DIR is config input.nanopore_dir and
+#           ONT is the {sample}_ont.<ext> filename pattern, both from 00_common.smk.
+# Does:     NanoPlot summarises read length, quality and yield for that FASTQ.
+#           --loglength adds log-scaled length plots, because ONT read lengths span
+#           orders of magnitude and collapse into one spike on a linear axis.
+# Produces: nanoplot_raw_dir = NANOPLOT_RAW_DIR, 01.reads/{sample}/ont/raw_qc — a
+#           DIRECTORY of plots plus {sample}_NanoStats.txt.
 # Consumed by: multiqc (shared/90_report.smk), and nothing else.
 #
-# --prefix "{sample}_" IS LOAD-BEARING, not cosmetic. MultiQC names a sample
-# after the file it read, and shared/90_report.smk rewrites those names with the
-# regex '^01\\.reads \\| ([^|]+) \\| ont \\| raw_qc \\| \\1$' — the backreference
-# requires the name INSIDE the directory to equal the sample name, which only
-# happens when NanoPlot writes {sample}_NanoStats.txt. Drop the prefix and
-# NanoPlot silently disappears from the report.
+# --prefix "{sample}_" IS LOAD-BEARING, not cosmetic. MultiQC names a sample after
+# the file it read, and shared/90_report.smk rewrites those names with the regex
+#   '^01\.reads \| ([^|]+) \| ont \| raw_qc \| \1$'
+# whose backreference requires the name INSIDE the directory to equal the sample
+# name — which only happens when NanoPlot writes {sample}_NanoStats.txt. Drop the
+# prefix and NanoPlot silently disappears from the report.
 #
 # Rule NAME: v1 BacFluxL called this `raw_read_qc`; we adopt BacFluxL+'s
 # `raw_long_read_qc` so the nanopore and hybrid front ends read identically.
@@ -58,7 +53,7 @@ rule raw_long_read_qc:
         nanoplot_raw_dir = directory(NANOPLOT_RAW_DIR),
     conda:
         "../../envs/nanoplot.yaml"
-        # NanoPlot is plotting, not aligning; it stops scaling early.
+    # NanoPlot is plotting, not aligning; it stops scaling early.
     threads: capped_cpus(8)
     log:
         LOGS + "/raw_long_read_qc_{sample}.log"
@@ -74,23 +69,38 @@ rule raw_long_read_qc:
         """
 
 
-# ── Rule: filter_long_reads — keep the long, high-quality subset (filtlong) ──
-# Biology / the three thresholds, all preserved from v1 BacFluxL:
-#   --min_length 1000     reads under 1 kb bring ONT's error rate without ONT's
-#                         main benefit (spanning repeats), so they are dropped.
-#   --keep_percent 90     discard the worst-scoring 10% of the remaining bases.
-#   --target_bases 5e8    stop at 500 Mbp, which is roughly 100x for a typical
-#                         5 Mbp bacterial genome. More coverage than that costs
-#                         Flye time without improving the assembly.
-# Note this is the NANOPORE-mode flag set. Hybrid mode uses a different one
-# (--trim --split --length_weight, and no --target_bases) because there the
-# selected Illumina reads, not a coverage cap, define what is worth keeping.
-#
-# Takes in: the raw ONT FASTQ.
-# Produces: FILT_LONG.
-# Consumed by: filtered_long_read_qc (below), ont_assembly (20_assembly.smk),
-#              long_read_consensus (30_polish.smk) and map_contigs
+# ──────────────────────── Read selection (filtlong) ────────────
+# Takes in: long = os.path.join(NANOPORE_DIR, ONT), the same raw ONT FASTQ
+#           raw_long_read_qc profiled above — filtlong reads the reads, not the
+#           plots, so the two rules are independent of each other.
+# Does:     filtlong scores every raw ONT read and keeps the longest, best-scoring
+#           subset. Three knobs, and only one of them is fixed in this rule:
+#             --min_length     parameters.long_read_qc.min_length, default 1000.
+#                              Reads under ~1 kb bring ONT's error rate without
+#                              ONT's main benefit, which is spanning repeats.
+#             --keep_percent   parameters.long_read_qc.keep_percent, default 95 —
+#                              keep the best N% of the remaining BASES. It was 90;
+#                              the long_read_qc block in config.yaml explains why
+#                              being less selective is safer for small plasmids.
+#             --target_bases   hard-coded 5e8 here: stop at 500 Mbp, roughly 100x
+#                              for a 5 Mbp bacterial genome. More coverage than
+#                              that costs Flye time without improving the assembly.
+# Produces: filt_long = FILT_LONG, 01.reads/{sample}/ont/{sample}_filt.fastq — the
+#           kept reads, and the only ONT reads anything downstream ever sees.
+# Consumed by: filtered_long_read_qc (below), check_medaka_model
+#              (shared/12_medaka_check.smk, which infers the Medaka model from
+#              these reads), ont_assembly (nanopore/20_assembly.smk),
+#              long_read_consensus (nanopore/30_polish.smk) and map_contigs
 #              (shared/10_decontam.smk, the ONT coverage track for BlobTools).
+#
+# GOTCHA: setting parameters.long_read_qc.length_weight has NO effect in this
+# mode. There is no --length_weight below, so filtlong uses its own default of 1.
+# That key reaches filtlong in hybrid mode only — which is where a 5,596 bp Col
+# plasmid was lost at length_weight 10 (the read counts are in config.yaml).
+#
+# Hybrid's whole flag set differs (--trim --split --length_weight, and no
+# --target_bases) because there the decontaminated Illumina reads, not a coverage
+# cap, define what is worth keeping — see hybrid/30_ont_reads.smk.
 #
 # Rule NAME: v1 BacFluxL called this `filter_reads`; renamed to BacFluxL+'s
 # `filter_long_reads` for the same read-alike reason as above.
@@ -120,13 +130,18 @@ rule filter_long_reads:
         """
 
 
-# ── Rule: filtered_long_read_qc — the same profile AFTER filtering ───────────
-# Takes in: FILT_LONG.
-# Produces: NANOPLOT_FILT_DIR.
-# Consumed by: multiqc only. Side by side with the raw plot it shows exactly what
-#              filtlong removed, which is the honest way to report a filter.
+# ──────────────────── Filtered read profile (NanoPlot) ─────────
+# Takes in: fastq = FILT_LONG, the kept reads from rule filter_long_reads above.
+# Does:     the same NanoPlot profile again, same flags, this time over the subset
+#           that survived the filter.
+# Produces: nanoplot_filt_dir = NANOPLOT_FILT_DIR, 01.reads/{sample}/ont/filt_qc —
+#           the same directory of plots plus {sample}_NanoStats.txt.
+# Consumed by: multiqc (shared/90_report.smk) only. Side by side with the raw plot
+#              it shows exactly what filtlong removed, which is the honest way to
+#              report a filter.
 #
-# Same --prefix rule as raw_long_read_qc: the report regex depends on it.
+# Same --prefix rule as raw_long_read_qc — the report regex depends on it, here on
+# its filt_qc branch.
 #
 # (v1 message: "--- NanoPlot: Filtered long-read QC. ---")
 rule filtered_long_read_qc:
