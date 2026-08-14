@@ -30,20 +30,20 @@
 # docs/validation/README.md and docs/mobilome_worked_example.md.
 mode: contigs
 input:
-  contigs_dir: /media/data/antonielli_dir/BacFlux_v2_validation/kpnih1_positive_control/input_dir
+  contigs_dir: <validation-root>/kpnih1_positive_control/input_dir
 directories:
-  output_dir: /media/data/antonielli_dir/BacFlux_v2_validation/kpnih1_positive_control/output_dir
-  bakta_db: /data/x1hbrnas4/big_db/bakta_6.0/db
-  blast_db: /data/x1hbrnas4/big_db/NCBI_nt_core_2026.07.13
-  eggnog_db: /data/x1hbrnas4/big_db/eggnog
-  gtdbtk_db: /data/x1hbrnas4/big_db/GTDB_R232/release232
-  platon_db: /data/x1hbrnas4/big_db/platon/db
-  checkv_db: /data/x1hbrnas4/big_db/checkv/
+  output_dir: <validation-root>/kpnih1_positive_control/output_dir
+  bakta_db: <db-root>/bakta_6.0/db
+  blast_db: <db-root>/NCBI_nt_core_2026.07.13
+  eggnog_db: <db-root>/eggnog
+  gtdbtk_db: <db-root>/GTDB_R232/release232
+  platon_db: <db-root>/platon/db
+  checkv_db: <db-root>/checkv/
   # Reuse already-downloaded shared databases rather than re-fetching ~25 GB for
   # a run that has nothing biologically to do with those samples.
-  vs2_db: /media/data/antonielli_dir/BacFlux_v2_validation/hybrid_screen_batch1/output_dir/07.phages/vs2_db
-  antismash_db: /media/data/antonielli_dir/BacFlux_v2_validation/hybrid_screen_batch1/output_dir/04.annotation/antismash/databases
-  dbcan_db: /media/data/antonielli_dir/BacFlux_v2_validation/hybrid_screen_batch1/output_dir/04.annotation/dbcan/dbcan_db_v5.1.2
+  vs2_db: <validation-root>/hybrid_screen_batch1/output_dir/07.phages/vs2_db
+  antismash_db: <validation-root>/hybrid_screen_batch1/output_dir/04.annotation/antismash/databases
+  dbcan_db: <validation-root>/hybrid_screen_batch1/output_dir/04.annotation/dbcan/dbcan_db_v5.1.2
 links:
   dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
   checkv_link: https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz

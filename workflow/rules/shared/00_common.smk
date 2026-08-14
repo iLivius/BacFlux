@@ -1856,9 +1856,12 @@ def _downstream_targets():
     if MOBILOME_RUN:
         if not glob.glob(os.path.join(WORKFLOW_DIR, "rules", "shared", "80_mobilome.smk")):
             sys.exit(
-                "[BacFlux] config.mobilome.run is true, but the mobilome module "
-                "(workflow/rules/shared/80_mobilome.smk) is not implemented yet. "
-                "Set mobilome.run: false."
+                "[BacFlux] config.mobilome.run is true, but the module's rule file "
+                "(workflow/rules/shared/80_mobilome.smk) is missing from this "
+                "checkout. The module ships with BacFlux v2, so this is an "
+                "incomplete copy of the repository rather than a config mistake — "
+                "re-clone or restore the file. To carry on without the module in "
+                "the meantime, set mobilome.run: false."
             )
         # Ask for the FILES, not the directory: the mobility table is the module's
         # headline product, and the IS summary carries the honest QC signal (what

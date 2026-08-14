@@ -317,10 +317,10 @@ means agreement with a curation, not with truth.
 ## 10. Where the numbers come from
 
 - Fragmented assemblies, coordinate translation and per-call scoring:
-  `/media/data/antonielli_dir/BacFlux_v2_validation/draft_validation/`
+  `<validation-root>/draft_validation/`
   (`assembly_stats.tsv`, `element_coordinates.tsv`, `element_summary.tsv`,
   `calls_all.tsv`, `scoring/*.tsv`).
-- Closed-genome baseline: `/media/data/antonielli_dir/BacFlux_v2_validation/phase7_benchmark/`
+- Closed-genome baseline: `<validation-root>/phase7_benchmark/`
   (read-only; not modified by this work).
 - Re-run of the caller with the guards in place, used for §8:
   `draft_validation/reverify/`.

@@ -537,7 +537,7 @@ pin-sensitive and nothing detects a future Bakta change silently reverting it to
 closed Unicycler/NCBI input genome is annotated as linear contigs.
 
 **Stage 4.5 — Real end-to-end validation, illumina mode. ✓ PASSED 2026-07-22.**
-Full run on strain CDRTa11 at `/media/data/antonielli_dir/BacFlux_v2_validation/illumina/`
+Full run on strain CDRTa11 at `<validation-root>/illumina/`
 (see its `RUN_NOTES.md` for the complete table and the caveats). 10/10 steps, zero errors,
 every stage compared against the v1.3.1 baseline in `BacFlux_test/output_dir`:
 
@@ -564,7 +564,7 @@ Not covered by this run, still to do: nanopore and hybrid validations; the `chec
 DOWNLOAD rule (the database was staged by hand because portal.nersc.gov was unreachable).
 
 **Stage 4.6 — Real end-to-end validation, nanopore mode. ✓ PASSED 2026-07-22.**
-Run at `/media/data/antonielli_dir/BacFlux_v2_validation/nanopore/` (see its `RUN_NOTES.md`).
+Run at `<validation-root>/nanopore/` (see its `RUN_NOTES.md`).
 34/34 steps, zero errors, launched with `--cores 56` and NO `--resources` flag — so this run
 is also the end-to-end gate for the `cpus`→`threads:` conversion (`bdb2a57`).
 
@@ -586,7 +586,7 @@ also record that `medaka_model` is coupled to the Flye read mode, and that `auto
 basecaller tag this dataset does not have.
 
 **Stage 4.7 — Real end-to-end validation, hybrid mode. ✓ PASSED 2026-07-22.**
-Run at `/media/data/antonielli_dir/BacFlux_v2_validation/hybrid/` (see its `RUN_NOTES.md`).
+Run at `<validation-root>/hybrid/` (see its `RUN_NOTES.md`).
 52/52 steps, zero errors, first attempt, `--cores 12` with no `--resources` flag.
 
 - **Genome chain byte-identical to BacFluxL+**: SPAdes draft, Flye ONT assembly, Medaka
@@ -677,7 +677,7 @@ this stage closed:
   documented v1→v2 change: hybrid auto-inference now resolves from `FILT_LONG` like nanopore.
 
 **Stage 4.10 — Real end-to-end validation, contigs mode. ✓ PASSED 2026-07-24.**
-Run at `/media/data/antonielli_dir/BacFlux_v2_validation/contigs_validation/` (see its
+Run at `<validation-root>/contigs_validation/` (see its
 `SAMPLE_NOTES.md`). 162/162 steps, zero errors, `--cores 96`, no `--resources`. This is the
 mode with NO v1 FastaFlux baseline, so it is not a byte-comparison — it is the first exercise
 of contigs-mode's OWN code: sample discovery from bare FASTA, its decontamination screen run

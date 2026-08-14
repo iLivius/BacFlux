@@ -55,7 +55,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Files whose comments we read. Env YAMLs are conda pins with no prose.
 SOURCE_SUFFIXES = (".smk", ".py", ".sh")
-SOURCE_NAMES = ("Snakefile", "FastaFlux")
+SOURCE_NAMES = ("Snakefile",)
 SKIP_DIRS = {".git", ".snakemake", "__pycache__", "ref"}
 
 # ── What a claim looks like ──────────────────────────────────────────────────

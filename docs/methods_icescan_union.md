@@ -6,7 +6,7 @@ over from notes. Where a claim could **not** be re-established, it is marked as
 such instead of being repeated.*
 
 Established 2026-07-30, on the 28-genome Phase 7 benchmark
-(`/media/data/antonielli_dir/BacFlux_v2_validation/phase7_benchmark`),
+(`<validation-root>/phase7_benchmark`),
 comparing two arms that differ **only** by whether the ICE caller was given
 `--icescan-tsv`.
 

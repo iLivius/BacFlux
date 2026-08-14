@@ -4,7 +4,7 @@
 page teaches you to read the output, this one teaches you to change it.*
 
 *Every number on this page was measured from artefacts on disk
-(`/media/data/antonielli_dir/BacFlux_v2_validation/`) or read out of the source,
+(`<validation-root>/`) or read out of the source,
 on 2026-07-31. Where a knob has never been measured, it says so rather than
 offering a plausible-sounding recommendation.*
 

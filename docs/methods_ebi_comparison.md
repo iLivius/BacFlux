@@ -4,8 +4,8 @@
 **Purpose:** a methods-section-ready account of a head-to-head run of BacFlux's
 mobilome module against an independent, published mobilome pipeline, on identical
 input, scored by identical code.
-**Artefacts:** `/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map`
-(runs, conversion, scoring) and `/media/data/antonielli_dir/BacFlux_v2_validation/phase7_benchmark`
+**Artefacts:** `<validation-root>/ebi_map`
+(runs, conversion, scoring) and `<validation-root>/phase7_benchmark`
 (BacFlux's own benchmark). Every figure below was recomputed from those files
 while writing this document, not copied from an earlier draft.
 

@@ -808,18 +808,22 @@ def test_output_directories_are_created(tmp_path):
 
 # A real v2 validation run: sample 006, classified from both the Illumina and the
 # ONT assembly into the genus GTDB called Pseudomonas_E in R226 and calls
-# Aquipseudomonas in R232. The expected answer either way is "no organism". The
-# path is a local one on this machine, so the test skips itself where the
-# validation data is not present.
-REAL_SUMMARY = ("/media/data/antonielli_dir/BacFlux_v2_validation/"
-                "hybrid_screen_batch2/output_dir/03.taxonomy/006/"
-                "gtdbtk.bac120.summary.tsv")
+# Aquipseudomonas in R232. The expected answer either way is "no organism".
+#
+# The file itself is a local validation artefact and is deliberately NOT in the
+# repository, so point the test at your own copy through the environment:
+#
+#     BACFLUX_TEST_GTDBTK_SUMMARY=/your/path/gtdbtk.bac120.summary.tsv pytest ...
+#
+# Unset, the test skips. It used to carry an absolute path from one machine, which
+# meant it silently never ran anywhere else.
+REAL_SUMMARY = os.environ.get("BACFLUX_TEST_GTDBTK_SUMMARY", "")
 
 
 def test_real_gtdbtk_summary_gives_no_organism(tmp_path):
     if not os.path.isfile(REAL_SUMMARY):
         import pytest
-        pytest.skip("validation data not present on this machine")
+        pytest.skip("set BACFLUX_TEST_GTDBTK_SUMMARY to run this")
 
     organism, classification, reason = gao.decide_organism(REAL_SUMMARY, "006")
     assert organism == ""
@@ -843,8 +847,12 @@ def test_real_gtdbtk_summary_gives_no_organism(tmp_path):
 # the 2026-07-27 move from R226). If a future release renames things, this test
 # fails and the table gets revisited instead of quietly mapping the wrong taxon.
 # Skipped where the DB is absent.
-GTDB_TAXONOMY = ("/data/x1hbrnas4/big_db/GTDB_R232/release232/taxonomy/"
-                 "gtdb_taxonomy.tsv")
+# GTDB's own taxonomy file, from the database directory config.gtdbtk_db points
+# at. Like the summary above it is far too large to vendor, so it comes from the
+# environment and the test skips without it:
+#
+#     BACFLUX_TEST_GTDB_TAXONOMY=$GTDBTK_DB/taxonomy/gtdb_taxonomy.tsv pytest ...
+GTDB_TAXONOMY = os.environ.get("BACFLUX_TEST_GTDB_TAXONOMY", "")
 
 
 def gtdb_species_names_matching(prefix):
@@ -870,7 +878,7 @@ def gtdb_species_names_matching(prefix):
 def test_gtdb_really_has_no_unsuffixed_enterococcus_faecium():
     if not os.path.isfile(GTDB_TAXONOMY):
         import pytest
-        pytest.skip("GTDB taxonomy not present on this machine")
+        pytest.skip("set BACFLUX_TEST_GTDB_TAXONOMY to run this")
 
     enterococci = gtdb_species_names_matching("Enterococcus")
     faecium_names = {n for n in enterococci if n.split()[1] == "faecium"}

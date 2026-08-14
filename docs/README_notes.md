@@ -228,7 +228,7 @@ way `links.checkv_link` was. (It failed exactly this way during implementation:
 The fallback is therefore a local copy, and BacFlux now supports one via **`directories.genomad_db`**
 (rule `genomad_db_local`, same symlink-view pattern as `vs2_db`). The README should tell anyone
 opting into geNomad to set it, and note that this machine already holds a copy under
-`/data/x1hbrnas4/big_db/genomad/`. Two gotchas worth stating, both found by running it:
+`<db-root>/genomad/`. Two gotchas worth stating, both found by running it:
 - geNomad reads `version.txt` on startup, so that file must be **readable**, not merely present.
   In a shared database it is easy for that one small file to end up mode 0640 while every large
   data file beside it is world-readable. BacFlux checks this at parse time now.
@@ -457,7 +457,7 @@ Bactopia, nf-core/funcscan and Bakta do not attempt it at all — Bakta never pa
 touches the launch command's expected `gtdbtk_db` path and the pinned tool version.
 
 `gtdbtk_db` now points at GTDB R232 (a colleague placed the release directory on the
-NAS: `/data/x1hbrnas4/big_db/GTDB_R232/release232`). This was not a database-only
+NAS: `<db-root>/GTDB_R232/release232`). This was not a database-only
 swap: GTDB-Tk hard-pins itself to ONE compatible reference-data release
 (`COMPATIBLE_REF_DATA_VERSIONS` in its own source) — 2.6.1 only accepts r220/r226, so
 R232 requires GTDB-Tk **2.7.0+** (pinned to 2.7.2 in `workflow/envs/gtdbtk.yaml`).

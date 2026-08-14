@@ -21,7 +21,7 @@ the CONFIDENCE says how much of that evidence survived a fragmented assembly. A
 tier is never quietly lowered because the assembly was poor, and a confidence is
 never left high because the tier looked good.
 
-Run: /home/antoniellil/miniconda3/envs/snakemake/bin/python -m pytest \
+Run: python -m pytest \
         workflow/scripts/80_mobilome/test_colocalise.py -q
 """
 
