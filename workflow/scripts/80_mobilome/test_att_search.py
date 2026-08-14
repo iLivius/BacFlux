@@ -1,14 +1,23 @@
 """Unit tests for att_search.py — the attL/attR direct-repeat search.
 
+att_search is the only piece of original algorithm in the mobilome module.
+conjscan_to_ice.py hands it one contig's sequence plus the coordinates of a
+conjugation-machinery cluster, and it looks for the pair of direct repeats that
+site-specific integration leaves at the two ends of an integrated element. Only a
+tRNA-anchored pair is ever acted on: it moves the element's start and end, and
+therefore decides which genes count as cargo of something predicted to be
+mobile. A mistake here either invents a boundary that does not exist or throws
+away a real one, which is why the assertions below are on exact coordinates.
+
 Every test builds a small SYNTHETIC contig with repeats planted at coordinates
 the test itself chose, so the expected answer is known exactly and the assertions
 can be on the numbers, not on "something was found". That is what spec §8 Phase 7
 asks for: "unit tests on synthetic contigs with planted att repeats at known
 offsets".
 
-No genome, no Bakta, no database - pure sequence handling.
+No genome, no Bakta, no database — pure sequence handling.
 
-Run: pytest workflow/scripts/mobilome/test_att_search.py -q
+Run: pytest workflow/scripts/80_mobilome/test_att_search.py -q
 """
 
 import random
@@ -24,7 +33,7 @@ def random_sequence(length, seed):
     A fixed seed per test keeps failures debuggable: the same "genome" is rebuilt
     byte for byte on every run, so a failing assertion always refers to the same
     sequence. Random background also means any repeat the search finds was
-    planted deliberately - chance 25-mers do not occur in a few kb.
+    planted deliberately — chance 25-mers do not occur in a few kb.
     """
     generator = random.Random(seed)
     return "".join(generator.choice("ACGT") for _ in range(length))
@@ -84,7 +93,7 @@ def test_denovo_finds_a_planted_direct_repeat_at_the_exact_offsets():
 
 
 def test_denovo_returns_none_when_there_is_no_repeat():
-    """Random sequence with nothing planted must yield no boundaries at all -
+    """Random sequence with nothing planted must yield no boundaries at all —
     the search must not invent an element out of background similarity."""
     sequence = random_sequence(80_000, seed=2)
     result = att.find_att_sites(sequence, element_start=30_000, element_end=40_000,
@@ -98,7 +107,7 @@ def test_denovo_ignores_a_repeat_that_does_not_bracket_the_machinery():
     """Two copies both sitting to the LEFT of the element are not attL/attR.
 
     Only the flanking regions are searched, so a repeat pair entirely on one side
-    can never be paired up - which is what stops an unrelated duplication
+    can never be paired up — which is what stops an unrelated duplication
     elsewhere on the contig from being read as element boundaries.
     """
     sequence = build_contig_with_att(ATT_MOTIF, 5_000, 12_000, seed=3)
@@ -163,7 +172,7 @@ def test_masked_is_repeats_do_not_produce_a_false_boundary():
 
 
 def test_mask_intervals_blanks_the_right_bases_and_keeps_the_length():
-    """Masking must not shift coordinates - every position reported afterwards
+    """Masking must not shift coordinates — every position reported afterwards
     still refers to the real genome."""
     sequence = "ACGT" * 10                     # 40 bp
     masked = att.mask_intervals(sequence, [(5, 8)])
@@ -185,12 +194,13 @@ def test_masking_is_clamped_to_the_sequence():
 # ── Repeats sitting in a tRNA: boundary_method='tRNA' ───────────────────────
 
 def trna_feature(contig, start, end, strand, name="tRNA-Gly(gcc)"):
+    """One tRNA in the shape att.parse_trna_features returns from a Bakta GFF3."""
     return {"contig": contig, "start": start, "end": end,
             "strand": strand, "name": name}
 
 
 def test_trna_anchored_search_is_preferred_over_denovo():
-    """When a repeat sits in a tRNA 3' end, that answer wins - even if a longer
+    """When a repeat sits in a tRNA 3' end, that answer wins — even if a longer
     unanchored repeat is available.
 
     This is the ranking rule the search turns on: a repeat at a tRNA is where
@@ -221,13 +231,13 @@ def test_trna_anchored_search_is_preferred_over_denovo():
     assert result["att_left"].startswith(str(trna_end - 24))
 
 
-# THE NEXT TWO ARE DELIBERATELY RETIRED, not broken - note the `_retired_`
+# The next two are deliberately retired, not broken — note the `_retired_`
 # prefix, which stops pytest collecting them. They pinned the OLD mismatch-
 # tolerant probe, which allowed attL and attR to differ by one base. The search
 # is exact now (maximal repeats are grown only while the flanks agree base for
 # base), so both would fail. They are kept as the record of what the module used
 # to promise; what replaced them is the exact-match pair further down, under
-# "The exact-match contract". Do not "fix" them - delete them or leave them.
+# "The exact-match contract". Do not "fix" them — delete them or leave them.
 
 def _retired_test_trna_anchored_tolerates_a_single_mismatch():
     """attL and attR often differ by one base, because only the copy that
@@ -281,7 +291,7 @@ def test_a_trna_far_outside_the_window_is_not_used():
 
 def test_empty_or_missing_input_is_not_fatal():
     """A contig with no sequence, or an element with no coordinates, must return
-    the 'none' result rather than raise - the caller writes these columns for
+    the 'none' result rather than raise — the caller writes these columns for
     every candidate unconditionally."""
     assert att.find_att_sites("", 10, 20)["boundary_method"] == "none"
     sequence = random_sequence(1_000, seed=12)
@@ -299,8 +309,21 @@ def test_reversed_coordinates_are_tolerated():
 
 
 # ── FASTA and GFF3 readers ──────────────────────────────────────────────────
+#
+# In a real run the sequence is the delivered assembly (contigs_final.fasta) and
+# the tRNAs come from that sample's Bakta GFF3, both handed over by
+# conjscan_to_ice.py, the only caller. These two readers are where a sample
+# silently loses its att search: a contig id that does not match ISEScan's, or a
+# tRNA block that is never found, ends as boundary_method='none' on every
+# element rather than as an error.
 
 def test_read_fasta_keys_on_the_first_token_and_upper_cases(tmp_path):
+    """Contigs are keyed on the first token of the header, not the whole line.
+
+    That is the same convention the rest of BacFlux uses, and it has to be: the
+    key must match the seqid in Bakta's GFF3, or no tRNA can ever be placed on
+    the sequence it came from.
+    """
     path = tmp_path / "genome.fna"
     path.write_text(">NZ_CP006659.2 Klebsiella pneumoniae chromosome\nacgt\nACGT\n"
                     ">contig_2\nTTTT\n")
@@ -312,6 +335,14 @@ def test_read_fasta_keys_on_the_first_token_and_upper_cases(tmp_path):
 
 
 def test_parse_trna_features_reads_bakta_gff3_and_stops_at_the_fasta(tmp_path):
+    """Bakta appends the whole assembly as FASTA after a ##FASTA line, so the
+    reader has to stop there: annotation ends, megabases of sequence begin.
+
+    The fixture plants the letters tRNA inside a sequence line on purpose. Only
+    the tab-delimited column check keeps that out of the results today, so if
+    anyone ever loosens the parser to a plain text search, this test fails
+    instead of the run quietly gaining a tRNA at a made-up coordinate.
+    """
     path = tmp_path / "sample.gff3"
     path.write_text(
         "##gff-version 3\n"
@@ -332,6 +363,8 @@ def test_parse_trna_features_reads_bakta_gff3_and_stops_at_the_fasta(tmp_path):
 
 
 def test_parse_trna_features_on_a_missing_file_is_not_fatal():
+    """No annotation means no tRNA anchoring, not a crash: the search falls back
+    to de novo repeats, which are reported but never move an element."""
     assert att.parse_trna_features("/nonexistent/sample.gff3") == []
 
 
@@ -355,7 +388,7 @@ def test_minimum_repeat_length_scales_with_the_window():
     large = att.minimum_informative_repeat_length(30_000, 30_000)
     assert large > small
     # For 30 kb flanks the arithmetic lands around 20 bp; well above the old
-    # fixed floor of 12, and comfortably inside the real 15-25 bp att range.
+    # fixed floor of 12, and comfortably inside the real 15–25 bp att range.
     assert 18 <= large <= 24
     # Never below the absolute floor, however tiny the window.
     assert att.minimum_informative_repeat_length(10, 10) == att.DENOVO_ABSOLUTE_MIN_REPEAT_BP
@@ -384,10 +417,10 @@ def test_random_sequence_yields_no_boundaries_at_several_window_sizes():
 
 # ── Negative controls built from REAL genome structure ──────────────────────
 #
-# The tests above use i.i.d. uniform random DNA, which is exactly the assumption
-# the de novo chance model makes - so they can only ever confirm that model, never
-# challenge it. Measured on the K. pneumoniae positive-control chromosome, 300
-# randomly placed non-ICE
+# The tests above use random DNA in which every base is equally likely and
+# independent of its neighbours — exactly the assumption the de novo chance model
+# makes — so they can only ever confirm that model, never challenge it. Measured
+# on the K. pneumoniae positive-control chromosome, 300 randomly placed non-ICE
 # spans produced a confident "denovo" boundary 22% of the time, against the ~1.3%
 # the model predicts. The difference is not noise: it is the repetitive structure
 # that every real chromosome has and random DNA does not.
@@ -398,9 +431,8 @@ def test_a_dispersed_repeat_family_is_not_an_att_site():
     """An rRNA-operon-like repeat, present many times, must not become a boundary.
 
     This is that control's false positive in miniature. A 25 bp stretch of 16S
-    rRNA
-    satisfies every length threshold and genuinely IS an exact direct repeat
-    shared by the two flanks - but the cell carries seven rRNA operons, so the
+    rRNA satisfies every length threshold and genuinely IS an exact direct repeat
+    shared by the two flanks — but the cell carries seven rRNA operons, so the
     sequence occurs seven times. An integration scar occurs exactly twice, which
     is what separates the two cases.
     """
@@ -437,7 +469,7 @@ def test_two_paralogous_trnas_are_not_an_att_pair():
     """Isoacceptor tRNAs share their 3' ends, and a genome carries dozens.
 
     Two paralogous tRNA genes share their 3' ends by definition, so a repeat
-    found in one is guaranteed to be found in the other - producing a beautifully
+    found in one is guaranteed to be found in the other — producing a beautifully
     bracketing pair that gets labelled 'tRNA', the method this module treats as
     its most precise. Nine such pairs turned up in 300 random spans of the
     K. pneumoniae positive-control chromosome.
@@ -459,7 +491,7 @@ def test_two_paralogous_trnas_are_not_an_att_pair():
 
 
 def test_one_copy_in_a_trna_is_the_real_integration_signature():
-    """Same sequence, but only the left copy is inside a tRNA - which is what
+    """Same sequence, but only the left copy is inside a tRNA — which is what
     site-specific integration at a tRNA 3' end actually leaves behind."""
     sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000, length=200_000, seed=505)
     one_trna = [trna_feature("contig_1", 29_952, 30_024, "+")]
@@ -474,11 +506,11 @@ def test_one_copy_in_a_trna_is_the_real_integration_signature():
     assert result["att_right"].startswith("85000..")
 
 
-# ── The exact-match contract, replacing the two retired mismatch tests ───────
+# ── The exact-match contract, replacing the two retired mismatch tests ──────
 #
 # The old design took a fixed probe and allowed up to one mismatch against it.
-# The search is now EXACT maximal repeats - `vmatch -l` semantics, which is what
-# ICEfinder2 actually uses - so mismatch tolerance no longer exists. That is a
+# The search is now EXACT maximal repeats — `vmatch -l` semantics, which is what
+# ICEfinder2 actually uses — so mismatch tolerance no longer exists. That is a
 # deliberate trade, and the honest limitation is recorded here rather than
 # hidden: BLAST (the DEPhT route) would absorb mismatches and indels, but needs
 # a subprocess dependency this module does not have. See
@@ -521,7 +553,7 @@ def test_an_exact_pair_is_still_found_after_the_change():
 def test_a_trna_derived_repeat_survives_its_own_paralogues():
     """THE regression that prompted the tRNA-aware copy guard.
 
-    ICEKp integrates at tRNA-Asn, so its att core is a piece of a tRNA 3' end -
+    ICEKp integrates at tRNA-Asn, so its att core is a piece of a tRNA 3' end —
     and a genome with five tRNA-Asn genes contains that sequence five times
     whether or not an ICE is present. The old "occurs at most twice" rule
     therefore threw away the real, published ICEKp att site. Copies INSIDE tRNAs
@@ -529,7 +561,7 @@ def test_a_trna_derived_repeat_survives_its_own_paralogues():
     """
     sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000,
                                      length=200_000, seed=818)
-    # three more copies of the same motif, each inside its own tRNA - the
+    # three more copies of the same motif, each inside its own tRNA — the
     # paralogous tRNA genes that defeated the old rule
     trnas = [trna_feature("contig_1", 29_952, 30_024, "+")]
     for position in (120_000, 150_000, 175_000):
@@ -553,7 +585,7 @@ def test_two_different_trna_species_can_still_bracket_an_element():
 
     Measured on ICEEc2 (GU725392), where the real 22 bp att pair sits in tRNA-Phe
     at one end and tRNA-Ser at the other. The blanket rule discarded the correct
-    boundary and the element was reported 37 kb short of its true extent - even
+    boundary and the element was reported 37 kb short of its true extent — even
     though the right pair was in the candidate list and outscored the winner.
     """
     sequence = build_contig_with_att(ATT_MOTIF, 30_000, 85_000, length=200_000, seed=505)

@@ -1,21 +1,31 @@
 #!/usr/bin/env python3
 """Re-check the GTDB -> AMRFinderPlus organism table against a GTDB release.
 
-WHY THIS EXISTS
-    gtdb_amrfinder_organism.py carries a small hand-checked table saying which
-    GTDB species names mean which AMRFinderPlus `--organism`. Those names are NOT
-    stable: GTDB explicitly states that the alphabetic suffixes are best-effort
-    and may change between releases, and it moves species between genera when the
-    tree says so. C. jejuni sits in g__Campylobacter_D today; nothing promises it
-    will tomorrow.
+Why this exists
+    gtdb_amrfinder_organism.py turns a GTDB-Tk species call into an
+    AMRFinderPlus `--organism` value, using two small generated files that sit
+    next to it: gtdb_organism_equivalences.tsv (the per-species overrides) and
+    gtdb_organism_genus_rules.tsv (which genus-level organisms may be matched
+    from the bare genus). Both were built from ONE GTDB release, and GTDB names
+    are NOT stable: GTDB explicitly states that the alphabetic suffixes are
+    best-effort and may change between releases, and it moves species between
+    genera when the tree says so. C. jejuni sits in g__Campylobacter_D today;
+    nothing promises it will tomorrow.
 
     So every time you point `gtdbtk_db` at a NEW GTDB release, the table needs
-    re-checking. This script does the checking for you. It does NOT edit the
-    table - a wrong --organism is worse than none, so the decision stays with a
-    human - it tells you exactly which entries still hold, which have moved, and
-    which new ones you could now add.
+    re-checking, and the unit tests cannot do it for you: they only prove the
+    module's rules are self-consistent, which they were all the way through the
+    original Campylobacter bug - the curated species had quietly moved into a
+    suffixed genus and stopped matching anything at all.
 
-WHAT IT CHECKS, AND WHAT "CORRECT" MEANS
+    This script does the checking against the release's own data. It does NOT
+    edit the table - a wrong --organism is worse than none, so the decision stays
+    with a human - it tells you exactly which entries still hold, which have
+    moved, and which new ones you could now add. Run it before reaching for
+    generate_gtdb_organism_table.py: both read the same metadata file, and when
+    this one reports everything OK there is nothing to regenerate.
+
+What it checks, and what "correct" means
     GTDB's own rule is that the species cluster holding the nomenclatural TYPE
     keeps the unsuffixed name; suffixed names are placeholders. That is why a
     genus suffix (Campylobacter_D jejuni) says nothing about species identity
@@ -35,6 +45,13 @@ WHAT IT CHECKS, AND WHAT "CORRECT" MEANS
       3. Are there NEW GTDB species that now resolve to a curated organism but
          are missing from the table?
 
+Shared with the generator
+    generate_gtdb_organism_table.py imports read_gtdb_metadata,
+    majority_ncbi_species, target_species_for and the two MIN_* bars from this
+    file rather than re-implementing them, so "does the table still hold" and
+    "rebuild the table from scratch" can never drift onto different evidence.
+    Anything changed below changes the generator too.
+
 INPUT
     --metadata   bac120_metadata_r<release>.tsv.gz, downloaded from
                  https://data.gtdb.ecogenomic.org/releases/release<N>/<N>.0/
@@ -46,7 +63,7 @@ OUTPUT
     something does, so it can be wired into CI if you ever want that.
 
 RUN
-    python workflow/scripts/mobilome/check_gtdb_organism_table.py \
+    python workflow/scripts/80_mobilome/check_gtdb_organism_table.py \
         --metadata /path/to/bac120_metadata_r232.tsv.gz
 """
 
@@ -57,21 +74,29 @@ import gzip
 import os
 import sys
 
-# The table under test lives next to this script.
+# The module under test lives next to this script. These scripts are plain files
+# run by path, not an installed package, so their own directory has to be put on
+# the import path by hand.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gtdb_amrfinder_organism as gao
 
 
+# ── The evidence bar for a suffixed epithet ──────────────────────────────────
 # A suffixed EPITHET is admitted only on strong evidence: GTDB is saying it
 # cannot safely attach the name, so we need the genome counts to say otherwise
-# very clearly. These two numbers are the bar used when the table was built.
+# very clearly. These two numbers are the bar used when the table was built, and
+# generate_gtdb_organism_table.py imports them from here BY NAME, so a rebuild
+# can never apply a different bar from the one this check enforces.
 MIN_AGREEMENT_FOR_SUFFIXED_EPITHET = 99.0   # percent of the cluster
 MIN_GENOMES_FOR_SUFFIXED_EPITHET = 20       # below this, one bad label flips it
 
-# Which NCBI species each AMRFinderPlus organism is meant for. Needed because the
-# organism string is not always an NCBI binomial: "Campylobacter" is a genus-level
-# taxgroup that NCBI documents as covering C. jejuni and C. coli ONLY, and
-# "Escherichia" covers E. coli plus Shigella. Everything else is derived from the
+
+# ── Which NCBI species each AMRFinderPlus organism covers ────────────────────
+# Needed because the organism string is not always an NCBI binomial:
+# "Campylobacter" is a genus-level taxgroup that NCBI documents as covering
+# C. jejuni and C. coli ONLY, and "Escherichia" covers E. coli plus the four
+# Shigella species (GTDB has already folded Shigella into g__Escherichia, so
+# they arrive under that genus anyway). Everything else is derived from the
 # organism name itself, so this map only lists the awkward ones.
 ORGANISM_TARGET_SPECIES = {
     "Campylobacter": {"Campylobacter jejuni", "Campylobacter coli"},
@@ -93,8 +118,14 @@ def target_species_for(organism):
     return {organism.replace("_", " ")}
 
 
+# ── Reading the release metadata: what is each GTDB cluster, in NCBI terms? ──
+
 def read_gtdb_metadata(metadata_path):
     """Count NCBI species names inside each GTDB species cluster.
+
+    This is the fact-gathering every question below rests on, and the reason
+    generate_gtdb_organism_table.py imports this module instead of parsing the
+    metadata itself.
 
     Input:  bac120_metadata_r<N>.tsv.gz - one row per genome, with both a
             gtdb_taxonomy and an ncbi_taxonomy lineage string.
@@ -149,8 +180,28 @@ def majority_ncbi_species(ncbi_counter):
     return name, percent, total
 
 
+# ── Question 1: do the committed species overrides still hold? ───────────────
+
 def check_equivalence_entries(counts, problems):
-    """Question 1: does each hand-checked entry still hold in this release?"""
+    """Question 1: does each committed species override still hold here?
+
+    Input:  the per-cluster NCBI counts from read_gtdb_metadata, plus the running
+            `problems` list this function adds to, which decides the script's
+            exit status.
+    Does:   re-asks, for every row of gtdb_organism_equivalences.tsv (loaded into
+            gao.GTDB_SPECIES_EQUIVALENCES at import), the same question that put
+            the row there in the first place.
+
+    One verdict is printed per entry:
+      OK       still mostly the NCBI species that organism is curated for
+      GONE     that GTDB species name has disappeared from this release
+      CHANGED  it now resolves to a different NCBI species - drop or re-justify
+      WEAK     right species, but a suffixed epithet whose evidence has fallen
+               below the bar above
+
+    The printed heading still reads "Hand-checked species equivalences". That
+    wording predates the generator; the entries have been generated since.
+    """
     print("\n1. Hand-checked species equivalences")
     print("   (GTDB species -> AMRFinderPlus --organism)\n")
 
@@ -190,8 +241,21 @@ def check_equivalence_entries(counts, problems):
               f"{ncbi_name} {percent:.1f}% of {total}")
 
 
+# ── Question 2: is a bare-genus match still safe? ────────────────────────────
+
 def check_genus_rules(counts, genus_of_species, problems):
-    """Question 2: is matching on the unsuffixed genus still safe?"""
+    """Question 2: is matching on the unsuffixed genus still safe?
+
+    Sums the genomes GTDB files under each unsuffixed genus and asks how many of
+    them really are one of the species that organism is curated for; the five
+    biggest offenders are listed under the verdict so a fall can be traced to a
+    named species rather than a bare percentage.
+
+    Only the organisms currently marked genus_safe=yes are asked about -
+    gao.GENUS_ORGANISMS holds exactly those - so this question can turn a "yes"
+    into UNSAFE but never a "no" back into a "yes". Promoting Campylobacter back
+    to genus level would take a regeneration, not a re-check.
+    """
     print("\n2. Genus-level rules")
     print("   (matching on the GTDB genus alone)\n")
 
@@ -214,6 +278,10 @@ def check_genus_rules(counts, genus_of_species, problems):
 
         seen = appropriate + inappropriate
         share = (100.0 * appropriate / seen) if seen else 0.0
+        # 95% is the same bar generate_gtdb_organism_table.py writes its
+        # genus_safe verdicts with, where it is named MIN_GENUS_SAFETY_PERCENT.
+        # It is the one number that lives in two files: change it here only and
+        # this check starts disagreeing with the table it is checking.
         verdict = "OK      " if share >= 95.0 else "UNSAFE  "
         print(f"   {verdict} g__{organism:20s} {share:5.1f}% appropriate "
               f"({appropriate} of {seen} genomes)")
@@ -224,6 +292,8 @@ def check_genus_rules(counts, genus_of_species, problems):
             problems.append(f"genus rule {organism}: only {share:.1f}% appropriate")
 
 
+# ── Question 3: which GTDB species now qualify but match nothing? ────────────
+
 def check_for_missing_entries(counts, problems):
     """Question 3: which GTDB species SHOULD be in the table but are not?
 
@@ -231,6 +301,10 @@ def check_for_missing_entries(counts, problems):
     species quietly moved into a suffixed genus and stopped matching. It scans
     every GTDB species, works out its NCBI name, and reports any that resolve to
     an organism we curate but that no rule in the module would currently match.
+
+    A candidate here is a proposal, never a decision: only the ADD? rows are
+    pushed into `problems`, and even those are for a human to accept by running
+    the generator.
     """
     print("\n3. Candidate entries that are missing")
     print("   (GTDB species that resolve to a curated organism but do not match)\n")
@@ -298,7 +372,15 @@ def check_for_missing_entries(counts, problems):
     print("            Never map these - it would assert a different taxon.")
 
 
+# ── Run all three questions and report ───────────────────────────────────────
+
 def main(argv=None):
+    """Run the three questions over one release and set the exit status.
+
+    Exit 0 means every entry still holds and nothing new qualifies; exit 1 means
+    at least one thing needs a human decision, and each of them is listed. The
+    non-zero status is the only machine-readable part of the output.
+    """
     parser = argparse.ArgumentParser(
         description="Re-check the GTDB->AMRFinderPlus organism table against a "
                     "GTDB release. Reports; never edits.")
@@ -324,6 +406,11 @@ def main(argv=None):
         print(f"{len(problems)} thing(s) need a human decision:")
         for problem in problems:
             print(f"   - {problem}")
+        # The advice below names the two constants because it predates the
+        # generator: neither is hand-typed any more, both are loaded from the
+        # generated TSVs. The real fix is to run generate_gtdb_organism_table.py
+        # against this same metadata file, commit the two files it rewrites, and
+        # re-run this check.
         print("\nEdit GTDB_SPECIES_EQUIVALENCES / GENUS_ORGANISMS in "
               "gtdb_amrfinder_organism.py, then re-run this check.")
         return 1

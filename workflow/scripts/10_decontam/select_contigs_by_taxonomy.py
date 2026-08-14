@@ -1,22 +1,68 @@
 #!/usr/bin/env python3
-"""Select assembly contigs using BlobTools genus assignments.
+"""Keep the assembly contigs that belong to the isolate, drop the rest, and record
+a reason for every contig either way.
 
-The script reads the best genus assignment for each contig, applies the
-configured decontamination strategy, and writes a filtered contig FASTA plus
-small audit files explaining what was kept or removed.
+Runs as rule select_contigs (shared/10_decontam.smk), the last step of the
+contamination screen. Two legs feed that screen — this sample's own reads mapped
+back to its own draft (per-contig depth) and megablast against NCBI nt (per-contig
+taxonomy) — and BlobTools joins them into one table. Only the taxonomy half
+matters here: the genus is blobtools' bestsum call, i.e. the taxon with the
+highest summed BLAST bitscore. Depth sits in the same table and this script never
+looks at it. The step runs BEFORE annotation because a contaminant contig left in
+inflates CheckM's contamination estimate, pulls GTDB-Tk off the right lineage, and
+pollutes every gene, AMR and plasmid call after it.
 
-Expected inputs:
-- a BlobTools bestscore table, where each row links one contig to its best
-  taxonomic assignment;
-- the assembly FASTA from which contigs should be retained or discarded;
-- optional global and sample-specific include/exclude genus settings.
+What it reads
+-------------
+  --bestscore  BLOB_TABLE, written by rule blob_table — one row per contig with
+               its best-scoring taxon at every rank. The genus is column 22.
+  --contigs    DRAFT_CONTIGS, the same contigs BlobTools judged.
+  the policy   seven flags carrying parameters.decontamination from
+               config/config.yaml, resolved once by _decontam_settings() in
+               shared/00_common.smk so a whole batch follows one policy: mode
+               (auto | include | exclude | off), discard_no_hit, and the five
+               genus-list and override paths.
 
-Main idea:
-1. Convert the config/TSV settings into Python lists, booleans, and strings.
-2. Read BlobTools genus assignments and count how common each genus is.
-3. Decide whether each contig should be kept or removed.
-4. Write both the filtered FASTA and audit files that make the decision
-   transparent.
+What it writes
+--------------
+  --output-fasta  DECONTAM_CONTIGS — the kept sequences, wrapped at 80 columns.
+                  Which rule consumes them depends on the mode; the per-mode
+                  table in shared/10_decontam.smk's header says which.
+  --output-list   the kept contig IDs, one per line. No other rule reads it.
+  --composition   COMPOSITION — each genus's share of the assembly. Read back by
+                  rule annotation in shared/40_annotation.smk to pick Bakta's
+                  --genus hint, so its shape is a contract; see write_composition.
+  --decisions     CONTIG_DECISIONS — the audit trail the project convention asks
+                  for, four columns:
+                    contig          first whitespace token of the contig name
+                                    source: column 1 of the BlobTools table
+                    assigned_genus  the genus BlobTools settled on, or the
+                                    literal "no-hit"
+                                    source: column 22 of the BlobTools table
+                    action          keep | remove
+                                    source: decide()
+                    reason          one token saying why — decide() carries the
+                                    full vocabulary
+                                    source: decide()
+
+Before trusting auto mode
+-------------------------
+Auto mode votes on the NUMBER OF CONTIGS per genus, not on how much DNA each
+genus holds, so a genus can win on many short contigs while another genus holds
+most of the genome. That matters because BLAST regularly spreads ONE organism
+across several related genus names whenever the isolate is thinly represented in
+nt: the vote then lands on the wrong half and the other half leaves as
+contamination. Three things push back, none of them a cure — the curated aliases
+in GENUS_EQUIVALENCE_ALIASES fold the commonest splits back into one target,
+while the two advisory warnings in warn_if_selection_looks_wrong() and the DNA
+column of the composition report only make the damage visible.
+
+In HYBRID mode a dropped contig can take its ONT reads with it and disappear from
+the assembly, not merely from the taxonomy table. The worked case and the fixes
+are in the decontamination block of config/config.yaml.
+
+Stdlib only and no conda environment: it runs in the environment Snakemake was
+launched from, like build_bakta_replicons.py and plasmid_concordance.py.
 """
 
 import argparse
@@ -25,25 +71,37 @@ import sys
 from collections import Counter, OrderedDict
 
 
-# The workflow supports four decontamination modes:
-# - auto: keep the most abundant genus inferred from BlobTools;
-# - include: keep only user-provided genera;
-# - exclude: remove user-provided genera;
-# - off: keep everything, useful when decontamination is disabled.
+# The four values parameters.decontamination.mode accepts:
+#   auto     keep the most abundant genus BlobTools reports for this sample
+#   include  keep only the genera the user listed
+#   exclude  drop only the genera the user listed
+#   off      keep everything (the audit files are still written)
 VALID_MODES = {"auto", "include", "exclude", "off"}
 
-# Boolean values may arrive from YAML, TSV, or the command line as strings.
-# These sets make the accepted spelling explicit and prevent silent surprises.
+# Booleans reach this script as text — a YAML value Snakemake stringified, a TSV
+# cell, or a word on the command line. The accepted spellings are listed here
+# rather than guessed at; parse_bool() says what happens to anything else.
 FALSE_VALUES = {"false", "0", "no", "off"}
 TRUE_VALUES = {"true", "1", "yes", "on"}
 
-# Some bacterial genera are frequently split across related names in BLAST /
-# BlobTools output, for example Bacillus/Paenibacillus/Peribacillus/Priestia,
-# Arthrobacter/Pseudarthrobacter, or Burkholderia/Paraburkholderia. Curated
-# aliases cover high-confidence cases observed in real runs. The prefix tuple
-# below preserves a limited part of the old BacFlux empirical regex behavior.
-# Together, these are heuristic safeguards against false contig removal, not a
-# formal taxonomic reconciliation system.
+# Genus names that BLAST and BlobTools routinely split ONE organism across,
+# treated here as a single target so a genuine isolate contig is not thrown out
+# as a contaminant.
+#
+# Peribacillus and Priestia are 2020 splits of Bacillus sensu lato, so hits for a
+# single genome come back under either name. One isolate lost its entire 4.5 Mb
+# chromosome to exactly this: the contig count tied 2-2 between Bacillus and
+# Peribacillus, the alphabetical tiebreak in choose_auto_genus() handed the vote
+# to Bacillus, and the chromosome left as contamination. A later reassembly of the
+# same reads called that small contig Priestia instead — which is why both names
+# are here; patching only one would have hit the same bug from the other side.
+#
+# Pseudoarthrobacter (with the 'o') is deliberately absent: it is not a validly
+# published name. LPSN lists only Pseudarthrobacter (Busse 2016) — the extra 'o'
+# is what you get from concatenating pseudo- and arthrobacter without the Latin
+# elision. It was removed on purpose and should not be added back.
+#
+# This is a safeguard against false removal, not taxonomic reconciliation.
 GENUS_EQUIVALENCE_ALIASES = {
     "paenibacillus": ("bacillus",),
     "peribacillus": ("bacillus",),
@@ -53,6 +111,11 @@ GENUS_EQUIVALENCE_ALIASES = {
     "paraburkholderia": ("burkholderia",),
 }
 
+# The same idea, blunter: strip a leading prefix to reach the parent genus.
+# Bradyrhizobium/Mesorhizobium/Neorhizobium/Sinorhizobium collapse to rhizobium,
+# Aeribacillus/Caldibacillus/Geobacillus to bacillus. Carried over from the
+# empirical regex the original BacFlux selector used, and kept because it covers
+# splits the curated table above has no entry for.
 GENUS_EQUIVALENCE_PREFIXES = (
     "brady",
     "meso",
@@ -64,43 +127,34 @@ GENUS_EQUIVALENCE_PREFIXES = (
 )
 
 
-# Small normalization helpers keep comparisons robust against empty values,
-# extra spaces, and different capitalization in config files or TSV inputs.
-def normalize(value):
-    """Convert None or any value into a stripped string.
+# ── Normalise genus names and fold known genus splits into one ───────────────
 
-    This keeps downstream code simple: instead of repeatedly checking for None,
-    every parser function can work with a clean string.
-    """
+def normalize(value):
+    """Return value as a stripped string; None and empty TSV cells become ""."""
     return str(value or "").strip()
 
 
 def normalize_genus(value):
-    """Normalize genus names for case-insensitive comparisons.
-
-    BlobTools output and user config should normally agree on capitalization,
-    but using lowercase internally avoids fragile matches such as
-    "Pseudomonas" versus "pseudomonas".
-    """
+    """Lower-case a genus name so "Pseudomonas" as BlobTools writes it and
+    "pseudomonas" as someone typed it into the config compare equal."""
     return normalize(value).lower()
 
 
 def genus_aliases(value):
-    """Return comparable aliases for a genus name.
+    """Return every name a genus is allowed to match.
 
-    The first alias is the normalized original genus. Additional aliases come
-    from curated common reclassification cases plus a small set of legacy
-    prefixes retained from the original BacFlux selector. For example:
+    Always the genus itself, lower-cased, plus whatever the curated table maps it
+    to, plus the parent left after stripping a known prefix:
 
-    - Paenibacillus -> paenibacillus, bacillus
     - Peribacillus -> peribacillus, bacillus
-    - Priestia -> priestia, bacillus
-    - Pseudarthrobacter -> pseudarthrobacter, arthrobacter
-    - Paenarthrobacter -> paenarthrobacter, arthrobacter
     - Paraburkholderia -> paraburkholderia, burkholderia
+    - Bradyrhizobium -> bradyrhizobium, rhizobium
 
-    These heuristic aliases are used for auto/include matching only. Exclude
-    mode remains exact because over-broad contaminant removal is riskier there.
+    A prefix is stripped only when four or more characters survive it, so a short
+    name is never cut down to a stub that would match half the database.
+
+    Used by auto and include matching only. Exclude stays exact, because a
+    too-broad alias there removes contigs rather than rescuing them.
     """
     genus = normalize_genus(value)
     aliases = {genus} if genus else set()
@@ -117,12 +171,14 @@ def genus_matches(genus, targets):
     return any(genus_keys & genus_aliases(target) for target in targets)
 
 
-def parse_bool(value, default=False):
-    """Parse config-style boolean values such as true/false, yes/no, 1/0.
+# ── Read the keep/drop policy from config, genus files and overrides ─────────
 
-    Empty values are allowed and fall back to the provided default. Invalid
-    values raise an error because a misspelled boolean could change whether
-    no-hit contigs are removed.
+def parse_bool(value, default=False):
+    """Parse a config-style boolean: true/false, yes/no, on/off, 1/0.
+
+    An empty value falls back to default. Anything unrecognised raises, because
+    a misspelling would otherwise become False and silently flip whether
+    unclassified contigs are discarded.
     """
     text = normalize(value).lower()
     if not text:
@@ -135,11 +191,12 @@ def parse_bool(value, default=False):
 
 
 def split_genera(value):
-    """Split a genus list into a Python list of genus strings.
+    """Split one genus list into individual genus names.
 
-    The config may contain a single genus, a semicolon-separated list, a
-    comma-separated list, or a tab-separated TSV cell. Internally all separators
-    are converted to tabs first, then empty items are discarded.
+    The same string may arrive in any shape the config and the override tables
+    allow — a single genus, "GenusA;GenusB", "GenusA,GenusB", or a tab-separated
+    TSV cell — so every separator is turned into a tab first, then empty items
+    are dropped.
     """
     text = normalize(value)
     if not text:
@@ -150,11 +207,11 @@ def split_genera(value):
 
 
 def read_lines_file(path):
-    """Read an optional plain-text genus list.
+    """Read the one-genus-per-line file behind --exclude-genera-file.
 
-    This is used for external include/exclude files. Each line may contain one
-    genus or a small list accepted by split_genera(). Blank lines and lines
-    starting with # are ignored so the file can be commented.
+    Blank lines and lines starting with # are skipped so the file can be
+    commented; a line may still hold several genera in any of split_genera's
+    shapes. An empty path means the option was not configured, and returns [].
     """
     if not path:
         return []
@@ -169,15 +226,16 @@ def read_lines_file(path):
 
 
 def read_overrides(path):
-    """Read sample-specific decontamination settings from a TSV override file.
+    """Read per-sample settings from the --sample-overrides TSV, keyed by sample.
 
-    The override file is optional. When present, each row can modify the mode,
-    include list, exclude list, or discard_no_hit behavior for one sample.
+    Optional. Columns sample and mode are required; include_genera,
+    exclude_genera and discard_no_hit may follow. A row replaces the global
+    setting for that one sample and leaves every other sample alone — the usual
+    case is one run-wide policy plus one awkward isolate.
 
-    Important TSV detail:
-    empty include/exclude cells are meaningful. They mean "do not replace the
-    global list". Therefore the row must still contain the correct number of tab
-    separators, even when some fields are blank.
+    The trap: an EMPTY include/exclude cell means "keep the global list", NOT
+    "match nothing". A row must therefore still carry the full set of tabs even
+    where fields are blank, or the columns shift and the wrong value is read.
     """
     if not path:
         return {}
@@ -198,8 +256,11 @@ def read_overrides(path):
                 raise ValueError(
                     f"Invalid mode '{mode}' for sample '{sample}' in '{path}'."
                 )
-            # Store parsed list columns as lists, but keep discard_no_hit as the
-            # raw string for now so an empty cell can mean "do not override".
+            # The two genus columns are parsed into lists here, but discard_no_hit
+            # stays raw TEXT. Parsing it now would need a default, and the natural
+            # False would make a blank cell look like an explicit "false" and
+            # quietly override the run-wide setting. Keeping the raw string lets
+            # main() tell "not specified" from "specified as false".
             overrides[sample] = {
                 "mode": mode,
                 "include": split_genera(row.get("include_genera")),
@@ -210,11 +271,11 @@ def read_overrides(path):
 
 
 def read_include_by_sample(path, sample):
-    """Read optional per-sample include genera from a two-column TSV file.
+    """Read this sample's include genera from the --include-genera-by-sample TSV.
 
-    This helper supports a compact file with columns sample and genus. It is
-    useful when many samples need different include lists but a full override
-    table would be unnecessarily verbose.
+    Two columns, sample and genus, and a sample may appear on several rows. The
+    compact alternative to a full override table when many samples each need
+    their own include list but nothing else differs.
     """
     if not path:
         return []
@@ -231,15 +292,19 @@ def read_include_by_sample(path, sample):
         return genera
 
 
+# ── Read the BlobTools genus table and the assembly FASTA ────────────────────
+
 def read_bestscore(path):
-    """Parse BlobTools bestscore output and count genus assignments.
+    """Read the BlobTools table into [(contig, genus), ...] plus a per-genus count.
 
-    The returned records list contains tuples: (contig_id, assigned_genus).
-    A tuple is a small fixed-size grouping of values; here each tuple keeps the
-    contig name and its genus together.
+    Row order is preserved so the decisions file lists contigs in the order
+    BlobTools reported them. The counts are what auto mode votes on and what the
+    composition report's contig column is built from.
 
-    The Counter named counts records how many contigs were assigned to each
-    genus. This is later used for the composition summary and for auto mode.
+    Raises rather than returning an empty list, and raises HERE rather than
+    letting main() fail later on "no contigs were kept" — that message sends the
+    reader to the decontamination policy, when the real fault is an unreadable or
+    truncated BlobTools table.
     """
     records = []
     counts = Counter()
@@ -253,15 +318,15 @@ def read_bestscore(path):
                 continue
             contig = fields[0].strip()
 
-            # BlobTools genus is expected in column 22 in this table format.
-            # Python uses zero-based indexing, so column 22 is fields[21].
-            # Empty genus values are treated as no-hit/unclassified.
+            # The genus sits in column 22 of `blobtools view --rank all`, i.e.
+            # fields[21] counting from zero — which is also why a row with fewer
+            # than 22 fields is skipped above rather than half-read. An empty
+            # cell means BLAST placed nothing, and is folded into "no-hit" so the
+            # rest of the script has one spelling to test for.
             genus = fields[21].strip() or "no-hit"
             if not contig:
                 continue
 
-            # Append a (contig, genus) tuple to preserve row order for the
-            # decisions output, and update the per-genus count at the same time.
             records.append((contig, genus))
             counts[genus] += 1
     if not records:
@@ -270,11 +335,13 @@ def read_bestscore(path):
 
 
 def read_fasta(path):
-    """Read the input contig FASTA while preserving the original record order.
+    """Read the assembly into {full header: sequence}, in the input record order.
 
-    OrderedDict behaves like a dictionary, but remembers insertion order. The
-    keys are FASTA headers and the values are full sequence strings. Preserving
-    order keeps the filtered FASTA close to the original assembly layout.
+    Order is kept so the filtered FASTA comes out in the same layout as the
+    assembly it came from. Sequence lines are accumulated and joined at the end,
+    which is what lets this read WRAPPED FASTA directly — v1 FastaFlux
+    re-linearised the file into contigs_filt_lin.fasta before calling the
+    selector, and that step was dropped in v2 as redundant.
     """
     records = OrderedDict()
     header = None
@@ -283,20 +350,15 @@ def read_fasta(path):
         for line in handle:
             line = line.rstrip("\n")
             if line.startswith(">"):
-                # A new header means the previous record is complete. Join all
-                # accumulated sequence chunks before starting the next contig.
+                # A new header closes the previous record.
                 if header is not None:
                     records[header] = "".join(seq_chunks)
                 header = line[1:].strip()
                 seq_chunks = []
             else:
-                # FASTA sequences may span many lines, so collect them in a
-                # list and join once. This is faster and cleaner than repeated
-                # string concatenation.
                 seq_chunks.append(line.strip())
     if header is not None:
-        # Store the final record after the loop; there is no next header to
-        # trigger the normal save step.
+        # The last record has no following header to close it, so store it here.
         records[header] = "".join(seq_chunks)
     if not records:
         raise ValueError(f"No FASTA records could be parsed from '{path}'.")
@@ -304,30 +366,42 @@ def read_fasta(path):
 
 
 def fasta_key(header):
-    """Match FASTA records by the first header token, as most tools do.
+    """Return the first whitespace token of a FASTA header, which is the contig ID.
 
-    If a FASTA header is "contig_1 length=1234", BlobTools usually refers only
-    to "contig_1". Splitting on whitespace keeps these IDs compatible.
+    A header can carry description text after the ID — ">contig_1 length=1234" —
+    while the BlobTools table names only "contig_1". The first token is what the
+    two are joined on, here and everywhere else in BacFlux.
     """
     return header.split()[0]
 
 
-def is_no_hit(genus):
-    """Treat BlobTools no-hit labels as unclassified contigs.
+# ── Decide keep or remove, one contig at a time ──────────────────────────────
 
-    The string test is intentionally broad because BlobTools labels can vary
-    slightly, but they usually contain no-hit when no confident taxonomy was
-    assigned.
+def is_no_hit(genus):
+    """Return True for a contig BLAST could not place.
+
+    A substring test, not an equality test: read_bestscore() folds an empty genus
+    cell into the bare "no-hit", but BlobTools' own label is not guaranteed to be
+    exactly that string, and every variant carrying it means the same thing here.
     """
     return "no-hit" in normalize_genus(genus)
 
 
 def choose_auto_genus(counts, discard_no_hit):
-    """Choose the most abundant assigned genus for auto decontamination mode.
+    """Pick the genus auto mode keeps: the one carried by the most contigs.
 
-    Auto mode assumes that the dominant assigned genus is the intended organism.
-    If discard_no_hit is true, no-hit contigs are excluded from this choice so
-    "no-hit" cannot accidentally become the selected target.
+    Counts CONTIGS, not bases. A genus can win here on many short contigs while
+    another genus holds most of the assembly's DNA — write_composition() prints
+    both figures side by side precisely so that disagreement is visible.
+
+    With discard_no_hit true, "no-hit" is dropped from the vote so unclassified
+    contigs can never become the target.
+
+    Ties are broken alphabetically so the answer is the same on every run, and
+    that tiebreak is not harmless: a 2-2 tie between Bacillus and Peribacillus
+    once handed the vote to Bacillus and sent a 4.5 Mb chromosome out as
+    contamination. The aliases in GENUS_EQUIVALENCE_ALIASES exist so that tie
+    never has to be broken in the first place.
     """
     candidates = [
         (genus, count)
@@ -337,18 +411,28 @@ def choose_auto_genus(counts, discard_no_hit):
     if not candidates:
         return None
 
-    # Sort primarily by descending count. If two genera have the same count,
-    # sort alphabetically to make the result deterministic across runs.
     candidates.sort(key=lambda item: (-item[1], normalize_genus(item[0])))
     return candidates[0][0]
 
 
 def decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus):
-    """Return the keep/remove decision and a short reason for one contig.
+    """Return ("keep"|"remove", reason) for one contig.
 
-    The result is a two-item tuple: ("keep" or "remove", reason). Writing the
-    reason later into contig_taxonomy_decisions.tsv makes the filtering auditable
-    instead of hiding decisions inside the code.
+    reason becomes the fourth column of contig_taxonomy_decisions.tsv and is the
+    only record of why a contig went. The full vocabulary, so an audit file can
+    be read without opening this function:
+
+      mode_off               mode is off; nothing is filtered
+      discarded_no_hit       unplaced by BLAST, and discard_no_hit is true
+      auto_genus:<G>         auto mode, this is the winning genus
+      auto_genus_alias:<G>   auto mode, an alias of the winning genus
+      not_auto_genus:<G>     auto mode, some other genus
+      auto_no_genus          auto mode found no genus at all to keep
+      included_genus         named in include_genera
+      included_genus_alias   an alias of something in include_genera
+      not_included_genus     absent from include_genera
+      excluded_genus         named in exclude_genera (exact match only)
+      not_excluded_genus     survived exclude mode
     """
     genus_key = normalize_genus(genus)
     include_keys = {normalize_genus(item) for item in include}
@@ -358,15 +442,18 @@ def decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus):
     if mode == "off":
         return "keep", "mode_off"
 
-    # no-hit removal is checked before mode-specific genus logic. This means
-    # discard_no_hit=true removes unclassified contigs in auto/include/exclude
-    # modes unless mode is off.
+    # discard_no_hit is applied BEFORE the mode logic, so it removes unclassified
+    # contigs in auto, include and exclude alike — the only escape is mode off.
+    # An unplaced contig is often short and low-coverage, but it can equally be a
+    # small plasmid nt has no near neighbour for, which is why the option exists
+    # rather than being hard-coded.
     if is_no_hit(genus) and discard_no_hit:
         return "remove", "discarded_no_hit"
 
-    # Auto mode keeps only contigs assigned to the most abundant genus chosen
-    # above. This is a convenience mode for relatively clean single-organism
-    # assemblies.
+    # Auto mode keeps only the winning genus chosen by choose_auto_genus(), and
+    # is the convenience setting for a clean single-organism culture. Aliases are
+    # allowed here: a genome split across Bacillus and Peribacillus should come
+    # through whole, not half.
     if mode == "auto":
         if auto_genus is None:
             return "remove", "auto_no_genus"
@@ -376,8 +463,9 @@ def decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus):
             return "keep", f"auto_genus_alias:{auto_genus}"
         return "remove", f"not_auto_genus:{auto_genus}"
 
-    # Include mode is strict: a user-provided target genus list is mandatory,
-    # and every contig outside that list is removed.
+    # Include mode is strict: the genus list is mandatory and everything outside
+    # it goes. Empty here means the user asked for include and gave no genus, so
+    # raise rather than delete the whole assembly.
     if mode == "include":
         if not include_keys:
             raise ValueError("Mode 'include' requires at least one genus.")
@@ -387,14 +475,18 @@ def decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus):
             return "keep", "included_genus_alias"
         return "remove", "not_included_genus"
 
-    # Exclude mode is the inverse: only the listed contaminant genera are
-    # removed, while all other assigned genera are retained.
+    # Exclude mode is the inverse: only the named contaminant genera go, and
+    # anything else stays. Matching here is EXACT, with no alias expansion — a
+    # broad alias in include mode rescues a contig, but the same alias here would
+    # delete contigs the user never named.
     if mode == "exclude":
         if genus_key in exclude_keys:
             return "remove", "excluded_genus"
         return "keep", "not_excluded_genus"
     raise ValueError(f"Unsupported decontamination mode '{mode}'.")
 
+
+# ── Write the composition report and warn when the call looks wrong ──────────
 
 def write_composition(path, counts, total, bases=None, total_bases=0):
     """Write genus composition as relative frequencies for quick inspection.
@@ -416,6 +508,11 @@ def write_composition(path, counts, total, bases=None, total_bases=0):
 
     Sorted by DNA, because that is the more honest ranking of "what is this
     sample mostly made of".
+
+    The line SHAPE is a contract, not just a report: rule annotation in
+    shared/40_annotation.smk parses this file to pick Bakta's --genus hint, and
+    adding the second figure changed what that parse returns. Read the comment on
+    its genus= line before changing the format again.
     """
     with open(path, "w", encoding="utf-8") as handle:
         if bases and total_bases:
@@ -425,7 +522,9 @@ def write_composition(path, counts, total, bases=None, total_bases=0):
                     f"contigs {counts.get(genus, 0) / total:.2f}\n"
                 )
         else:
-            # Fallback used when sequence lengths were not available.
+            # The v1 one-figure form, kept as the fallback for when no contig in
+            # the BlobTools table was found in the FASTA and there are no lengths
+            # to divide by. Same "Genus: 0.87" shape, ranked by contig count.
             for genus, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
                 handle.write(f"{genus}: {count / total:.2f}\n")
 
@@ -507,11 +606,17 @@ def warn_if_selection_looks_wrong(bases, total_bases, removed_bases):
         )
 
 
+# ── Apply the policy and write the four output files ─────────────────────────
+
 def main():
-    # Command-line arguments are supplied by Snakemake from the workflow config.
-    # Optional text arguments use nargs="?" and const="" so a command like
-    # --include-genera with an empty YAML value is interpreted as an empty string
-    # instead of causing argparse to fail with "expected one argument".
+    # Every flag is filled in by rule select_contigs in shared/10_decontam.smk
+    # from parameters.decontamination.
+    #
+    # The six optional flags use nargs="?" with a const value (empty string, or
+    # "false" for --discard-no-hit): an unset YAML key reaches the shell as an
+    # empty word, and without const argparse would stop the run with "expected one
+    # argument" instead of reading it as "not configured". This is why leaving
+    # include_genera blank in the config is safe.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bestscore", required=True)
     parser.add_argument("--contigs", required=True)
@@ -529,9 +634,9 @@ def main():
     parser.add_argument("--decisions", required=True)
     args = parser.parse_args()
 
-    # Start from global config values: mode, include/exclude lists, optional
-    # genus list files, and whether unclassified/no-hit contigs are discarded.
-    # Lists can be built from direct config values plus optional external files.
+    # Start from the run-wide policy. Each genus list is the inline config value
+    # PLUS whatever the optional file adds, so a long shared exclude list can live
+    # in a file while one or two genera stay visible in config.yaml.
     mode = args.mode
     include = split_genera(args.include_genera)
     include.extend(read_include_by_sample(args.include_genera_by_sample, args.sample))
@@ -539,9 +644,9 @@ def main():
     exclude.extend(read_lines_file(args.exclude_genera_file))
     discard_no_hit = parse_bool(args.discard_no_hit, default=False)
 
-    # Sample overrides replace the relevant global settings only for that sample.
-    # Empty include/exclude override columns leave the global lists untouched.
-    # This allows a run-wide exclude list plus special behavior for one sample.
+    # Then let this sample's override row REPLACE what it names, and only that.
+    # A blank cell falls through and the run-wide value stands — which is how one
+    # awkward isolate gets its own genus list without disturbing the batch.
     overrides = read_overrides(args.sample_overrides)
     if args.sample in overrides:
         override = overrides[args.sample]
@@ -553,26 +658,26 @@ def main():
         if override["discard_no_hit"] is not None and normalize(override["discard_no_hit"]):
             discard_no_hit = parse_bool(override["discard_no_hit"], default=discard_no_hit)
 
-    # Load taxonomy assignments and FASTA records, then index FASTA by contig ID
-    # so BlobTools rows can be connected back to the original sequences.
+    # The two real inputs. They are joined on the contig ID, so a rename anywhere
+    # upstream shows up as the missing-contig warning at the end of this function.
     records, counts = read_bestscore(args.bestscore)
     fasta_records = read_fasta(args.contigs)
 
-    # fasta_by_id is a dictionary. The key is the short contig ID used by
-    # BlobTools, and the value is a tuple containing the original full FASTA
-    # header and sequence. Keeping the full header avoids losing metadata.
+    # Index the sequences by the short contig ID BlobTools uses, but carry the
+    # FULL original header alongside so the filtered assembly keeps the
+    # length/coverage metadata the assembler wrote into it.
     fasta_by_id = {fasta_key(header): (header, sequence) for header, sequence in fasta_records.items()}
     total = sum(counts.values())
     auto_genus = choose_auto_genus(counts, discard_no_hit) if mode == "auto" else None
 
-    # Apply the decision logic contig by contig. The decisions TSV is an audit
-    # trail that explains every keep/remove call made by the workflow.
+    # One pass over the BlobTools rows: decide, write the audit line, tally the
+    # sequence, and collect the survivors.
     kept = []
     seen = set()
-    # Track how much SEQUENCE each genus holds, and how much is being removed.
-    # The keep/remove decision is unchanged and still count-based; these totals
-    # only feed the composition report and the warnings below. Lengths come from
-    # the FASTA that was already loaded, so nothing extra is read.
+    # How much SEQUENCE each genus holds, and how much of it is leaving. These
+    # totals feed the composition report and the two warnings only — the
+    # keep/remove decision above is still made on contig counts. The lengths come
+    # from the FASTA already in memory, so nothing extra is read from disk.
     bases_by_genus = Counter()
     total_bases = 0
     removed_bases = 0
@@ -591,28 +696,35 @@ def main():
                 if action != "keep":
                     removed_bases += length
 
-            # A contig is added to the output only if it was marked keep, exists
-            # in the FASTA, and has not already been added. The seen set prevents
-            # duplicate FASTA records if the taxonomy table contains duplicates.
+            # Kept, present in the FASTA, and not already collected. The `seen`
+            # test guards against a BlobTools table that lists the same contig on
+            # more than one row: writing it twice would hand Bakta and CheckM a
+            # duplicated sequence.
             if action == "keep" and contig in fasta_by_id and contig not in seen:
                 kept.append(contig)
                 seen.add(contig)
 
-    # The composition report is written after decisions so it is generated even
-    # when the selected contig list is small; it summarizes the original input
-    # taxonomy, not only the kept contigs.
+    # The composition report describes the assembly BlobTools saw, kept and
+    # dropped contigs alike — that is what makes it useful for judging whether
+    # the policy was right. Written here, after the loop, so it exists even when
+    # almost nothing survived.
     write_composition(args.composition, counts, total, bases_by_genus, total_bases)
 
     # Announce a taxonomically confused sample, or an unusually large removal,
     # before the run moves on. Purely advisory: no decision above depends on it.
     warn_if_selection_looks_wrong(bases_by_genus, total_bases, removed_bases)
 
-    # Write the list of kept contig IDs for tools that prefer a text selection.
+    # The kept IDs as plain text. It is a declared output of rule select_contigs,
+    # but no other rule reads it — the filtered FASTA written next is what
+    # everything downstream consumes.
     with open(args.output_list, "w", encoding="utf-8") as handle:
         for contig in kept:
             handle.write(f"{contig}\n")
 
-    # Write the filtered assembly FASTA, wrapping sequences at 80 characters.
+    # The filtered assembly itself, wrapped at 80 columns. Where it goes next
+    # depends on the mode — the per-mode table in shared/10_decontam.smk's header
+    # says whether this file is already the delivered genome or an intermediate
+    # that Medaka or Polypolish still has to polish.
     with open(args.output_fasta, "w", encoding="utf-8") as handle:
         for contig in kept:
             header, sequence = fasta_by_id[contig]
@@ -620,8 +732,10 @@ def main():
             for start in range(0, len(sequence), 80):
                 handle.write(sequence[start:start + 80] + "\n")
 
-    # Warn if BlobTools reported contigs that are not present in the input FASTA;
-    # this usually indicates mismatched inputs or changed contig headers.
+    # Contigs BlobTools judged that are not in the FASTA at all. The join is on
+    # the contig ID, so this is the detector for a mismatched pair of inputs or
+    # for an upstream step having rewritten the headers. It goes to stderr, which
+    # rule select_contigs folds into logs/select_contigs_{sample}.log.
     missing = sorted({contig for contig, _ in records if contig not in fasta_by_id})
     if missing:
         print(
@@ -629,8 +743,12 @@ def main():
             file=sys.stderr,
         )
     if not kept:
-        # An empty selected assembly is almost always a configuration problem,
-        # so fail loudly instead of letting downstream rules consume nothing.
+        # Nothing survived. Raise rather than write an empty FASTA: Snakemake
+        # would otherwise mark the rule complete and every stage from annotation
+        # onwards would run on zero sequence. The decisions file written above is
+        # the first place to look — every contig there carries the reason it went,
+        # which separates a policy that names the wrong genus from a sample the
+        # taxonomy screen could not place at all.
         raise ValueError(
             f"No contigs were kept for sample '{args.sample}' with mode '{mode}'. "
             "Check taxonomy assignments and decontamination settings."

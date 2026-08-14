@@ -19,11 +19,13 @@ agree, instead of trusting either one alone:
 This script reads both tools' outputs for ONE sample and writes a per-contig
 concordance TSV. Confidence is driven by Platon/geNomad AGREEMENT:
 
-    both tools call plasmid          -> agreement=both        confidence=high
-    only Platon calls plasmid        -> agreement=platon_only  confidence=medium
-    only geNomad calls plasmid       -> agreement=genomad_only confidence=medium
-    Platon says chromosome, geNomad  -> agreement=conflict     confidence=low
-      says plasmid (a real clash)                              (flagged, kept)
+    both tools call plasmid              -> both                high
+    only Platon calls plasmid            -> platon_only         medium
+    only geNomad calls plasmid           -> genomad_only        medium
+    Platon says chromosome and geNomad   -> conflict            low
+      says plasmid: a real clash, kept and flagged
+    Platon crashed, so there is no       -> platon_unavailable  low
+      second opinion to agree or disagree with
 
 Disagreements are FLAGGED, never discarded. The file itself is the audit trail
 (the agreement / confidence / platon_blast_hit columns are the per-contig
@@ -37,11 +39,17 @@ match directly — the front-end trims FASTA headers to their first token):
 - geNomad plasmid summary    <prefix>_plasmid_summary.tsv -> geNomad-called contigs + score/fdr
 
 Output: {sample}_plasmid_concordance.tsv, one row per plasmid CANDIDATE contig
-(the union of the two tools' plasmid calls).
+(the union of the two tools' plasmid calls); every column is described on
+OUTPUT_COLUMNS below. It is written into 06.plasmids/{sample}/ and is the
+terminal plasmid deliverable whenever geNomad was opted in as the phage caller.
+With geNomad off, rule plasmid_concordance is never defined, this script never
+runs, and Platon's verified_plasmids.txt stays the deliverable instead.
 
-This is a standalone CLI (argparse), stdlib only, and is exercised by
-workflow/scripts/tests/test_plasmid_concordance.py without any tool or database.
-Called by the plasmid_concordance rule in workflow/rules/shared/60_plasmid.smk.
+A standalone CLI (argparse), stdlib only — which is how rule
+plasmid_concordance (shared/60_plasmid.smk) can borrow Platon's own conda env
+to run it and add no dependency. Exercised by
+workflow/scripts/60_plasmid/test_plasmid_concordance.py with no tool or database
+installed.
 """
 
 import argparse
@@ -50,39 +58,55 @@ import os
 import sys
 
 
+# ── The report's columns, and what each one comes from ──────────────────────
+
 # The columns of the deliverable TSV, in the exact order they are written. Kept
 # as one list so the header and every row use the same field names and order.
+# The platon_* columns come from Platon's own three files (.tsv,
+# .chromosome.fasta, verified_plasmids.txt), the genomad_* columns from
+# geNomad's plasmid summary, and the last two are worked out here by classify().
+# Every value is written as a string, "NA" included: this table is meant to be
+# read and sorted, not computed on.
 OUTPUT_COLUMNS = [
     "sample",
     "contig",
-    "platon_call",       # plasmid | chromosome | not_called
+    "platon_call",       # plasmid | chromosome | not_called | not_assessed
     "platon_rds",        # Platon replicon-distribution score, or NA
     "platon_blast_hit",  # hit | no_hit | NA  (the kept v1 check — supplementary)
     "genomad_call",      # plasmid | absent
     "genomad_score",     # geNomad plasmid_score, or NA
-    "genomad_fdr",       # geNomad fdr, often NA (see note in parse_genomad_plasmids)
-    "agreement",         # both | platon_only | genomad_only | conflict | undetermined
+    "genomad_fdr",       # geNomad fdr, often NA (see parse_genomad_plasmids)
+    # both | platon_only | genomad_only | conflict | platon_unavailable |
+    # undetermined — assigned by classify() from the two calls above.
+    "agreement",
     "confidence",        # high | medium | low
 ]
 
-# The two fixed sentences the plasmid_search rule writes into verified_plasmids.txt.
-# We match on these exact trailing phrases to recover the per-contig BLAST-text
-# state. Kept as named constants so the parser and the producing rule can be
-# cross-checked at a glance (rule text lives in 60_plasmid.smk).
+
+# ── The fixed sentences this script matches in verified_plasmids.txt ────────
+
+# Two of the sentences rule plasmid_search (shared/60_plasmid.smk) writes into
+# verified_plasmids.txt, one line per Platon-plasmid contig. Matching on these
+# exact trailing phrases is how the per-contig BLAST-text state is recovered,
+# and keeping them as named constants means the parser here and the rule that
+# writes them can be checked against each other at a glance.
 VERIFIED_SUFFIX_HIT = " is a plasmid."
 VERIFIED_SUFFIX_NO_HIT = " was not verified by BLAST search."
 
-# What the plasmid_search rule writes into verified_plasmids.txt when Platon
-# itself exited non-zero (60_plasmid.smk): "{sample}: Platon exited with status
-# {rc}; see the log." That line is the ONLY reliable signal that Platon crashed.
+# The third sentence: what plasmid_search writes when Platon itself exited
+# non-zero — "{sample}: Platon exited with status {rc}; see the log." That line
+# is the ONLY reliable signal that Platon crashed.
 #
-# Note what is deliberately NOT treated as a failure: an empty Platon directory.
-# A completed, exit-0 Platon run legitimately writes almost nothing when every
-# contig is longer than its 500 kb size filter - which is the NORMAL case for a
+# What is deliberately NOT treated as a failure: an empty Platon directory. A
+# completed, exit-0 Platon run legitimately writes almost nothing when every
+# contig is longer than its 500 kb size filter — which is the NORMAL case for a
 # closed genome, and true of several samples in this project's own validation
 # set. Reading "no output files" as "Platon failed" would therefore mislabel
 # exactly the assemblies we most want to be right about.
 PLATON_CRASH_MARKER = "Platon exited with status"
+
+
+# ── Small shared readers: FASTA IDs, TSV tables, column lookup ──────────────
 
 
 def first_token(header_line):
@@ -134,6 +158,9 @@ def _column_index(header, name, source):
     return header.index(name)
 
 
+# ── Platon's side: plasmid calls, chromosome calls, and crashes ─────────────
+
+
 def parse_platon_tsv(path):
     """Read Platon's per-plasmid table into {contig_id: rds}.
 
@@ -143,7 +170,7 @@ def parse_platon_tsv(path):
     The RDS is kept as its raw string; it is shown for review, not thresholded
     here.
 
-    Input:  <prefix>.tsv from the plasmid_search rule.
+    Input:  <prefix>.tsv from rule plasmid_search.
     Output: dict mapping plasmid contig ID -> RDS string. Empty when Platon found
             no plasmids.
     """
@@ -195,16 +222,11 @@ def parse_fasta_ids(path):
 def platon_run_failed(verified_plasmids_path):
     """Did Platon actually CRASH for this sample? -> True/False.
 
-    Input:  verified_plasmids.txt, written by the plasmid_search rule, which is
-            already an input to this script.
+    Input:  verified_plasmids.txt, written by rule plasmid_search and already an
+            input to this script.
     Does:   look for the one line that rule writes when Platon exits non-zero.
-    Output: True only for a real crash.
-
-    Why this signal and not "the Platon directory looks empty": an exit-0 Platon
-    run writes almost nothing when every contig exceeds its 500 kb size filter,
-    which is the ordinary outcome for a closed genome. Treating that as a failure
-    would flag the best assemblies in the set as unassessed. A crash is a
-    different thing, and the rule already records it explicitly.
+    Output: True only for a real crash. An empty or near-empty Platon directory
+            is NOT a crash — see the reason recorded on PLATON_CRASH_MARKER.
     """
     if not verified_plasmids_path or not os.path.exists(verified_plasmids_path):
         return False
@@ -218,7 +240,7 @@ def platon_run_failed(verified_plasmids_path):
 def parse_verified_plasmids(path):
     """Read the kept v1 BLAST-text check into {contig_id: "hit"|"no_hit"}.
 
-    verified_plasmids.txt is written by the plasmid_search rule with one line per
+    verified_plasmids.txt is written by rule plasmid_search with one line per
     Platon-plasmid contig:
         "{sample}: {contig} is a plasmid."                    -> hit
         "{sample}: {contig} was not verified by BLAST search." -> no_hit
@@ -251,11 +273,17 @@ def parse_verified_plasmids(path):
                 contig_id = after_sample[: -len(VERIFIED_SUFFIX_NO_HIT)].strip()
                 state = "no_hit"
             else:
-                # e.g. the "Platon found no plasmid ..." line — no per-contig state.
+                # The Platon-crash line lands here: it has the ": " but neither
+                # phrase. (The "Platon found no plasmid ..." line carries no ": "
+                # at all and was already skipped above.) Neither says anything
+                # about an individual contig.
                 continue
             if contig_id:
                 blast_states[contig_id] = state
     return blast_states
+
+
+# ── geNomad's side: the contigs it calls plasmids ───────────────────────────
 
 
 def parse_genomad_plasmids(path):
@@ -269,7 +297,7 @@ def parse_genomad_plasmids(path):
     default it is "NA" (or the column may be absent entirely). We therefore treat
     fdr as OPTIONAL and never filter on it — it is informational only.
 
-    Input:  <prefix>_plasmid_summary.tsv from the genomad_end_to_end rule.
+    Input:  <prefix>_plasmid_summary.tsv from rule genomad_end_to_end.
     Output: dict mapping plasmid contig ID -> (plasmid_score, fdr) as strings.
             Empty when geNomad found no plasmids.
     """
@@ -298,29 +326,30 @@ def parse_genomad_plasmids(path):
     return genomad_plasmids
 
 
+# ── Agreement becomes confidence: the D9 rules ──────────────────────────────
+
+# Pure rules, and the whole point of D9. Two callers that fail in different ways
+# agreeing is much better evidence than either one alone:
+#   - both call plasmid                     -> strongest evidence     (high)
+#   - one calls plasmid, the other silent   -> single-tool evidence   (medium)
+#   - Platon chromosome vs geNomad plasmid  -> a real clash, kept     (low)
+#
+# LIMITATION (D9 open issue — verify and upgrade on the first real geNomad run):
+# the geNomad input here is only its plasmid_summary (POSITIVE plasmid calls),
+# so genomad_call="absent" conflates "geNomad actively called it chromosome or
+# virus" with "geNomad never scored it". The FORWARD conflict (Platon chromosome
+# vs geNomad plasmid) IS flagged low; the REVERSE clash (Platon plasmid vs
+# geNomad-NOT-plasmid) is currently reported "platon_only"/medium, not
+# "conflict"/low. Reading geNomad's per-contig aggregated_classification.tsv
+# would make this symmetric — deferred until geNomad can be run to confirm that
+# file's exact format. Nothing is discarded either way; only the tier label of
+# that reverse case is conservative.
 def classify(platon_call, genomad_call):
     """Turn a (Platon, geNomad) call pair into (agreement, confidence).
 
-    These are pure rules — the whole point of D9. Confidence follows how much the
-    two independent tools agree:
-      - both call plasmid                 -> strongest evidence          (high)
-      - one calls plasmid, other silent   -> single-tool evidence        (medium)
-      - Platon chromosome vs geNomad plasmid -> a real clash, kept & flagged (low)
-
-    Input:  platon_call in {plasmid, chromosome, not_called},
+    Input:  platon_call in {plasmid, chromosome, not_called, not_assessed},
             genomad_call in {plasmid, absent}.
     Output: (agreement, confidence) strings for the report row.
-
-    LIMITATION (D9 open issue — verify/upgrade on the first real geNomad run):
-    the geNomad input here is only its plasmid_summary (POSITIVE plasmid calls),
-    so genomad_call="absent" conflates "geNomad actively called it chromosome/
-    virus" with "geNomad never scored it". The FORWARD conflict (Platon chromosome
-    vs geNomad plasmid) IS flagged low; the REVERSE clash (Platon plasmid vs
-    geNomad-NOT-plasmid) is currently reported "platon_only"/medium, not
-    "conflict"/low. Reading geNomad's per-contig aggregated_classification.tsv
-    would make this symmetric — deferred until geNomad can be run to confirm that
-    file's exact format. Nothing is discarded either way; only the tier label of
-    that reverse case is conservative.
     """
     # Platon crashed: there is no second opinion to agree or disagree with. Saying
     # "genomad_only / medium" here would claim a two-tool comparison that never
@@ -342,6 +371,9 @@ def classify(platon_call, genomad_call):
     return "undetermined", "low"
 
 
+# ── One row per plasmid candidate contig, then write the table ──────────────
+
+
 def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_plasmids,
                platon_assessed=True):
     """Assemble one output row per plasmid CANDIDATE contig.
@@ -350,7 +382,9 @@ def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_pl
     Contigs both tools agree are chromosome are intentionally left out — they are
     not plasmid candidates, matching v1's verified_plasmids.txt scope.
 
-    Input:  the four parsed structures plus the sample name.
+    Input:  the four parsed structures plus the sample name, and
+            platon_assessed=False when Platon crashed for this sample (from
+            platon_run_failed), which turns every Platon call into not_assessed.
     Output: a list of dicts keyed by OUTPUT_COLUMNS, sorted by contig ID so the
             table is deterministic across runs.
     """
@@ -358,7 +392,7 @@ def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_pl
 
     rows = []
     for contig in sorted(plasmid_candidate_ids):
-        # --- Platon side: plasmid, chromosome, or simply never called ---
+        # ── Platon side: plasmid, chromosome, or simply never called ────────
         if not platon_assessed:
             # Platon crashed for this sample, so it has no opinion on any contig.
             # Calling this "not_called" would read as "Platon looked and passed
@@ -378,7 +412,7 @@ def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_pl
         # The kept v1 BLAST-text signal — only ever set for Platon-plasmid contigs.
         platon_blast_hit = blast_states.get(contig, "NA")
 
-        # --- geNomad side: plasmid or absent ---
+        # ── geNomad side: plasmid or absent ─────────────────────────────────
         if contig in genomad_plasmids:
             genomad_call = "plasmid"
             genomad_score, genomad_fdr = genomad_plasmids[contig]
@@ -387,7 +421,7 @@ def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_pl
             genomad_score = "NA"
             genomad_fdr = "NA"
 
-        # --- concordance tier from the two independent calls ---
+        # ── The concordance tier, from the two independent calls ────────────
         agreement, confidence = classify(platon_call, genomad_call)
 
         rows.append({
@@ -422,8 +456,11 @@ def write_rows(path, rows):
             writer.writerow(row)
 
 
+# ── Command line, the join, and the join-key sanity check ───────────────────
+
+
 def main():
-    # Arguments are supplied by the plasmid_concordance rule in 60_plasmid.smk.
+    # Arguments are supplied by rule plasmid_concordance in shared/60_plasmid.smk.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sample", required=True,
                         help="Sample name, written into the first column.")
@@ -464,7 +501,9 @@ def main():
             "sample. Check that upstream FASTA headers are trimmed to one token.\n"
         )
 
-    # Join them into the confidence-tiered table and write it.
+    # Platon crashed: say so once, loudly. Every row below carries
+    # not_assessed / platon_unavailable, and a reader must not take that for
+    # "Platon looked and found no plasmids".
     if not platon_assessed:
         sys.stderr.write(
             "[plasmid_concordance] WARNING: Platon exited non-zero for sample "
@@ -475,6 +514,7 @@ def main():
             "stand alone and unconfirmed.\n"
         )
 
+    # Join the two callers into the confidence-tiered table and write it.
     rows = build_rows(
         args.sample, platon_plasmids, chromosome_ids, blast_states, genomad_plasmids,
         platon_assessed=platon_assessed,

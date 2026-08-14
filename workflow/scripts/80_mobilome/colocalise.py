@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """Place every AMR gene in its mobile-element context and give it a mobility tier.
 
-This is the analytical heart of the mobilome module (spec `docs/mobilome_module_SPEC.md`
+The analytical heart of the mobilome module (spec `docs/mobilome_module_SPEC.md`
 §7 = work package D, and §2.5 = the mobility ladder). It answers ONE question per
 AMR gene:
 
     is this resistance gene sitting inside (or next to) a mobile genetic element,
     and if so how transferable is that element?
 
-WHY THIS MATTERS (the biology)
-------------------------------
+Why the address of a resistance gene matters as much as its name
+----------------------------------------------------------------
 A resistance gene that is part of the species' normal chromosomal repertoire
 (an intrinsic efflux pump, a chromosomal AmpC) is a very different risk from the
 same activity carried on a conjugative plasmid, because only the second one can
 move into another bacterium. Regulators (EFSA) ask exactly this: is the
-determinant INTRINSIC or ACQUIRED, and is it TRANSFERABLE. This script produces
-the supporting evidence for that judgement. It does not produce the judgement
-itself, and the output must never be labelled "EFSA-compliant".
+determinant INTRINSIC or ACQUIRED, and is it TRANSFERABLE. What comes out of
+here is the supporting evidence for that judgement, never the judgement itself,
+and it must never be labelled "EFSA-compliant".
 
-THE MOBILITY LADDER implemented here (spec §2.5), lowest to highest:
+The mobility ladder implemented here (spec §2.5), lowest rung to highest:
 
     1  chromosomal, no mobile-element context      -> intrinsic candidate
     2  IS sitting upstream and pointing at the gene -> the IS can supply an
        outward-reading ("hybrid") promoter that raises expression. This is
-       EXPRESSION MODULATION, NOT mobilisation - the gene still cannot move.
+       EXPRESSION MODULATION, NOT mobilisation — the gene still cannot move.
     3  gene sits between two copies of the same IS  -> a composite transposon;
        the whole block can hop within the cell.
     4  gene sits inside a named unit transposon or an integron cassette
@@ -34,83 +34,94 @@ THE MOBILITY LADDER implemented here (spec §2.5), lowest to highest:
        -> PREDICTED self-transmissible. Always write "predicted": the
           confirmatory experiment is a filter/broth mating assay, not software.
 
-SPECIAL CASE, reported separately and never counted as mobilisation: an IS that
+Special case, reported separately and never counted as mobilisation: an IS that
 has landed INSIDE the AMR coding sequence. That usually INACTIVATES the gene
 (the strain is likely susceptible despite the hit), so it gets its own
 `is_inside_amr_cds` flag rather than being folded into the mobilisation call.
 
-THE HONEST-SIGNALS RULE (spec §2.3 - read this before trusting any output)
---------------------------------------------------------------------------
-On short-read (SPAdes) assemblies, IS elements are the main reason contigs
-break: multiple identical IS copies collapse into one, and the assembler cannot
-tell which copy went where. So the AMR gene and the IS that flanks it very often
-land on DIFFERENT contigs - the exact structure we are trying to detect is what
-destroyed the assembly. Consequences hard-wired here:
+What a fragmented assembly can and cannot show
+----------------------------------------------
+Read this before trusting any output (spec §2.3). On short-read (SPAdes)
+assemblies, IS elements are the main reason contigs break: multiple identical IS
+copies collapse into one, and the assembler cannot tell which copy went where.
+So the AMR gene and the IS that flanks it very often land on DIFFERENT contigs —
+the exact structure we are trying to detect is what destroyed the assembly.
+Consequences hard-wired here:
 
   * a located IS count is a FLOOR, never a count;
   * ABSENCE of a flanking IS may simply mean the contig ended, so every row
     carries `dist_to_contig_end` and `is_at_contig_boundary`, and anything
     resting on a contig boundary or on a partial hit is capped at LOW confidence;
-  * published IS-detection false-discovery rates are 8-24% even on curated data,
+  * published IS-detection false-discovery rates are 8–24% even on curated data,
     so confidence is always TIERED (high/medium/low) and never a bare call.
 
-A NOTE ON WHAT RUNS WHERE, because older comments in this module got it wrong.
-BacFlux v2 is ONE workflow with four entry points (illumina, nanopore, hybrid,
-contigs). Composite-transposon calling and ICE-boundary calling run in ALL of
-them - they are not reserved for long reads, and there is no longer a separate
-long-read repository to reserve them for. What genuinely differs between a good
-assembly and a fragmented one is how much you should BELIEVE the answer, and
-that is reported per row (`dist_to_contig_end`, `is_at_contig_boundary`,
+What runs where, because older comments in this module got it wrong: BacFlux v2
+is ONE workflow with four entry points (illumina, nanopore, hybrid, contigs).
+Composite-transposon calling and ICE-boundary calling run in ALL of them — they
+are not reserved for long reads, and there is no longer a separate long-read
+repository to reserve them for. What genuinely differs between a good assembly
+and a fragmented one is how much you should BELIEVE the answer, and that is
+reported per row (`dist_to_contig_end`, `is_at_contig_boundary`,
 `spans_contigs`) rather than being decided for you by the sequencing technology.
 
-DATA FLOW
----------
-Inputs (all plain TSV; parsed with the standard library only - no pandas, no
-bedtools, the interval arithmetic is written out below so it can be read):
+Where the inputs come from, and what happens when one is missing
+----------------------------------------------------------------
+All four are plain TSV, parsed with the standard library only — no pandas, no
+bedtools, the interval arithmetic is written out below so it can be read.
 
-  --amrfinder       AMRFinderPlus 4.x TSV (rule amrfinderplus - "work package A"
+  --amrfinder       AMRFinderPlus 4.x TSV (rule amrfinderplus — "work package A"
                     in the spec, the step that surfaces AMRFinderPlus's full
                     report instead of just the gene names Bakta shows). One row per
                     AMR/STRESS/VIRULENCE hit with contig + 1-based coordinates.
-                    THIS IS THE ONLY REQUIRED INPUT - it defines the output rows.
-  --is-table        mobile elements with coordinates, normally derived from
-                    ISEScan (rule isescan + loaders). One row per element. An
-                    optional `element_type` column lets the SAME file also carry
-                    named transposons/integrons (from the TnCentral naming
-                    cascade, rule name_elements) and ICE/IME calls (rule
-                    conjscan_ice), so tiers 3, 4 and 6 all read from one tidy
-                    table.
-  --replicons       one row per contig: chromosome or plasmid (from Platon /
-                    the plasmid-concordance step) plus, for plasmids, whether
-                    CONJscan found conjugation machinery (conjugative) or only a
-                    relaxase (mobilisable). Drives tiers 5 and 6.
-  --contig-lengths  contig -> length, or a samtools .fai. Needed for the
-                    distance-to-contig-end signal described above.
+                    This is the ONLY required input — it defines the output rows.
+  --is-table        mobile elements with coordinates, one row per element.
+                    REPEATABLE, and the workflow passes it two or three times
+                    rather than pre-merging: the tidied ISEScan calls
+                    (isescan_to_table.py, rule isescan_table), the ICE/IME
+                    candidates (conjscan_to_ice.py, rule conjscan_ice — or its
+                    named copy from rule name_ice_elements when the ICEberg
+                    layer is on), and, only when a TnCentral source is
+                    configured, the curated transposons and integrons
+                    (name_transposons.py, rule name_elements). An `element_type`
+                    column on each says which kind it holds, so tiers 3, 4 and 6
+                    all read from one pooled list of elements.
+  --replicons       one row per contig: chromosome or plasmid (rule
+                    mobilome_replicons, which runs platon_replicons.py over
+                    Platon and, when geNomad is on, the plasmid-concordance
+                    table) plus, for plasmids, how mobile PLATON thinks the
+                    plasmid is, from its own gene counts: conjugation genes
+                    (conjugative) versus a relaxase or oriT alone (mobilisable).
+                    Drives tiers 5 and 6. CONJscan's independent, typed opinion
+                    does NOT arrive here — it comes in on the ICE table above,
+                    which is what lets Step 8 corroborate or contradict Platon.
+  --contig-lengths  contig -> length, or a samtools .fai (rule contig_lengths).
+                    Needed for the distance-to-contig-end signal described above.
 
 Every input EXCEPT --amrfinder may be missing, empty or header-only: ISEScan
 writes no files at all when it finds no IS, and plenty of isolates have no
 plasmid. Those cases degrade gracefully and are written into the audit file, so
 "no evidence" is never silently confused with "no data".
 
-Outputs:
-  --out-table  one row per AMR gene, the deliverable (spec §9).
-  --out-audit  the decision trail: an explicit reason for every gene that got no
-               mobile-element context, every candidate structure that was
-               rejected, and every confidence cap that was applied. This follows
-               BacFlux's existing `contig_taxonomy_decisions.tsv` convention -
-               every filtering decision must be auditable.
-
-Consumed next by the mobilome report rule (spec §10).
+Outputs, both under 08.mobilome/:
+  --out-table  one row per AMR gene, the deliverable (spec §9). Written to
+               {sample}_amr_mobility.tsv, which is a rule-all target and the
+               module's terminal product — no other rule reads it.
+  --out-audit  the decision trail, {sample}_amr_mobility_audit.tsv: an explicit
+               reason for every gene that got no mobile-element context, every
+               candidate structure that was rejected, and every confidence cap
+               that was applied. This follows BacFlux's existing
+               `contig_taxonomy_decisions.tsv` convention — every filtering
+               decision must be auditable.
 
 Coordinates: everything here is 1-BASED AND INCLUSIVE on both ends, which is what
 AMRFinderPlus and ISEScan both emit, so no conversion happens anywhere. Distances
 are the number of bases strictly BETWEEN two features (adjacent features = 0).
 
-Licensing note: this is an independent implementation. No code or expression was
+Licensing: this is an independent implementation. No code or expression was
 taken from EBI's mobilome-annotation-pipeline (parts of which are CC BY-NC-SA and
-incompatible with BacFlux's MIT licence). Only conventions are borrowed - the
+incompatible with BacFlux's MIT licence). Only conventions are borrowed — the
 Sequence-Ontology vocabulary, the "assign a CDS to an element at >=0.9 coverage"
-threshold and the discard-with-reason file pattern - and conventions are facts,
+threshold and the discard-with-reason file pattern — and conventions are facts,
 not expression (spec §11).
 
 Standalone CLI, stdlib only, exercised by test_colocalise.py with synthetic
@@ -123,14 +134,11 @@ import os
 import sys
 
 
-# ---------------------------------------------------------------------------
-# CONVENTIONS, NOT BIOLOGY
+# ── Conventions, not biology: every number below is a threshold we chose ────
 #
-# Every number below is a threshold we CHOSE. None of them is a property of a
-# cell. That is why the output table always reports the MEASURED distance next
-# to the tier: a reader who disagrees with a threshold can re-judge a row
-# without re-running anything.
-# ---------------------------------------------------------------------------
+# None of them is a property of a cell. That is why the output table always
+# reports the MEASURED distance next to the tier: a reader who disagrees with a
+# threshold can re-judge a row without re-running anything.
 
 # Longest block of DNA we are willing to call a composite transposon. Real
 # composites run from ~2.5 kb (IS26 translocatable units) to ~25 kb; 20 kb is the
@@ -139,7 +147,7 @@ DEFAULT_MAX_COMPOSITE_SPAN_BP = 20000
 
 # How close an upstream IS must be before we are willing to say it could be
 # driving the gene from an outward-reading promoter (ladder tier 2). The classic
-# examples sit very close: ISEcp1 is 42-266 bp upstream of blaCTX-M. 500 bp is a
+# examples sit very close: ISEcp1 is 42–266 bp upstream of blaCTX-M. 500 bp is a
 # generous round number; beyond it, an intervening gene is likely and the
 # mechanism becomes speculative.
 HYBRID_PROMOTER_MAX_BP = 500
@@ -150,17 +158,17 @@ HYBRID_PROMOTER_MAX_BP = 500
 IS_ADJACENT_MAX_BP = 5000
 
 # A feature this close to the end of its contig cannot be trusted to have its
-# real neighbourhood assembled next to it - the contig ended, so absence of
+# real neighbourhood assembled next to it — the contig ended, so absence of
 # evidence is not evidence of absence. Triggers the boundary flag and the
 # low-confidence cap.
 #
-# ⚠ THE TEST IS STRICTLY LESS-THAN (`distance < 1000`), and the message text next
+# The test is STRICTLY LESS-THAN (`distance < 1000`), and the message text next
 # to it says "< 1000 bp". Leave it that way. It looks inconsistent with the
 # `<= boundary_bp` tests in conjscan_to_ice.py and isescan_to_table.py, but those
 # are DIFFERENT thresholds applied to DIFFERENT objects (whole elements, not AMR
 # genes) and written to differently named columns. "Harmonising" the operator
 # here would flip every gene sitting at exactly 1000 bp from a contig end from
-# `no` to `yes` and add a low-confidence cap to it - a silent change to published
+# `no` to `yes` and add a low-confidence cap to it — a silent change to published
 # results, for no gain.
 CONTIG_END_WINDOW_BP = 1000
 
@@ -177,7 +185,7 @@ MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION = 0.5
 # How close an IS must sit to the edge of a PARTIAL AMR hit before we read the
 # pair as "the IS landed in this gene and split it". A transposition leaves the
 # insertion flush against the interrupted sequence, usually with a short
-# target-site duplication of a few bp, so this window is deliberately tight - it
+# target-site duplication of a few bp, so this window is deliberately tight — it
 # is testing for "butted up against", not "nearby". See
 # find_truncating_abutting_is for why this second test is needed at all.
 ABUTTING_IS_MAX_GAP_BP = 25
@@ -246,25 +254,25 @@ OUTPUT_COLUMNS = [
     "n_flanking_is",             # IS on either side within the composite window
     "same_orientation",          # yes | no | NA  (the two flanking copies)
     "flanking_span_bp",          # measured span of the called composite
-    "is_inside_amr_cds",         # yes | no  - likely INACTIVATION, not mobilisation
+    "is_inside_amr_cds",         # yes | no  — likely INACTIVATION, not mobilisation
     "is_amr_overlap_bp",
     "plasmid_mobility",          # conjugative | mobilisable | non_mobilisable | unknown | NA
     "mobility_evidence",         # free text passed through from CONJscan, if given
     # The typed conjugation machinery behind a tier 5/6 call (spec §9). Filled
-    # from the ICE/IME table - either the element containing the gene, or, for a
+    # from the ICE/IME table — either the element containing the gene, or, for a
     # plasmid, any conjugative system found elsewhere on the same replicon, since
     # that is what makes the whole plasmid transferable.
-    "relaxase_type",             # e.g. MOBH, MOBF - NA when none was found
-    "mpf_type",                  # mating-pair apparatus type, e.g. F, T - NA if none
+    "relaxase_type",             # e.g. MOBH, MOBF — NA when none was found
+    "mpf_type",                  # mating-pair apparatus type, e.g. F, T — NA if none
     "machinery_intact",          # yes | no | NA  (no = truncated/degraded)
     "machinery_source",          # which element supplied the three fields above
-    # Element boundaries - the attL/attR direct repeats an ICE leaves behind
+    # Element boundaries — the attL/attR direct repeats an ICE leaves behind
     # where it integrated. Filled from the ICE table (rule conjscan_ice, which
     # runs att_search.py). The att search runs in EVERY mode, not just long-read.
     #
     # Reading these three correctly:
     #   NA     this gene has no ICE/IME context at all, so there was nothing to
-    #          find boundaries FOR - see Step 9b, which only fills them when a
+    #          find boundaries FOR — see Step 9b, which only fills them when a
     #          machinery element contains the gene;
     #   none   an element was found, but its edges could not be established -
     #          usually the contig ends before the flank does;
@@ -272,7 +280,7 @@ OUTPUT_COLUMNS = [
     #          actually produces. This is the only label acted on upstream:
     #          conjscan_to_ice.py moves an element's coordinates onto a tRNA
     #          boundary but not onto a denovo one;
-    #   denovo a bracketing repeat with no tRNA involved - reported as evidence,
+    #   denovo a bracketing repeat with no tRNA involved — reported as evidence,
     #          but the element's coordinates were NOT moved onto it.
     "boundary_method",           # tRNA | denovo | none | NA
     "attL",
@@ -281,7 +289,7 @@ OUTPUT_COLUMNS = [
     "dist_to_contig_end",
     "is_at_contig_boundary",     # yes | no | NA
     "spans_contigs",             # yes | no
-    "mobility_tier",             # 1-6, or NA when the gene has no coordinates
+    "mobility_tier",             # 1–6, or NA when the gene has no coordinates
     "mobility_tier_label",
     "confidence",                # high | medium | low
 ]
@@ -290,7 +298,7 @@ OUTPUT_COLUMNS = [
 # generate several (no context found, plus two rejected structures, plus a
 # confidence cap).
 #
-# THE TEN `decision` WORDS, which are what you filter this file on. The usual
+# The ten `decision` words, which are what you filter this file on. The usual
 # first look at a run is
 #     cut -f8,9 {sample}_amr_mobility_audit.tsv | sort | uniq -c | sort -rn
 # so the full list is written out here rather than left to be discovered:
@@ -304,21 +312,21 @@ OUTPUT_COLUMNS = [
 #   row_skipped            an AMRFinderPlus row could not be placed at all (no
 #                          contig coordinates), so it gets no tier.
 #   no_mge_context         the gene was assessed and nothing mobile was near it.
-#                          This is a RESULT, not a failure - it is what a tier 1
+#                          This is a RESULT, not a failure — it is what a tier 1
 #                          intrinsic candidate looks like.
 #   tier_not_raised        evidence was found but did not meet the bar for the
 #                          next rung, e.g. an upstream IS beyond the promoter
 #                          window. The single most common word in the file.
 #   evidence_rejected      a candidate structure was thrown out (IS inside the
 #                          coding sequence, unusable element type, ...).
-#   evidence_recorded      kept as a note without changing the tier - e.g. the
+#   evidence_recorded      kept as a note without changing the tier — e.g. the
 #                          gene sits in a named element but a higher rung already
 #                          applies, and the name would otherwise be lost.
 #   evidence_corroborated  two independent tools agreed; recorded because
 #                          agreement is evidence and should be visible.
 #   tools_disagree         two tools disagreed (CONJscan typed a system Platon
 #                          did not call a plasmid). NOT resolved silently.
-#   confidence_capped      the call was downgraded - contig boundary, partial
+#   confidence_capped      the call was downgraded — contig boundary, partial
 #                          hit, spans contigs, or a missing input table.
 #
 # `reason` is a short slug and `detail` carries the actual numbers. Every reason
@@ -368,7 +376,7 @@ OUTPUT_COLUMNS = [
 #   the ICE table onto the gene, so an AMR call can never be reported more
 #   confidently than the element the call rests on. It has never fired in any run
 #   kept on disk (the retained runs' ICE-context genes all sat in high-confidence
-#   elements), but it is live code, not a leftover - checked 2026-08-01.
+#   elements), but it is live code, not a leftover — checked 2026-08-01.
 AUDIT_COLUMNS = [
     "sample",
     "contig",
@@ -383,9 +391,7 @@ AUDIT_COLUMNS = [
 ]
 
 
-# ===========================================================================
-# Small shared helpers: reading tables, finding columns, interval arithmetic.
-# ===========================================================================
+# ── Small shared helpers: read tables, find columns, measure intervals ──────
 
 
 def read_tsv(path):
@@ -494,9 +500,7 @@ def gap_bp(a_start, a_end, b_start, b_end):
     return space if space > 0 else 0
 
 
-# ===========================================================================
-# Input parsers. One per file, each returning plain Python structures.
-# ===========================================================================
+# ── Input parsers, one per file, each returning plain Python structures ─────
 
 # AMRFinderPlus 4.x renamed most of its columns (3.x "Gene symbol" became
 # "Element symbol", and so on). A parser written against the old names finds
@@ -520,7 +524,7 @@ def parse_amrfinder(path):
 
     What it produces: a list of dicts, one per hit, which becomes one row of the
     deliverable. STRESS and VIRULENCE rows are kept alongside AMR rows rather
-    than dropped - a mercury-resistance (STRESS) gene inside a transposon is
+    than dropped — a mercury-resistance (STRESS) gene inside a transposon is
     exactly the classic Tn21 cargo, and the `amr_element_type` column lets a
     reader filter to AMR only if they want to.
 
@@ -613,10 +617,10 @@ ELEMENT_TYPE_SYNONYMS = {
     "ime": "ime",
     # The two classes conjscan_to_ice.py reports but deliberately does NOT let
     # raise the tier (spec §8 phase 4: a conjugative region with no integrase is
-    # unbounded - "report, don't call ICE"; an island has no conjugation machinery
+    # unbounded — "report, don't call ICE"; an island has no conjugation machinery
     # at all). They must still be RECOGNISED here. While they were missing from
     # this table they parsed as element_type None, which meant they were dropped
-    # from every test AND logged as an "unrecognised element_type" - so an AMR gene
+    # from every test AND logged as an "unrecognised element_type" — so an AMR gene
     # sitting inside a predicted chromosomal conjugative region came out as
     # "intrinsic candidate" at high confidence, with a contradictory audit line
     # beside it. Recognised-but-not-tier-raising is the correct handling: they set
@@ -626,13 +630,13 @@ ELEMENT_TYPE_SYNONYMS = {
     "genomic_island": "genomic_island",
     "island": "genomic_island",
     "cime": "genomic_island",        # a CIME is an integrated, non-mobile island
-    # An AICE - an actinomycete integrative element, from the ICEscan model set.
+    # An AICE — an actinomycete integrative element, from the ICEscan model set.
     # Despite the C in the name it does NOT conjugate: it has no relaxase and no
     # mating-pair apparatus, and moves as double-stranded DNA between the
     # compartments of a Streptomyces mycelium, pushed through the septal pore by
     # its own FtsK/SpoIIIE translocase. Both mobility tiers at the top of the
-    # ladder are conjugation - tier 5 "mobilisable by a helper", tier 6
-    # "self-transmissible" - so an AICE belongs to neither and is recognised here
+    # ladder are conjugation — tier 5 "mobilisable by a helper", tier 6
+    # "self-transmissible" — so an AICE belongs to neither and is recognised here
     # as CONTEXT ONLY, like the two classes above it: it sets the neighbourhood
     # and caps confidence, and can raise no tier. Without this entry it parsed as
     # None and was dropped with an "unrecognised element_type" line.
@@ -649,28 +653,29 @@ CONTEXT_ONLY_ELEMENT_TYPES = {"conjugative_region", "genomic_island", "aice"}
 def parse_mobile_elements(path):
     """Read the mobile-element table into one dict per element.
 
-    WHERE IT COMES FROM: normally the ISEScan run on this sample's contigs
-    (rule isescan), reshaped by isescan_to_table.py into tidy columns. The same
-    file may also carry named transposons/integrons from the TnCentral naming
-    cascade (name_transposons.py) and ICE/IME calls (conjscan_to_ice.py, which
-    runs in every mode) - the optional `element_type` column says which is which,
-    and rows without it are treated as insertion sequences (the ISEScan-only
-    case). That default is deliberate, so a hand-trimmed two-column table still
-    runs; it is also recorded in the audit file, because silently reading a whole
-    table as insertion sequences is exactly the kind of thing that should not
-    happen quietly.
+    Where it comes from: normally the ISEScan run on this sample's contigs
+    (rule isescan), reshaped into tidy columns by isescan_to_table.py (rule
+    isescan_table). This reads ONE file; the workflow hands over two or three
+    (see --is-table in the module header) and main() pools the rows, but a
+    single file may equally carry all the kinds at once. The optional
+    `element_type` column says which kind each row is, and rows without it are
+    treated as insertion sequences (the ISEScan-only case). That default is
+    deliberate, so a hand-trimmed two-column table still runs; it is also
+    recorded in the audit file, because silently reading a whole table as
+    insertion sequences is exactly the kind of thing that should not happen
+    quietly.
 
     Columns read (first matching name wins, case-insensitive):
       contig        contig | seqID | sequence | seq_id      (required)
       start         start  | isBegin                         (required)
       end           end    | isEnd                           (required)
-      strand        strand                        - may be EMPTY: ISEScan leaves
+      strand        strand                        — may be EMPTY: ISEScan leaves
                                                     it blank for an IS with no
                                                     predicted transposase.
-      family        family                        - IS family, e.g. IS6, IS3
-      cluster       cluster                       - ISEScan's finer grouping
+      family        family                        — IS family, e.g. IS6, IS3
+      cluster       cluster                       — ISEScan's finer grouping
       element_type  element_type | type_of_element | mge_type
-                                                  - see ELEMENT_TYPE_SYNONYMS.
+                                                  — see ELEMENT_TYPE_SYNONYMS.
                                                     isescan_to_table.py writes
                                                     `mge_type`; conjscan_to_ice.py
                                                     and name_transposons.py write
@@ -679,19 +684,19 @@ def parse_mobile_elements(path):
                                                     were left as they are rather
                                                     than renamed in an output.
       complete      is_complete | complete | completeness | type
-                                                  - ISEScan's `type` column is
+                                                  — ISEScan's `type` column is
                                                     'c' (complete) or 'p'
                                                     (partial); partial elements
                                                     are kept (we tier them
                                                     ourselves) but they lower
                                                     confidence.
-      id            is_id | id | element_id | mge_id        - synthesised if absent
-      name          name | element_name | mge_name          - curated name, if any
+      id            is_id | id | element_id | mge_id        — synthesised if absent
+      name          name | element_name | mge_name          — curated name, if any
 
-    NOTE on ISEScan's raw `.tsv`: its `type` column holds c/p (complete/partial),
+    ISEScan's raw `.tsv` holds c/p (complete/partial) in a column called `type`,
     which is why bare `type` is accepted as a COMPLETENESS alias and never as an
-    element-type alias. Element type must be spelled out - `element_type`,
-    `type_of_element` or `mge_type` - or a c/p column would be read as an
+    element-type alias. Element type must be spelled out — `element_type`,
+    `type_of_element` or `mge_type` — or that c/p column would be read as an
     element type and every row would become an unrecognised type.
 
     Produces: a list of element dicts. Feeds the disruption test, the adjacency
@@ -716,7 +721,7 @@ def parse_mobile_elements(path):
     # This used to accept only "family", which matches nothing in our own IS table,
     # so is_family came out NA on every row and the IS26/IS6 same-family tests
     # below silently never fired. Matching is exact (see find_column), so a missing
-    # alias is invisible rather than an error - hence listing the real name first.
+    # alias is invisible rather than an error — hence listing the real name first.
     family_index = find_column(header, ["is_family", "family"])
     cluster_index = find_column(header, ["cluster"])
     type_index = find_column(header, ["element_type", "type_of_element", "mge_type"])
@@ -726,7 +731,7 @@ def parse_mobile_elements(path):
 
     # Quality columns that only the ICE/IME table carries (conjscan_to_ice.py).
     # That script already decides whether an element's machinery is intact, whether
-    # it straddles a contig break, and what confidence it deserves - and those
+    # it straddles a contig break, and what confidence it deserves — and those
     # judgements must survive into the deliverable, or the AMR row ends up more
     # confident than the element it rests on. They are absent from the IS table,
     # where find_column simply returns None and the fields stay empty.
@@ -739,7 +744,7 @@ def parse_mobile_elements(path):
     # The conjugation MACHINERY itself, as CONJscan typed it. Spec §9 asks for
     # relaxase_type / mpf_type / machinery_intact in the deliverable, and these
     # are also what lets a plasmid's mobility be corroborated (or contradicted)
-    # against Platon's much cruder gene COUNTS - see
+    # against Platon's much cruder gene COUNTS — see
     # find_conjugative_machinery_on_contig.
     has_relaxase_index = find_column(header, ["has_relaxase"])
     has_t4ss_index = find_column(header, ["has_t4ss"])
@@ -814,8 +819,8 @@ def element_says_true(value):
     """Is this element-table cell an explicit TRUE?
 
     conjscan_to_ice.py writes TRUE/FALSE; a loader elsewhere might write yes/1.
-    Anything else - including the empty string an IS row leaves behind, since the
-    IS table has no such column - is "not stated", never True. Absence of
+    Anything else — including the empty string an IS row leaves behind, since the
+    IS table has no such column — is "not stated", never True. Absence of
     evidence must not read as evidence.
     """
     return str(value).strip().lower() in {"true", "yes", "1"}
@@ -826,8 +831,8 @@ def find_conjugative_machinery_on_contig(elements_on_contig):
 
     Biology: Platon decides whether a contig is a plasmid and guesses how mobile
     it is by COUNTING hits to conjugation-related genes. CONJscan asks a much
-    harder question - does this replicon carry a complete, TYPED mating-pair
-    system? - and conjscan_to_ice.py has already written that answer out. For a
+    harder question — does this replicon carry a complete, TYPED mating-pair
+    system? — and conjscan_to_ice.py has already written that answer out. For a
     plasmid the two are independent opinions about the same thing, so the second
     one can corroborate or contradict the first.
 
@@ -839,7 +844,7 @@ def find_conjugative_machinery_on_contig(elements_on_contig):
 
     Note this deliberately does NOT require the element to CONTAIN the AMR gene.
     A conjugative system anywhere on the same plasmid is what makes that plasmid
-    transferable, and with it every gene it carries - which is the whole point of
+    transferable, and with it every gene it carries — which is the whole point of
     ladder tier 6.
     """
     best_element = None
@@ -920,7 +925,7 @@ def element_says_false(value):
     """Is this element-table cell an explicit FALSE?
 
     conjscan_to_ice.py writes TRUE/FALSE; other loaders might write no/0. Anything
-    else - including an empty cell from the IS table, which has no such column - is
+    else — including an empty cell from the IS table, which has no such column — is
     treated as "not stated", so a missing column can never be read as a failure.
     """
     return str(value).strip().lower() in {"false", "no", "0"}
@@ -930,7 +935,7 @@ def element_quality_caps(element):
     """Turn an ICE/IME element's OWN quality flags into confidence caps.
 
     Biology and why this matters: conjscan_to_ice.py already asks the hard
-    questions about each candidate - is the conjugation machinery complete, or is
+    questions about each candidate — is the conjugation machinery complete, or is
     this a decayed element that can no longer move? does it straddle a contig
     break, so its extent is a guess? Those answers were being computed and then
     thrown away here, so an AMR gene sitting in a half-broken, contig-spanning
@@ -980,8 +985,8 @@ def normalise_completeness(value):
     """Turn the many spellings of complete/partial into 'complete'|'partial'|'unknown'.
 
     ISEScan writes 'c' or 'p'; a loader might write True/False or the words. A
-    partial (fragmentary) IS call is kept - the spec says explicitly not to run
-    ISEScan with --removeShortIS, because we tier partials ourselves - but it
+    partial (fragmentary) IS call is kept — the spec says explicitly not to run
+    ISEScan with --removeShortIS, because we tier partials ourselves — but it
     lowers the confidence of anything built on it.
     """
     text = str(value).strip().lower()
@@ -1016,10 +1021,17 @@ PLASMID_MOBILITY_SYNONYMS = {
 def parse_replicons(path):
     """Read the per-contig replicon call into {contig: {...}}.
 
-    WHERE IT COMES FROM: Platon (via the plasmid-concordance step) says whether
-    each contig is chromosome or plasmid; CONJscan/MacSyFinder says whether a
-    plasmid carries conjugation machinery. Both are folded into one small table
-    upstream so this script joins on one file.
+    Where it comes from: platon_replicons.py (rule mobilome_replicons). Platon
+    says whether each contig is chromosome or plasmid — cross-checked against
+    geNomad through the plasmid-concordance table when geNomad is the phage
+    caller — and, for a plasmid, how mobile it looks, from Platon's own
+    `# Conjugation` / `# Mobilization` / `# OriT` counts.
+
+    That mobility call is PLATON's, not CONJscan's, and it is the cruder of the
+    two: counting hits to conjugation proteins is not the same as typing a
+    complete mating-pair system. CONJscan's answer reaches this script by the
+    other route entirely — on the ICE table passed to --is-table — which is why
+    Step 8 can set the two opinions against each other instead of trusting one.
 
     Columns read (first matching name wins):
       contig            contig | contig_id | seq_name | ID       (required)
@@ -1091,12 +1103,14 @@ def parse_replicons(path):
 def parse_contig_lengths(path):
     """Read contig lengths into {contig: length}.
 
-    WHERE IT COMES FROM: the assembly, `02.assembly/{sample}/contigs_final.fasta`.
-    Either a two-column TSV with a header (contig, length) or, because it is the
-    obvious thing to have lying around, a headerless samtools `.fai` index whose
-    first two fields are name and length. Both are accepted.
+    Where it comes from: rule contig_lengths, which measures the decontaminated
+    assembly `02.assembly/{sample}/contigs_final.fasta` with isescan_to_table.py
+    --out-contig-lengths. Either a two-column TSV with a header (contig, length)
+    or, because it is the obvious thing to have lying around, a headerless
+    samtools `.fai` index whose first two fields are name and length. Both are
+    accepted.
 
-    WHAT IT IS FOR: the distance-to-contig-end signal. On a short-read assembly
+    What it is for: the distance-to-contig-end signal. On a short-read assembly
     that number is the difference between "there is no IS next to this gene" and
     "the contig ran out before we could see one".
     """
@@ -1123,9 +1137,7 @@ def parse_contig_lengths(path):
     return lengths
 
 
-# ===========================================================================
-# Biology rules. Each of these answers one small question about one gene.
-# ===========================================================================
+# ── Biology rules, each answering one small question about one gene ─────────
 
 
 def normalise_family(value):
@@ -1166,7 +1178,7 @@ def families_match(left, right):
 
     Primary test is the IS family. When the family is uninformative ('new',
     'ISNCY', blank) we fall back to ISEScan's `cluster`, which groups elements
-    at a finer level - two members of the same cluster are the same element even
+    at a finer level — two members of the same cluster are the same element even
     if neither has a family name. If neither test can be applied we return
     False, and the caller writes the reason to the audit.
     """
@@ -1243,7 +1255,7 @@ def find_truncating_abutting_is(gene, insertion_sequences):
 
     Biology, and why the overlap test above is not enough on its own. When an IS
     transposes INTO a resistance gene it splits the coding sequence, and
-    AMRFinderPlus then reports only the surviving fragment - the part that still
+    AMRFinderPlus then reports only the surviving fragment — the part that still
     matches its reference. So the coordinates it gives END where the IS BEGINS.
     The overlap between the reported gene and the IS is therefore ~0 by
     construction, and the >=50% overlap test can essentially never fire for the
@@ -1251,7 +1263,7 @@ def find_truncating_abutting_is(gene, insertion_sequences):
     paper is a PARTIAL hit sitting flush against an IS.
 
     This is a second, independent signal, added ALONGSIDE the overlap test rather
-    than replacing it - the overlap test still catches an IS called across a
+    than replacing it — the overlap test still catches an IS called across a
     complete gene, which this one would miss.
 
     Two guards keep it honest:
@@ -1262,7 +1274,7 @@ def find_truncating_abutting_is(gene, insertion_sequences):
         transposition leaves the two flush (often with a short target-site
         duplication), so this window is small on purpose.
 
-    Returns (element_or_None, gap_bp, which_end) - which_end is "start" or "end",
+    Returns (element_or_None, gap_bp, which_end) — which_end is "start" or "end",
     naming the side of the gene the IS sits against.
     """
     method = str(gene.get("method", "")).upper()
@@ -1299,7 +1311,7 @@ def is_upstream_of_gene(element, gene):
     upstream side is the HIGHER coordinates. This matters because an outward-
     reading promoter in an IS can only drive a gene that lies downstream of it.
 
-    Returns False when the gene's strand is unknown - we cannot say which side
+    Returns False when the gene's strand is unknown — we cannot say which side
     is upstream, so we do not guess.
     """
     strand = str(gene["strand"]).strip()
@@ -1315,7 +1327,7 @@ def find_upstream_promoter_is(gene, insertion_sequences):
 
     This is ladder tier 2. Three things must all be true:
       1. the IS lies upstream in the gene's reading direction (see above);
-      2. the IS is on the SAME strand as the gene - the convention we use for
+      2. the IS is on the SAME strand as the gene — the convention we use for
          "pointing at the gene", since ISEScan reports the transposase strand and
          an IS end reading in the gene's direction is the one that can form a
          hybrid promoter;
@@ -1324,7 +1336,7 @@ def find_upstream_promoter_is(gene, insertion_sequences):
 
     Returns (element, gap_bp) for the closest qualifying IS, or (None, None).
     Also returns, as a third value, the closest IS that satisfied 1 and 2 but was
-    TOO FAR - so the caller can write an honest audit line instead of silently
+    TOO FAR — so the caller can write an honest audit line instead of silently
     dropping a near miss.
     """
     within_window = []
@@ -1402,7 +1414,7 @@ def flanking_is_candidates(gene, insertion_sequences, max_span_bp):
 
     Takes in: one AMR gene, the insertion sequences ON ITS OWN CONTIG, and the
               longest span we are willing to call a composite transposon.
-    Returns:  (left_candidates, right_candidates) - IS lying entirely before the
+    Returns:  (left_candidates, right_candidates) — IS lying entirely before the
               gene, and entirely after it, each within max_span_bp of it.
 
     "Close enough" is measured gene-edge to IS-edge, not centre to centre, so a
@@ -1430,19 +1442,19 @@ def flanking_is_candidates(gene, insertion_sequences, max_span_bp):
 def find_composite_pair(gene, insertion_sequences, max_span_bp):
     """Look for two copies of the same IS flanking the gene -> a composite transposon.
 
-    This is ladder tier 3. The structure being tested for is:
+    Ladder tier 3. The structure being tested for is:
 
-        ---[ IS_x ]--------- AMR gene ---------[ IS_x ]---
-            left                                  right
-        |<------------- span (<= max_span_bp) ------------>|
+        ──[ IS_x ]──────────── AMR gene ────────────[ IS_x ]──
+           left                                       right
+        │◄─────────────── span (<= max_span_bp) ──────────────►│
 
     All of the following must hold (spec §7):
-      * both IS on the SAME contig as the gene (guaranteed - the caller only
+      * both IS on the SAME contig as the gene (guaranteed — the caller only
         passes IS from this contig);
       * the gene lies strictly BETWEEN them;
       * the two copies are the same element (same family, or same ISEScan
         cluster when the family is uninformative);
-      * they are in the SAME orientation - EXCEPT for IS26/IS6, which is exempt
+      * they are in the SAME orientation — EXCEPT for IS26/IS6, which is exempt
         (see ORIENTATION_EXEMPT_IS_FAMILIES: it flanks cargo in direct
         orientation and is the most important architecture in clinical AMR);
       * the whole span is no longer than max_span_bp.
@@ -1452,10 +1464,10 @@ def find_composite_pair(gene, insertion_sequences, max_span_bp):
 
     Returns (best_pair_or_None, rejection_summary) where a pair is
     (left_element, right_element, span_bp) and rejection_summary is a dict of
-    {reason_slug: [detail strings]} for the audit trail - a candidate structure
+    {reason_slug: [detail strings]} for the audit trail — a candidate structure
     we looked at and turned down is exactly what the audit file is for.
 
-    LIMITATION, and it is the important one: on a short-read assembly the two IS
+    Limitation, and it is the important one: on a short-read assembly the two IS
     copies usually collapse into one contig break, so a real composite very often
     CANNOT be seen. A negative here is weak evidence; a positive is strong.
     """
@@ -1529,10 +1541,12 @@ def find_composite_pair(gene, insertion_sequences, max_span_bp):
 def find_containing_element(gene, elements, wanted_types):
     """Find a named element (transposon / integron / ICE / IME) carrying the gene.
 
-    Ladder tiers 4 and 6. Unlike the composite search, this does not infer a
-    structure from a pattern - the element interval was called by something else
-    (the TnCentral naming cascade, or the long-read ICE module) and we only ask
-    whether the AMR gene sits inside it.
+    Ladder tiers 4 and 6, and also the context-only types. Unlike the composite
+    search, this does not infer a structure from a pattern — the element interval
+    was called by something else (the TnCentral naming cascade in
+    name_transposons.py, or the ICE step in conjscan_to_ice.py, which runs in all
+    four v2 modes and not just on long reads) and we only ask whether the AMR
+    gene sits inside it.
 
     "Inside" means at least MIN_AMR_FRACTION_INSIDE_ELEMENT (0.9) of the gene
     lies within the element's interval, so a gene clipped by a few bases at an
@@ -1566,7 +1580,7 @@ def apply_confidence_caps(starting_level, caps):
     """Lower a confidence level to the strictest cap that applies.
 
     `caps` is a list of (level, reason, detail). Confidence can only ever go
-    DOWN here - that is the point. Every cap that fired is also written to the
+    DOWN here — that is the point. Every cap that fired is also written to the
     audit file, so a "low" in the table always has a stated cause.
     """
     level = starting_level
@@ -1576,9 +1590,7 @@ def apply_confidence_caps(starting_level, caps):
     return level
 
 
-# ===========================================================================
-# Per-gene assessment: pulls the rules above together into one output row.
-# ===========================================================================
+# ── Per-gene assessment: pull the rules above into one output row ───────────
 
 
 def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
@@ -1590,19 +1602,19 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             SAME contig, plus the replicon call and contig length for that contig.
     Output: (row_dict keyed by OUTPUT_COLUMNS, list_of_audit_row_dicts).
 
-    HOW TO READ THIS FUNCTION. It is long, and deliberately so: it is a single
-    numbered walk down one gene's evidence, and the numbered `# --- Step N`
-    banners are the map. Nothing is hidden in a helper that changes the answer.
+    How to read this function. It is long, and deliberately so: it is a single
+    numbered walk down one gene's evidence, and the `Step N` banners in the body
+    are the map. Nothing is hidden in a helper that changes the answer.
 
-        Steps 0-7   GATHER evidence. Each answers exactly one question - where is
+        Steps 0–7   GATHER evidence. Each answers exactly one question — where is
                     the gene, which replicon, is an IS inside it, is there a pair
-                    flanking it, is it inside a named element - and none of them
+                    flanking it, is it inside a named element — and none of them
                     assigns a tier.
         Step 8      APPLY THE LADDER. One top-down cascade, and the ONLY place in
                     this script where mobility_tier is set for an assessed gene.
                     (Step 0 sets it to "NA" and returns early for a gene with no
                     coordinates; that is the one exception.)
-        Steps 9-9c  DECORATE the decided row - contig-spanning check, the typed
+        Steps 9–9c  DECORATE the decided row — contig-spanning check, the typed
                     conjugation machinery behind a tier 5/6 call, and keeping a
                     curated element name that a higher rung would otherwise hide.
                     These READ the tier; they never change it.
@@ -1613,7 +1625,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     could be assigned, which is exactly the bug the single cascade prevents.
     """
     audit_rows = []
-    caps = []          # (level, reason, detail) - confidence can only go down
+    caps = []          # (level, reason, detail) — confidence can only go down
 
     def add_audit(decision, reason, detail, tier="NA", context="NA"):
         audit_rows.append({
@@ -1651,9 +1663,9 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         "spans_contigs": "no",
     })
 
-    # --- AMRFinderPlus's own fragmentation flag -----------------------------
+    # ── AMRFinderPlus's own fragmentation flag ──────────────────────────────
     # Method values starting with PARTIAL_CONTIG_END mean the hit was cut off BY
-    # THE CONTIG BOUNDARY - the gene continues onto DNA we never assembled. Note
+    # The contig boundary — the gene continues onto DNA we never assembled. Note
     # the distinction from a bare PARTIAL*, which is truncated but internal
     # (a real pseudogene, not an assembly artefact). Only the former is the
     # fragmentation signal, and it caps confidence at low: we do not know what
@@ -1668,7 +1680,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             "the contig, so its true flanking context was not assembled",
         ))
 
-    # --- Step 0: can this hit be placed on the assembly at all? -------------
+    # ── Step 0: can this hit be placed on the assembly at all? ──────────────
     start = to_int(amr["start_raw"])
     end = to_int(amr["end_raw"])
     contig = amr["contig"]
@@ -1687,7 +1699,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
 
     # The gene as the biology rules below see it. method and pct_coverage ride
     # along because find_truncating_abutting_is needs to know whether
-    # AMRFinderPlus reported the WHOLE gene or only a surviving fragment - a
+    # AMRFinderPlus reported the WHOLE gene or only a surviving fragment — a
     # fragment flush against an IS is what an IS-inactivated gene looks like.
     gene = {
         "start": start,
@@ -1697,7 +1709,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         "pct_coverage": amr["pct_coverage"],
     }
 
-    # --- Step 1: where is the gene relative to the ends of its contig? ------
+    # ── Step 1: where is the gene relative to the ends of its contig? ───────
     contig_length = contig_lengths.get(contig)
     if contig_length is None:
         row["contig_length"] = "NA"
@@ -1723,7 +1735,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                 "simply mean the contig ran out",
             ))
 
-    # --- Step 2: which replicon is it on? -----------------------------------
+    # ── Step 2: which replicon is it on? ────────────────────────────────────
     replicon_call = replicons.get(contig)
     if replicon_call is None:
         row["replicon"] = "unknown"
@@ -1749,7 +1761,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             ))
 
         # How much agreement is behind the replicon call. This decides tiers 5
-        # and 6, so a call resting on one tool - or on two tools that disagree -
+        # and 6, so a call resting on one tool — or on two tools that disagree —
         # must not be reported as confidently as one both tools made.
         call_source = replicon_call.get("replicon_call_source", "platon")
         if call_source == "genomad":
@@ -1770,7 +1782,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                 "before relying on the tier.",
             ))
 
-    # --- Step 3: split the elements on this contig by what they are ---------
+    # ── Step 3: split the elements on this contig by what they are ──────────
     insertion_sequences = [
         element for element in elements_on_contig
         if element["element_type"] == "insertion_sequence"
@@ -1786,10 +1798,10 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                   f"({sorted({element['raw_type'] for element in unrecognised})}) "
                   "and were ignored")
 
-    # --- Step 4: has an IS landed inside the gene? (inactivation, not mobility)
+    # ── Step 4: has an IS landed inside the gene? (inactivation, not mobility) ───
     disrupting_is, disruption_overlap, overlapping_is = \
         find_disrupting_is(gene, insertion_sequences)
-    # Second, independent signal for the same biology - see the long note on
+    # Second, independent signal for the same biology — see the long note on
     # find_truncating_abutting_is. Only consulted when the overlap test found
     # nothing, so the stronger evidence always wins.
     abutting_is, abutting_gap, abutting_end = \
@@ -1807,7 +1819,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     elif abutting_is is not None:
         # The IS-into-gene architecture as it actually appears in the data: a
         # PARTIAL AMRFinderPlus hit sitting flush against an IS. Treated exactly
-        # like the overlap case - flagged as likely inactivation and deliberately
+        # like the overlap case — flagged as likely inactivation and deliberately
         # NOT counted as mobilisation (spec §2.5's special case).
         row["is_inside_amr_cds"] = "yes"
         add_audit(
@@ -1823,9 +1835,9 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
 
     elif overlapping_is is not None:
         # An IS physically overlaps the gene, but by too little to call the CDS
-        # disrupted. It is also excluded from every other test - find_nearest_is
+        # disrupted. It is also excluded from every other test — find_nearest_is
         # skips overlapping elements, and the flanking/composite tests need the IS
-        # to sit clear of the gene - so without this the row would read as
+        # to sit clear of the gene — so without this the row would read as
         # "nothing nearby" while an IS is sitting on the gene. Do not change the
         # tier (we cannot say what this means biologically), but do not claim
         # certainty either.
@@ -1836,13 +1848,13 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             "context is not clean",
         ))
 
-    # --- Step 5: nearest IS, and the tier-2 upstream-promoter test ----------
+    # ── Step 5: nearest IS, and the tier-2 upstream-promoter test ───────────
     nearest_is, nearest_distance = find_nearest_is(gene, insertion_sequences)
     # An IS that has landed IN the gene must not then be read as an upstream
     # promoter for it. The two calls are mutually exclusive biology: one says the
     # reading frame is broken (the strain is probably susceptible), the other says
     # the gene is intact and being over-expressed. Without this exclusion the
-    # abutting case above came out as tier 2 "expression modulation" - the
+    # abutting case above came out as tier 2 "expression modulation" — the
     # opposite conclusion, from the same coordinates. Spec §2.5 keeps inactivation
     # out of the mobilisation ladder entirely.
     inactivating_is_ids = {element["id"] for element in (disrupting_is, abutting_is)
@@ -1872,7 +1884,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             "to assume it supplies an outward-reading promoter",
         )
 
-    # --- Step 6: composite transposon (tier 3) ------------------------------
+    # ── Step 6: composite transposon (tier 3) ───────────────────────────────
     composite_pair, composite_rejections = find_composite_pair(
         gene, insertion_sequences, max_span_bp
     )
@@ -1886,7 +1898,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             f"{len(details)} candidate flanking pair(s) rejected. Examples: {examples}",
         )
 
-    # --- Step 7: named elements that CONTAIN the gene (tiers 4 and 6) -------
+    # ── Step 7: named elements that CONTAIN the gene (tiers 4 and 6) ────────
     named_element = find_containing_element(gene, elements_on_contig,
                                             {"unit_transposon", "integron"})
     ice_element = find_containing_element(gene, elements_on_contig, {"ice"})
@@ -1908,7 +1920,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     # The nearest NON-IS element of any kind on this contig, with its measured
     # distance. The nearest-IS search deliberately looks at insertion sequences
     # only, which left a gene sitting 16 kb from a called IME reported as
-    # "intrinsic candidate, nothing nearby" - true of insertion sequences, and
+    # "intrinsic candidate, nothing nearby" — true of insertion sequences, and
     # badly misleading about the genome.
     nearest_context_element, nearest_context_distance = find_nearest_element(
         gene,
@@ -1916,7 +1928,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
          if element["element_type"] in {"ice", "ime"} | CONTEXT_ONLY_ELEMENT_TYPES],
     )
 
-    # --- Step 8: the ladder, applied once, from the top down ----------------
+    # ── Step 8: the ladder, applied once, from the top down ─────────────────
     # Highest applicable rung wins. The order below IS the ladder (spec §2.5);
     # a more specific, interval-level call (ICE) is preferred over a whole-
     # replicon one (conjugative plasmid) when both would give the same tier.
@@ -1933,7 +1945,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     context_elements = []
 
     if ice_element is not None:
-        # Tier 6: the gene is inside an integrative and conjugative element - the
+        # Tier 6: the gene is inside an integrative and conjugative element — the
         # element carries its own conjugation machinery, so a chromosomal
         # location does NOT mean "not transferable".
         row["mobility_tier"] = 6
@@ -1959,7 +1971,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         # NOT "high", and the asymmetry this fixes is worth spelling out.
         #
         # This branch's evidence is Platon's "# Conjugation" column, which is a
-        # count of HMM hits against conjugation proteins - not an assessment that
+        # count of HMM hits against conjugation proteins — not an assessment that
         # a working mating apparatus is present. A conjugative system is a
         # multi-protein machine (relaxase + coupling protein + a mating-pair
         # apparatus of a dozen or so genes), so one hit does not evidence one.
@@ -1968,7 +1980,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         # conjscan_to_ice.py refuses to call relaxase-plus-coupling-protein an ICE
         # and downgrades it to an IME marked "machinery incomplete". The plasmid
         # path applied no completeness test at all, so a single Platon hit reached
-        # the top of the ladder at high confidence with no audit line - a stronger
+        # the top of the ladder at high confidence with no audit line — a stronger
         # claim, on weaker evidence, than the chromosome path would ever allow.
         #
         # The TIER stays 6 either way: the plasmid genuinely carries conjugation
@@ -1979,7 +1991,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         # CONJscan runs over the whole proteome, plasmids included, so
         # conjscan_to_ice.py has usually already asked the harder question: is
         # there a complete, TYPED mating-pair system on this replicon? When the
-        # answer is yes, the count-based caveat below simply does not apply - the
+        # answer is yes, the count-based caveat below simply does not apply — the
         # apparatus WAS verified, and saying otherwise in the audit would be
         # false. When there is no such evidence, the cap stands.
         base_confidence = "high"
@@ -2006,7 +2018,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             ))
 
     elif ime_element is not None:
-        # Tier 5: an integrative MOBILISABLE element - it has a relaxase but no
+        # Tier 5: an integrative MOBILISABLE element — it has a relaxase but no
         # conjugation machinery of its own, so it needs a helper element.
         row["mobility_tier"] = 5
         row["mge_context"] = "ime"
@@ -2020,7 +2032,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
 
     elif replicon == "plasmid":
         # Tier 5: on a plasmid. Whether it can actually move depends on the
-        # mobility typing, which is reported next to the tier - an untyped
+        # mobility typing, which is reported next to the tier — an untyped
         # plasmid is still an ACQUIRED element, which is the regulatory question,
         # but we must not imply it is transferable.
         row["mobility_tier"] = 5
@@ -2028,12 +2040,12 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         row["mge_id"] = row["replicon_id"]
         row["distance_bp"] = "0"
 
-        # DISAGREEMENT between the two independent opinions about this replicon.
+        # Disagreement between the two independent opinions about this replicon.
         # Platon's counts did not reach "conjugative", but CONJscan typed a
         # complete conjugative system on the very same contig. The tier is NOT
-        # raised on that alone - Platon's replicon-level call decides the tier,
+        # raised on that alone — Platon's replicon-level call decides the tier,
         # and quietly promoting a gene to "predicted self-transmissible" on a
-        # disagreement is exactly the overclaim this module exists to avoid - but
+        # disagreement is exactly the overclaim this module exists to avoid — but
         # the conflict is flagged loudly and the certainty drops, because one of
         # the two tools is wrong and we cannot say which. A reader who sees this
         # line has everything needed to check it by hand.
@@ -2059,8 +2071,8 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             base_confidence = "high"
         elif plasmid_mobility == "non_mobilisable":
             base_confidence = "high"
-            # The tier number stays 5 - the gene IS on a plasmid, which is the
-            # acquired-vs-intrinsic answer the regulator asks for - but tier 5's
+            # The tier number stays 5 — the gene IS on a plasmid, which is the
+            # acquired-vs-intrinsic answer the regulator asks for — but tier 5's
             # generic label reads "mobilisable_needs_helper", and saying that about
             # a plasmid we just typed NON-mobilisable contradicts our own evidence
             # in the one column most people read. Override the wording; the audit
@@ -2087,7 +2099,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         # Tier 4: inside a curated unit transposon or integron cassette. A curated
         # named hit OVERRIDES the pattern-based composite call below, because the
         # curated entry carries the true architecture (and gets IS26 right for
-        # free) - spec §7, "a TnCentral named hit should override".
+        # free) — spec §7, "a TnCentral named hit should override".
         row["mobility_tier"] = 4
         row["mge_context"] = named_element["element_type"]
         row["mge_id"] = named_element["id"]
@@ -2164,7 +2176,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
 
     else:
         # Tier 1: nothing found. On the chromosome with no mobile-element context,
-        # this is the intrinsic-resistance candidate - the "not acquired, not
+        # this is the intrinsic-resistance candidate — the "not acquired, not
         # transferable" end of the ladder.
         row["mobility_tier"] = 1
         base_confidence = "high" if replicon == "chromosome" else "medium"
@@ -2193,9 +2205,9 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             )
         elif containing_context_element is not None:
             # No IS nearby, but the gene sits INSIDE a conjugative region or a
-            # genomic island. These deliberately do not raise the tier - a
+            # genomic island. These deliberately do not raise the tier — a
             # conjugative region with no integrase has no established boundaries,
-            # and an island carries no conjugation machinery - but calling such a
+            # and an island carries no conjugation machinery — but calling such a
             # gene an "intrinsic candidate" at high confidence is plainly wrong:
             # something mobile-element-shaped is sitting on top of it. Report the
             # context, cap the confidence, and say why.
@@ -2287,7 +2299,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             "'not looked at', not 'looked at and found nothing'",
         ))
 
-    # --- Step 9: does the winning element itself sit across a contig break? --
+    # ── Step 9: does the winning element itself sit across a contig break? ───
     # Anything spanning contigs is capped at low regardless of everything else
     # (spec §8 phase 6): the coordinates of such an element are a guess.
     # "NA" is excluded explicitly: it is our own placeholder for "no element", and
@@ -2299,7 +2311,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     #     split IS shows up.
     #  2. The element's own table says so. An ICE/IME row already carries a
     #     spans_contigs flag that conjscan_to_ice.py worked out from where its
-    #     anchor genes landed - and detector 1 is structurally BLIND to it,
+    #     anchor genes landed — and detector 1 is structurally BLIND to it,
     #     because an ICE id embeds its contig ("contig_1|ice-100:200") and each
     #     element is written as exactly one row. So before this, spans_contigs
     #     could never read "yes" for an ICE no matter what the ICE step found.
@@ -2333,15 +2345,15 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                     "truncated by the assembly",
                 ))
 
-    # --- Step 9b: name the conjugation machinery behind a tier 5/6 call ------
+    # ── Step 9b: name the conjugation machinery behind a tier 5/6 call ──────
     # Spec §9 asks for relaxase_type / mpf_type / machinery_intact in the
     # deliverable, so a reader can see WHICH machinery justifies a transferability
     # claim without opening the ICE table. Two possible sources, in order:
     #   1. the element that actually set the context (an ICE or IME containing
-    #      the gene) - the most specific answer;
+    #      the gene) — the most specific answer;
     #   2. otherwise, for a gene on a plasmid, any conjugative system typed
     #      elsewhere on the same replicon, because that is what makes the whole
-    #      plasmid - and therefore this gene - transferable.
+    #      plasmid — and therefore this gene — transferable.
     # machinery_source records which of the two it was, so the row is never
     # ambiguous about whether the machinery surrounds the gene or merely shares
     # its replicon.
@@ -2371,7 +2383,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         row["attL"] = str(machinery_element.get("att_left", "")).strip() or "NA"
         row["attR"] = str(machinery_element.get("att_right", "")).strip() or "NA"
 
-    # --- Step 9c: keep the curated name even when a higher rung won ---------
+    # ── Step 9c: keep the curated name even when a higher rung won ──────────
     # The ladder is ordered so that being on a plasmid (tier 5/6) outranks being
     # in a named transposon (tier 4), and that ordering is right: a plasmid can
     # cross into another cell, a transposon on its own cannot.
@@ -2402,7 +2414,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                 "which is what you would look up in the literature.",
                 tier=row["mobility_tier"], context=row["mge_context"])
 
-    # --- Step 10: final confidence, and an audit line per cap that fired ----
+    # ── Step 10: final confidence, and an audit line per cap that fired ─────
     row["mobility_tier_label"] = tier_label_override or MOBILITY_TIER_LABELS[row["mobility_tier"]]
     row["confidence"] = apply_confidence_caps(base_confidence, caps)
     for cap_level, reason, detail in caps:
@@ -2412,9 +2424,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     return row, audit_rows
 
 
-# ===========================================================================
-# Whole-sample assembly and output
-# ===========================================================================
+# ── Whole-sample assembly and output ────────────────────────────────────────
 
 
 def build_report(sample, amr_hits, elements, replicons, contig_lengths, max_span_bp,
@@ -2472,8 +2482,9 @@ def write_tsv(path, columns, rows):
 
 
 def main(argv=None):
-    # Arguments are supplied by the amr_mge_colocalisation rule in
-    # workflow/rules/mobilome.smk (spec §10).
+    # Arguments are supplied by rule amr_mge_colocalisation — see
+    # shared/80_mobilome.smk. (Spec §10 puts the module in
+    # workflow/rules/mobilome.smk; that path predates the v2 rule directories.)
     parser = argparse.ArgumentParser(
         description="Assign each AMR gene its mobile-element context and mobility tier."
     )
@@ -2518,8 +2529,8 @@ def main(argv=None):
     # Remember any table that arrived WITHOUT an element-type column. Every row
     # in such a file is read as an insertion sequence (see parse_mobile_elements),
     # which is a real assumption about real data, so it gets an audit line rather
-    # than happening quietly. In the shipped workflow this never fires - all the
-    # tables wired to --is-table carry a type column - but a hand-trimmed table
+    # than happening quietly. In the shipped workflow this never fires — all the
+    # tables wired to --is-table carry a type column — but a hand-trimmed table
     # is explicitly supported, and that is the case worth recording.
     tables_read_as_insertion_sequences = []
     for element_table_path in element_table_paths:
@@ -2622,7 +2633,7 @@ def main(argv=None):
 
 if __name__ == "__main__":
     # sys.exit(main()) like every other script in this package. main() has no
-    # return statement, so this passes None and still exits 0 on success - the
-    # point is that the idiom is the same everywhere, and a future `return 1`
-    # would actually reach the shell instead of being thrown away.
+    # return statement, so this passes None and still exits 0 on success; the
+    # point of keeping the idiom is that a future `return 1` here would reach
+    # the shell instead of being thrown away.
     sys.exit(main())

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for workflow/scripts/plasmid_concordance.py (D9).
+"""Unit tests for workflow/scripts/60_plasmid/plasmid_concordance.py (D9).
 
 These tests need no tools and no databases — they feed tiny in-memory fixtures
 (Platon TSV, Platon chromosome FASTA, verified_plasmids.txt, geNomad plasmid
@@ -7,9 +7,18 @@ summary) through the parsers and the join, and assert the resulting rows and
 confidence tiers. This is the one Stage-2b deliverable that is fully verifiable
 in a plain Python environment.
 
-Run either way:
-    pytest workflow/scripts/tests/test_plasmid_concordance.py
-    python workflow/scripts/tests/test_plasmid_concordance.py
+What the script decides is how much a plasmid call is worth: Platon and geNomad
+reach it by different routes, so where they agree the evidence is genuinely
+stronger, and where they clash the row is FLAGGED rather than dropped. The tests
+below walk one contig through each of those outcomes.
+
+Run:
+    pytest workflow/scripts/60_plasmid/test_plasmid_concordance.py
+
+Running the file directly with python also works but executes only 18 of the 23
+tests: the unittest.main() guard sits ABOVE the last class in this file, so it
+exits before TestPlatonFailureIsNotASecondOpinion is even defined. pytest ignores
+the guard and collects everything, which is why it is the way to run this.
 """
 
 import os
@@ -17,10 +26,8 @@ import sys
 import tempfile
 import unittest
 
-# Import the module under test regardless of where the test runner starts from:
-# add the parent scripts/ directory (which holds plasmid_concordance.py) to the
-# import path, then import it by name.
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# The module under test sits in this same directory, so both pytest and a direct
+# `python test_*.py` already have it on the import path — no sys.path juggling.
 import plasmid_concordance as pc  # noqa: E402
 
 
@@ -34,11 +41,14 @@ def write_temp(content):
     return handle.name
 
 
+# ── Four contigs, one per agreement tier ─────────────────────────────────────
 # Minimal but realistic fixtures. Four contigs, chosen to exercise every tier:
 #   contig_1 -> Platon plasmid + geNomad plasmid            -> both / high
 #   contig_2 -> Platon plasmid only (geNomad absent)        -> platon_only / medium
 #   contig_3 -> geNomad plasmid only (Platon never called)  -> genomad_only / medium
 #   contig_4 -> Platon CHROMOSOME vs geNomad plasmid        -> conflict / low
+# contig_5 exists only in the chromosome FASTA and is the negative control: both
+# tools called it chromosomal, so it must not appear in the output at all.
 PLATON_TSV = (
     "ID\tLength\tCoverage\t# ORFs\tRDS\tCircular\tInc Type(s)\t# Plasmid Hits\n"
     "contig_1\t45000\t12.0\t60\t0.85\tyes\tIncF\t3\n"
@@ -69,6 +79,14 @@ VERIFIED_PLASMIDS = (
     "sampleA: contig_2 was not verified by BLAST search.\n"
 )
 
+
+# ── Parsing what each tool actually writes ───────────────────────────────────
+# One shape has to fail loudly: a Platon TSV whose columns changed. A parser that
+# quietly returned nothing there would produce a tidy concordance table saying
+# the genome carries no plasmid — a wrong answer nobody would question.
+# The other odd shapes below are all NORMAL and must be tolerated: an empty
+# Platon table, the "no plasmid found" line, and a geNomad summary with no fdr
+# column, which is what geNomad writes without score calibration.
 
 class TestParsers(unittest.TestCase):
     def test_parse_platon_tsv_by_name(self):
@@ -119,6 +137,13 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(result["contig_1"], ("0.95", "NA"))
 
 
+# ── Turning two calls into an agreement and a confidence ─────────────────────
+# The tier is driven by AGREEMENT, not by either tool's own score, because the
+# two reach a plasmid call by different routes: Platon from replicon-distribution
+# scores, geNomad from gene content and markers. An unforeseen combination has to
+# come back as a sentinel rather than raise, so one odd contig cannot lose the
+# whole table.
+
 class TestClassify(unittest.TestCase):
     def test_all_tiers(self):
         self.assertEqual(pc.classify("plasmid", "plasmid"), ("both", "high"))
@@ -129,6 +154,11 @@ class TestClassify(unittest.TestCase):
     def test_unexpected_pair_is_sentinel_not_crash(self):
         self.assertEqual(pc.classify("chromosome", "absent"), ("undetermined", "low"))
 
+
+# ── The joined table: which contigs appear, and what they carry ──────────────
+# One row per plasmid CANDIDATE, meaning the union of the two tools' plasmid
+# calls — so a contig both tools called chromosomal is simply absent, and a
+# conflict is present and labelled rather than resolved.
 
 class TestBuildRows(unittest.TestCase):
     def setUp(self):
@@ -148,6 +178,8 @@ class TestBuildRows(unittest.TestCase):
         )
 
     def test_rows_sorted_for_determinism(self):
+        # Two runs on the same assembly must produce byte-identical tables, or a
+        # re-run looks like a changed result when nothing changed.
         self.assertEqual(
             [row["contig"] for row in self.rows],
             ["contig_1", "contig_2", "contig_3", "contig_4"],
@@ -186,6 +218,14 @@ class TestBuildRows(unittest.TestCase):
         self.assertEqual((row["agreement"], row["confidence"]), ("conflict", "low"))
 
 
+# ── Writing the TSV and reading it back ──────────────────────────────────────
+# The header must be written even when there is nothing to report: an isolate
+# with no plasmid is an ordinary result, and a header-only file says "ran, found
+# nothing" where a zero-byte file reads as a step that died — a distinction this
+# module cares about elsewhere too (see the last class in this file).
+# platon_replicons.py reads this table when geNomad was run, and copes with both
+# the absent and the header-only case.
+
 class TestWriteAndReadBack(unittest.TestCase):
     def test_roundtrip_tsv(self):
         rows = pc.build_rows(
@@ -210,9 +250,14 @@ class TestWriteAndReadBack(unittest.TestCase):
         self.assertEqual(lines, ["\t".join(pc.OUTPUT_COLUMNS)])
 
 
+# This guard sits mid-file, so `python <this file>` stops here and never defines
+# the class below it — see the note in the module docstring. Under pytest the
+# guard is false and everything is collected.
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 
+
+# ── A crashed Platon is not a second opinion ─────────────────────────────────
 
 class TestPlatonFailureIsNotASecondOpinion(unittest.TestCase):
     """A crashed Platon must not be scored as a genuine second opinion.

@@ -98,7 +98,7 @@ interval turns every gene inside it into predicted cargo. tRNA-anchored pairs
 
 **Exact maximal repeats between the two flanks, computed in standard-library
 Python** — `vmatch -l N` semantics, which is what ICEfinder and ICEfinder2 use.
-The search is in `workflow/scripts/mobilome/att_search.py`
+The search is in `workflow/scripts/80_mobilome/att_search.py`
 (`find_maximal_repeats` / `search_maximal_repeat`).
 
 > **Correction, 2026-07-31.** This section previously described a flank-vs-flank

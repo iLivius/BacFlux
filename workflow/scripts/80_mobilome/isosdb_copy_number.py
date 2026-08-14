@@ -1,49 +1,64 @@
 #!/usr/bin/env python3
-"""Estimate how many IS copies the assembly LOST, by counting reads instead of contigs.
+"""Estimate how many IS copies the assembly LOST, by counting reads instead of
+contigs.
 
-THE PROBLEM THIS EXISTS TO MEASURE
-    Insertion sequences are the single biggest cause of contig breaks in a
-    short-read assembly, because multiple identical copies of one IS collapse
-    into a single node in the assembly graph. So the thing the mobilome module is
-    hunting is often precisely what destroyed the contig it is looking at.
+Why the located IS count needs a number attached
+------------------------------------------------
+Insertion sequences are the single biggest cause of contig breaks in a
+short-read assembly, because several identical copies of one IS collapse into a
+single node in the assembly graph. The thing the mobilome module is hunting is
+often precisely what destroyed the contig it is looking at.
 
-    Everywhere else this module says "the located IS count is a FLOOR, not a
-    count". That is honest, but it is also unquantified: a reader has no idea
-    whether the floor is 2 short or 40 short. This script puts a number on it.
+Everywhere else this module says "the located IS count is a FLOOR, not a count".
+That is honest, but unquantified: a reader has no idea whether the floor is 2
+short or 40 short. This puts a number on it.
 
-HOW, IN ONE SENTENCE
-    Reads are immune to assembly collapse - every copy of an IS contributes its
-    own reads whether or not the assembler kept them apart - so an IS present in
-    five copies attracts about five times the read depth of the single-copy
-    chromosome, and dividing the two gives the copy number.
+Reads are immune to assembly collapse — every copy of an IS contributes its own
+reads whether or not the assembler kept them apart — so an IS present in five
+copies attracts about five times the read depth of the single-copy chromosome,
+and dividing the two gives the copy number:
 
-        copy number  ~=  depth over the IS  /  depth over the genome as a whole
+    copy number  ~=  depth over the IS  /  depth over the genome as a whole
 
-WHAT IT TAKES IN
-    - BBMap covstats from mapping this sample's reads against ISOSDB, the openly
-      licensed IS nucleotide database (rule isosdb_map).
-    - BBMap covstats from mapping the SAME reads against the sample's own
-      assembly (rule assembly_depth), which supplies the single-copy baseline.
-    - ISOSDB's IS_fam_annot.txt, so results can be reported per IS FAMILY as well
-      as per database entry.
-    - Optionally the ISEScan table, so the located count can be compared with the
-      read-based estimate - which is the whole point.
+Depth and not raw read counts, because a longer reference collects more reads
+simply by being longer. Depth (reads x read length / reference length) already
+divides that out, which is why BBMap's Avg_fold is the column read here rather
+than Plus_reads + Minus_reads.
 
-WHAT IT PRODUCES
-    - a per-family summary: located copies, read-based estimate, and the delta;
-    - an audit TSV, because every element excluded from the estimate needs a
-      stated reason.
+What it reads, and what reads it
+--------------------------------
+  --isosdb-covstats    BBMap coverage of this sample's reads against ISOSDB, the
+                       openly licensed (MIT) IS nucleotide database
+                       source: rule isosdb_map
+  --assembly-covstats  BBMap coverage of the SAME reads against this sample's own
+                       assembly, which supplies the single-copy baseline
+                       source: rule assembly_depth
+  --family-map         ISOSDB's IS_fam_annot.txt, so results are reported per IS
+                       FAMILY as well as per database entry
+                       source: rule isosdb_db
+  --is-table           the IS elements ISEScan actually located on the contigs —
+                       the number the read-based estimate is set against
+                       source: rule isescan_table
 
-WHAT THIS IS NOT
-    It does not change any AMR gene's mobility tier, and it must not: it says
-    nothing about WHERE the extra copies are, only that they exist. It is a
-    quality metric attached to the IS inventory, and it is the honest companion
-    to the "floor, not a count" warning.
+Out come a per-family summary (located copies, read-based estimate, delta) and an
+audit TSV giving a reason for every element left out of the estimate. Nothing
+downstream consumes either — they are workflow targets read by a person.
 
-WHY DEPTH RATIOS AND NOT READ COUNTS
-    Longer references collect more reads simply by being longer. Depth (reads x
-    read length / reference length) already divides that out, which is why BBMap's
-    Avg_fold is the column used rather than Plus_reads + Minus_reads.
+Reads are needed, so the leg runs in illumina and hybrid mode only, and only when
+mobilome.isosdb.fasta_url or mobilome.isosdb.dir is set — see rule is_copy_number
+in shared/80_mobilome.smk.
+
+What this number is not
+-----------------------
+It changes no AMR gene's mobility tier, and must not: it says nothing about WHERE
+the extra copies are, only that they exist. It is a quality metric attached to
+the IS inventory, and the honest companion to the "floor, not a count" warning.
+
+The trap is a delta that comes out NEGATIVE. When ISOSDB holds nothing matching
+this organism the estimate comes out low, and a negative delta reads like "the
+assembly collapsed nothing" when the truth is "this database is silent about this
+genome". So it is never reported as a delta — the reasoning is in estimate_copies,
+under db_informative.
 """
 
 import argparse
@@ -51,6 +66,11 @@ import os
 import statistics
 import sys
 
+
+# ── The two thresholds, and why they sit where they do ───────────────────────
+# Both are defaults only. rule is_copy_number always passes the config values
+# (mobilome.isosdb.min_covered_percent and mobilome.isosdb.min_copy_number), so
+# these numbers apply when the script is run by hand.
 
 # Below this fraction of a database entry covered by reads, the "depth" is being
 # computed over a reference that is mostly untouched, and the number means
@@ -63,6 +83,8 @@ DEFAULT_MIN_COVERED_PERCENT = 90.0
 # noise plus mapping loss regularly pushes a real single copy to 0.6-0.8x.
 DEFAULT_MIN_COPY_NUMBER = 0.5
 
+
+# ── Reading BBMap's coverage table ───────────────────────────────────────────
 
 def read_covstats(path):
     """Read a BBMap covstats file into a list of dicts.
@@ -91,6 +113,12 @@ def read_covstats(path):
     return rows
 
 
+# ── Small shared helpers ─────────────────────────────────────────────────────
+# A cell that will not parse as a number becomes zero rather than raising, so one
+# malformed row in a coverage table cannot take the whole sample down. Zero depth
+# and zero length fall below every threshold here, so such a row drops out rather
+# than corrupting the estimate.
+
 def to_float(value, default=0.0):
     try:
         return float(value)
@@ -105,6 +133,8 @@ def to_int(value, default=0):
         return default
 
 
+# ── The denominator: what does single-copy sequence look like? ───────────────
+
 def genome_baseline_depth(assembly_covstats):
     """The read depth of a SINGLE-COPY region, which is the denominator.
 
@@ -115,7 +145,7 @@ def genome_baseline_depth(assembly_covstats):
     Uses the LENGTH-WEIGHTED MEDIAN across contigs rather than the mean, and the
     reason matters. A bacterial assembly is one long chromosome plus a handful of
     short contigs, and those short contigs are exactly the ones with unstable
-    depth - repeat collapses sit at several times the genome depth, and low-
+    depth — repeat collapses sit at several times the genome depth, and low-
     coverage junk sits near zero. A plain mean over contigs lets a 2 kb outlier
     weigh as much as a 5 Mb chromosome; a plain median over contigs does the
     same. Weighting by length makes the answer "the depth of a typical BASE",
@@ -144,6 +174,11 @@ def genome_baseline_depth(assembly_covstats):
     return weighted[-1][0]
 
 
+# ── ISOSDB's family annotation, and what ISEScan already located ─────────────
+# The two tables that let a per-entry depth be rolled up to an IS FAMILY, which
+# is the level the summary reports at. Per-entry numbers ride along as context
+# only — see the ambiguous-read note in estimate_copies.
+
 def read_family_map(path):
     """ISOSDB entry ID -> IS family, from ISOSDB's IS_fam_annot.txt.
 
@@ -168,9 +203,15 @@ def read_family_map(path):
 def read_located_families(path):
     """IS family -> how many copies ISEScan actually LOCATED on the contigs.
 
-    This is the number the read-based estimate is compared against, and the
-    comparison is the deliverable: located is what survived assembly, estimated
-    is what the reads say was there.
+    This is the number the read-based estimate is set against, and the comparison
+    is the deliverable: located is what survived assembly, estimated is what the
+    reads say was there.
+
+    The family column is called is_family in the tidy table isescan_to_table.py
+    writes and family in ISEScan's own raw output, so both names are accepted and
+    either file works. A table carrying neither column returns nothing, and every
+    family is then reported with located_copies = 0: the estimate still runs, but
+    the collapse delta it produces is the estimate itself and means nothing.
     """
     counts = {}
     if not path or not os.path.isfile(path):
@@ -199,6 +240,8 @@ def read_located_families(path):
     return counts
 
 
+# ── What we write ────────────────────────────────────────────────────────────
+
 def audit_row(sample, action, reason, detail, element="NA"):
     return {
         "sample": sample, "element": element,
@@ -209,9 +252,9 @@ def audit_row(sample, action, reason, detail, element="NA"):
 AUDIT_COLUMNS = ["sample", "element", "action", "reason", "detail"]
 
 # EVERY `action` / `reason` PAIR THIS SCRIPT CAN WRITE. `action` says what
-# happened, `reason` says why. Note that NOTHING here changes an AMR gene's
-# mobility tier - this whole leg is a QC measurement of how badly the assembler
-# collapsed the IS copies, reported alongside the located count.
+# happened, `reason` says why. None of it changes an AMR gene's mobility tier —
+# the whole leg is a QC measurement of how badly the assembler collapsed the IS
+# copies, reported alongside the located count.
 #
 #   action=discarded      an ISOSDB database entry was not counted as detected
 #     database_entry_not_fully_covered  less of the entry was covered by reads
@@ -223,38 +266,47 @@ AUDIT_COLUMNS = ["sample", "element", "action", "reason", "detail"]
 #                                       copy-number estimate
 #
 #   action=not_applicable no estimate could be made, for a reason that is NOT a
-#                         failure - the located count simply stands on its own
+#                         failure — the located count simply stands on its own
 #     no_genome_baseline_depth          assembly depth could not be established,
 #                                       so there is no single-copy baseline to
 #                                       divide by. Nothing can be estimated.
-#     isosdb_does_not_cover_this_organism  ISOSDB has no entries matching this
-#                                       genome's IS at all
-#     family_absent_from_isosdb         this particular IS family is not in the
-#                                       database, so its collapse cannot be
-#                                       measured even though others can
+#     isosdb_does_not_cover_this_organism  no ISOSDB entry was covered by reads
+#                                       for ANY family this sample has, so the
+#                                       leg produced nothing at all
+#     family_absent_from_isosdb         no ISOSDB entry for this one family was
+#                                       covered by reads, so its collapse cannot
+#                                       be measured even though other families'
+#                                       can. Says the database lacks this
+#                                       organism's version of the family, NOT
+#                                       that nothing collapsed.
 #     isosdb_detected_fewer_than_located  the read-mapping leg found FEWER copies
 #                                       than ISEScan located on the contigs. The
 #                                       delta is reported as NA rather than as a
 #                                       negative number, because a negative
-#                                       "collapse" is not meaningful - it means
+#                                       "collapse" is not meaningful — it means
 #                                       the database is the limiting factor here,
 #                                       not the assembly.
 #
-#   action=summary        one closing row per family, recording that an estimate
-#                         was made
+#   action=summary        ONE closing row per SAMPLE (not per family), recording
+#                         what the leg managed overall
 #     copy_number_estimate_complete
 
+# The deliverable: one row per IS family, written to {sample}_is_copy_number.tsv
+# and read by a person. No rule consumes it.
 SUMMARY_COLUMNS = [
     "sample", "is_family",
-    "located_copies",          # what ISEScan found on the contigs
-    "estimated_copies",        # what the read depth implies (NA if undetectable)
-    "collapse_delta",          # estimated - located, or NA - see db_informative
-    "db_informative",          # did ISOSDB contain this family at all?
-    "n_db_entries_detected",   # how many ISOSDB entries contributed
+    "located_copies",          # copies ISEScan found on the contigs
+    "estimated_copies",        # copies the read depth implies; NA if none detected
+    "collapse_delta",          # estimated - located; NA when db_informative is FALSE
+    "db_informative",          # TRUE only when ISOSDB detected this family AND
+                               # the estimate reached the located count
+    "n_db_entries_detected",   # how many ISOSDB entries contributed to the estimate
     "max_entry_copy_number",   # the deepest single entry, for context
-    "genome_baseline_depth",
+    "genome_baseline_depth",   # the single-copy denominator, identical on every row
 ]
 
+
+# ── Depths in, per-family copy numbers out ───────────────────────────────────
 
 def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
                     located_counts,
@@ -264,14 +316,13 @@ def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
 
     Returns (summary_rows, audit_rows).
 
-    A NOTE ON WHAT THE NUMBER IS AND IS NOT. ISOSDB is dereplicated at 95%
-    identity, but IS families remain similar enough that one real element can
-    attract reads across several database entries. BBMap is run with
-    ambiguous=best so each read lands on one entry only, which stops the total
-    from being multiplied - but it also means the split between near-identical
-    entries is arbitrary. That is why the family total is the headline and the
-    per-entry numbers are reported only as context: the family sum is robust to
-    where an ambiguous read landed, the per-entry split is not.
+    Why the FAMILY total is the headline and the per-entry split is not. ISOSDB
+    is dereplicated at 95% identity, but IS families remain similar enough that
+    one real element can attract reads across several database entries. BBMap is
+    run with ambiguous=best (rule isosdb_map) so each read lands on one entry
+    only, which stops the total from being multiplied — but it also means the
+    split between near-identical entries is arbitrary. The family sum is robust
+    to where an ambiguous read landed; the per-entry numbers are context.
     """
     audit_rows = []
 
@@ -296,7 +347,7 @@ def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
 
         if covered < min_covered_percent:
             # Depth over a reference the reads barely touched is not a depth for
-            # that element - it is usually a conserved domain shared with another
+            # that element — it is usually a conserved domain shared with another
             # family. Quietly averaging it in would inflate every estimate.
             audit_rows.append(audit_row(
                 sample, "discarded", "database_entry_not_fully_covered",
@@ -327,38 +378,37 @@ def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
         located = located_counts.get(family, 0)
         estimated = bucket["copies"]
 
-        # THE CHECK THIS LEG CANNOT WORK WITHOUT.
+        # The check this leg cannot work without.
         #
         # ISEScan finds IS elements by profile HMM, which recognises a FAMILY.
-        # This leg maps reads to ISOSDB, which requires nucleotide identity to a
-        # specific catalogued element. Those are not the same sensitivity, and
-        # the spec (§2.2) quantifies the gap from the ISOSDB paper itself: 97.5%
-        # of its transposases have protein homologs in ISfinder but only 37.9%
-        # have nucleotide ones.
+        # This leg maps reads to ISOSDB, which needs nucleotide identity to one
+        # specific catalogued element. Those are not the same sensitivity, and the
+        # spec (§2.2) quantifies the gap from the ISOSDB paper itself: 97.5% of
+        # its transposases have protein homologs in ISfinder but only 37.9% have
+        # nucleotide ones.
         #
-        # So for an organism ISOSDB does not cover - which for a non-clinical,
-        # environmental isolate is the NORMAL case - no entry attracts reads, the
-        # estimate comes out at zero, and the delta goes NEGATIVE. Reported
-        # naively that reads as "the assembly did not collapse anything, we
-        # over-called", when the truth is "this database has nothing to say about
-        # this organism". Measured on hybrid sample 006 (Aquipseudomonas): 17 IS
-        # located by ISEScan, 1 of 22,713 ISOSDB entries covered end to end,
-        # delta -7.3 on the IS3 family alone.
+        # So for an organism ISOSDB does not cover — which for a non-clinical,
+        # environmental isolate is the NORMAL case — no entry attracts reads, the
+        # estimate comes out at zero, and the delta goes NEGATIVE. Read naively
+        # that says "the assembly collapsed nothing, we over-called", when the
+        # truth is "this database has nothing to say about this organism".
+        # Measured on hybrid sample 006 (Aquipseudomonas): 17 IS located by
+        # ISEScan, 1 of 22,713 ISOSDB entries covered end to end, delta -7.3 on
+        # the IS3 family alone.
+        #
+        # Hence both halves of the test below. `entries > 0` alone is not enough:
+        # on that same sample the IS3 family had 9 elements located and exactly
+        # ONE ISOSDB entry detected, which passes `entries > 0` and would have
+        # published a delta of -7.3 that measures the database, not the assembly.
+        # Requiring `estimated >= located` as well is what stops it.
         #
         # Absence of a nucleotide match is not evidence of absence of copies, so
-        # when nothing was detected the estimate is reported as NA rather than as
-        # a number that looks like a measurement.
-        # A NEGATIVE delta is never evidence of anything except incomplete
-        # database coverage, so it is never reported as a delta.
-        #
-        # This leg can only ever say "there are AT LEAST this many more copies
-        # than you located". It cannot say "there are fewer", because ISEScan's
-        # profile HMMs are strictly more sensitive than nucleotide mapping to a
-        # specific catalogued element - so estimated < located always means
-        # ISOSDB missed some, never that ISEScan over-called. On sample 006 the
-        # IS3 family had 9 elements located and exactly ONE ISOSDB entry
-        # detected: db_informative is technically true, but a delta of -7.3
-        # measures the database, not the assembly.
+        # a family with nothing detected is reported NA rather than as a number
+        # that looks like a measurement, and a negative delta is never reported as
+        # a delta at all. The leg can only ever say "there are AT LEAST this many
+        # more copies than you located" — never "there are fewer", because
+        # estimated < located always means ISOSDB missed some, never that ISEScan
+        # over-called.
         informative = bucket["entries"] > 0 and estimated >= located
         summary_rows.append({
             "sample": sample,
@@ -396,6 +446,12 @@ def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
                 "NOT that the assembly collapsed nothing. Reported as NA rather "
                 "than as a negative delta, which would read like a measurement."))
 
+    # One closing audit row per sample, so the audit file alone reconstructs the
+    # run. `families_informative` counts a family as one ISOSDB could speak to
+    # whenever ANY entry was detected — the looser of the two tests, dropping the
+    # `estimated >= located` half the db_informative column also requires. So it
+    # can come out higher than the db_informative=TRUE count, which is the number
+    # main() prints when it finishes. The two disagreeing is normal, not a bug.
     total_located = sum(located_counts.values())
     total_estimated = sum(b["copies"] for b in per_family.values())
     families_informative = sum(1 for b in per_family.values() if b["entries"] > 0)
@@ -427,6 +483,8 @@ def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
     return summary_rows, audit_rows
 
 
+# ── Writing the two outputs ──────────────────────────────────────────────────
+
 def write_tsv(path, columns, rows):
     parent = os.path.dirname(os.path.abspath(path))
     if parent:
@@ -436,6 +494,12 @@ def write_tsv(path, columns, rows):
         for row in rows:
             handle.write("\t".join(str(row.get(column, "NA")) for column in columns) + "\n")
 
+
+# ── Command line ─────────────────────────────────────────────────────────────
+# rule is_copy_number passes every flag; the defaults exist for a hand run. The
+# closing message says whether ISOSDB could quantify the collapse at all, because
+# "no estimate" is the common outcome outside ISOSDB's sampling and a reader who
+# only sees the table would not know why it is empty.
 
 def main(argv=None):
     parser = argparse.ArgumentParser(

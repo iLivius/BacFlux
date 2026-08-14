@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the complete GTDB -> AMRFinderPlus organism table for one GTDB release.
 
-WHY THIS EXISTS
+Why this exists
     gtdb_amrfinder_organism.py used to carry a short, HAND-TYPED list of GTDB
     names needing special handling (5 entries, covering Campylobacter and
     Enterococcus faecium, found one bug report at a time). Running
@@ -21,9 +21,9 @@ WHY THIS EXISTS
     Nothing here changes gtdb_amrfinder_organism.py's DECISION LOGIC (the order
     of checks in map_classification is untouched) - only the DATA it reads.
     Re-run this whenever gtdbtk_db is pointed at a new GTDB release; see
-    docs/README_notes.md item 11 and check_gtdb_organism_table.py, which tells
-    you whether a re-run is actually needed before you bother downloading a new
-    multi-hundred-MB metadata file.
+    docs/README_notes.md item 11. Both scripts read the same metadata file, so
+    run check_gtdb_organism_table.py against it first: when it reports every
+    entry OK and no missing candidates, there is nothing here to regenerate.
 
 THE RULE, IN ONE PARAGRAPH
     A GTDB species name has the shape "Genus[_suffix] epithet[_suffix]". A
@@ -64,10 +64,12 @@ OUTPUT
     ordinary invocation only needs --metadata.
 
 RUN
-    python workflow/scripts/mobilome/generate_gtdb_organism_table.py \
-        --metadata /path/to/bac120_metadata_r226.tsv.gz
+    python workflow/scripts/80_mobilome/generate_gtdb_organism_table.py \
+        --metadata /path/to/bac120_metadata_r232.tsv.gz
     Then re-run check_gtdb_organism_table.py against the SAME metadata file to
-    confirm the freshly written table reports everything OK.
+    confirm the freshly written table reports everything OK, then commit both
+    files. (R232 in the example is the release the committed tables were built
+    from; the first run of this script was against R226.)
 """
 
 import argparse
@@ -77,12 +79,15 @@ import os
 import re
 import sys
 
-# Both sibling scripts live next to this one.
+# Both sibling scripts live next to this one. They are plain files run by path,
+# not an installed package, so their directory has to go on the import path by
+# hand before either can be imported.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check_gtdb_organism_table as gtdb_check
 import gtdb_amrfinder_organism as gao
 
 
+# ── The evidence bars ────────────────────────────────────────────────────────
 # Same evidence bar the hand-built table used for a suffixed epithet, imported
 # BY NAME from the checker (not re-typed) so the two scripts can never quietly
 # drift onto different numbers.
@@ -93,22 +98,54 @@ MIN_GENOMES_FOR_SUFFIXED_EPITHET = gtdb_check.MIN_GENOMES_FOR_SUFFIXED_EPITHET
 # genus-alone matching is judged safe. Same bar check_gtdb_organism_table.py
 # already used (95.0, inline there); named here so this script's own logic is
 # self-contained and readable without cross-referencing the checker's source.
+# This is the one number NOT shared by import, so changing it here alone makes
+# the checker start calling a freshly generated table unsafe.
 MIN_GENUS_SAFETY_PERCENT = 95.0
 
-# The two data files gtdb_amrfinder_organism.py loads at import time. Generation
-# writes here by default so the ordinary workflow is just "run this script,
-# commit the two files it touches."
+
+# ── The two files this script writes ─────────────────────────────────────────
+# gtdb_amrfinder_organism.py loads both at import time. Generation writes here
+# by default so the ordinary workflow is just "run this script, commit the two
+# files it touches."
 _HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_EQUIVALENCES_PATH = os.path.join(_HERE, "gtdb_organism_equivalences.tsv")
 DEFAULT_GENUS_RULES_PATH = os.path.join(_HERE, "gtdb_organism_genus_rules.tsv")
 
+# gtdb_organism_equivalences.tsv, one row per GTDB species that needs an
+# override. Only the first two columns are read back by the workflow; the rest
+# is the evidence, kept so a human can see what the row rests on:
+#   gtdb_species       : GTDB name exactly as GTDB-Tk writes it ("Campylobacter_D coli")
+#                        source: the s__ field of the release's gtdb_taxonomy
+#   amrfinder_organism : the --organism value to pass for it
+#                        source: build_ncbi_to_organism_map, keyed on ncbi_species
+#   ncbi_species       : what the cluster's genomes are called at NCBI
+#                        source: majority vote over ncbi_taxonomy (majority_ncbi_species)
+#   percent_agreement  : share of the cluster carrying that NCBI name
+#   n_genomes          : genomes in the cluster
+#   rule               : unsuffixed_epithet (RULE A) | suffixed_epithet_strong_evidence (RULE B)
 EQUIVALENCES_HEADER = ["gtdb_species", "amrfinder_organism", "ncbi_species",
                        "percent_agreement", "n_genomes", "rule"]
+
+# gtdb_organism_genus_rules.tsv, exactly three rows - one per AMRFinderPlus
+# organism curated at genus level. Again only the first two columns are read
+# back:
+#   organism            : Campylobacter | Escherichia | Salmonella
+#   genus_safe          : yes | no - may this organism be matched from the bare
+#                         g__ field, with no species check at all?
+#   percent_appropriate : share of the genomes in that unsuffixed genus that
+#                         really are one of its curated species
+#   n_appropriate       : genomes behind that share
+#   n_total             : genomes GTDB files under the unsuffixed genus
+#                         source (all four): decide_genus_safety
 GENUS_RULES_HEADER = ["organism", "genus_safe", "percent_appropriate",
                      "n_appropriate", "n_total"]
 
+# Matches the release label in a metadata filename: bac120_metadata_r232.tsv.gz
+# -> "r232". Used for the provenance line only, never for a decision.
 RELEASE_FROM_FILENAME = re.compile(r"_(r\d+)[._]")
 
+
+# ── Which release did this table come from? ──────────────────────────────────
 
 def guess_release(metadata_path):
     """Pull a release label ("r226") out of the metadata filename for the
@@ -118,6 +155,8 @@ def guess_release(metadata_path):
     match = RELEASE_FROM_FILENAME.search(os.path.basename(metadata_path))
     return match.group(1) if match else "unknown release"
 
+
+# ── Which AMRFinderPlus organism does an NCBI species belong to? ─────────────
 
 def build_ncbi_to_organism_map():
     """{NCBI species name -> AMRFinderPlus organism}, for all 31 curated
@@ -136,6 +175,8 @@ def build_ncbi_to_organism_map():
             ncbi_to_organism[ncbi_species] = organism
     return ncbi_to_organism
 
+
+# ── Genus-level verdicts: may this organism be matched from the genus alone? ─
 
 def decide_genus_safety(organism, counts, genus_of_species):
     """Is matching AMRFinderPlus organism `organism` from its bare GTDB genus,
@@ -156,7 +197,9 @@ def decide_genus_safety(organism, counts, genus_of_species):
             GTDB placed in that bare genus are the curated species - Escherichia
             and Salmonella clear this bar; Campylobacter does not, because its
             curated species (jejuni, coli) do not even live in the unsuffixed
-            genus in the first place.
+            genus in the first place. Campylobacter reaches its organism through
+            the per-species overrides instead (g__Campylobacter_D), which is why
+            a "no" here is not a gap.
     """
     wanted = gtdb_check.target_species_for(organism)
     appropriate = inappropriate = 0
@@ -178,6 +221,12 @@ def build_genus_rules(counts, genus_of_species):
     names with no underscore (Campylobacter, Escherichia, Salmonella; there are
     only ever these three, since that is a fact about AMRFinderPlus's own
     curated list, not about any one GTDB release).
+
+    Rows carry the GENUS_RULES_HEADER columns and are written to
+    gtdb_organism_genus_rules.tsv. Every candidate gets a row, "no" verdicts
+    included: an organism missing from the file is read back as unsafe anyway,
+    so a "no" row is there for the reader, to show the question was asked and
+    with what numbers.
     """
     candidates = sorted(organism for organism in gao.ALL_ORGANISMS if "_" not in organism)
     rows = []
@@ -194,6 +243,8 @@ def build_genus_rules(counts, genus_of_species):
     return rows
 
 
+# ── Per-species overrides: RULE A and RULE B, applied to every cluster ───────
+
 def build_equivalence_rows(counts, genus_safe_organisms):
     """One row per GTDB species cluster that needs an EXPLICIT override entry.
 
@@ -209,22 +260,30 @@ def build_equivalence_rows(counts, genus_safe_organisms):
       2. Reject it if the GTDB epithet, once its own suffix is stripped, is NOT
          literally the epithet of the matched NCBI name. This is the guard
          against a genuinely DIFFERENT species that merely happens to carry the
-         curated NCBI label on some of its genomes - found for real, twice, the
-         first time this script ran against R226:
-           Arthrobacter_D sp009728235 (n=1) -> NCBI says "Vibrio cholerae" for
-             that ONE deposited genome - a submission mislabelled at NCBI, not
-             a real Vibrio. A placeholder epithet ("sp<digits>") is never a
-             real species name, so is_placeholder_species is checked directly
-             on top of the epithet-agreement test, for clarity as much as
-             defence: an epithet that IS a placeholder always fails the
-             agreement test too (it cannot equal a real curated epithet), but
-             saying so explicitly makes the intent obvious to a reader.
-           Enterococcus_B lactis (n=692) -> only 55.1% of that cluster is
-             labelled "Enterococcus faecium" at NCBI, evidently many historical
-             submissions predating E. lactis being recognised as its own
-             species. E. lactis IS its own GTDB species (a real, clinically
-             distinct one) and must never be reported as E. faecium, however
-             many old NCBI records blur the two.
+         curated NCBI label on some of its genomes. It is not hypothetical: the
+         first run of this script, against R226, wrote four wrong rows in two
+         shapes; adding the guard and re-running removed exactly those four
+         rows and nothing else.
+           One mislabelled deposit is enough. Arthrobacter_D sp009728235 (n=1)
+             -> NCBI says "Vibrio cholerae" for that ONE deposited genome - a
+             submission mislabelled at NCBI, not a real Vibrio. The same thing
+             happened to Terrimonas_A sp003243445 (-> Citrobacter_freundii) and
+             Phascolarctobacterium_A sp963603005 (-> Escherichia). A placeholder
+             epithet ("sp<digits>") is never a real species name, so
+             is_placeholder_species is checked directly on top of the
+             epithet-agreement test, for clarity as much as defence: an epithet
+             that IS a placeholder always fails the agreement test too (it
+             cannot equal a real curated epithet), but saying so explicitly
+             makes the intent obvious to a reader.
+           A real species NCBI has not caught up with. Enterococcus_B lactis
+             (n=692) -> only 55.1% of that cluster is labelled "Enterococcus
+             faecium" at NCBI, evidently many historical submissions predating
+             E. lactis being recognised as its own species. E. lactis IS its own
+             GTDB species (a real, clinically distinct one) and must never be
+             reported as E. faecium, however many old NCBI records blur the two.
+         check_gtdb_organism_table.py has carried this same guard since the
+         Serratia sarumanii episode; it was just not carried across when this
+         script was written fresh, which is how all four rows got through.
       3. Skip it again if the PLAIN rules in gtdb_amrfinder_organism.py would
          already match it with no override: neither the genus nor the epithet
          token carries a GTDB suffix (the ordinary exact-species rule handles
@@ -235,8 +294,11 @@ def build_equivalence_rows(counts, genus_safe_organisms):
          type-strain convention is the real justification; the vote is
          corroboration). Epithet suffixed -> RULE B, accepted only above the
          percent/genome-count bar.
-    Output: a list of dict rows, one per accepted override, unsorted (the
-            caller sorts before writing).
+    Output: a list of dict rows, one per accepted override, unsorted (main
+            sorts by GTDB name before writing them to
+            gtdb_organism_equivalences.tsv). Every row here becomes a lookup
+            that map_classification consults FIRST, ahead of its own suffix
+            rules - which is exactly why the guards above matter.
     """
     ncbi_to_organism = build_ncbi_to_organism_map()
     rows = []
@@ -259,8 +321,8 @@ def build_equivalence_rows(counts, genus_safe_organisms):
 
         # The GTDB epithet (suffix stripped) must be the SAME epithet as the
         # matched NCBI name - not merely a cluster whose majority vote happens
-        # to land on a curated name. See the note above for the two real
-        # counter-examples this catches.
+        # to land on a curated name. See the note above for the two shapes of
+        # real counter-example this catches.
         ncbi_epithet = ncbi_name.split(" ", 1)[1] if " " in ncbi_name else ncbi_name
         if epithet_base != ncbi_epithet:
             continue
@@ -300,11 +362,17 @@ def build_equivalence_rows(counts, genus_safe_organisms):
     return rows
 
 
+# ── Write the two generated files ────────────────────────────────────────────
+
 def write_tsv(path, header, rows, provenance):
     """Write one generated TSV: a single '#'-prefixed provenance line, then a
     normal header row, then one row per dict in `rows` (columns in `header`
     order). The loader in gtdb_amrfinder_organism.py knows to skip the leading
     '#' line; nothing else needs to.
+
+    The provenance line is the only record of which GTDB release a committed
+    table came from - the rows themselves carry no release stamp - so it names
+    the metadata file, the release and the date, and says not to hand-edit.
     """
     with open(path, "w", newline="", encoding="utf-8") as handle:
         handle.write("# %s\n" % provenance)
@@ -314,7 +382,20 @@ def write_tsv(path, header, rows, provenance):
             writer.writerow([row[column] for column in header])
 
 
+# ── Read the metadata, rebuild both tables, say what was written ─────────────
+
 def main(argv=None):
+    """Read one release's metadata and rewrite both data files.
+
+    The order of the two builds matters: the genus verdicts come first, because
+    a cluster sitting in a genus already judged safe needs no per-species
+    override, and build_equivalence_rows can only skip those if it is handed the
+    set of safe organisms.
+
+    Returns 0 in every case; the one thing it refuses to continue past is a
+    missing metadata file. Nothing here checks its own output - that is
+    check_gtdb_organism_table.py's job, which the closing message asks for.
+    """
     parser = argparse.ArgumentParser(
         description="Build the full GTDB->AMRFinderPlus organism table from a "
                     "GTDB release's own metadata. Overwrites the two data files "

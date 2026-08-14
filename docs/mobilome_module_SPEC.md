@@ -13,7 +13,7 @@ record*, not a work order. See the box below before acting on anything in it.
 > This spec was written **before** the module existed, and it still reads like a
 > plan. The module is built: **22 rules in
 > `workflow/rules/shared/80_mobilome.smk`**, with the helper package in
-> `workflow/scripts/mobilome/` and a passing test suite
+> `workflow/scripts/80_mobilome/` and a passing test suite
 > (`pytest workflow/scripts` — 420 tests). Some sections were updated in place as
 > they were implemented (§5.3 and §5.5 carry dated correction boxes); most were
 > not.
@@ -91,7 +91,7 @@ Run with `snakemake --sdm conda`. Conda-per-rule is the dependency model. Everyt
 
 **Known facts (from v1.3.1 release notes, verified):**
 - ABRicate runs as a **named wildcard rule `amr_contigs`** across multiple databases (anonymous per-database rules were replaced in v1.3.1). So there are *several* ABRicate outputs per sample — the mobilome module must choose one (or merge) rather than assume a single file.
-- `workflow/scripts/` already exists (e.g. `select_contigs_by_taxonomy.py`) — the proposed `workflow/scripts/mobilome/` package fits the existing convention.
+- `workflow/scripts/` already exists (e.g. `select_contigs_by_taxonomy.py`) — the proposed `workflow/scripts/80_mobilome/` package fits the existing convention.
 - `config/config_custom.yaml` exists alongside `config/config.yaml`; dry-runs are done against the custom one.
 - **Path layouts differ across the family.** BacFluxLplus numbers directories differently (`09.taxonomy`, `10.annotation`, `12.plasmids`) and adds dnaapler / Polypolish / Snippy stages; BacFluxL uses older tool versions (ABRicate v1.0.1, antiSMASH 7.1.0) and runs both Prokka and Bakta. **Never hard-code a path across repos** — resolve via config or a per-repo path map.
 
@@ -477,7 +477,7 @@ Composite call = short parser over `pairs.tsv`: same contig, ≥2 IS hits, **sam
 
 *Was "BacFluxL only". **Built, and it runs in all four v2 modes** — a hybrid dry
 run prints "Mobilome module: ON" like any other. Phases 0–6 are implemented in
-`workflow/scripts/mobilome/` (`att_search.py`, `conjscan_to_ice.py`,
+`workflow/scripts/80_mobilome/` (`att_search.py`, `conjscan_to_ice.py`,
 `colocalise.py`); Phase 7 was carried out and is written up in the README's
 Validation section and in `methods_ebi_comparison.md`. The single biggest
 departure from the plan below is Phase 3 — see the superseded-probe box in it.*
@@ -583,7 +583,7 @@ Example report line (target quality):
 > (22 rules), alongside the other shared stages
 > (`00_common`, `10_decontam`, `20_qc`, `30_taxonomy`, `40_annotation`, `50_amr`,
 > `60_plasmid`, `70_phage`, `90_report`). The helper package landed where planned,
-> at `workflow/scripts/mobilome/`, though with different file names — the real ones
+> at `workflow/scripts/80_mobilome/`, though with different file names — the real ones
 > are `att_search.py`, `conjscan_to_ice.py`, `colocalise.py`, `isescan_to_table.py`
 > and `name_elements.py`, plus their `test_*.py` siblings.
 
@@ -601,7 +601,7 @@ workflow/rules/mobilome.smk        # ACTUAL: workflow/rules/shared/80_mobilome.s
     amr_mge_colocalisation
     mobilome_report
 
-workflow/scripts/mobilome/       # importable package + thin CLI, pytest-able outside Snakemake
+workflow/scripts/80_mobilome/       # importable package + thin CLI, pytest-able outside Snakemake
     __init__.py  loaders.py  att_search.py  classify.py  colocalise.py  report.py
 ```
 Gate everything behind `config["mobilome"]["run"]` (default `false`) and `config["mobilome"]["ice"]["run"]`.

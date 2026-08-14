@@ -273,7 +273,7 @@ REAL RESULT, sample 386 (Arthrobacter, 4.23 Mb, 2 contigs incl. a 58 kb plasmid)
 31 IS elements — 18 complete, 13 partial; families IS481 (9), IS3 (6), ISNCY (5),
 IS21 (4), IS110 (4), IS256 (3); 0.82% of the genome. **All 31 on contig_1 (the
 chromosome); none on the plasmid contig.** Saved as test fixtures:
-`workflow/scripts/mobilome/testdata/isescan_386_real.{tsv,sum}`.
+`workflow/scripts/80_mobilome/testdata/isescan_386_real.{tsv,sum}`.
 
 ---
 
@@ -382,7 +382,7 @@ can be MOBILISED by a helper, but cannot self-transmit. Tier 5, not tier 6 — a
 Reporting "conjugation machinery present" as a bare fact here would be misleading;
 reporting the type, the wholeness and the missing MPF is the useful answer.
 
-Fixture saved: `workflow/scripts/mobilome/testdata/conjscan_386_real_best_solution.tsv`.
+Fixture saved: `workflow/scripts/80_mobilome/testdata/conjscan_386_real_best_solution.tsv`.
 
 ## Empty-result behaviour (important for graceful degradation)
 

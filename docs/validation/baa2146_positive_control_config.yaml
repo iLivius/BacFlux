@@ -7,13 +7,27 @@
 # real plasmid, where independent published literature gives external ground
 # truth to check the tool's answer against.
 #
-# GENOME: Klebsiella pneumoniae ATCC BAA-2146 (KPNIH1), GCF_000364385.3. The
-# NIH Clinical Center 2011 KPC-outbreak reference strain (Mathers et al., mBio
-# 2015 and related CDC/NIH publications). Complete assembly: one chromosome +
-# four named plasmids (pKpQIL-IT-like KPC vehicle, pNDM-US carrying a SECOND,
-# independent carbapenemase). Klebsiella_pneumoniae is itself one of
-# AMRFinderPlus's 31 curated organisms, so this run also exercises the
-# GTDB->--organism point-mutation path in the same genome.
+# GENOME: Klebsiella pneumoniae ATCC BAA-2146, GCF_000364385.3 — the "NDM-1
+# superbug". A complete, pan-resistant assembly: chromosome CP006659.2 plus four
+# plasmids, carrying blaNDM-1, blaCTX-M-15, blaOXA-1, blaTEM-1, blaCMY-6, rmtC
+# and a long tail of aminoglycoside, sulfonamide, quinolone, macrolide and metal
+# genes. blaNDM-1 sits on pNDM-US, which Platon types as conjugative (tier 6);
+# blaCTX-M-15 sits both on the chromosome (tier 2, an ISEcp1 48 bp upstream) and
+# on a second plasmid (tier 5) — three tiers in one genome, all checkable against
+# published descriptions of these replicons. Klebsiella_pneumoniae is also one of
+# AMRFinderPlus's 31 curated organisms, so the same run exercises the
+# GTDB → --organism point-mutation path.
+#
+# ⚠ THIS IS NOT KPNIH1, whatever the paths below say. The directories here, and
+# the sample column of every file this run produced, read `kpnih1`; that was a
+# typing mistake, and the same two strains have been conflated more than once on
+# this project. KPNIH1 is a DIFFERENT genome (CP008827.1) — another
+# carbapenem-resistant ST258 clinical isolate, with its own resistance content
+# and its own curated ICEberg element. The KPC / pKpQIL / NIH-outbreak
+# description this header used to carry belongs to that strain, not to this one.
+# The paths are left alone because they name real directories on disk; the strain
+# is whatever CP006659.2 says it is. Same correction in
+# docs/validation/README.md and docs/mobilome_worked_example.md.
 mode: contigs
 input:
   contigs_dir: /media/data/antonielli_dir/BacFlux_v2_validation/kpnih1_positive_control/input_dir
@@ -33,8 +47,8 @@ directories:
 links:
   dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
   checkv_link: https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz
-  # This validation config does NOT inherit config.yaml's defaults - Snakemake
-  # just loads whatever --configfile is given - so the Zenodo mirror has to be
+  # This validation config does NOT inherit config.yaml's defaults — Snakemake
+  # just loads whatever --configfile is given — so the Zenodo mirror has to be
   # named here explicitly or GENOMAD_LINK resolves empty and falls back to
   # geNomad's own NERSC downloader.
   genomad_link: https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz
@@ -45,6 +59,13 @@ resources:
 parameters:
   nt_version: core_nt
   decontamination:
+    # auto, and on THIS genome auto throws a real plasmid away: NZ_CP006660.1
+    # (pMYS, 2,014 bp) is assigned Escherichia by BLAST bestsum, because E. coli
+    # entries outnumber Klebsiella ones in nt 58,709 to 16,253, and is removed.
+    # So the run analyses three plasmids where the reference has four. Kept as it
+    # ran, since the discard is itself part of what this control demonstrates —
+    # see docs/validation/BAA-2146_contig_taxonomy_decisions.tsv, which is that
+    # run's audit file.
     mode: auto
     discard_no_hit: true
 phage:
@@ -56,7 +77,13 @@ phage:
   # mobilome), since none of those rules depend on the phage caller.
   # directories.genomad_db is deliberately left UNSET so genomad_db downloads
   # for real via links.genomad_link (the Zenodo mirror) rather than reusing a
-  # cached copy - re-confirming that path against a real biological sample.
+  # cached copy — re-confirming that path against a real biological sample.
   caller: genomad
 mobilome:
+  # Only the core module. Every optional layer is left unset, so this run reports
+  # element classes, tiers and confidences but no curated NAMES — mge_name comes
+  # out NA. The name ICEKpnATCCBAA-2146-1-like quoted in
+  # docs/mobilome_worked_example.md comes from an earlier run of the same genome
+  # that had mobilome.iceberg.urls set. The isosdb copy-number layer could not
+  # have run here in any case: it needs reads, and this is contigs mode.
   run: true

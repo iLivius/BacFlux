@@ -412,7 +412,7 @@ Bactopia, nf-core/funcscan and Bakta do not attempt it at all — Bakta never pa
 
 **What the README needs to say:**
 - BacFlux uses a hand-checked, project-local table (`GTDB_SPECIES_EQUIVALENCES` in
-  `workflow/scripts/mobilome/gtdb_amrfinder_organism.py`). It is documented and audited,
+  `workflow/scripts/80_mobilome/gtdb_amrfinder_organism.py`). It is documented and audited,
   not authoritative. Every decision, including every refusal, is written to
   `{sample}_amrfinder_organism_audit.tsv` with its reason.
 - Explain the suffix rule once, because it is counter-intuitive and it is the whole

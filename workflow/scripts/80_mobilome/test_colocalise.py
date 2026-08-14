@@ -1,16 +1,28 @@
 """Unit tests for colocalise.py — the AMR x mobile-element co-localisation step.
 
+colocalise.py writes the module's deliverable: one row per AMR gene saying which
+mobile element the gene sits in or beside, and how far that element could carry
+it. The rungs of the mobility ladder are spelled out in colocalise.py's own
+docstring (spec §2.5); the sections below walk them in order, tier 1 to tier 6,
+and then the special cases.
+
 Everything here runs on SYNTHETIC tables written into a temp directory: no
 ISEScan, no AMRFinderPlus, no Platon, no database, no network. The point is to
-pin down the mobility-ladder rules (spec §2.5) and the graceful-degradation
-behaviour so they cannot drift silently.
+pin down the ladder rules and the graceful-degradation behaviour so they cannot
+drift silently.
 
 Each test builds a tiny genome-on-paper — a contig of a known length with an AMR
 gene at known coordinates and mobile elements placed around it — and asserts the
 tier, the context, the measured distance and the confidence that come back.
 
+Two answers are kept apart throughout, and most of the tests that look pedantic
+are holding that line: the TIER says what the evidence would mean if it is right,
+the CONFIDENCE says how much of that evidence survived a fragmented assembly. A
+tier is never quietly lowered because the assembly was poor, and a confidence is
+never left high because the tier looked good.
+
 Run: /home/antoniellil/miniconda3/envs/snakemake/bin/python -m pytest \
-        workflow/scripts/mobilome/test_colocalise.py -q
+        workflow/scripts/80_mobilome/test_colocalise.py -q
 """
 
 import csv
@@ -21,9 +33,11 @@ import pytest
 import colocalise as co
 
 
-# ---------------------------------------------------------------------------
-# Fixtures and helpers: build input files, run the CLI, read the outputs back.
-# ---------------------------------------------------------------------------
+# ── Fixture builders: every input table, written by hand ─────────────────────
+#
+# run_colocalise() writes each input into tmp_path and then drives main() with
+# the same arguments rule amr_mge_colocalisation passes in the workflow, so a
+# test failing here is a statement about the real invocation.
 
 # The AMRFinderPlus 4.2.7 header, verbatim (22 columns). Written into every
 # synthetic AMR table so the tests exercise the real parser contract, including
@@ -67,8 +81,8 @@ def read_tsv(path):
 # Column order used by every synthetic mobile-element table below. It matches
 # what the module's loader is expected to hand over: one row per called element.
 # Column names here must be the ones isescan_to_table.py ACTUALLY writes. This
-# header used to say "family", which no real BacFlux table has ever contained -
-# the real one is "is_family" - and because colocalise matches columns by name and
+# header used to say "family", which no real BacFlux table has ever contained —
+# the real one is "is_family" — and because colocalise matches columns by name and
 # silently ignores a name it cannot find, every test below passed against a
 # contract that did not exist while is_family came out NA on real data and the
 # IS26/IS6 tests never fired. If you add a column here, copy the name from a real
@@ -95,7 +109,7 @@ LENGTH_HEADER = ["contig", "length"]
 # exactly as rule amr_mge_colocalisation does. Column names copied from a real
 # {sample}_ice_candidates.tsv. The last four are the quality judgements
 # conjscan_to_ice.py makes about the element and that the mobility row must
-# inherit - they do not exist in the IS table.
+# inherit — they do not exist in the IS table.
 ICE_HEADER = ["contig", "start", "end", "strand", "mge_id", "mge_name",
               "element_type", "mobility", "machinery_intact", "degraded_reason",
               "spans_contigs", "confidence",
@@ -175,10 +189,7 @@ def audit_reasons(audit_rows, gene=None):
             if gene is None or row["amr_gene"] == gene}
 
 
-# ---------------------------------------------------------------------------
-# The pure helper functions. Cheap to test, and every ladder rule rests on them.
-# ---------------------------------------------------------------------------
-
+# ── Pure helpers, on which every rung of the ladder rests ────────────────────
 
 def test_overlap_and_gap_arithmetic_is_1_based_inclusive():
     # 100-200 and 150-300 share 150..200 = 51 bases.
@@ -193,6 +204,8 @@ def test_overlap_and_gap_arithmetic_is_1_based_inclusive():
 
 
 def test_family_matching_uses_family_then_cluster():
+    """A composite transposon is two copies of the SAME element, so this decides
+    whether a flanking pair can be called one at all."""
     is3_a = {"family": "IS3", "cluster": "IS3_1", "name": ""}
     is3_b = {"family": "is3", "cluster": "IS3_2", "name": ""}
     is21 = {"family": "IS21", "cluster": "IS21_1", "name": ""}
@@ -206,12 +219,16 @@ def test_family_matching_uses_family_then_cluster():
     assert co.families_match(new_same, dict(new_same)) == (True, "cluster")
     assert co.families_match(new_same, new_other) == (False, "cluster")
 
-    # Nothing informative at all -> we must not claim the copies are the same.
+    # Nothing informative at all → the two copies must not be called the same
+    # element on no evidence.
     blank = {"family": "", "cluster": "", "name": ""}
     assert co.families_match(blank, blank) == (False, "unknown")
 
 
 def test_is6_family_is_exempt_from_the_orientation_rule():
+    """The exemption has to fire on either spelling of the same element: ISEScan
+    writes the family as IS6, while a curated name from the TnCentral cascade
+    arrives as IS26 in the `name` column."""
     assert co.is_orientation_exempt({"family": "IS6", "name": ""}) is True
     assert co.is_orientation_exempt({"family": "is26", "name": ""}) is True
     # Family column blank but the naming cascade called it IS26.
@@ -225,17 +242,20 @@ def test_upstream_depends_on_the_genes_reading_direction():
     left_element = {"start": 500, "end": 900}
     right_element = {"start": 2100, "end": 2500}
     # A + strand gene is read left to right, so its upstream side is the LOWER
-    # coordinates; for a - strand gene it is the other way round.
+    # coordinates; for a `-` strand gene it is the other way round.
     assert co.is_upstream_of_gene(left_element, plus_gene) is True
     assert co.is_upstream_of_gene(right_element, plus_gene) is False
     assert co.is_upstream_of_gene(right_element, minus_gene) is True
     assert co.is_upstream_of_gene(left_element, minus_gene) is False
-    # Unknown gene strand: we cannot say which side is upstream, so we do not.
+    # Unknown gene strand: neither side is upstream, so neither is claimed.
     assert co.is_upstream_of_gene(left_element, {"start": 1000, "end": 2000,
                                                  "strand": "NA"}) is False
 
 
 def test_confidence_can_only_be_capped_downwards():
+    """Caps are one-way. Several rules cap the same row — a contig edge, a
+    partial hit, a missing input — and none of them may hand certainty back that
+    an earlier one took away."""
     assert co.apply_confidence_caps("high", []) == "high"
     assert co.apply_confidence_caps("high", [("medium", "r", "d")]) == "medium"
     assert co.apply_confidence_caps("high", [("medium", "r", "d"),
@@ -244,9 +264,12 @@ def test_confidence_can_only_be_capped_downwards():
     assert co.apply_confidence_caps("low", [("high", "r", "d")]) == "low"
 
 
-# ---------------------------------------------------------------------------
-# Ladder tier 1 — chromosomal, nothing nearby.
-# ---------------------------------------------------------------------------
+# ── Ladder tier 1: chromosomal, nothing mobile nearby ────────────────────────
+#
+# The intrinsic candidate — a gene that is part of the species' own chromosomal
+# repertoire. It is the default answer, so it must be reached by looking rather
+# than by failing to look: every tier-1 row carries an audit line saying what was
+# checked, and drops to medium confidence when an input was missing.
 
 
 def test_tier1_chromosomal_no_context(tmp_path):
@@ -285,13 +308,17 @@ def test_tier1_reports_the_measured_distance_to_a_nearby_but_unqualified_is(tmp_
     assert "nearby_is_not_upstream_or_not_oriented" in audit_reasons(audit)
 
 
-# ---------------------------------------------------------------------------
-# Ladder tier 2 — IS upstream and pointing at the gene (expression, not mobility).
-# ---------------------------------------------------------------------------
+# ── Ladder tier 2: an IS upstream, reading into the gene ─────────────────────
+#
+# An IS carries an outward-facing promoter, so a copy landing just upstream on
+# the gene's own strand can drive transcription of it — the classic ISEcp1 /
+# blaCTX-M architecture. That is EXPRESSION MODULATION, not mobilisation: the
+# gene itself still cannot move. The mechanism is inferred from coordinates
+# alone, which is why tier 2 never earns high confidence.
 
 
 def test_tier2_upstream_oriented_is_gives_expression_modulation(tmp_path):
-    """ISEcp1-like: IS 199 bp upstream, same strand -> hybrid promoter candidate."""
+    """ISEcp1-like: IS 199 bp upstream, same strand → hybrid promoter candidate."""
     report, audit = run_colocalise(
         tmp_path,
         amr_rows=[amr_row(symbol="blaCTX-M-15", start=10000, stop=11000, strand="+")],
@@ -352,7 +379,7 @@ def test_a_distant_upstream_is_does_not_clutter_the_audit(tmp_path):
 
 
 def test_tier2_on_a_minus_strand_gene_looks_at_the_other_side(tmp_path):
-    """For a - strand gene, 'upstream' means the HIGHER coordinates."""
+    """For a `-` strand gene, 'upstream' means the HIGHER coordinates."""
     report, _audit = run_colocalise(
         tmp_path,
         amr_rows=[amr_row(start=10000, stop=11000, strand="-")],
@@ -364,9 +391,13 @@ def test_tier2_on_a_minus_strand_gene_looks_at_the_other_side(tmp_path):
     assert row["distance_bp"] == "199"
 
 
-# ---------------------------------------------------------------------------
-# Ladder tier 3 — composite transposon, including the IS26/IS6 exception.
-# ---------------------------------------------------------------------------
+# ── Ladder tier 3: composite transposon, and the IS26 exception ──────────────
+#
+# Two copies of the same IS bracketing the gene can move the whole block as one
+# unit. The generic rule asks for the same family, the same orientation and a
+# span within --max-composite-span; IS6/IS26 is exempted from the orientation
+# test because it forms translocatable units with its copies in DIRECT
+# orientation, and it is the single most clinically important architecture here.
 
 
 def test_tier3_composite_same_family_same_orientation(tmp_path):
@@ -394,6 +425,8 @@ def test_tier3_composite_same_family_same_orientation(tmp_path):
 
 
 def test_composite_rejected_when_the_two_copies_are_different_families(tmp_path):
+    """Two unrelated IS happening to sit either side of a gene are not a
+    transposon: only copies of one element recombine to move the block."""
     report, audit = run_colocalise(
         tmp_path,
         amr_rows=[amr_row(start=10000, stop=11000, strand="+")],
@@ -541,10 +574,12 @@ def test_the_tightest_flanking_pair_wins(tmp_path):
     assert row["n_flanking_is"] == "4"          # all four are reported as context
 
 
-# ---------------------------------------------------------------------------
-# Ladder tier 4 — a curated named element containing the gene, which overrides
-# the pattern-based composite call.
-# ---------------------------------------------------------------------------
+# ── Ladder tier 4: a curated named element overrides the pattern ─────────────
+#
+# A TnCentral or Integrall hit brings the real architecture with it, so a named
+# transposon or integron wins over a composite inferred from IS geometry — the
+# curated entry gets cases like IS26 right for free. The naming layer is opt-in
+# (no URL configured, no names), so tier 4 never appears on most runs.
 
 
 def test_tier4_named_unit_transposon_overrides_the_composite_pattern(tmp_path):
@@ -597,9 +632,13 @@ def test_unrecognised_element_type_is_ignored_and_audited(tmp_path):
     assert "unknown_element_type" in audit_reasons(audit)
 
 
-# ---------------------------------------------------------------------------
-# Ladder tiers 5 and 6 — replicon-driven, plus ICE/IME.
-# ---------------------------------------------------------------------------
+# ── Ladder tiers 5 and 6: the replicon, and ICE/IME ──────────────────────────
+#
+# The top two rungs are about moving between CELLS: tier 5 needs a helper
+# element, tier 6 does not. Platon's replicon call drives them for plasmids and
+# conjscan_to_ice.py's element call drives them on the chromosome — which is the
+# whole point of the ICE branch, since "chromosomal therefore not transferable"
+# is exactly the assumption an ICE breaks.
 
 
 def test_tier5_on_a_mobilisable_plasmid(tmp_path):
@@ -653,7 +692,7 @@ def test_tier6_conjugative_plasmid_is_predicted_self_transmissible(tmp_path):
     assert row["mge_context"] == "plasmid"
     assert row["plasmid_mobility"] == "conjugative"
     # NOT high. This tier rests on Platon's conjugation HMM hit COUNT, which does
-    # not establish that a complete mating apparatus is present - and on the
+    # not establish that a complete mating apparatus is present — and on the
     # chromosome the same evidence is refused an ICE call and marked "machinery
     # incomplete". The tier stands; the certainty is capped, and audited.
     assert row["confidence"] == "medium"
@@ -707,9 +746,12 @@ def test_ice_wins_over_a_conjugative_plasmid_when_both_apply(tmp_path):
     assert row["mge_context"] == "ice"
 
 
-# ---------------------------------------------------------------------------
-# The inactivation special case — reported, never counted as mobilisation.
-# ---------------------------------------------------------------------------
+# ── The inactivation special case, kept off the ladder ───────────────────────
+#
+# An IS that landed INSIDE the coding sequence has probably broken the gene, so
+# the strain may be susceptible despite the hit. It gets its own column rather
+# than a tier: "is it broken" and "can it move" are separate questions, and a
+# broken gene inside a composite transposon still answers yes to both.
 
 
 def test_is_inside_the_amr_cds_is_flagged_as_inactivation_not_mobilisation(tmp_path):
@@ -717,7 +759,7 @@ def test_is_inside_the_amr_cds_is_flagged_as_inactivation_not_mobilisation(tmp_p
     report, audit = run_colocalise(
         tmp_path,
         amr_rows=[amr_row(symbol="blaTEM", start=10000, stop=11000, strand="+")],
-        # 10200-10900 = 701 bp of the gene's 1001 bp -> above the 0.5 threshold.
+        # 10200-10900 = 701 bp of the gene's 1001 bp → above the 0.5 threshold.
         is_rows=[is_row(start=10200, end=10900, strand="+", family="IS1",
                         is_id="IS_in_gene")],
         replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
@@ -788,13 +830,18 @@ def test_stress_and_virulence_rows_are_kept_and_labelled(tmp_path):
     assert types == {"ampC": "AMR", "merA": "STRESS"}
 
 
-# ---------------------------------------------------------------------------
-# The short-read honesty signals: contig ends and partial hits.
-# ---------------------------------------------------------------------------
+# ── Short-read honesty signals: contig ends and partial hits ─────────────────
+#
+# IS copies are what break a short-read assembly, so the structure being detected
+# is the structure that destroyed the evidence for it. A gene or element sitting
+# at a contig edge, an AMRFinderPlus PARTIAL_CONTIG_END hit, or an element
+# reported on two contigs all cap the row at low confidence — the tier stands,
+# the certainty does not.
 
 
 def test_gene_near_a_contig_end_is_flagged_and_capped_at_low(tmp_path):
-    """The gene is 50 bp from the end: a missing flank may just be a missing contig."""
+    """The gene sits 50 bp from the contig end, so a missing flanking IS may be
+    a missing contig rather than an absent element."""
     report, audit = run_colocalise(
         tmp_path,
         amr_rows=[amr_row(symbol="ampC", start=900, stop=1150, strand="+")],
@@ -890,9 +937,12 @@ def test_unknown_contig_length_caps_confidence_and_is_audited(tmp_path):
     assert "contig_length_unknown" in audit_reasons(audit)
 
 
-# ---------------------------------------------------------------------------
-# Graceful degradation: every input except the AMR table may be missing.
-# ---------------------------------------------------------------------------
+# ── Graceful degradation: only the AMR table is required ─────────────────────
+#
+# ISEScan writes no files at all when a genome has no IS, and plenty of isolates
+# have no plasmid, so a missing or empty input is an ordinary result. It must
+# still cost confidence and leave an audit line, because "not looked at" is not
+# the same finding as "looked at and found nothing".
 
 
 def test_empty_is_table_still_produces_rows_and_says_why(tmp_path):
@@ -993,10 +1043,7 @@ def test_outputs_always_have_a_header_even_with_no_amr_genes(tmp_path):
     assert header == co.OUTPUT_COLUMNS
 
 
-# ---------------------------------------------------------------------------
-# Parser robustness.
-# ---------------------------------------------------------------------------
-
+# ── Parser robustness: bad rows, old headers, other spellings ────────────────
 
 def test_amr_row_without_coordinates_is_not_assessable(tmp_path):
     """Protein-only AMRFinderPlus output has no contig: say so, do not guess."""
@@ -1048,7 +1095,7 @@ def test_isescan_native_column_names_are_accepted(tmp_path):
     elements = co.parse_mobile_elements(path)
     assert [element["start"] for element in elements] == [8000, 12000]
     assert [element["complete"] for element in elements] == ["complete", "partial"]
-    # No element_type column -> everything is an insertion sequence.
+    # No element_type column → everything is read as an insertion sequence.
     assert {element["element_type"] for element in elements} == {"insertion_sequence"}
     # ...and the parser records that the column was absent, so main() can audit it.
     assert all(not element["element_type_column_present"] for element in elements)
@@ -1059,8 +1106,8 @@ def test_a_table_with_no_element_type_column_is_audited(tmp_path):
     so it must leave a trace in the audit file.
 
     This is the documented default that lets a hand-trimmed contig/start/end
-    table still run. It cannot fire in the shipped workflow - every table the
-    rule passes to --is-table carries a type column - but if someone points the
+    table still run. It cannot fire in the shipped workflow — every table the
+    rule passes to --is-table carries a type column — but if someone points the
     script at their own file, the audit has to say that any transposon, integron
     or ICE rows in it were demoted to plain IS.
     """
@@ -1105,6 +1152,9 @@ def test_a_table_that_has_an_element_type_column_is_not_audited_as_assumed(tmp_p
 
 
 def test_contig_lengths_accept_a_headerless_samtools_fai(tmp_path):
+    """A samtools .fai works in place of the two-column table. The workflow
+    always passes rule contig_lengths' table; this is for running the script by
+    hand against an assembly that already has a samtools index."""
     fai_path = tmp_path / "contigs.fasta.fai"
     fai_path.write_text("contig_1\t50000\t12\t60\t61\ncontig_2\t4000\t51000\t60\t61\n",
                         encoding="utf-8")
@@ -1113,18 +1163,22 @@ def test_contig_lengths_accept_a_headerless_samtools_fai(tmp_path):
 
 
 def test_reversed_element_coordinates_are_repaired(tmp_path):
+    """Here a reversed interval is swapped rather than dropped, because by this
+    point the element table is someone else's output and the row still places an
+    element on a contig. isescan_to_table.py, which owns the IS calls
+    themselves, is the layer that drops such a record with a reason."""
     path = write_tsv(tmp_path / "is.tsv", IS_HEADER,
                      [is_row(start=9000, end=8000)])
     element = co.parse_mobile_elements(path)[0]
     assert (element["start"], element["end"]) == (8000, 9000)
 
 
-# ---------------------------------------------------------------------------
-# Regression anchor against the real AMRFinderPlus output for sample 006, if the
-# shared test-data file is present. Sample 006 is a Pseudomonas_E with five
-# chromosomal, intrinsic-looking AMR genes (efflux pumps + AmpC) and nothing
-# acquired — so the honest answer is five tier-1 rows.
-# ---------------------------------------------------------------------------
+# ── Regression anchor: the real AMRFinderPlus output for 006 ─────────────────
+#
+# Runs only when the shared fixture is present. Sample 006 is a Pseudomonas_E
+# with five chromosomal, intrinsic-looking AMR genes (efflux pumps + AmpC) and
+# nothing acquired — so the honest answer is five tier-1 rows, and this is the
+# one test here whose input nobody wrote by hand.
 
 REAL_AMRFINDER = os.path.join(os.path.dirname(__file__), "testdata",
                               "amrfinderplus_006_real.tsv")
@@ -1157,8 +1211,7 @@ def test_real_sample_006_is_five_intrinsic_candidates(tmp_path):
     assert {row["confidence"] for row in report} == {"medium"}
 
 
-# ---------------------------------------------------------------------------
-# The ICE/IME element's OWN verdict must reach the AMR row.
+# ── The ICE/IME element's own verdict must reach the AMR row ─────────────────
 #
 # conjscan_to_ice.py already decides whether a candidate's machinery is intact,
 # whether it straddles a contig break, and what confidence it deserves. Those
@@ -1166,7 +1219,6 @@ def test_real_sample_006_is_five_intrinsic_candidates(tmp_path):
 # a half-broken, contig-spanning element was still reported as tier 6 at high
 # confidence — the strongest claim the module can make, resting on an element the
 # module itself had flagged as doubtful. These tests pin that shut.
-# ---------------------------------------------------------------------------
 
 
 def test_degraded_ice_machinery_caps_the_genes_confidence(tmp_path):
@@ -1264,9 +1316,14 @@ def test_an_is_partly_overlapping_the_gene_is_not_reported_as_clean_context(tmp_
     assert "is_partially_overlaps_amr_gene" in audit_reasons(audit)
 
 
-# ---------------------------------------------------------------------------
-# "Nothing found" must mean "looked and found nothing", never "did not look".
-# ---------------------------------------------------------------------------
+# ── "Nothing found" must never mean "did not look" ───────────────────────────
+#
+# Four real defects, one test each: an element type nobody had mapped, a
+# nearest-element scan that looked only at insertion sequences, a confidence
+# check satisfied by rows from the wrong table, and an audit line that claimed
+# more had been checked than was. The first three all ended the same way — a
+# gene reported as an intrinsic candidate at high confidence while the evidence
+# against that sat unread in an input file.
 
 
 def test_an_ice_row_does_not_stand_in_for_missing_is_calls(tmp_path):
@@ -1354,9 +1411,13 @@ def test_the_no_context_audit_line_only_claims_what_was_checked(tmp_path):
     assert "no_mobile_element_on_this_contig" not in reasons
 
 
-# ---------------------------------------------------------------------------
-# The IS-into-gene architecture, as it actually appears in the data.
-# ---------------------------------------------------------------------------
+# ── The IS-into-gene architecture, as the data really shows it ───────────────
+#
+# The tidy version of an insertion — an IS overlapping half the coding sequence —
+# is not what arrives. AMRFinderPlus reports only the surviving fragment, so the
+# gene's coordinates STOP where the IS begins and the two features barely
+# overlap. Reading that geometry as "IS upstream of an intact gene" inverts the
+# conclusion: expression raised, rather than gene destroyed.
 
 
 def test_an_is_abutting_a_partial_hit_is_called_inactivation_not_expression(tmp_path):
@@ -1385,7 +1446,8 @@ def test_an_is_abutting_a_partial_hit_is_called_inactivation_not_expression(tmp_
 
 
 def test_a_partial_hit_truncated_by_the_contig_end_is_not_called_inactivation(tmp_path):
-    """The guard: AMRFinderPlus says when the ASSEMBLY, not an IS, did the cutting."""
+    """The guard: AMRFinderPlus says when the ASSEMBLY, not an IS, did the
+    cutting."""
     report, audit = run_colocalise(
         tmp_path,
         amr_rows=[amr_row(symbol="aac(3)-IIa", start=10000, stop=10450,
@@ -1413,16 +1475,14 @@ def test_a_complete_gene_next_to_an_is_is_still_ordinary_context(tmp_path):
     assert "is_abuts_partial_amr_hit_likely_inactivation" not in audit_reasons(audit)
 
 
-# ---------------------------------------------------------------------------
-# Plasmid mobility: Platon COUNTS genes, CONJscan TYPES the machinery.
+# ── Plasmid mobility: Platon COUNTS genes, CONJscan TYPES them ───────────────
 #
 # Platon decides the tier (it is the replicon-level call). CONJscan corroborates
 # or contradicts it, which moves the CONFIDENCE and gets named in the row. The
 # motivating real case: K. pneumoniae ATCC BAA-2146 plasmid pNDM-US, where
 # Platon counted 8 conjugation hits and CONJscan independently typed a complete
-# F-type system with a MOBH relaxase - yet blaNDM-1 was still reported at medium
+# F-type system with a MOBH relaxase — yet blaNDM-1 was still reported at medium
 # confidence with an audit line claiming the apparatus "was not verified".
-# ---------------------------------------------------------------------------
 
 
 def test_verified_machinery_lets_a_conjugative_plasmid_keep_high_confidence(tmp_path):
@@ -1467,8 +1527,8 @@ def test_the_machinery_is_named_in_the_deliverable(tmp_path):
     assert row["relaxase_type"] == "MOBH"
     assert row["mpf_type"] == "F"
     assert row["machinery_intact"] == "yes"
-    # The gene is NOT inside the element - the machinery is elsewhere on the
-    # same plasmid - and the row must say so rather than imply containment.
+    # The gene is NOT inside the element — the machinery is elsewhere on the
+    # same plasmid — and the row must say so rather than imply containment.
     assert row["machinery_source"].startswith("same_replicon:")
 
 
@@ -1507,7 +1567,7 @@ def test_degraded_machinery_does_not_count_as_verified(tmp_path):
 
 
 def test_relaxase_only_is_not_a_complete_system(tmp_path):
-    """MOBC alone (the real pHg case) is a relaxase with no mating apparatus -
+    """MOBC alone (the real pHg case) is a relaxase with no mating apparatus —
     mobilisable at best, and certainly not proof of self-transmissibility."""
     report, audit = run_colocalise(
         tmp_path,
@@ -1527,7 +1587,7 @@ def test_relaxase_only_is_not_a_complete_system(tmp_path):
 def test_tools_disagreeing_about_plasmid_mobility_is_flagged_not_promoted(tmp_path):
     """CONJscan typed a complete system but Platon did not call the plasmid
     conjugative. The tier follows Platon and is NOT quietly promoted, but the
-    conflict is reported and the confidence drops - one of the two is wrong and
+    conflict is reported and the confidence drops — one of the two is wrong and
     we cannot say which."""
     report, audit = run_colocalise(
         tmp_path,
@@ -1564,7 +1624,7 @@ def test_a_containing_ice_supplies_the_machinery_fields_directly(tmp_path):
 
 def test_machinery_columns_stay_NA_when_there_is_no_machinery(tmp_path):
     """An ordinary chromosomal gene must not acquire machinery fields from
-    nowhere - absence of evidence has to look like absence."""
+    nowhere — absence of evidence has to look like absence."""
     report, _audit = run_colocalise(
         tmp_path,
         amr_rows=[amr_row(start=10000, stop=11000)],

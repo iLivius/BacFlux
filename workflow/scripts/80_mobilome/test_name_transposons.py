@@ -1,23 +1,31 @@
 """Tests for name_transposons.py — the curated naming layer that makes tier 4 real.
 
-WHAT IS AT STAKE HERE
-    This script hands colocalise.py intervals and says "a named transposon lives
-    here". Every AMR gene inside one of those intervals is then reported as cargo
-    of that transposon, at tier 4. So an interval that is too WIDE is not a
-    cosmetic problem: it silently converts unrelated chromosomal genes into
-    "mobilisable, named architecture".
+name_transposons.py hands colocalise.py intervals and says "a named transposon
+lives here". Every AMR gene inside one of those intervals is then reported as
+cargo of that transposon, at tier 4. So an interval that is too WIDE is not a
+cosmetic problem: it silently converts unrelated chromosomal genes into
+"mobilisable, named architecture".
 
-    That is not hypothetical. The first run of this script on the KPNIH1 positive
-    control produced a single "Tn7246" spanning 942,502 bp — 129x the length of
-    the 7,325 bp transposon itself — because two separate copies of it, a
-    megabase apart, were merged into one element. Most of the tests below exist
-    because of that.
+That is not hypothetical. Its first run on the K. pneumoniae positive control
+produced a single "Tn7246" spanning 942,502 bp — 129x the length of the 7,325 bp
+transposon itself — because two separate copies of it, a megabase apart, were
+merged into one element. Most of the tests below exist because of that. (The
+strain is left unnamed on purpose: this project has used both KPNIH1 and ATCC
+BAA-2146 as K. pneumoniae controls and confused them more than once, and only
+the Tn3000 case at the foot of this file carries an accession that pins it.)
+
+The hits are hand-built BLAST rows, so no TnCentral download and no blastn are
+needed. The layer itself is opt-in: with neither mobilome.tncentral.url nor
+mobilome.tncentral.dir set, nothing here runs and the ladder simply stops at
+tier 3, since tier 4 is the tier that requires a curated name.
+
+Run: pytest workflow/scripts/80_mobilome/test_name_transposons.py -q
 """
 
 import name_transposons as nt
 
 
-# ── Fixtures ─────────────────────────────────────────────────────────────────
+# ── Building one BLAST HSP against a TnCentral defline ───────────────────────
 
 def hsp(contig="contig_1", subject="Tn4401b-JX560992", pident="99.9",
         length=5000, qstart=10_000, qend=15_000, sstart=1, send=5000,
@@ -41,7 +49,7 @@ def reasons(audit_rows):
     return {row["reason"] for row in audit_rows}
 
 
-# ── Defline parsing and element classification ───────────────────────────────
+# ── Reading a TnCentral defline and typing the element ───────────────────────
 
 def test_element_name_splits_on_the_last_hyphen():
     """TnCentral writes <NAME>-<ACCESSION>, and names contain hyphens themselves,
@@ -74,7 +82,7 @@ def test_a_plain_is_is_skipped_with_a_reason():
 # ── THE bug: separate copies must not be merged ──────────────────────────────
 
 def test_two_copies_of_one_transposon_stay_two_elements():
-    """The KPNIH1 Tn7246 failure, reduced to its essentials.
+    """The Tn7246 failure from the K. pneumoniae control, reduced to essentials.
 
     Two full-length copies of a 5 kb transposon, a megabase apart on the same
     contig. Taking min(qstart)/max(qend) across all HSPs would report ONE element
@@ -100,6 +108,10 @@ def test_pieces_of_one_copy_broken_by_indels_are_still_merged():
     separately each piece covers too little of the reference and would be thrown
     out by the coverage threshold — so the elements most worth naming, the big
     mosaic ones, would be exactly the ones systematically missed.
+
+    The gap the merge tolerates is a fraction of the reference length with an
+    absolute floor, so that it models an indel inside one copy rather than the
+    distance between two — see SAME_COPY_GAP_MULTIPLE in name_transposons.py.
     """
     hits = [
         hsp(qstart=10_000, qend=12_000, sstart=1, send=2_000, length=2_000),
@@ -157,7 +169,7 @@ def test_coverage_is_against_the_reference_not_the_contig():
     assert float(elements[0]["subject_coverage"]) == 1.0
 
 
-# ── Nested references ────────────────────────────────────────────────────────
+# ── Nested TnCentral references ──────────────────────────────────────────────
 
 def test_nested_reference_hits_collapse_to_the_best_one():
     """TnCentral entries nest on purpose — a large transposon contains smaller
@@ -204,7 +216,7 @@ def test_an_integron_is_typed_as_an_integron():
     assert elements[0]["mge_name"] == "In104"
 
 
-# ── Graceful degradation ─────────────────────────────────────────────────────
+# ── Degrading when TnCentral has nothing to say ──────────────────────────────
 
 def test_no_hits_is_a_normal_result_not_an_error():
     """Most genomes carry no characterised transposon."""
@@ -241,16 +253,19 @@ def test_identity_describes_the_whole_copy_not_its_best_fragment():
     assert abs(float(elements[0]["identity"]) - 93.9) < 0.2
 
 
-# ── Regressions from the adversarial review ─────────────────────────────────
+# ── Regressions from the adversarial review ──────────────────────────────────
 
 def test_a_neighbours_inverted_repeats_do_not_stretch_the_interval():
-    """The Tn3000 failure from the KPNIH1 control, reduced.
+    """The Tn3000 failure from the K. pneumoniae control (ATCC BAA-2146), reduced.
 
     Terminal inverted repeats are SHARED between related transposons, so two
     short IR hits belonging to a NEIGHBOURING element cluster with the real copy
     and drag the reported interval across DNA that has nothing to do with this
-    transposon. Identity and coverage cannot see it - the aligned parts match
-    perfectly, there just are not enough of them.
+    transposon. Identity and coverage cannot see it — the aligned parts match
+    perfectly, there just are not enough of them. What catches it is the fraction
+    of the reported interval that is actually ALIGNED to the reference: on that
+    control five of six elements score 1.00 and only the spurious Tn3000 falls to
+    0.57 (MIN_ALIGNED_FRACTION in name_transposons.py).
     """
     hits = [
         hsp(qstart=27_185, qend=27_268, sstart=1, send=84, length=84,
@@ -263,7 +278,7 @@ def test_a_neighbours_inverted_repeats_do_not_stretch_the_interval():
     elements, audit = build(hits)
 
     assert len(elements) == 1
-    # The real copy only - not 27,185-32,882.
+    # The real copy only — not the 27,185–32,882 the IRs stretched it to.
     assert elements[0]["start"] == "29785"
     assert elements[0]["end"] == "32882"
     assert float(elements[0]["aligned_fraction"]) > 0.95

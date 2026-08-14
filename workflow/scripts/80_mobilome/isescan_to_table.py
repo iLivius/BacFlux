@@ -1,100 +1,101 @@
 #!/usr/bin/env python3
-"""Turn ISEScan's raw output for ONE sample into the single tidy insertion-sequence
-(IS) table the rest of the mobilome module consumes, and compute the honest
-short-read QC signals that go with it ("work package C" - the IS-detection stage
-- in docs/mobilome_module_SPEC.md §6).
+"""Turn ISEScan's raw output for one sample into the tidy insertion-sequence table
+the rest of the mobilome module reads, plus the QC that says how far to trust it.
 
-WHY THIS EXISTS — the biology
-    Insertion sequences are small mobile elements that copy themselves around a
-    genome. They matter here because an AMR gene sitting next to, or between, IS
-    copies may be mobilisable, while the same gene with no mobile context is more
-    likely intrinsic. So the mobilome module needs one clean list of "where are
-    the IS elements on this assembly", which is what this script produces.
+Insertion sequences are small mobile elements that copy themselves around a
+genome. They matter here because an AMR gene sitting beside, or between, IS
+copies may be mobilisable, while the same gene with no mobile context is more
+likely intrinsic. So the module needs one clean list of where the IS elements sit
+on this assembly, and that is what this writes — work package C, the IS-detection
+stage, in docs/mobilome_module_SPEC.md §6.
 
-    The catch, and the reason for half the code below: IS elements are the single
-    biggest cause of contig breaks in short-read assemblies. A repeat that occurs
-    in several identical copies cannot be resolved by the assembler, so the
-    assembly is cut at exactly those copies. Two consequences we must report
-    rather than hide:
-      * the number of IS we can LOCATE is a FLOOR, never a count — collapsed
-        copies are simply absent from the assembly;
-      * an IS found at the very end of a contig is, quite literally, the place
-        where the assembly fell apart, so its genomic context is unknown.
-    Hence the per-IS distance-to-contig-end and at_contig_boundary flag, and the
-    per-sample fraction of IS calls sitting at a contig end. Published IS-calling
-    false-discovery rates are 8-24% even on curated data, so nothing downstream
-    should ever quote a bare IS count without these numbers next to it.
+The located count is a FLOOR, never a count. IS elements are the single biggest
+cause of contig breaks in a short-read assembly: a repeat present in several
+identical copies cannot be resolved, so the assembler cuts the contig at exactly
+those copies. Two consequences, both of them reported rather than hidden:
 
-WHERE THE INPUT COMES FROM
-    rule isescan runs ISEScan 1.7.3 on the final assembly
-    (02.assembly/{sample}/contigs_final.fasta) WITHOUT --removeShortIS, so both
-    complete and partial (truncated / single-copy, no perfect terminal repeat)
-    copies are reported and we tier them ourselves instead of letting the tool
-    silently drop the weak ones.
+    - collapsed copies are absent from the assembly altogether, so the number
+      of IS that can be located is a floor;
+    - an IS at the very end of a contig sits literally where the assembly fell
+      apart, so its genomic context is unknown.
 
-    ISEScan mirrors the input path into its output directory: for an input
-    02.assembly/{sample}/contigs_final.fasta and --output 08.mobilome/{sample}/isescan
-    the results land in 08.mobilome/{sample}/isescan/{sample}/contigs_final.fasta.tsv.
-    --isescan-out therefore accepts EITHER that .tsv file directly OR the output
-    directory, and we find the results file inside it.
+Hence the per-IS distance to the contig end and the at_contig_boundary flag, and
+the per-sample fraction of calls sitting at one. Published IS-calling
+false-discovery rates run 8–24% even on curated data, so nothing downstream
+should quote a bare IS count without these numbers beside it.
 
-WHAT THIS SCRIPT PRODUCES (and what consumes it)
-    --out-table    one row per IS copy, normalised column names, 1-based inclusive
-                   coordinates. This is the IS side of the AMR x MGE
-                   co-localisation step (colocalise.py), which reads it straight
-                   in as a TSV and does its own interval arithmetic - despite what
-                   the spec's recipe suggests, no BED file and no bedtools are
-                   involved anywhere in this module.
-    --out-summary  one row per sample: totals, complete vs partial, how many IS sit
-                   within --boundary-bp of a contig end, and that fraction. This is
-                   the QC metric the spec asks for; it travels with the report so a
-                   reader can see how fragmented the evidence is.
-    --out-audit    one row per IS record we DROPPED or FLAGGED, with an explicit
-                   reason column, PLUS one sample-level row when there was nothing
-                   to report at all, saying which of the two very different
-                   situations applies: ISEScan wrote no results file (so the run
-                   itself, not the biology, is why the table is empty) or ISEScan
-                   reported zero IS for this genome. BacFlux convention (see
-                   contig_taxonomy_decisions.tsv): every filtering decision must be
-                   inspectable afterwards; nothing disappears silently, and "the
-                   tool produced nothing" must never look like "the genome has
-                   nothing".
+Where the input comes from: rule isescan runs ISEScan 1.7.3 on the delivered
+assembly, 02.assembly/{sample}/contigs_final.fasta, deliberately WITHOUT
+--removeShortIS, so complete and partial copies (truncated, or single-copy with
+no perfect terminal repeat) both arrive here and we tier them ourselves instead
+of letting the tool drop the weak ones silently.
 
-COORDINATES
-    ISEScan reports isBegin/isEnd as 1-based and inclusive of both ends. We keep
-    them exactly as they are — NO conversion happens here — because 1-based
-    inclusive is what Bakta, AMRFinderPlus and GFF all use, so every table in this
-    module joins without an off-by-one trap. IF anyone ever adds a BED export (the
-    module does not have one today), they must subtract 1 from `start` there,
-    because BED is 0-based and half-open. That conversion belongs in the BED
-    writer, not here, so there stays exactly one place to check it.
+ISEScan mirrors the input path inside its output directory: for that input and
+--output 08.mobilome/{sample}/isescan, the results land at
+08.mobilome/{sample}/isescan/{sample}/contigs_final.fasta.tsv. --isescan-out
+therefore accepts EITHER that .tsv directly OR the output directory, and
+find_isescan_results looks inside it.
 
-DEFENSIVE PARSING
-    ISEScan's .tsv column NAMES were read from the v1.7.3 source, but this parser
-    still keys on the header line rather than on column positions, so a future
-    version that inserts a column cannot silently shift our coordinates. If the
-    header is missing a column we truly need, we STOP with a message naming the
-    file and the column — a loud failure beats a table of wrong coordinates.
-    A genome with no IS at all, by contrast, is a perfectly normal biological
-    result and is handled gracefully (empty but well-formed outputs, exit 0).
+The three tables this writes, and what reads each one next:
 
-TWO WAYS TO RUN IT
-    1) main use — normalise ISEScan output for one sample:
-         isescan_to_table.py --sample S \
-             --isescan-out 08.mobilome/S/isescan \
-             --contig-lengths 08.mobilome/S/contig_lengths.tsv \
-             --boundary-bp 100 \
-             --out-table  08.mobilome/S/S_is_elements.tsv \
-             --out-summary 08.mobilome/S/S_is_summary.tsv \
-             --out-audit  08.mobilome/S/S_is_discarded.tsv
+  --out-table    one row per IS copy, normalised column names, 1-based inclusive
+                 coordinates. This is the IS side of the AMR x MGE
+                 co-localisation step: colocalise.py reads it straight in as a
+                 TSV and does its own interval arithmetic. Despite the spec's
+                 bedtools recipe, no BED file and no bedtools are involved
+                 anywhere in this module.
+  --out-summary  one row per sample: totals, complete vs partial, how many IS sit
+                 within --boundary-bp of a contig end, and that fraction — the QC
+                 metric spec §6 asks for. _downstream_targets() in
+                 shared/00_common.smk lists this file for every sample whenever
+                 the mobilome module runs, so it is always written whether or not
+                 anyone opens it: it is what the headline mobility table has to be
+                 read alongside.
+  --out-audit    one row per IS record dropped or flagged, with an explicit
+                 reason column, plus one sample-level row when there was nothing
+                 to report at all. That row says which of two very different
+                 situations applies: ISEScan wrote no results file (so the run,
+                 not the biology, is why the table is empty), or ISEScan reported
+                 zero IS for this genome. BacFlux convention, the same one behind
+                 contig_taxonomy_decisions.tsv: every filtering decision stays
+                 inspectable, nothing disappears silently, and "the tool produced
+                 nothing" must never look like "the genome has nothing".
 
-    2) helper used by the same rule to make that --contig-lengths file from the
-       assembly FASTA (plain stdlib FASTA reading, no Biopython):
-         isescan_to_table.py --genome-fasta 02.assembly/S/contigs_final.fasta \
-             --out-contig-lengths 08.mobilome/S/contig_lengths.tsv
+Coordinates stay exactly as ISEScan wrote them. isBegin/isEnd are 1-based and
+inclusive of both ends, and NO conversion happens here, because 1-based inclusive
+is also what Bakta, AMRFinderPlus and GFF3 use — so every table in this module
+joins without an off-by-one trap. If anyone ever adds a BED export (the module
+has none today) they must subtract 1 from start THERE, because BED is 0-based and
+half-open. Keeping that conversion in the BED writer leaves exactly one place to
+check it.
+
+Defensive parsing: ISEScan's column NAMES were read from the v1.7.3 source, but
+the parser still looks each one up in the file's own header, so a future version
+that inserts a column cannot silently shift our coordinates. A header missing a
+column we truly need stops the run, naming the file and the column — a loud
+failure beats a table of plausible wrong coordinates. A genome with no IS at all,
+by contrast, is an ordinary biological result and is handled gracefully: empty
+but well-formed outputs, exit 0.
+
+Two ways to run it, called from two different rules:
+
+1) the main use, run by rule isescan_table — normalise ISEScan's output:
+     isescan_to_table.py --sample S \
+         --isescan-out 08.mobilome/S/isescan \
+         --contig-lengths 08.mobilome/S/S_contig_lengths.tsv \
+         --boundary-bp 100 \
+         --out-table  08.mobilome/S/S_is_elements.tsv \
+         --out-summary 08.mobilome/S/S_is_summary.tsv \
+         --out-audit  08.mobilome/S/S_is_discarded.tsv
+
+2) the helper, run earlier by rule contig_lengths, which measures the assembly
+   FASTA that both this script and ISEScan were given (stdlib FASTA reading, no
+   Biopython). Its output is an input of rule isescan_table above:
+     isescan_to_table.py --genome-fasta 02.assembly/S/contigs_final.fasta \
+         --out-contig-lengths 08.mobilome/S/S_contig_lengths.tsv
 
 Standard library only — this runs inside the ISEScan conda env, which carries no
-pandas. Unit tests: workflow/scripts/mobilome/test_isescan_to_table.py
+pandas. Unit tests: workflow/scripts/80_mobilome/test_isescan_to_table.py
 """
 
 import argparse
@@ -106,10 +107,11 @@ import sys
 # ── What ISEScan gives us ────────────────────────────────────────────────────
 
 # The 24 columns ISEScan 1.7.3 writes into <contigs>.fasta.tsv, in the exact
-# order the tool emits them (read from the v1.7.3 source, not from the docs).
-# We normally look columns up BY NAME from the file's own header; this list is
-# only the fallback for a results file that somehow arrives without a header, and
-# it is also the reference a reader can check the mapping against.
+# order the tool emits them — read from the v1.7.3 source, not from its docs,
+# which disagree in at least one place (see `ov` below). Columns are normally
+# looked up BY NAME in the file's own header; this list is only the fallback for
+# a results file that somehow arrives without one, and the reference a reader can
+# check the mapping against.
 ISESCAN_COLUMNS = [
     "seqID",         # contig name = first whitespace token of the FASTA header
     "family",        # IS family, e.g. IS3, IS6/IS26, IS200/IS605
@@ -148,23 +150,37 @@ OPTIONAL_ISESCAN_COLUMNS = [
 
 # ISEScan's completeness letter. 'c' = a complete copy (full length, with a
 # proper terminal inverted repeat); 'p' = partial, i.e. truncated or a single
-# copy without a perfect TIR. We deliberately KEEP the partials (ISEScan is run
-# without --removeShortIS) because on a fragmented short-read assembly a partial
-# call is often a real IS cut in half by a contig break — dropping them would
-# throw away exactly the evidence the boundary flag exists to quantify.
+# copy without a perfect TIR. The partials are deliberately KEPT — ISEScan runs
+# without `--removeShortIS` — because on a fragmented short-read assembly a
+# partial call is usually a real IS cut in half by a contig break, and dropping
+# those would throw away exactly the evidence the boundary flag exists to
+# quantify.
 ISESCAN_TYPE_COMPLETE = "c"
 ISESCAN_TYPE_PARTIAL = "p"
 
 
-# ── What we write ────────────────────────────────────────────────────────────
+# ── The three tables this writes ─────────────────────────────────────────────
 
 # Sequence Ontology term SO:0000973 "insertion_sequence" — the vocabulary the
 # whole mobilome module labels its element types with, so IS rows, prophage rows
 # and (later) ICE rows can be concatenated into one MGE table.
 MGE_TYPE_INSERTION_SEQUENCE = "insertion_sequence"
 
-# The deliverable IS table, in the order the columns are written. One row per IS
-# copy ISEScan located on the assembly.
+# The deliverable IS table, in the order the columns are written — one row per IS
+# copy ISEScan located on the assembly. Where each value comes from, so nobody has
+# to guess which numbers are the tool's and which are ours:
+#   contig, start, end, and strand … tpase_orf_end
+#                            ISEScan's own values under our names (the mapping is
+#                            in normalise_records). Two columns in that block are
+#                            not straight copies: is_complete and ir_present are
+#                            TRUE/FALSE read off ISEScan's type letter and irLen.
+#   length_bp                recomputed from start and end, NOT taken from
+#                            ISEScan's own isLen column
+#   contig_length … at_contig_boundary
+#                            computed here, against the contig-lengths file
+#                            written by --genome-fasta mode (rule contig_lengths)
+#   sample, mge_id, mge_type added here, so IS rows concatenate with the other
+#                            MGE tables the module writes
 OUTPUT_COLUMNS = [
     "sample",
     "mge_id",                     # contig|insertion_sequence-start:end (stable join key)
@@ -224,17 +240,17 @@ AUDIT_COLUMNS = [
     "start",
     "end",
     "action",     # dropped | kept_flagged | input_missing | input_empty
-    "reason",     # short machine-readable token - the full list is below
+    "reason",     # short greppable token — every one it can write is listed below
     "detail",     # human-readable explanation + the offending raw line
 ]
 
-# EVERY `reason` TOKEN THIS SCRIPT CAN WRITE, so you can grep for one without
-# reading the source. `action` says what happened to the record, `reason` says
-# why. The two that matter most are marked.
+# EVERY `reason` token this script can write, listed so one can be grepped for
+# without reading the source. `action` says what happened to the record, `reason`
+# says why. The two marked ** are the ones that mean something is wired wrong.
 #
 #   action=dropped        the IS record was thrown away and is NOT in the table
 #     unexpected_field_count          the line did not have the expected number
-#                                     of columns - malformed ISEScan output
+#                                     of columns — malformed ISEScan output
 #     missing_contig_id               no sequence identifier on the row
 #     unparseable_coordinates         isBegin/isEnd were not numbers
 #     invalid_coordinate_range        start > end, or a zero/negative coordinate
@@ -244,12 +260,12 @@ AUDIT_COLUMNS = [
 #                                     and the IS is dropped rather than reported
 #                                     without the honesty flag.
 #  ** coordinates_beyond_contig_length  the IS runs past the end of its own contig.
-#                                     Both of these ** reasons almost always mean
-#                                     ISEScan and the contig-lengths file were
-#                                     built from DIFFERENT assemblies. If either
-#                                     appears in quantity, that is a wiring bug to
-#                                     fix, not a property of the genome - the IS
-#                                     table will be silently short.
+#                                     Both ** reasons almost always mean ISEScan
+#                                     and the contig-lengths file were built from
+#                                     DIFFERENT assemblies. Either one appearing in
+#                                     quantity is a wiring bug to fix, not a
+#                                     property of the genome — the IS table will be
+#                                     silently short.
 #
 #   action=kept_flagged   the IS IS in the table, but something about it is
 #                         unreliable and the row says so
@@ -277,7 +293,7 @@ ISESCAN_INTERMEDIATE_DIRS = {"proteome", "hmm"}
 AUDIT_DETAIL_MAX_CHARS = 200
 
 
-# ── Small shared helpers ─────────────────────────────────────────────────────
+# ── Small shared helpers: read a field, format a field, write a table ────────
 
 def _warn(message):
     """Write one warning line to stderr, tagged so it is greppable in a Snakemake
@@ -353,7 +369,7 @@ def write_tsv(path, columns, rows):
             writer.writerow(row)
 
 
-# ── Helper: contig lengths from the assembly FASTA ───────────────────────────
+# ── Contig lengths: what every distance-to-contig-end is measured against ────
 
 def fasta_contig_lengths(path):
     """Read a genome FASTA and return {contig_id: length_in_bp}.
@@ -406,10 +422,16 @@ def write_contig_lengths(path, lengths):
 def read_contig_lengths(path):
     """Read the two-column contig-length TSV back into {contig: length}.
 
-    Accepts the file with or without its 'contig<TAB>length' header (a user may
-    well hand-make this file with awk), by simply skipping any line whose second
-    field is not a number. Lines that are neither a header nor a valid pair are
-    reported and skipped rather than guessed at.
+    Accepts the file with or without its 'contig<TAB>length' header — a hand-made
+    one from awk is a perfectly reasonable input — by skipping any line whose
+    second field is not a number. The header row is exactly such a line, which is
+    why it needs no special case.
+
+    Individual unusable lines are skipped without comment, so the safety net is
+    the check at the end: a file that yielded NOTHING raises, because carrying on
+    with an empty length map would drop every IS in the sample with reason
+    contig_not_in_contig_lengths and look like a genome finding rather than a
+    broken input.
     """
     lengths = {}
     if not path or not os.path.exists(path):
@@ -619,7 +641,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
         start_text = record.get("isBegin")
         end_text = record.get("isEnd")
 
-        # --- 1. the line itself has to have the expected shape ---
+        # ── 1. The line itself has to have the expected shape ────────────────
         if record.get("_n_fields") != record.get("_n_columns"):
             audit(
                 contig, start_text, end_text, "dropped", "unexpected_field_count",
@@ -628,7 +650,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             )
             continue
 
-        # --- 2. we need a contig to place the IS on ---
+        # ── 2. An IS needs a contig to sit on ────────────────────────────────
         if not contig:
             audit(
                 contig, start_text, end_text, "dropped", "missing_contig_id",
@@ -636,7 +658,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             )
             continue
 
-        # --- 3. coordinates must be readable and sane ---
+        # ── 3. Coordinates must be readable and sane ─────────────────────────
         start = _int_or_none(start_text)
         end = _int_or_none(end_text)
         if start is None or end is None:
@@ -656,7 +678,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
         # length includes both the first and last base.
         length_bp = end - start + 1
 
-        # --- 4. optional minimum length ---
+        # ── 4. Optional minimum length ───────────────────────────────────────
         # Default 0, i.e. off. The spec's general 500 bp floor for MGE predictions
         # is deliberately NOT applied to IS here: a short call is usually a
         # partial IS cut by a contig break, and those are exactly what we want to
@@ -668,7 +690,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             )
             continue
 
-        # --- 5. the contig must be one we know the length of ---
+        # ── 5. The contig must be one whose length is known ──────────────────
         if contig not in contig_lengths:
             audit(
                 contig, start, end, "dropped", "contig_not_in_contig_lengths",
@@ -687,7 +709,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             )
             continue
 
-        # --- 6. completeness: ISEScan's own complete/partial letter ---
+        # ── 6. Completeness: ISEScan's own complete/partial letter ───────────
         raw_type = (record.get("type") or "").strip().lower()
         if raw_type == ISESCAN_TYPE_COMPLETE:
             is_complete = True
@@ -701,7 +723,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
                 "kept with is_complete=NA",
             )
 
-        # --- 7. terminal inverted repeats ---
+        # ── 7. Terminal inverted repeats ─────────────────────────────────────
         # A pair of inverted repeats at the two ends is the structural signature of
         # an intact IS, so its presence is one of the confidence signals the
         # module tiers on. ISEScan reports irLen = 0 when it found none; if that
@@ -714,7 +736,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             tir_text = (record.get("tir") or "").strip()
             ir_present = bool(tir_text) and tir_text not in {"-", "NA", "."}
 
-        # --- 8. how close is this IS to where the assembly broke? ---
+        # ── 8. How close is this IS to where the assembly broke? ─────────────
         # An IS sitting at a contig end is the assembler telling us it could not
         # resolve that repeat: whatever was next to the IS is missing from the
         # assembly, so any statement about its genomic context is unsupported.
@@ -893,13 +915,17 @@ def summarise(sample, rows, audit_rows, boundary_bp, min_length_bp, results_file
     }
 
 
-# ── Command line ─────────────────────────────────────────────────────────────
+# ── Parse the command line for both modes ────────────────────────────────────
 
 def build_parser():
-    """The two usages are described in the module docstring. Everything is
-    declared optional here and checked in main(), so that one script can serve
-    both the small FASTA-length helper and the main normalisation step without
-    argparse subcommands (which would change the documented flag layout)."""
+    """Declare the flags for both modes; the modes themselves are described in the
+    module docstring.
+
+    Everything is optional here and checked in main() instead, so that one script
+    can serve both the small FASTA-length helper and the main normalisation step
+    without argparse subcommands — which would change the flag layout the two
+    rules in shared/80_mobilome.smk already call it with.
+    """
     parser = argparse.ArgumentParser(
         description="Normalise ISEScan output into the mobilome module's IS table.",
     )
@@ -909,12 +935,20 @@ def build_parser():
                         help="ISEScan results .tsv, OR the ISEScan --output directory.")
     parser.add_argument("--contig-lengths",
                         help="Two-column TSV (contig, length) for the same assembly.")
-    # NOTE: conjscan_to_ice.py also has a --boundary-bp, with a DIFFERENT default
-    # (1000) and a different job - it decides when a whole ICE/IME element is too
-    # close to a contig end and caps that element's confidence. This one asks the
-    # same question about a single IS copy and only sets a flag plus the summary
-    # fraction. Two knobs, same name, deliberately not linked; only this one is
-    # actually passed by the workflow (rule isescan_table).
+    # There are three contig-edge thresholds in this module, deliberately
+    # different numbers on different objects, so do not "harmonise" them (two of
+    # the three even share this flag's name):
+    #   here (--boundary-bp, 100)                 an INSERTION SEQUENCE near a
+    #                                             contig end
+    #   conjscan_to_ice.py --boundary-bp (1000)   a whole ICE/IME element
+    #   colocalise.py CONTIG_END_WINDOW_BP (1000) an AMR GENE
+    # An ICE is tens of kilobases, so 1 kb from a contig end already means most of
+    # it is missing; an IS is a couple of kb at most, so only a much closer call
+    # says anything.
+    # This one only raises a flag and feeds the summary fraction — it never drops
+    # a row. It is also the only one of the three wired to a config key
+    # (mobilome.contig_boundary_bp, passed by rule isescan_table); the other two
+    # always run at their defaults.
     parser.add_argument("--boundary-bp", type=int, default=100,
                         help="An IS within this many bp of a contig end is flagged "
                              "as sitting at a contig boundary (default: 100). Not "
@@ -937,12 +971,23 @@ def build_parser():
 
 
 def main(argv=None):
+    """Run whichever of the two modes the flags asked for, and return the exit
+    code Snakemake will see.
+
+    1 means the run was mis-wired (flags missing, genome FASTA absent,
+    contig-lengths file unreadable, ISEScan columns unidentifiable) and the
+    workflow must stop. 0 covers everything else INCLUDING a genome with no
+    insertion sequences, which is a result and not a failure.
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    # ── Helper mode: assembly FASTA -> contig lengths TSV ────────────────────
-    # Run by the same Snakemake rule, just before the main mode, so the main mode
-    # always has the lengths of the exact assembly ISEScan was given.
+    # ── Helper mode: assembly FASTA → contig lengths TSV ─────────────────────
+    # Run by rule contig_lengths, a separate and earlier rule than the one that
+    # runs the main mode, off the SAME contigs_final.fasta that rule isescan is
+    # given — which is what guarantees the lengths describe the assembly the IS
+    # calls were made on. When they do not, every IS on the mismatched contig is
+    # dropped with reason contig_not_in_contig_lengths.
     if args.genome_fasta or args.out_contig_lengths:
         if not (args.genome_fasta and args.out_contig_lengths):
             sys.stderr.write(

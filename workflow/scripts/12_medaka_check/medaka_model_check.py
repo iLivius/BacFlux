@@ -1,34 +1,49 @@
 #!/usr/bin/env python3
-"""Validate (or auto-infer) the Medaka consensus model BEFORE the expensive
-assembly runs — and, when a configured model is wrong, suggest the closest
-available ones so the fix is obvious.
+"""Validate the configured Medaka consensus model, or resolve one from the
+reads, before the assembler starts — and when the configured model is wrong,
+print the closest available ones so the fix is obvious.
 
-WHY THIS EXISTS
-    Medaka polishing is one of the LAST steps of a long-read run (it needs the
-    finished assembly). So a bad model — a typo, or one dropped in a newer Medaka
-    version — used to surface only after Flye had already spent an hour or more.
-    rule check_medaka_model runs THIS script right after read filtering and gates
-    the assembler on it, so an unusable model kills the run in seconds, not hours.
+Medaka polishing is one of the LAST steps of a long-read run, because it needs
+the finished assembly. A model this Medaka version does not have — a typo, or
+one dropped in a newer release — therefore used to show up only after Flye had
+already spent an hour or more. rule check_medaka_model
+(shared/12_medaka_check.smk) runs this script right after read filtering and
+gates the assembler on its result, so an unusable model kills the run in
+seconds.
 
-WHERE IT RUNS
-    Inside the Medaka conda env (rule check_medaka_model), so `medaka` is on PATH.
-    The pure string logic (parsing/tokenising/suggesting) is deliberately kept
-    free of any Medaka call so it can be unit-tested without the tool.
+Arguments, all handed over by that rule:
+  --model    the explicit model name the user set in
+             parameters.{nanopore|hybrid}.medaka_model. Empty means auto mode:
+             infer the model from the reads.
+  --reads    FILT_LONG, the filtlong-filtered ONT reads Medaka will polish
+             against. Auto-inference reads the basecaller tag out of their
+             FASTQ headers, so the model resolved here is the one the polish
+             step would have inferred for itself.
+  --fallback-to-auto   the opt-in middle option (config key
+             medaka_model_fallback_auto, default off): when an EXPLICIT model
+             is invalid, try auto-inference instead of stopping, and use what
+             it gives back with a loud warning.
+  --out      the validated or resolved model, written as one line. rule
+             long_read_consensus (nanopore/30_polish.smk, and its twin in
+             hybrid/40_ont_assembly.smk) cats it back and hands it to
+             `medaka_consensus -m`, so the model is resolved once, not twice,
+             and the two steps cannot disagree.
 
-INPUT / OUTPUT
-    --model    the configured model. Non-empty = an explicit name the user set;
-               empty = auto mode ("infer from the reads").
-    --reads    the (filtlong) FASTQ Medaka will polish against; the basecaller tag
-               in its headers is what auto-inference reads.
-    --fallback-to-auto   the opt-in middle option: when an EXPLICIT model is
-               invalid, instead of failing, try auto-inference from the reads and
-               use that if it works (with a loud warning). Default off.
-    --out      on success, the single validated/resolved model NAME is written
-               here (one line). rule long_read_consensus reads it back, so the
-               model is resolved once, not twice.
+Exit 0 and write --out on success; print a filtered suggestion table to stderr
+and exit 1 on failure.
 
-    Exit 0 and write --out on success; print a filtered suggestion table to
-    stderr and exit 1 on failure.
+Auto mode asks for the BACTERIAL consensus model (`--auto_model
+consensus_bacteria` below), which corrects the systematic errors bacterial DNA
+methylation leaves in canonical basecalls. That is a different job from
+Dorado's modified-base calling, and it is still the right model for reads
+basecalled without one. It does assume native, unamplified DNA: on an
+amplified library pin the matching standard model explicitly instead — see
+docs/methods_medaka_model_choice.md.
+
+Runs inside the Medaka conda env, so `medaka` is on PATH. Only
+list_available_models() and resolve_from_reads() call the tool; the parsing,
+tokenising and suggesting are kept free of it so they can be unit-tested with
+no Medaka installed (test_medaka_model_check.py).
 """
 
 import argparse
@@ -41,11 +56,11 @@ import sys
 # ── Medaka calls (the only functions that touch the tool) ────────────────────
 
 def list_available_models():
-    """Return the list of model names Medaka knows about, from
-    `medaka tools list_models`. That command prints one line
-    'Available: m1, m2, ...' (plus Default lines we ignore). Parsing the live
-    tool — not a hard-coded list — is the whole point: the valid set is
-    version-specific, which is exactly why a stale config model breaks."""
+    """Return the model names this Medaka build knows, read from
+    `medaka tools list_models` (one 'Available: m1, m2, ...' line, plus Default
+    lines that are ignored). Asking the installed tool instead of carrying a
+    hard-coded list is the whole point: the valid set is version-specific, which
+    is exactly how a config model that worked last year stops working."""
     proc = subprocess.run(
         ["medaka", "tools", "list_models"],
         capture_output=True, text=True,
@@ -63,9 +78,10 @@ def list_available_models():
 
 def resolve_from_reads(reads):
     """Ask Medaka to infer the consensus model from the basecaller tag in the
-    reads. Returns the resolved model name, or None if Medaka cannot infer one
-    (no tag, or a tag its lookup does not recognise). Never raises for the
-    ordinary 'could not infer' case — that is a result, not an error."""
+    reads, requesting the bacterial variant. Returns whatever Medaka prints — a
+    PATH to the model file rather than a bare name, which is a valid `-m`
+    argument all the same — or None when Medaka cannot infer one (no tag, or a
+    tag its lookup does not know), which is a result and not an error."""
     proc = subprocess.run(
         ["medaka", "tools", "resolve_model", "--auto_model", "consensus_bacteria", reads],
         capture_output=True, text=True,
@@ -76,7 +92,7 @@ def resolve_from_reads(reads):
     return model or None
 
 
-# ── Pure logic (unit-tested; no Medaka needed) ───────────────────────────────
+# ── Reading a model name: pure logic, unit-tested without Medaka ─────────────
 
 # The axes a user actually scans for when picking a model, in the words the
 # Medaka names use. Everything else in a name (pore e82, speed 400bps, the
@@ -87,12 +103,11 @@ _ACCURACIES = {"fast", "hac", "sup", "high"}
 
 
 def tokenize(model):
-    """Split a Medaka model name into the axes we care about. Names are
-    underscore-joined and irregular (some carry a device token, some do not;
-    versions are either gNNN or vX.Y.Z), so classify token-by-token rather than
-    assume fixed positions. Returns a dict with flowcell/device/accuracy/version
-    (any of which may be None) plus is_variant (snp/variant models are for
-    variant CALLING, not consensus polishing)."""
+    """Split a Medaka model name into the axes a user picks by: flowcell,
+    device, accuracy, version (any of them None when the name omits it) plus
+    is_variant. Names are underscore-joined and irregular — some carry a device
+    token, some do not, versions are either gNNN or vX.Y.Z — so every token is
+    classified on its own rather than read from a fixed position."""
     parts = model.split("_")
     out = {"flowcell": None, "device": None, "accuracy": None,
            "version": None, "is_variant": False}
@@ -140,12 +155,11 @@ def _fmt_table(models):
 
 
 def suggest(bad_model, available):
-    """Build the suggestion text for an invalid explicit model. If the bad name
-    has recognisable axes, narrow the (consensus) models to those sharing them —
-    e.g. a typo'd version 'r941_min_hac_g508' narrows to the r941/MinION/hac
-    rows, where the real 'r941_min_hac_g507' is the obvious pick. If nothing in
-    the name is recognisable, fall back to the full consensus table grouped the
-    same way."""
+    """Build the suggestion text printed when an explicit model is not available.
+    Narrows the consensus models to those sharing whatever axes the bad name did
+    specify — a typo'd 'r941_min_hac_g508' narrows to the r941 / MinION / hac
+    rows, where the real 'r941_min_hac_g507' is the obvious pick — and falls back
+    to the whole consensus table when nothing in the name is recognisable."""
     pool = consensus_models(available)
     want = tokenize(bad_model)
 
@@ -186,8 +200,14 @@ def auto_failure_message(available):
     )
 
 
-# ── Orchestration ────────────────────────────────────────────────────────────
+# ── Decide the model: auto, explicit, or explicit-then-auto fallback ─────────
 
+# Three ways in, tried in this order: an empty --model means auto, so the reads
+# decide; a non-empty one is honoured when it names a model this Medaka build has,
+# or a model file already on disk; and only with --fallback-to-auto does an
+# invalid explicit name fall back to auto rather than stopping the run. An
+# explicit choice is otherwise never swapped for a guess — it is honoured or
+# reported, which is why the default is off.
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Validate/resolve the Medaka model early.")
     ap.add_argument("--model", default="", help="explicit model, or empty for auto")

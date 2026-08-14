@@ -1,4 +1,10 @@
-"""Unit tests for workflow/scripts/mobilome/isescan_to_table.py.
+"""Unit tests for workflow/scripts/80_mobilome/isescan_to_table.py.
+
+isescan_to_table turns one sample's raw ISEScan output into the three files the
+rest of the module depends on: the IS table colocalise.py reads, the per-sample
+QC summary that table has to be read alongside, and the audit file naming every
+record dropped or flagged. These tests cover all three, plus the second CLI mode
+(rule contig_lengths) that measures the assembly FASTA.
 
 No tools, no databases, no real ISEScan run: every test builds a small
 ISEScan-shaped .tsv by hand and pushes it through the parser, so the whole
@@ -9,8 +15,14 @@ The fixtures follow the real ISEScan 1.7.3 output contract (24 named columns,
 terminal inverted repeat was found), so a test passing here means the parser
 agrees with the tool, not just with itself.
 
+Two facts run through most of what follows. An IS count is a floor, not a count —
+identical copies collapse in a short-read assembly and never appear — which is
+why the distance to the contig end travels with every row. And an empty table
+has two completely different meanings: ISEScan looked and found nothing, or
+ISEScan wrote nothing at all. The audit file has to tell them apart.
+
 Run:
-    python -m pytest workflow/scripts/mobilome/test_isescan_to_table.py -q
+    python -m pytest workflow/scripts/80_mobilome/test_isescan_to_table.py -q
 """
 
 import csv
@@ -158,6 +170,12 @@ def test_contig_lengths_roundtrip_with_and_without_header(tmp_path):
 
 
 def test_helper_cli_mode_writes_contig_lengths(tmp_path):
+    """The second CLI mode, run by rule contig_lengths before ISEScan is parsed.
+
+    It measures the same assembly FASTA ISEScan was given, so every
+    distance-to-contig-end in the IS table is computed against the contigs the
+    calls actually came off.
+    """
     fasta = tmp_path / "contigs_final.fasta"
     fasta.write_text(">contig_1\nACGTACGTAC\n>contig_2\nACGT\n")
     out = tmp_path / "contig_lengths.tsv"
@@ -270,6 +288,13 @@ def test_ir_present_reflects_ir_length(tmp_path):
 
 
 # ── The short-read honesty signals ───────────────────────────────────────────
+#
+# An IS at a contig end sits where the assembly fell apart, so whatever was next
+# to it is unknown. These columns are the whole reason the IS table can be read
+# honestly: colocalise.py caps a gene's confidence when its context element
+# touches an edge, and the per-sample fraction says how much of the inventory is
+# in that state. The distance is always reported next to the flag, because only
+# the flag depends on --boundary-bp.
 
 def test_is_flush_against_contig_start_is_at_boundary(tmp_path):
     # An IS starting at base 1: zero bases of contig before it. This is exactly
@@ -400,11 +425,14 @@ def test_header_only_results_file_is_graceful(tmp_path):
     assert code == 0
     assert table == []
     assert summary["n_is_total"] == "0"
-    # The file WAS found and parsed, so provenance records it (unlike the no-file case).
+    # The file WAS found and parsed, so provenance records it — unlike the
+    # no-file case, where it reads NONE.
     assert summary["isescan_results_file"] == results
 
 
 def test_completely_empty_results_file_is_graceful(tmp_path):
+    # A zero-byte file: no header either, so there is not even a schema to check.
+    # Still a normal outcome rather than a parse error.
     empty = tmp_path / "r.tsv"
     empty.write_text("")
     code, table, summary, _ = run_main(tmp_path, empty, {"contig_1": 50000})
@@ -495,7 +523,7 @@ def test_no_sample_level_row_when_isescan_reported_is(tmp_path):
     # so the sample-level note never dilutes the record-level audit trail.
     results = write_isescan_tsv(tmp_path / "r.tsv", [
         isescan_row(isBegin="5000", isEnd="6200"),
-        isescan_row(isBegin="6200", isEnd="5000"),   # reversed -> dropped
+        isescan_row(isBegin="6200", isEnd="5000"),   # reversed → dropped
     ])
     code, table, summary, audit = run_main(tmp_path, results, {"contig_1": 50000})
     assert code == 0
@@ -539,6 +567,10 @@ def test_malformed_coordinates_go_to_audit_without_crashing(tmp_path):
 
 
 def test_reversed_coordinates_go_to_audit(tmp_path):
+    # isEnd before isBegin: the parser drops it rather than swapping the two
+    # numbers, because a repaired row would look like a perfectly good IS at
+    # coordinates nothing vouches for. Dropped with a reason, as every filtering
+    # decision in this module is.
     results = write_isescan_tsv(tmp_path / "r.tsv",
                                 [isescan_row(isBegin="6200", isEnd="5000")])
     code, table, _, audit = run_main(tmp_path, results, {"contig_1": 50000})
@@ -549,7 +581,7 @@ def test_reversed_coordinates_go_to_audit(tmp_path):
 
 def test_ragged_row_is_dropped_with_a_reason(tmp_path):
     # A truncated line means the column-to-value mapping cannot be trusted for
-    # that line, so its coordinates might be silently wrong -> drop and record.
+    # that line, so its coordinates might be silently wrong → drop and record.
     good = isescan_row(isBegin="5000", isEnd="6200")
     ragged = "\t".join(["contig_1", "IS3", "IS3_1", "7000"])
     results = write_isescan_tsv(tmp_path / "r.tsv", [good, ragged])

@@ -2,82 +2,88 @@
 """Translate a GTDB-Tk species call into the matching AMRFinderPlus
 `--organism` value — or into nothing at all, which is the common case here.
 
-WHY THIS EXISTS
-    AMRFinderPlus only reports POINT MUTATIONS (gyrA/rpoB-style chromosomal
-    substitutions) when it is told which organism it is looking at, because
-    every curated organism carries its own hand-checked list of
-    resistance-conferring changes. Those point mutations are precisely the
-    "intrinsic, chromosomal, not transferable" category that a homology screen
-    like ABRicate structurally cannot see, and tier 1 of the mobilome module's
-    mobility ladder (chromosomal / intrinsic candidate) is exactly that
-    category. So when the isolate IS one of the curated organisms we want the
-    flag; when it is not, we must run without it.
+Why AMRFinderPlus has to be told which organism it is looking at
+----------------------------------------------------------------
+AMRFinderPlus only reports POINT MUTATIONS (gyrA/rpoB-style chromosomal
+substitutions) when it is told which organism it is looking at, because every
+curated organism carries its own hand-checked list of resistance-conferring
+changes. Those point mutations are precisely the "intrinsic, chromosomal, not
+transferable" category that a homology screen like ABRicate structurally cannot
+see, and tier 1 of the mobilome module's mobility ladder (chromosomal /
+intrinsic candidate) is exactly that category. So when the isolate IS one of the
+curated organisms we want the flag; when it is not, we must run without it.
 
-    AMRFinderPlus 4.2.7 curates only 31 organisms, and it names them
-    NCBI-style. GTDB names do not always agree: GTDB splits genera and marks
-    the split-off lineages with an alphanumeric suffix (`Pseudomonas_E`,
-    `Klebsiella_A`), and gives genomes with no named species a placeholder
-    epithet (`sp024807945`). A naive substring match would happily turn
-    `s__Pseudomonas_E sp010095445` into `--organism Pseudomonas_aeruginosa`,
-    and AMRFinderPlus would then score that genome's proteins against
-    P. aeruginosa's curated mutation list. That is worse than no call at all,
-    so every mismatch below is handled explicitly.
+Why a GTDB name cannot be matched to that list naively
+------------------------------------------------------
+AMRFinderPlus 4.2.7 curates only 31 organisms, and it names them NCBI-style.
+GTDB names do not always agree: GTDB splits genera and marks the split-off
+lineages with an alphanumeric suffix (`Pseudomonas_E`, `Klebsiella_A`), and
+gives genomes with no named species a placeholder epithet (`sp024807945`). A
+naive substring match would happily turn `s__Pseudomonas_E sp010095445` into
+`--organism Pseudomonas_aeruginosa`, and AMRFinderPlus would then score that
+genome's proteins against P. aeruginosa's curated mutation list. That is worse
+than no call at all, so every mismatch below is handled explicitly.
 
-    The suffix rule is not symmetric, though. When GTDB breaks up a genus, the
-    species that move out keep their epithet, so `s__Enterococcus_B faecium`
-    really is NCBI's Enterococcus faecium and does deserve the flag. Those cases
-    live in GTDB_SPECIES_EQUIVALENCES below - not hand-typed one bug report at a
-    time, but GENERATED from GTDB's own metadata by
-    generate_gtdb_organism_table.py, which applies the exact rule that
-    originally justified the first few entries (see the comment above that
-    dict) uniformly to every GTDB species cluster, for every one of
-    AMRFinderPlus's 31 curated organisms. Likewise GENUS_ORGANISMS /
-    NAME_ONLY_ORGANISMS below are generated, not hand-picked: whether matching an
-    organism from its bare GTDB genus is safe is a question about genome counts,
-    answered once per GTDB release rather than guessed.
+When a GTDB suffix means a different taxon, and when it does not
+----------------------------------------------------------------
+The suffix rule is not symmetric. When GTDB breaks up a genus, the species that
+move out keep their epithet, so `s__Enterococcus_B faecium` really is NCBI's
+Enterococcus faecium and does deserve the flag. Those cases live in
+GTDB_SPECIES_EQUIVALENCES below — not hand-typed one bug report at a time, but
+GENERATED from GTDB's own metadata by generate_gtdb_organism_table.py, which
+applies the exact rule that originally justified the first few entries (see the
+comment above that dict) uniformly to every GTDB species cluster, for every one
+of AMRFinderPlus's 31 curated organisms. Likewise GENUS_ORGANISMS /
+NAME_ONLY_ORGANISMS below are generated, not hand-picked: whether matching an
+organism from its bare GTDB genus is safe is a question about genome counts,
+answered once per GTDB release rather than guessed.
 
-WHERE IT RUNS
-    In the mobilome module's WP-A step, between GTDB-Tk (stage 03.taxonomy) and
-    AMRFinderPlus (stage 05.amr / 08.mobilome). It is pure text handling —
-    standard library only, no AMRFinderPlus call — so it unit-tests without any
-    tool or database present.
+What goes in, what comes out, and where it sits in the workflow
+---------------------------------------------------------------
+Runs in the mobilome module's WP-A step, between GTDB-Tk (stage 03.taxonomy) and
+AMRFinderPlus. Both the caller and AMRFinderPlus itself live in the mobilome
+stage — rules amrfinder_organism and amrfinderplus in shared/80_mobilome.smk,
+writing into 08.mobilome, not into the 05.amr stage where ABRicate and the CARD
+read mapping sit. Pure text handling, standard library only and no AMRFinderPlus
+call, so it unit-tests without any tool or database present.
 
-INPUT (give exactly one of the first two)
-    --gtdbtk-summary  the GTDB-Tk `gtdbtk.*.summary.tsv` written for this sample
-                      (BacFlux writes one directory per sample, so every row in
-                      the file belongs to this isolate). Only two of its columns
-                      are read: `user_genome` and `classification`, the latter
-                      looking like
-                      `d__Bacteria;p__Pseudomonadota;...;g__Pseudomonas_E;s__Pseudomonas_E sp010095445`.
-    --gtdbtk-dir      the GTDB-Tk output DIRECTORY for this sample
-                      (03.taxonomy/{sample}), from which the summary is located
-                      the same way the existing report rule does it: top level
-                      first, then the classify/ subdirectory. Convenient for a
-                      Snakemake rule that takes the whole directory as input.
-    --sample          the BacFlux sample name, used to pick this sample's rows
-                      (hybrid mode classifies both assemblies and writes
-                      `<sample>_illumina` and `<sample>_ont`) and to label the
-                      audit row.
+Give exactly one of the first two:
+  --gtdbtk-summary : the GTDB-Tk gtdbtk.*.summary.tsv written for this sample.
+                     BacFlux runs GTDB-Tk into one directory per sample, so
+                     every row in the file belongs to this isolate. Only two of
+                     its columns are read, user_genome and classification, the
+                     latter looking like
+                     d__Bacteria;p__Pseudomonadota;...;g__Pseudomonas_E;s__Pseudomonas_E sp010095445
+  --gtdbtk-dir     : the GTDB-Tk output DIRECTORY for this sample
+                     (03.taxonomy/{sample}), inside which find_summary_in_dir
+                     locates the summary. Convenient for a Snakemake rule that
+                     takes the whole directory as input, which is what rule
+                     amrfinder_organism does.
+  --sample         : the BacFlux sample name, used to pick this sample's rows
+                     (hybrid mode classifies both assemblies and writes
+                     <sample>_illumina and <sample>_ont) and to label the audit
+                     row.
 
-OUTPUT
-    --out-organism    one line with the AMRFinderPlus organism name on a match,
-                      or a completely EMPTY file on no match. The Snakemake rule
-                      turns it into the flag, e.g.
-                      `org=$(cat {input.organism}); [ -n "$org" ] && set -- --organism "$org"`.
-                      An empty file therefore means "run AMRFinderPlus without
-                      --organism", which is the graceful, silent fallback the
-                      spec asks for.
-    --out-audit       a four-column TSV (sample, gtdb_classification,
-                      matched_organism, reason) recording the decision and why
-                      it was taken — the BacFlux convention that every
-                      filtering/selection decision is auditable, as in
-                      contig_taxonomy_decisions.tsv.
+And it writes two files:
+  --out-organism   : one line holding the AMRFinderPlus organism name on a
+                     match, or a completely EMPTY file on no match. Rule
+                     amrfinderplus reads it, strips the whitespace, and passes
+                     `--organism` (plus `--mutation_all`, which is meaningless
+                     without it) only when something is left — so an
+                     empty file means "run AMRFinderPlus without --organism",
+                     the graceful, silent fallback the spec asks for.
+  --out-audit      : a four-column TSV (sample, gtdb_classification,
+                     matched_organism, reason) recording the decision and why it
+                     was taken — the BacFlux convention that every
+                     filtering/selection decision is auditable, as in
+                     contig_taxonomy_decisions.tsv.
 
-EXIT STATUS
-    0 in every ordinary situation, INCLUDING no match, no row for the sample,
-    an unreadable summary and a missing summary file. Environmental isolates
-    normally have no curated organism (none of the six isolates screened in this
-    project do), so "no match" is the normal path, not an error.
+Why nothing here is ever an error
+---------------------------------
+The exit status is 0 in every ordinary situation, INCLUDING no match, no row for
+the sample, an unreadable summary and a missing summary file. Environmental
+isolates normally have no curated organism (none of the six isolates screened in
+this project do), so "no match" is the normal path, not an error.
 """
 
 import argparse
@@ -89,7 +95,7 @@ import sys
 # ── The 31 curated AMRFinderPlus organisms ───────────────────────────────────
 # Copied verbatim from `amrfinder --list_organisms -d {bakta_db}/amrfinderplus-db/latest`
 # (version 4.2.7, recorded in docs/mobilome_wpA_ground_truth.md §"Spec §12 Q2").
-# This is the ONE hand-verified fact in this whole file - it comes from running
+# This is the ONE hand-verified fact in this whole file — it comes from running
 # the tool, not from GTDB, so no metadata file can tell us this list. Every
 # other set below is DERIVED from it, either by simple string shape (does the
 # name have an underscore?) or by loading a small generated data file.
@@ -129,12 +135,12 @@ ALL_ORGANISMS = frozenset({
 
 # Curated per SPECIES: the genome must be that exact species, not merely that
 # genus. AMRFinderPlus spells these Genus_epithet, underscore-joined, and that
-# shape IS the fact that separates them from the genus-level ones below - a
+# shape IS the fact that separates them from the genus-level ones below — a
 # species-level organism always has an underscore, a genus-level one never does.
 SPECIES_ORGANISMS = frozenset(name for name in ALL_ORGANISMS if "_" in name)
 
 # The three organisms AMRFinderPlus curates at GENUS level (no underscore in the
-# name at all: Campylobacter, Escherichia, Salmonella - always exactly these
+# name at all: Campylobacter, Escherichia, Salmonella — always exactly these
 # three, because that is a fact about AMRFinderPlus's own list, not about any
 # one GTDB release). Whether matching one of them from its BARE GTDB genus is
 # safe is a genome-counting question, answered by the generated genus-rules file
@@ -152,15 +158,18 @@ def _read_generated_tsv(path):
     """Read one of the two generated data files into (header, list-of-dicts).
 
     Input:  a path written by generate_gtdb_organism_table.py: one leading line
-            starting with '#' (provenance - which release, when, from which
+            starting with '#' (provenance — which release, when, from which
             metadata file), then a normal tab-separated header and data rows.
     Output: (header, rows) where rows is a list of {column: value} dicts, in
-            file order. Returns ([], []) for anything that stops us trusting the
-            file - missing, empty, or a header that does not even parse - so a
-            damaged data file degrades to "nothing generated" rather than
-            crashing the whole AMRFinderPlus rule. A missing file is the normal
-            state for a fresh, generated-but-not-yet-committed checkout, not an
-            error worth alarming about.
+            file order.
+
+    Returns ([], []) for anything that stops us trusting the file — missing,
+    empty, or a header that does not even parse. Both files are committed next to
+    this script, so a missing one means the checkout is incomplete rather than
+    fresh; either way the loaders below fall back to their own safe defaults and
+    the AMRFinderPlus rule still runs, with the audit row saying no organism was
+    matched. Losing point mutations is recoverable; killing the run for every
+    sample over a data file is not.
     """
     if not os.path.isfile(path):
         return [], []
@@ -185,7 +194,7 @@ def _load_genus_rules(path, candidates):
 
     Input:  gtdb_organism_genus_rules.tsv (organism, genus_safe, ...), plus the
             fixed 3-member set of organisms this question is even asked about.
-    Output: (genus_organisms, name_only_organisms) - two sets partitioning
+    Output: (genus_organisms, name_only_organisms) — two sets partitioning
             `candidates`. An organism the file does not mention, or a file that
             cannot be read at all, defaults to NAME_ONLY (unsafe): the module's
             whole stance is that a wrong --organism is worse than none, so a
@@ -211,7 +220,7 @@ def _load_species_equivalences(path, valid_organisms):
     Input:  gtdb_organism_equivalences.tsv (gtdb_species, amrfinder_organism,
             ...), plus the full set of legal --organism strings.
     Output: a plain dict. Any row whose organism is NOT one of the 31 legal
-            values is dropped with a warning rather than trusted - AMRFinderPlus
+            values is dropped with a warning rather than trusted — AMRFinderPlus
             exits with an error on an unrecognised --organism, so a stale or
             corrupted generated file must never be allowed to reach the point of
             emitting one. A missing file yields an empty dict: no overrides
@@ -232,15 +241,15 @@ def _load_species_equivalences(path, valid_organisms):
     return equivalences
 
 
-# ── The two generated tables, loaded once at import time ────────────────────
+# ── The two generated tables, loaded once at import time ─────────────────────
 # GENUS_ORGANISMS: safe to match from the bare GTDB genus alone (currently
-#     Escherichia and Salmonella - see gtdb_organism_genus_rules.tsv for the
+#     Escherichia and Salmonella — see gtdb_organism_genus_rules.tsv for the
 #     genome counts behind each verdict).
 # NAME_ONLY_ORGANISMS: legal --organism values that must NEVER be picked from a
 #     genus alone (currently just Campylobacter: its unsuffixed GTDB genus holds
-#     none of the species it is curated for - see GTDB_SPECIES_EQUIVALENCES,
+#     none of the species it is curated for — see GTDB_SPECIES_EQUIVALENCES,
 #     which is how its actual species reach it instead).
-# GTDB_SPECIES_EQUIVALENCES: the per-species override table itself - see the
+# GTDB_SPECIES_EQUIVALENCES: the per-species override table itself — see the
 #     long comment below for what it means and how each entry earns its place.
 GENUS_ORGANISMS, NAME_ONLY_ORGANISMS = _load_genus_rules(
     GENUS_RULES_PATH, _GENUS_LEVEL_CANDIDATE_ORGANISMS)
@@ -263,11 +272,10 @@ AUDIT_HEADER = ["sample", "gtdb_classification", "matched_organism", "reason"]
 # Escherichia coli_D. The suffix means "related to, but NOT the same taxon as"
 # the unsuffixed name, so by default it blocks a match.
 #
-# ONE deliberate exception, and only on the GENUS half of the name: see
-# GTDB_SPECIES_EQUIVALENCES below. When GTDB breaks up a genus that NCBI keeps
-# whole, a species that moves out keeps its own epithet and is still the same
-# species, so a hand-checked list of exact names may override this rule. A suffix
-# on the EPITHET is never overridden - there GTDB split the species itself.
+# The one thing allowed to override it is an exact GTDB species name listed in
+# the generated GTDB_SPECIES_EQUIVALENCES table below, and a suffix on the GENUS
+# earns that override far more readily than one on the EPITHET. Which names, and
+# on what evidence: see the comment above that table.
 GTDB_SUFFIX = re.compile(r"_[A-Z]+$")
 
 # GTDB gives genomes with no validly published species name a placeholder
@@ -282,30 +290,35 @@ GTDB_PLACEHOLDER_SPECIES = re.compile(r"^sp\d*$")
 # cases. When GTDB breaks up a genus that NCBI keeps whole, the species that
 # move out keep their own epithet, so "s__Enterococcus_B faecium" is exactly
 # NCBI's Enterococcus faecium, just filed under a different GTDB genus. GTDB
-# assigns that genus suffix by where the genus TYPE SPECIES landed - E. faecalis
+# assigns that genus suffix by where the genus TYPE SPECIES landed — E. faecalis
 # is the type species of Enterococcus, so it keeps the unsuffixed genus and
 # faecium was pushed into _B. The same mechanism explains Campylobacter: C.
-# fetus is the type species, so C. jejuni and C. coli - the food-chain
-# pathogens AMRFinderPlus actually curates - sit in g__Campylobacter_D, not in
-# the unsuffixed genus at all.
+# fetus is the type species, so C. jejuni and C. coli — the food-chain
+# pathogens AMRFinderPlus actually curates — sit in g__Campylobacter_D, not in
+# the unsuffixed genus at all. That is why Campylobacter is in
+# NAME_ONLY_ORGANISMS: its bare GTDB genus contains none of what it is curated
+# for, and the species reach it through the equivalences table instead.
 #
 # A suffix on the EPITHET means something different and stronger: GTDB itself
 # is saying it cannot safely attach that name here (usually because the type
 # strain was never sequenced), so an epithet suffix is only overridden on
-# overwhelming genome-count evidence, never assumed.
+# overwhelming genome-count evidence, never assumed — Helicobacter pylori_C, for
+# instance: 740 genomes, 99.9% of them NCBI Helicobacter pylori.
 #
-# GTDB_SPECIES_EQUIVALENCES below is therefore NOT a hand-typed list any more.
-# It is GENERATED by generate_gtdb_organism_table.py, which reads a GTDB
-# release's own metadata (every genome's GTDB name AND its NCBI name, side by
-# side) and applies exactly the two rules above - mechanically, to every GTDB
-# species cluster, for all 31 curated organisms - rather than one bug report at
-# a time. See that script's docstring for the full rule and
-# check_gtdb_organism_table.py for how to tell whether the generated table still
-# holds after a GTDB release bump, before spending the time to regenerate it.
+# GTDB_SPECIES_EQUIVALENCES is therefore NOT a hand-typed list. It is GENERATED
+# by generate_gtdb_organism_table.py, which reads a GTDB release's own metadata
+# (every genome's GTDB name AND its NCBI name, side by side) and applies exactly
+# the two rules above — mechanically, to every GTDB species cluster, for all 31
+# curated organisms — rather than one bug report at a time. Each row carries the
+# rule that produced it (unsuffixed_epithet or suffixed_epithet_strong_evidence),
+# the NCBI species it agrees with, and the genome count behind the agreement. See
+# that script's docstring for the full rule, and check_gtdb_organism_table.py for
+# how to tell whether the generated table still holds after a GTDB release bump,
+# before spending the time to regenerate it.
 #
 # The data itself lives in gtdb_organism_equivalences.tsv, next to this script,
 # committed to the repo so BacFlux never needs the multi-hundred-MB GTDB
-# metadata file at runtime - only when regenerating the table.
+# metadata file at runtime — only when regenerating the table.
 GTDB_SPECIES_EQUIVALENCES = _load_species_equivalences(EQUIVALENCES_PATH, ALL_ORGANISMS)
 
 
@@ -315,7 +328,8 @@ def read_gtdbtk_summary(summary_path):
     """Pull the (genome name, classification) pairs out of a GTDB-Tk summary TSV.
 
     Input:  path to `gtdbtk.bac120.summary.tsv` (or the ar53 equivalent) as
-            written by rule gtdbtk into 03.taxonomy/{sample}/.
+            written by rule taxonomic_assignment (shared/30_taxonomy.smk) into
+            03.taxonomy/{sample}/.
     Output: (rows, problem) where rows is a list of (user_genome,
             classification) tuples in file order, and problem is an empty
             string when all was well or a short human-readable message when the
@@ -362,17 +376,20 @@ def read_gtdbtk_summary(summary_path):
 def find_summary_in_dir(gtdbtk_dir):
     """Locate the GTDB-Tk summary inside a per-sample GTDB-Tk output directory.
 
-    Input:  03.taxonomy/{sample} as produced by rule gtdbtk.
+    Input:  03.taxonomy/{sample} as produced by rule taxonomic_assignment
+            (shared/30_taxonomy.smk).
     Output: (summary path, problem) — the path of the summary to read, or an
             empty path plus a message when there is none.
 
     GTDB-Tk writes `gtdbtk.bac120.summary.tsv` (bacteria) and/or
     `gtdbtk.ar53.summary.tsv` (archaea) into classify/, and classify_wf also
-    leaves a symlink to it at the top level. We look at the top level first and
-    then in classify/, which is the same order the existing report rule in the
-    Snakefile uses. BacFlux is a bacterial workflow, so the bac120 file wins
-    when both are present; the ar53 file is still accepted as a fallback so an
-    archaeal isolate does not silently produce nothing at all.
+    leaves a symlink to it at the top level, so both places are worth trying.
+    This looks at the top level first and then in classify/; the MultiQC staging
+    step in shared/90_report.smk does the same search in the OPPOSITE order.
+    Either way it lands on the same summary, since the top-level entry points at
+    the classify/ one. BacFlux is a bacterial workflow, so within a directory the
+    bac120 file is tried first; the ar53 file is still accepted as a fallback so
+    an archaeal isolate does not silently produce nothing at all.
     """
     if not os.path.isdir(gtdbtk_dir):
         return "", "GTDB-Tk output directory not found at %s" % gtdbtk_dir
@@ -439,7 +456,9 @@ def strip_gtdb_suffix(name):
     Output: (base name, had a suffix) e.g. ("Pseudomonas", True), ("Klebsiella", False).
 
     The flag is what matters: a suffixed name is a DIFFERENT taxon from the
-    unsuffixed NCBI one, so it must never be matched to a curated organism.
+    unsuffixed NCBI one, so it blocks the plain species and genus matches in
+    map_classification. The only thing that gets past it is an exact name listed
+    in the generated GTDB_SPECIES_EQUIVALENCES table, which is checked first.
     """
     if not name:
         return "", False
@@ -464,8 +483,11 @@ def map_classification(classification):
             empty string for no match; reason always explains the decision in
             plain words and is written straight into the audit TSV.
 
-    The order of the checks is the whole point of this function, so it is spelt
-    out step by step rather than compressed.
+    The order of the four steps carries the logic and cannot be shuffled. The
+    generated equivalences table is consulted FIRST, because the names in it are
+    exactly the ones the suffix rule in step 2 would otherwise refuse; only then
+    does the plain species match run, then the genus match, and last the "no
+    match" branch, which exists purely to write a reason worth reading later.
     """
     ranks = split_classification(classification)
     genus_field = ranks.get("g", "")
@@ -517,10 +539,15 @@ def map_classification(classification):
             return species_key, "exact species match (GTDB s__%s %s)" % (genus, epithet)
 
     # Step 3 — genus-level match.
-    # Three AMRFinderPlus organisms are curated for a whole genus, so any
-    # species in it qualifies — including unnamed ones, and including Shigella,
-    # which GTDB has already folded into g__Escherichia. A GTDB-suffixed genus
-    # is still excluded: Campylobacter_A is not the curated Campylobacter.
+    # AMRFinderPlus curates three organisms for a whole genus, but only the ones
+    # in GENUS_ORGANISMS reach this branch: the generated genus-rules file counts
+    # how much of each GTDB genus really is that organism, and Campylobacter fails
+    # that count outright (its unsuffixed GTDB genus holds none of the curated
+    # species, which arrive through step 1 instead). For the genera that do pass,
+    # any species qualifies — including unnamed ones, and including Shigella,
+    # which GTDB has already folded into g__Escherichia. A GTDB-suffixed genus is
+    # still excluded here: a lineage GTDB split off is not the curated organism,
+    # whatever the base name says.
     if genus and not genus_is_suffixed and genus in GENUS_ORGANISMS:
         return genus, ("genus-level match (AMRFinderPlus curates '%s' at genus "
                        "level; GTDB g__%s)" % (genus, genus))
@@ -603,7 +630,7 @@ def decide_organism(summary_path, sample):
             distinct_classifications.append(decision[1])
     classification_text = " | ".join(distinct_classifications)
 
-    # The rows disagree about the organism -> refuse to guess.
+    # The rows disagree about the organism — refuse to guess.
     if len(distinct_organisms) > 1:
         per_row = ", ".join("%s=%s" % (d[0], d[2] or "none") for d in decisions)
         return "", classification_text, (
@@ -631,9 +658,11 @@ def write_outputs(out_organism, out_audit, sample, classification, organism, rea
     """Write the organism file consumed by the AMRFinderPlus rule and the audit
     TSV kept for the record.
 
-    The organism file is deliberately EMPTY (zero bytes) when there is no match,
-    so the shell test `[ -n "$(cat ...)" ]` in the rule is all that is needed to
-    decide whether to pass --organism.
+    The organism file is deliberately EMPTY (zero bytes) when there is no match.
+    That is the whole signalling mechanism: rule amrfinderplus reads the file,
+    strips whitespace (a match is written with a trailing newline) and tests
+    whether anything is left, so no exit code, marker word or second file is
+    needed to say "no organism".
 
     In the audit, an empty classification or organism is written as the literal
     "NA" — the same convention AMRFinderPlus itself uses for missing values, and
@@ -701,8 +730,9 @@ def main(argv=None):
     write_outputs(args.out_organism, args.out_audit, args.sample,
                   classification, organism, reason)
 
-    # One line to the Snakemake log so the choice is visible without opening the
-    # audit file.
+    # One line summarising the choice. Rule amrfinder_organism redirects stdout
+    # into logs/mobilome_amrfinder_organism_{sample}.log, so the decision is
+    # visible there without opening the audit TSV.
     if organism:
         sys.stdout.write("%s: AMRFinderPlus --organism %s (%s)\n"
                          % (args.sample, organism, reason))

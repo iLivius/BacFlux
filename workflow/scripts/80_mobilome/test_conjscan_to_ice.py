@@ -1,17 +1,29 @@
-"""Unit tests for workflow/scripts/mobilome/conjscan_to_ice.py.
+"""Unit tests for workflow/scripts/80_mobilome/conjscan_to_ice.py.
+
+conjscan_to_ice answers the question no plasmid caller can: an ICE sits in the
+chromosome and still carries its own conjugation machinery, so a resistance gene
+inside one is chromosomal AND predicted transferable. That is the strongest claim
+the module makes — mobility tier 6 — and most of what follows is about refusing
+to make it on thin evidence.
 
 No tools, no databases, no MacSyFinder run: every test builds a small
 CONJscan-shaped best_solution.tsv and a small Bakta-shaped GFF3 by hand and
-pushes them through the script, so the whole anchor -> cluster -> classify chain
-is verifiable in a plain Python environment.
+pushes them through the script, so the whole anchors → clusters → classification
+chain is verifiable in a plain Python environment.
 
 The fixtures follow the real contracts:
-  * CONJscan/MacSyFinder 2.1.6 best_solution.tsv - three '#' banner lines, then
+  * CONJscan/MacSyFinder 2.1.6 best_solution.tsv — three '#' banner lines, then
     the verbatim 22-column header, then one row per machinery gene, with blank
     lines between systems;
-  * Bakta 1.12.0 GFF3 - '##sequence-region' headers, Pyrodigal CDS rows carrying
+  * Bakta 1.12.0 GFF3 — '##sequence-region' headers, Pyrodigal CDS rows carrying
     ID= and locus_tag= with the same value, percent-encoded product text, and a
     '##FASTA' section at the end.
+
+Most tests pass NO genome FASTA, because they are about classification rather
+than boundaries. Without sequence the att search cannot run, so those elements
+come back with boundary_method='none' and the machinery span as their interval —
+that is the expected result there, not a gap. The tests that ARE about Phase 3
+plant a repeat pair in a synthetic contig and hand it over with --genome.
 
 Two tests go further and use the REAL output of sample 386 (an Arthrobacter
 isolate): the saved fixture testdata/conjscan_386_real_best_solution.tsv, and
@@ -22,7 +34,7 @@ There is also a contract test that feeds this script's output table straight int
 colocalise.py's own parser, which is what consumes it in the workflow.
 
 Run:
-    python -m pytest workflow/scripts/mobilome/test_conjscan_to_ice.py -q
+    python -m pytest workflow/scripts/80_mobilome/test_conjscan_to_ice.py -q
 """
 
 import csv
@@ -124,7 +136,7 @@ def gff_trna(contig, start, end, strand="+", name="tRNA-Gly(gcc)"):
     """Build one Bakta-shaped tRNA line.
 
     Needed because only a tRNA-ANCHORED att pair is allowed to widen an element
-    (a de novo repeat is reported but not applied - see
+    (a de novo repeat is reported but not applied — see
     refine_candidate_boundaries), so any fixture that tests widening has to plant
     a real tRNA for the probe to come from.
     """
@@ -194,14 +206,15 @@ def run_main(tmp_path, conjscan=None, gff=None, contig_lengths=None, extra=None,
 
 
 def audit_reasons(audit_rows):
-    """The set of reason tokens present in an audit file - what most tests assert on."""
+    """The set of reason tokens present in an audit file — what most tests assert
+    on, usually as a subset check so an extra unrelated reason does not fail."""
     return {row["reason"] for row in audit_rows}
 
 
 # A standard scene used by most end-to-end tests: one 200 kb contig carrying an
 # integrase, a relaxase, a coupling protein and a VirB4, spaced a few kb apart so
 # they all fall inside the default 15 kb clustering window. The machinery genes
-# alone (relaxase 55000 -> VirB4 65500) already span more than the default 8 kb
+# alone (relaxase 55000 → VirB4 65500) already span more than the default 8 kb
 # minimum, so the tests that remove the integrase still produce a candidate
 # rather than being dropped for length.
 SCENE_CONTIGS = {"contig_1": 200000}
@@ -245,7 +258,7 @@ def test_real_conjscan_fixture_parses():
 
 def test_real_fixture_classifies_the_two_relaxases_and_two_coupling_proteins():
     """The two relaxase families are relaxases, the two t4cp2 hits are coupling
-    proteins - and NOT mating-pair components, which is what keeps sample 386 at
+    proteins — and NOT mating-pair components, which is what keeps sample 386 at
     'mobilisable' rather than 'self-transmissible'."""
     hits = ci.read_conjscan_hits(REAL_CONJSCAN_FIXTURE)
     classes = [ci.anchor_class_for_gene_name(hit["gene_name"]) for hit in hits]
@@ -290,7 +303,7 @@ def test_real_sample_386_end_to_end():
 
       * contig_1 carries a phage integrase, a coupling protein and a MOBF
         relaxase within the clustering window, and NO mating-pair apparatus, so
-        it is an IME - mobilisable with a helper, not self-transmissible;
+        it is an IME — mobilisable with a helper, not self-transmissible;
       * sys_wholeness is 0.667, so the machinery is flagged incomplete and the
         mobility sentence says so;
       * contig_2's relaxase + coupling protein span only 6765 bp, below the 8 kb
@@ -333,8 +346,9 @@ def test_real_sample_386_end_to_end():
     assert element["spans_contigs"] == "FALSE"
     assert element["at_contig_boundary"] == "FALSE"
     assert element["confidence"] == "medium"
-    # Phase 3 is not implemented, and the table says so rather than implying the
-    # interval is a resolved element boundary.
+    # No genome FASTA was passed, so the att search never ran — Phase 3 needs
+    # sequence. The table says so rather than implying the machinery span is a
+    # resolved element boundary.
     assert element["boundary_method"] == "none"
     assert element["attL"] == "NA" and element["attR"] == "NA"
 
@@ -381,7 +395,7 @@ def test_classification_fallbacks_for_combinations_the_spec_omits():
 # ── End to end: one case per class ───────────────────────────────────────────
 
 def test_ice_needs_all_three_anchor_classes(tmp_path):
-    """Integrase + relaxase + mating-pair component on one contig -> ICE, high.
+    """Integrase + relaxase + mating-pair component on one contig → ICE, high.
 
     This is the case the whole module exists for: the element is on the
     CHROMOSOME and is still predicted to move itself.
@@ -411,23 +425,29 @@ def test_ice_needs_all_three_anchor_classes(tmp_path):
     assert element["machinery_intact"] == "TRUE"
     # High: every anchor class present, machinery intact, one contig. No genome was
     # given so the element's ENDS are unknown, but by default that is reported in
-    # boundary_method rather than folded into the confidence - the two answer
+    # boundary_method rather than folded into the confidence — the two answer
     # different questions. See test_strict_mode_requires_a_trna_boundary_for_high.
     assert element["confidence"] == "high"
     assert element["mge_id"] == "contig_1|ice-50000:65500"
     assert element["length_bp"] == "15501"
     assert element["integrase_products"] == "Phage integrase family protein"
     assert "S1_00010(integrase)" in element["anchor_ids"]
-    # Nothing dropped. Two audit lines, both consequences of the same thing:
-    # these unit tests deliberately pass no genome FASTA, so Phase 3 could not
-    # look for the element's real ends (the att search needs sequence, and the
-    # real rule always supplies it), and the confidence is therefore settled at
-    # medium once that is known.
-    # 'integrase_attached_beyond_cluster_window' is expected: the integrase in
-    # this fixture sits outside the machinery clustering window and is attached by
-    # the wider integrase search, which is the whole point of that step.
-    # 'assembly_contiguity' is expected on EVERY sample: one row per run recording
-    # the contig count and N50 the calls came off.
+    # Nothing was dropped. Three reasons may appear, and none of them is a
+    # rejection:
+    #   assembly_contiguity   one row per run on EVERY sample, recording the
+    #                         contig count and N50 the calls came off;
+    #   no_genome_for_att_search
+    #                         these unit tests deliberately pass no genome FASTA,
+    #                         so Phase 3 could not look for the element's real
+    #                         ends (the real rule always supplies one). By
+    #                         default that is reported in boundary_method and
+    #                         does NOT lower the confidence — see
+    #                         test_strict_mode_requires_a_trna_boundary_for_high;
+    #   integrase_attached_beyond_cluster_window
+    #                         the integrase in this fixture sits outside the
+    #                         machinery clustering window and is attached by the
+    #                         wider integrase search, which is the point of that
+    #                         step.
     assert audit_reasons(audit) <= {
         "assembly_contiguity",
         "no_genome_for_att_search",
@@ -436,7 +456,7 @@ def test_ice_needs_all_three_anchor_classes(tmp_path):
 
 
 def test_ime_is_integrase_plus_relaxase_without_mating_pair(tmp_path):
-    """Integrase + relaxase + coupling protein, no MPF -> IME, mobilisable.
+    """Integrase + relaxase + coupling protein, no MPF → IME, mobilisable.
 
     The coupling protein must NOT be read as a T4SS: if it were, this would be
     wrongly promoted to a self-transmissible ICE.
@@ -467,15 +487,15 @@ def test_ime_is_integrase_plus_relaxase_without_mating_pair(tmp_path):
 def test_accessory_virb4_in_a_mob_system_does_not_make_an_ice(tmp_path):
     """A lone VirB4 inside a relaxase-only MOB system is not a mating bridge.
 
-    CONJscan's `MOB` model describes a relaxase-only system - DNA that another
-    element's machinery can pick up - and it lists VirB4 as an ACCESSORY gene.
+    CONJscan's `MOB` model describes a relaxase-only system — DNA that another
+    element's machinery can pick up — and it lists VirB4 as an ACCESSORY gene.
     So a MOB system can quite legitimately contain one VirB4 hit while the cell
     has no mating-pair apparatus at all.
 
     Counting that hit as an MPF would raise this element from tier 5 (mobilisable,
     needs a helper) to tier 6 (predicted self-transmissible) on the strength of a
     single accessory gene, which is the worst overcall this module could make.
-    The hit is not hidden - it is still reported in has_t4ss - but the class must
+    The hit is not hidden — it is still reported in has_t4ss — but the class must
     come from the SYSTEM's own type, and the audit file must say so.
     """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
@@ -496,7 +516,7 @@ def test_accessory_virb4_in_a_mob_system_does_not_make_an_ice(tmp_path):
     assert len(rows) == 1
     element = rows[0]
     assert element["mge_class"] == "ime"
-    assert element["element_type"] == "ime"           # colocalise.py -> tier 5, not 6
+    assert element["element_type"] == "ime"           # colocalise.py → tier 5, not 6
     assert element["mobility"] == "mobilisable (needs a helper)"
     assert "self-transmissible" not in element["mobility"]
     # The marker is reported, not suppressed; it simply does not carry the call.
@@ -536,7 +556,7 @@ def test_integrase_only_cluster_is_dropped_not_reported(tmp_path):
     Every genome carries several site-specific recombinases. Phase 2 keeps only
     clusters with a relaxase or a mating-pair component, so the integrase on
     contig_2 here is dropped with a stated reason instead of being reported as a
-    passive island - which would put a meaningless row in the table for every
+    passive island — which would put a meaningless row in the table for every
     recombinase in the genome. The classifier's island branch is still exercised
     directly in test_classification_table_matches_the_spec.
     """
@@ -569,7 +589,7 @@ def test_integrase_only_cluster_is_dropped_not_reported(tmp_path):
 
 
 def test_machinery_without_an_integrase_is_not_called_an_ice(tmp_path):
-    """Relaxase + mating-pair component, no integrase -> conjugative region.
+    """Relaxase + mating-pair component, no integrase → conjugative region.
 
     The spec is explicit: report it, do not call it an ICE. Nothing here says
     the machinery sits in a discrete element with boundaries, so the row must not
@@ -600,7 +620,7 @@ def test_machinery_without_an_integrase_is_not_called_an_ice(tmp_path):
     assert "predicted self-transmissible" not in element["mobility"]
 
     # And the downstream consumer must not treat it as an ICE either. It DOES
-    # recognise the type now - being unrecognised used to mean the element was
+    # recognise the type now — being unrecognised used to mean the element was
     # dropped from every test in colocalise, so an AMR gene sitting inside a
     # predicted conjugative region came out as "intrinsic candidate" at high
     # confidence. Recognised, but never tier-raising, is the correct handling.
@@ -614,7 +634,7 @@ def test_transposase_with_an_integrase_domain_is_not_an_integrase_anchor(tmp_pat
 
     Counting one as an integrase would promote a plain insertion sequence next to
     a relaxase into an ICE, so a product that also says 'transposase' is
-    excluded - and the exclusion is written to the audit file, never silent.
+    excluded — and the exclusion is written to the audit file, never silent.
     """
     cds = [
         gff_cds("contig_1", 50000, 51200, "+", "S1_00010",
@@ -715,8 +735,8 @@ def test_hit_is_virb4_knows_the_exchangeable_name_but_not_the_f_type_traU():
 
     Every CONJscan model lists `T4SS_I_traU` as an exchangeable profile for
     `T4SS_virb4`, so a VirB4 hit can be reported under either name. `T4SS_F_traU`
-    is a different gene entirely - an F-type mating-pair component in its own
-    right - and must not be mistaken for the ATPase.
+    is a different gene entirely — an F-type mating-pair component in its own
+    right — and must not be mistaken for the ATPase.
     """
     assert ci.hit_is_virb4({"gene_name": "T4SS_virb4", "hit_gene_ref": "T4SS_virb4"})
     # Found through the exchangeable profile; the model's own gene is alongside it.
@@ -750,8 +770,8 @@ def test_truncated_virb4_under_its_exchangeable_name_is_still_flagged(tmp_path):
     VirB4 is one of the two components the truncation check tests (the other is
     the relaxase), because both have to WORK for transfer to happen. Here the
     ATPase of a type I system was found through its exchangeable `T4SS_I_traU`
-    profile and aligns over only 30% of the HMM. The class is still ICE - a typed
-    T4SS system was called - but the machinery must be reported as degraded, in
+    profile and aligns over only 30% of the HMM. The class is still ICE — a typed
+    T4SS system was called — but the machinery must be reported as degraded, in
     the mobility sentence itself, not quietly as intact.
     """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
@@ -784,14 +804,14 @@ def test_a_lone_relaxase_of_a_typed_system_does_not_make_an_ice(tmp_path):
     MacSyFinder LONER genes may sit anywhere on the replicon, so a relaxase
     declared a loner of a typed T4SS model carries that model's type letter with
     it. Asking only "is the contributing system typed?" therefore let a cluster
-    holding exactly ONE integrase and ONE relaxase - has_t4cp FALSE, has_t4ss
-    FALSE, the textbook IME signature - be reported as `ice`, "predicted
+    holding exactly ONE integrase and ONE relaxase — has_t4cp FALSE, has_t4ss
+    FALSE, the textbook IME signature — be reported as `ice`, "predicted
     self-transmissible".
 
     That is the worst overcall this script can make: tier 6 is the answer a
     regulator reads. It happened on NC_013929 in the Phase 7 benchmark, where the
-    row contradicted itself - missing_components said "coupling protein,
-    mating-pair apparatus" beside the tier-6 claim - and the caller's own audit
+    row contradicted itself — missing_components said "coupling protein,
+    mating-pair apparatus" beside the tier-6 claim — and the caller's own audit
     had already refused to merge in the real apparatus, 1.2 Mb away.
 
     The apparatus must be HERE, not merely somewhere on the replicon.
@@ -801,7 +821,7 @@ def test_a_lone_relaxase_of_a_typed_system_does_not_make_an_ice(tmp_path):
         gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "Phage integrase family protein"),
         gff_cds("contig_1", 55000, 56600, "+", "S1_00015", "TrwC relaxase domain-containing protein"),
     ]
-    # The relaxase is the only hit, and it is attributed to a TYPED model - the
+    # The relaxase is the only hit, and it is attributed to a TYPED model — the
     # loner case. No mating-pair gene is in the cluster.
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id="S1_00015", gene_name="T4SS_MOBF",
@@ -815,7 +835,7 @@ def test_a_lone_relaxase_of_a_typed_system_does_not_make_an_ice(tmp_path):
     assert len(rows) == 1
     row = rows[0]
     assert row["has_t4ss"] == "FALSE"
-    # The type letter is still REPORTED - we do not hide what CONJscan said...
+    # The type letter is still REPORTED — we do not hide what CONJscan said...
     assert row["mpf_typed_system"] == "TRUE"
     # ...but it no longer buys a self-transmissibility claim.
     assert row["mge_class"] == "ime"
@@ -880,13 +900,13 @@ def test_ime_architecture_cluster_survives_the_lower_floor(tmp_path):
 
     Measured on the Phase 7 IME pilot: the size floor is applied to the anchor
     cluster's SPAN, and that span scales with the NUMBER of machinery genes. An
-    IME carries a relaxase and an integrase - two genes, 1-6 kb - where an ICE
+    IME carries a relaxase and an integrase — two genes, 1–6 kb — where an ICE
     carries a twenty-gene operon. An 8,000 bp floor therefore selected for ICEs
     by construction: six of the twelve curated IMEs were clustered and
     classified correctly, then dropped for size, Tn4451 at a span of 1,266 bp.
 
     This is the same scene as the test above with the mating-pair gene swapped
-    for a relaxase - which is precisely the difference between the two classes.
+    for a relaxase — which is precisely the difference between the two classes.
     """
     contigs = {"contig_1": 200000}
     cds = [
@@ -970,7 +990,7 @@ def test_system_spanning_two_contigs_is_capped_at_low_confidence(tmp_path):
 
     So it can join genes on either side of a contig break into one 'system' that
     does not exist. Anything spanning contigs is capped at LOW regardless of how
-    good the rest of the evidence looks - the spec's rule, applied without
+    good the rest of the evidence looks — the spec's rule, applied without
     exception.
     """
     contigs = {"contig_1": 200000, "contig_2": 200000}
@@ -979,7 +999,7 @@ def test_system_spanning_two_contigs_is_capped_at_low_confidence(tmp_path):
         gff_cds("contig_2", 85000, 86600, "+", "S1_00610", "TrwC relaxase domain-containing protein"),
         gff_cds("contig_2", 90000, 92000, "+", "S1_00620", "conjugal transfer protein TraB"),
     ]
-    # One sys_id, hits on BOTH contigs - exactly the artefact described above.
+    # One sys_id, hits on BOTH contigs — exactly the artefact described above.
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
                      model_fqn="CONJScan/Chromosome/T4SS_typeF"),
@@ -1030,7 +1050,7 @@ def test_element_at_a_contig_end_is_flagged_and_capped(tmp_path):
 
 
 def test_unknown_contig_length_caps_confidence_at_medium(tmp_path):
-    """No length, no boundary check - and we say so instead of assuming safety."""
+    """No length, no boundary check — and we say so instead of assuming safety."""
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
                      model_fqn="CONJScan/Chromosome/T4SS_typeF"),
@@ -1080,7 +1100,7 @@ def test_missing_conjscan_file_writes_an_empty_table_and_exits_zero(tmp_path):
     """CONJscan is opt-in and most isolates have no conjugative system.
 
     A missing file must produce a complete, empty table plus an audit line
-    explaining that the ICE check was not made - 'not looked at' is a different
+    explaining that the ICE check was not made — 'not looked at' is a different
     statement from 'looked at and found nothing'.
     """
     gff = write_gff(tmp_path / "S1.gff3", SCENE_CONTIGS, SCENE_CDS)
@@ -1147,7 +1167,7 @@ def test_comment_only_conjscan_file(tmp_path):
 
 def test_missing_bakta_gff_writes_an_empty_table_and_exits_zero(tmp_path):
     """Without the annotation a protein hit has no coordinates, so nothing can be
-    clustered - but the rule still produces readable files and exits 0."""
+    clustered — but the rule still produces readable files and exits 0."""
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
     ])
@@ -1248,7 +1268,7 @@ def test_output_is_readable_by_colocalise(tmp_path):
     assert element["contig"] == "contig_1"
     assert element["start"] == 50000
     assert element["end"] == 65500
-    assert element["element_type"] == "ice"            # -> mobility tier 6
+    assert element["element_type"] == "ice"            # → mobility tier 6
     assert element["id"] == "contig_1|ice-50000:65500"
 
 
@@ -1332,7 +1352,7 @@ def test_profile_hits_recover_an_element_when_no_system_was_assembled(tmp_path):
 
     The case this comes from is ICEVflInd1 on the Phase 7 benchmark: a genuine
     114 kb SXT/R391-family ICE where CONJscan hit twelve mating-pair profiles, a
-    coupling protein and VirB4 - but no relaxase. Every conjugative model
+    coupling protein and VirB4 — but no relaxase. Every conjugative model
     requires a relaxase, so no system was assembled and the module reported
     nothing whatsoever. A real element vanished on one missing component.
 
@@ -1389,7 +1409,7 @@ def test_profile_hit_confidence_cap_survives_the_boundary_pass(tmp_path):
     )
     assert len(rows) == 1
     # All four anchor classes are present here, so without the cap this would be
-    # a 'high' call - which is precisely the misleading output being prevented.
+    # a 'high' call — which is precisely the misleading output being prevented.
     assert rows[0]["n_anchor_classes"] == "4"
     assert rows[0]["evidence_level"] == "profile_hits_only"
     assert rows[0]["confidence"] == "low"
@@ -1416,10 +1436,10 @@ def test_assembled_system_is_not_labelled_as_profile_hits(tmp_path):
 def test_an_icescan_integrase_cannot_upgrade_profile_hits_to_a_system(tmp_path):
     """An attached integrase must not answer "was a conjugation system assembled?".
 
-    THE BUG THIS PINS. The profile-hit fallback exists for machinery MacSyFinder
+    The bug this pins. The profile-hit fallback exists for machinery MacSyFinder
     saw but never assembled into a system, and every such row is capped at low
     confidence and labelled evidence_level=profile_hits_only. That judgement used
-    to be made by asking whether ANY anchor in the cluster carried a system id -
+    to be made by asking whether ANY anchor in the cluster carried a system id —
     and an ICEscan integrase carries one, because ICEscan (unlike CONJScan) does
     have integrase models.
 
@@ -1432,7 +1452,7 @@ def test_an_icescan_integrase_cannot_upgrade_profile_hits_to_a_system(tmp_path):
     The scene below is exactly that: CONJscan found no system, its three
     machinery profiles are recovered from hmmer_results/, and ICEscan supplies a
     Phage_integrase on the same CDS the Bakta product text already calls an
-    integrase - which is how the ICEscan system id ends up on the surviving
+    integrase — which is how the ICEscan system id ends up on the surviving
     anchor (see the corroboration step in main()).
     """
     conjscan = tmp_path / "best_solution.tsv"
@@ -1456,7 +1476,7 @@ def test_an_icescan_integrase_cannot_upgrade_profile_hits_to_a_system(tmp_path):
     assert len(rows) == 1
     row = rows[0]
     # The integrase is real evidence and still counts towards the class and the
-    # anchor classes - it is only the "was a SYSTEM assembled?" question it may
+    # anchor classes — it is only the "was a SYSTEM assembled?" question it may
     # not answer.
     assert row["has_integrase"] == "TRUE"
     assert row["n_anchor_classes"] == "4"
@@ -1469,7 +1489,7 @@ def test_an_icescan_integrase_cannot_upgrade_profile_hits_to_a_system(tmp_path):
 
 
 def test_an_icescan_relaxase_system_still_counts_as_an_assembled_system(tmp_path):
-    """The fix above narrows the question to machinery - not to CONJscan.
+    """The fix above narrows the question to machinery — not to CONJscan.
 
     ICEscan's Gram-positive and IME relaxase families are the reason it is
     unioned in at all, and a relaxase belonging to a real assembled ICEscan
@@ -1499,8 +1519,8 @@ def test_window_does_not_split_one_conjscan_system(tmp_path):
     This is the Phase 7 benchmark's clearest finding. Distance clustering used to
     be the only thing deciding what belonged together, so a system whose genes
     were spread slightly wider than the window came out as several "elements".
-    On R391 the two halves were 15,010 bp apart against a 15,000 bp window - a
-    ten base pair margin - and the reported element lost a third of its length.
+    On R391 the two halves were 15,010 bp apart against a 15,000 bp window — a
+    ten base pair margin — and the reported element lost a third of its length.
 
     MacSyFinder has already decided these hits form one system, using gene-count
     co-localisation rules rather than base pairs. That decision now wins:
@@ -1525,7 +1545,7 @@ def test_window_does_not_split_one_conjscan_system(tmp_path):
     )
     assert len(rows) == 1
     row = rows[0]
-    # One element with the complete machinery, spanning relaxase to VirB4 - not
+    # One element with the complete machinery, spanning relaxase to VirB4 — not
     # two fragments, one of which would have been a spurious passive island.
     assert row["mge_class"] == "ice"
     assert row["has_relaxase"] == "TRUE"
@@ -1534,7 +1554,7 @@ def test_window_does_not_split_one_conjscan_system(tmp_path):
     assert row["has_integrase"] == "TRUE"
     # 50000 rather than the relaxase's 55000: the attached integrase at
     # 50000-51200 is part of the element, and the span runs from the first anchor
-    # to the last. 65500 is VirB4's end - the half that used to be cut off.
+    # to the last. 65500 is VirB4's end — the half that used to be cut off.
     assert int(row["machinery_start"]) == 50000
     assert int(row["machinery_end"]) == 65500
 
@@ -1549,7 +1569,7 @@ def test_system_merge_refused_when_it_would_exceed_max_element(tmp_path):
     Caught on the Phase 7 benchmark: on the 10.1 Mb Streptomyces scabiei
     chromosome MacSyFinder assigned hits 2.19 Mb apart to one system. Merging
     them honestly produced a 2,185,966 bp span, which then exceeded
-    --max-element-bp and was dropped altogether - so a partial detection became
+    --max-element-bp and was dropped altogether — so a partial detection became
     a total miss. Refusing the merge keeps the pieces, which is strictly better.
     """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
@@ -1616,17 +1636,17 @@ def test_window_still_separates_distinct_systems(tmp_path):
 def test_a_loner_hit_does_not_merge_two_distant_clusters(tmp_path):
     """A MacSyFinder LONER must not join two blocks of machinery into one element.
 
-    THE CASE THIS COMES FROM. CP011419.1 (Streptococcus suis, IME pilot). A MOBT
+    The case this comes from. CP011419.1 (Streptococcus suis, IME pilot). A MOBT
     relaxase at gene 102 is a loner of system MOB_3, whose only other member is a
     coupling protein 175 genes away at gene 277. The merge rule keyed on the
-    system id alone, so those two anchors became one 179,889 bp "IME" - sixteen
-    times the curated element - and the genuine 4,959 bp IME inside it was then
+    system id alone, so those two anchors became one 179,889 bp "IME" — sixteen
+    times the curated element — and the genuine 4,959 bp IME inside it was then
     reported a second time.
 
-    WHY THE SYSTEM ID IS NOT ENOUGH HERE. Merging on a shared system id is
+    Why the system id is not enough here. Merging on a shared system id is
     justified because MacSyFinder has already applied its own co-localisation
     test, counted in genes. A LONER is precisely the gene it exempted from that
-    test - the model lets it join from anywhere on the replicon - and MacSyFinder
+    test — the model lets it join from anywhere on the replicon — and MacSyFinder
     says so by writing a NEGATIVE locus_num. So on a loner the system id carries
     no statement about proximity at all.
 
@@ -1667,8 +1687,8 @@ def test_a_loner_hit_does_not_merge_two_distant_clusters(tmp_path):
 def test_locus_members_of_one_system_are_still_merged(tmp_path):
     """The loner rule must not undo the fix it sits next to.
 
-    Same geometry as the test above - two machinery blocks farther apart than the
-    clustering window, one shared system id - but here BOTH sides are genes
+    Same geometry as the test above — two machinery blocks farther apart than the
+    clustering window, one shared system id — but here BOTH sides are genes
     MacSyFinder placed in a real locus (positive locus_num). That is the R391
     case the merge exists for, and it must still produce one element.
     """
@@ -1697,8 +1717,8 @@ def test_locus_members_of_one_system_are_still_merged(tmp_path):
 def test_an_absent_locus_num_column_still_merges(tmp_path):
     """An older MacSyFinder table without locus_num behaves as it did before.
 
-    The loner rule reads a column we did not use until now. If a future - or
-    past - version of the tool does not write it, nothing is assumed about the
+    The loner rule reads a column we did not use until now. If a future — or
+    past — version of the tool does not write it, nothing is assumed about the
     hits and the merge goes ahead, rather than the module silently stopping to
     merge anything.
     """
@@ -1744,7 +1764,7 @@ def test_gff_parsing_reads_coordinates_products_and_lengths(tmp_path):
 
 
 def test_summary_line_names_each_class(tmp_path, capsys):
-    """The stdout line has to distinguish an ICE from a passive island - '2
+    """The stdout line has to distinguish an ICE from a passive island — '2
     elements found' would be a misleading thing to read in a log."""
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF",
@@ -1765,9 +1785,14 @@ def test_summary_line_names_each_class(tmp_path, capsys):
     assert "confidence high 1" in printed
 
 
-# ---------------------------------------------------------------------------
-# Phase 3: att-site boundaries, and the biology that gates them.
-# ---------------------------------------------------------------------------
+# ── Phase 3: att-site boundaries, and the biology that gates them ────────────
+#
+# The search only runs for an element that has an integrase, because an att pair
+# is the scar that integrase leaves — no integrase, no scar to find. And only a
+# tRNA-anchored pair is applied to the coordinates: ~16% of arbitrary chromosomal
+# spans carry a de novo repeat by chance, so widening an element onto one would
+# turn unrelated chromosomal genes into cargo of something reported as predicted
+# self-transmissible.
 
 
 def test_att_search_is_skipped_when_there_is_no_integrase(tmp_path):
@@ -1776,8 +1801,8 @@ def test_att_search_is_skipped_when_there_is_no_integrase(tmp_path):
 
     This is the real failure seen on the K. pneumoniae positive control: without
     this gate the search "resolved"
-    boundaries for two conjugative_region calls that had no integrase at all -
-    one of them on a plasmid, which does not integrate - while the one genuinely
+    boundaries for two conjugative_region calls that had no integrase at all —
+    one of them on a plasmid, which does not integrate — while the one genuinely
     integrative element got nothing. Any repeat found in that situation is
     something else (an IS end, a duplication, noise), and widening the element to
     it would manufacture a boundary that does not exist.
@@ -1791,7 +1816,7 @@ def test_att_search_is_skipped_when_there_is_no_integrase(tmp_path):
     # from the GFF3, not from CONJscan, so it has to be left OUT of the
     # annotation entirely for this element to have none.
     gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS, SCENE_CDS[1:])
-    # A genome carrying a perfectly good direct repeat bracketing the machinery -
+    # A genome carrying a perfectly good direct repeat bracketing the machinery —
     # which must still NOT be reported, because there is no integrase.
     genome = tmp_path / "genome.fna"
     motif = "GGCTCGAACCCAGGACCTCTTGCAT"
@@ -1815,13 +1840,13 @@ def test_att_search_is_skipped_when_there_is_no_integrase(tmp_path):
 
 def test_att_search_widens_an_integrative_element_to_its_real_ends(tmp_path):
     """With an integrase present and a tRNA-anchored att pair bracketing the
-    machinery, the element is widened to it - because the cargo between attL and
+    machinery, the element is widened to it — because the cargo between attL and
     attR is what actually travels when the element moves."""
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
         conjscan_row(hit_id=T4CP_HIT, gene_name="T4SS_t4cp2"),
     ])
-    # The tRNA ends at 40024, so its last 25 bp are 40000..40024 - which is where
+    # The tRNA ends at 40024, so its last 25 bp are 40000..40024 — which is where
     # the left att copy is planted. Integration reconstitutes the host tRNA at one
     # end, so exactly one copy lies inside a tRNA and the other does not.
     gff = write_gff(tmp_path / "sample.gff3", SCENE_CONTIGS,
@@ -1846,7 +1871,7 @@ def test_att_search_widens_an_integrative_element_to_its_real_ends(tmp_path):
     assert element["boundary_method"] == "tRNA"
     assert element["attL"] == "40000..40024"
     assert element["attR"] == "70000..70024"
-    # start/end are now the ELEMENT, not the machinery - and the machinery span
+    # start/end are now the ELEMENT, not the machinery — and the machinery span
     # is preserved rather than overwritten.
     assert element["start"] == "40000"
     assert element["end"] == "70024"
@@ -1862,7 +1887,7 @@ def test_a_denovo_repeat_is_reported_but_never_moves_the_element(tmp_path):
     Same fixture as above but with NO tRNA, so the bracketing repeat can only be
     found de novo. On a real chromosome ~16% of arbitrary spans yield such a
     repeat by chance, so it is reported for a human to follow up and the element
-    interval stays the machinery span - otherwise every gene in the invented
+    interval stays the machinery span — otherwise every gene in the invented
     interval would be called cargo of a self-transmissible element.
     """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
@@ -1928,8 +1953,9 @@ def test_widening_recomputes_the_contig_distance_flags_and_confidence(tmp_path):
     feeds assess_confidence, so a widened element running off the end of its
     contig would keep a high confidence it no longer deserves.
 
-    Here the element widens to within 200 bp of the contig end, well inside the
-    default boundary window, so the flag must flip and the confidence must drop.
+    Here the element widens to 100 bp from the contig end, well inside the
+    1000 bp default boundary window, so the flag must flip and the confidence
+    must drop.
     """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id=RELAXASE_HIT, gene_name="T4SS_MOBF"),
@@ -1988,13 +2014,13 @@ def test_widening_that_stays_clear_of_the_contig_ends_keeps_its_confidence(tmp_p
     assert "confidence_settled_after_boundary_search" not in audit_reasons(audit)
 
 
-# ── The strict spec §8 Phase 6 rule, as an opt-in ───────────────────────────
+# ── The strict spec §8 Phase 6 rule, as an opt-in ────────────────────────────
 
 def test_strict_mode_requires_a_trna_boundary_for_high(tmp_path):
     """--require-trna-boundary-for-high applies the spec's literal Phase 6 rule.
 
-    Same evidence as test_ice_needs_all_three_anchor_classes - all four anchor
-    classes, intact machinery, one contig - but no genome, so the element's ends
+    Same evidence as test_ice_needs_all_three_anchor_classes — all four anchor
+    classes, intact machinery, one contig — but no genome, so the element's ends
     were never resolved. By default that is reported in boundary_method and the
     call stays high; in strict mode it caps the call at medium.
 
@@ -2022,7 +2048,7 @@ def test_strict_mode_requires_a_trna_boundary_for_high(tmp_path):
                if row["reason"] == "confidence_settled_after_boundary_search"]
     assert settled, "the strict downgrade must be audited"
     assert "no att pair was found" in settled[0]["detail"]
-    # The element itself is identical either way - only the label changed.
+    # The element itself is identical either way — only the label changed.
     assert strict_rows[0]["start"] == lenient_rows[0]["start"]
     assert strict_rows[0]["end"] == lenient_rows[0]["end"]
 
@@ -2060,7 +2086,7 @@ def test_an_unknown_contig_length_is_not_read_as_not_at_the_boundary(tmp_path):
     finalise_confidence re-reads at_contig_boundary from the row it wrote
     earlier. Reading that cell with a plain TRUE/not-TRUE test collapses NA
     ("no contig length was known, so we could not check") into FALSE ("we
-    checked and the element is clear of the ends") - an unknown quietly becoming
+    checked and the element is clear of the ends") — an unknown quietly becoming
     a positive claim, which is the one direction this module must not drift in.
     """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
@@ -2069,7 +2095,7 @@ def test_an_unknown_contig_length_is_not_read_as_not_at_the_boundary(tmp_path):
         conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
                      model_fqn="CONJScan/Chromosome/T4SS_typeF"),
     ])
-    # No sequence-region lines -> no contig length is known.
+    # No sequence-region lines → no contig length is known.
     gff = write_gff(tmp_path / "S1.gff3", {}, SCENE_CDS)
 
     _rc, rows, _audit, _path = run_main(tmp_path, conjscan, gff)
@@ -2083,7 +2109,7 @@ def test_an_unknown_contig_length_is_not_read_as_not_at_the_boundary(tmp_path):
 # ICEscan is a FORK of CONJScan 2.0.1 by the same Pasteur authors, one minor
 # version behind the CONJScan 2.1.0 we run. It ADDS an IME model, an AICE model
 # and 21 profiles; it REMOVES MOB.xml, the decayed dCONJ models and the whole
-# Plasmids set, and its T4SS quorum is stricter - so swapping to it LOSES
+# Plasmids set, and its T4SS quorum is stricter — so swapping to it LOSES
 # elements. We union the two instead, and take from ICEscan only its integrase
 # anchors, its Gram-positive/IME relaxase families and its IME/AICE model
 # classes. These tests pin the parts of that bargain that are easy to break.
@@ -2092,7 +2118,7 @@ def test_an_unknown_contig_length_is_not_read_as_not_at_the_boundary(tmp_path):
 def icescan_row(**overrides):
     """One ICEscan best_solution.tsv line.
 
-    Identical column layout to CONJscan's - both are MacSyFinder - so the same
+    Identical column layout to CONJscan's — both are MacSyFinder — so the same
     row builder is reused and only the model namespace differs.
     """
     fields = {"model_fqn": "ICEscan/Chromosome/IME"}
@@ -2118,10 +2144,10 @@ def test_the_four_untrusted_integrase_profiles_anchor_nothing():
       TIGR02224  XerC   } the chromosomal dif-site recombinases every bacterium
       TIGR02225  XerD   } carries. A XerC attached 43,639 bp from a 945 bp
                  relaxase cluster produced an element six times its true size.
-      rve        the DDE catalytic domain shared by IS transposases - 66 of its
+      rve        the DDE catalytic domain shared by IS transposases — 66 of its
                  71 hits on the benchmark are Bakta-annotated transposases.
 
-    They must be neither an integrase NOR - via the fall-through default -
+    They must be neither an integrase NOR — via the fall-through default —
     a mating-pair component, which is why None is the required answer.
     """
     for profile in ("TIGR02249", "TIGR02224", "TIGR02225", "rve"):
@@ -2141,8 +2167,8 @@ def test_icescan_relaxase_families_are_recognised_as_relaxases():
 
 def test_aice_machinery_is_never_conjugation_machinery():
     """An AICE translocates double-stranded DNA through a septal pore; it has no
-    relaxase and no mating bridge. Classing any of these as T4SS - which the
-    fall-through default would have done - would manufacture a mating-pair
+    relaxase and no mating bridge. Classing any of these as T4SS — which the
+    fall-through default would have done — would manufacture a mating-pair
     apparatus and promote elements to 'predicted self-transmissible'."""
     for profile in ("FtsK_SpoIIIE", "Prim-Pol", "RepSAv2", "DUF3631"):
         assert ci.anchor_class_for_gene_name(profile) == ci.ANCHOR_AICE
@@ -2150,7 +2176,7 @@ def test_aice_machinery_is_never_conjugation_machinery():
 
 def test_conjscan_profile_names_are_unchanged_by_the_icescan_vocabulary():
     """The new name rules must not have moved any CONJscan profile between
-    classes - that would change every existing call."""
+    classes — that would change every existing call."""
     assert ci.anchor_class_for_gene_name("T4SS_MOBF") == ci.ANCHOR_RELAXASE
     assert ci.anchor_class_for_gene_name("T4SS_t4cp2") == ci.ANCHOR_T4CP
     assert ci.anchor_class_for_gene_name("T4SS_tcpA") == ci.ANCHOR_T4CP
@@ -2159,8 +2185,8 @@ def test_conjscan_profile_names_are_unchanged_by_the_icescan_vocabulary():
 
 
 def test_without_icescan_the_result_is_byte_for_byte_what_it_always_was(tmp_path):
-    """THE CONTROL. A user who has not downloaded the ICEscan models - the
-    default - must get exactly today's answer.
+    """THE CONTROL. A user who has not downloaded the ICEscan models — the
+    default — must get exactly today's answer.
 
     The models are CC BY-NC-SA and fetched at runtime, so most runs will not have
     them. Running the same input with and without --icescan-tsv pointed at
@@ -2191,13 +2217,13 @@ def test_an_icescan_integron_integrase_cannot_anchor_an_element(tmp_path):
     A TIGR02249 hit sits 45 kb from the machinery, well inside the 50 kb
     integrase window. Trusting it would attach it, stretch the element to cover
     it, and report an ICE. It must anchor nothing, leaving the cluster with no
-    integrase - so the honest "machinery, but no element boundaries" call stands.
+    integrase — so the honest "machinery, but no element boundaries" call stands.
 
     NOTE the CDS is deliberately annotated "hypothetical protein" so that the
     ONLY thing that could make it an integrase is the ICEscan profile, which is
     what this test is about. Bakta usually annotates IntI1 as "class 1 integron
     integrase IntI1", and INTEGRASE_PRODUCT_PATTERN matches that on purpose (see
-    its comment) - so the product-text path has its own, separate exposure to
+    its comment) — so the product-text path has its own, separate exposure to
     integron integrases, which the FIX-4 tie-break rather than this rule is what
     keeps in check.
     """
@@ -2224,7 +2250,7 @@ def test_an_icescan_integron_integrase_cannot_anchor_an_element(tmp_path):
     assert len(rows) == 1
     assert rows[0]["has_integrase"] == "FALSE"
     assert rows[0]["element_type"] != "ice"
-    # The element must not have been stretched to reach the IntI1 at 95-96 kb.
+    # The element must not have been stretched to reach the IntI1 at 95–96 kb.
     assert int(rows[0]["end"]) < 90000
     assert "untrusted_integrase_profile" in audit_reasons(audit)
 
@@ -2261,7 +2287,7 @@ def test_an_icescan_rve_hit_cannot_anchor_an_element(tmp_path):
 
 def test_an_icescan_relaxase_can_make_an_ime_conjscan_would_have_missed(tmp_path):
     """The measured gain. A Gram-positive relaxase family CONJScan 2.1.0 does
-    not model, plus a product-text integrase, is exactly the IME architecture -
+    not model, plus a product-text integrase, is exactly the IME architecture —
     and its machinery is two genes, so it needs the lower IME size floor."""
     cds = [
         gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "tyrosine recombinase XerC"),
@@ -2288,11 +2314,11 @@ def test_an_icescan_relaxase_can_make_an_ime_conjscan_would_have_missed(tmp_path
 def test_an_icescan_ime_model_cannot_promote_an_island(tmp_path):
     """ICEscan's IME quorum is two genes, both declared loners, so the model can
     fire from hits anywhere on the replicon. It must never turn a cluster with no
-    relaxase into an IME - that would be a tier-5 mobility claim on no evidence.
+    relaxase into an IME — that would be a tier-5 mobility claim on no evidence.
     """
     # The cluster has a mating-pair gene and an integrase but NO relaxase, so our
     # own rules call it a passive island. ICEscan's IME model fires over the same
-    # integrase - and must not be allowed to change the answer.
+    # integrase — and must not be allowed to change the answer.
     cds = list(SCENE_CDS)
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
         conjscan_row(hit_id=VIRB4_HIT, gene_name="T4SS_virb4",
@@ -2328,7 +2354,7 @@ def test_icescan_system_ids_cannot_collide_with_conjscan_ones():
 
 def aice_scene(tmp_path):
     """A minimal AICE: integrase, FtsK/SpoIIIE translocase and a Rep protein,
-    called as ICEscan's AICE model. No relaxase and no mating-pair gene - which
+    called as ICEscan's AICE model. No relaxase and no mating-pair gene — which
     is what an AICE is, not what is wrong with it."""
     cds = [
         gff_cds("contig_1", 50000, 51200, "+", "S1_00010",
@@ -2365,8 +2391,8 @@ def test_an_aice_is_reported_as_its_own_class(tmp_path):
 
 
 def test_an_aice_never_claims_a_conjugation_tier(tmp_path):
-    """THE HEADLINE RULE. Tiers 5 and 6 are both conjugation - "mobilisable by a
-    helper" and "self-transmissible" - and an AICE does neither: it moves as
+    """THE HEADLINE RULE. Tiers 5 and 6 are both conjugation — "mobilisable by a
+    helper" and "self-transmissible" — and an AICE does neither: it moves as
     double-stranded DNA between hyphal compartments by FtsK/SpoIIIE
     translocation. Either tier would be a false claim, so it gets none, and the
     reason is spelled out rather than left blank."""
@@ -2406,7 +2432,7 @@ def test_an_aice_does_not_read_as_a_degraded_ice(tmp_path):
 def test_loose_ftsk_hits_do_not_manufacture_an_aice(tmp_path):
     """FtsK/SpoIIIE is a core chromosome-partitioning ATPase present in
     essentially every bacterium. Without ICEscan's assembled AICE model behind
-    it, it must seed nothing at all - otherwise every genome we ever run grows an
+    it, it must seed nothing at all — otherwise every genome we ever run grows an
     'AICE'."""
     cds = [
         gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "integrase"),
@@ -2435,17 +2461,17 @@ def test_the_tie_break_prefers_the_integrase_that_yields_an_att_pair(tmp_path):
 
     Two integrases are in the running for one cluster. The old rule was
     "closest, first-seen wins a tie", so when both sat inside the machinery span
-    - gap 0 for each, which is the normal case once ICEscan's hits join the pool
-    - the winner was decided by list order, i.e. by SOURCE rather than by any
+    — gap 0 for each, which is the normal case once ICEscan's hits join the pool
+    — the winner was decided by list order, i.e. by SOURCE rather than by any
     evidence.
 
     The geometry here makes distance and att support disagree on purpose:
 
-      40000..40024   attL - the last 25 bp of the tRNA ending at 40024
+      40000..40024   attL — the last 25 bp of the tRNA ending at 40024
       41000..42200   the REAL integrase, inside the att-bounded interval,
                      23,800 bp from the machinery
       66000..68500   the conjugation machinery
-      70000..70024   attR - the second copy of that same 25-mer
+      70000..70024   attR — the second copy of that same 25-mer
       70500..71500   the DECOY, only 2,000 bp from the machinery, but OUTSIDE
                      the att interval
 
@@ -2453,7 +2479,7 @@ def test_the_tie_break_prefers_the_integrase_that_yields_an_att_pair(tmp_path):
     swallowed by the span instead of flanking it and no pair can be found.
     Attaching the real integrase leaves both copies in the flanks, where the
     scar of integration actually lies. The decoy is more than ten times closer,
-    so if distance still ranked first it would win - and the element would come
+    so if distance still ranked first it would win — and the element would come
     out unbounded, which is precisely the CP042858.1 failure.
 
     Both candidates come from the Bakta product text, so this isolates key 1
@@ -2550,8 +2576,8 @@ def test_at_equal_distance_an_hmm_hit_does_not_displace_the_annotation(tmp_path)
 #
 # Two calls of the same class where one sits inside the other describe the same
 # neighbourhood twice, and a reader has no way to tell which line to believe.
-# resolve_nested_calls keeps one of them - on evidence, never simply the smaller
-# one - and writes the other to the audit. The end-to-end test below reproduces
+# resolve_nested_calls keeps one of them — on evidence, never simply the smaller
+# one — and writes the other to the audit. The end-to-end test below reproduces
 # the CP011419.1 shape that prompted this; the pure-function tests after it pin
 # each rung of the decision ladder separately, including the cases where the
 # LARGER call is the one that must survive.
@@ -2580,8 +2606,8 @@ def nesting_row(mge_id, contig, start, end, mge_class="ime",
 def test_one_locus_is_not_reported_as_two_nested_imes(tmp_path):
     """The CP011419.1 defect, end to end: a blob and the honest call inside it.
 
-    THE MEASURED CASE. On CP011419.1 the caller emitted a 179,889 bp "IME"
-    spanning sixteen times the curated element, and - inside it - the honest
+    The measured case. On CP011419.1 the caller emitted a 179,889 bp "IME"
+    spanning sixteen times the curated element, and — inside it — the honest
     4,959 bp IME that sits 63 bp from the curated start. Both were reported, so
     one locus appeared twice and the benchmark still scored the element as a
     16.19x swallow.
@@ -2592,7 +2618,7 @@ def test_one_locus_is_not_reported_as_two_nested_imes(tmp_path):
     best_solution_loners.tsv. A loner is precisely the gene a model admits from
     anywhere on the replicon WITHOUT the co-localisation test, and MacSyFinder
     signals that with a negative locus_num. So merge_clusters_sharing_a_system's
-    justification - "MacSyFinder already decided these genes form one system" -
+    justification — "MacSyFinder already decided these genes form one system" —
     is false for a loner, and merging on it invented a 179,889 bp interval.
 
     The fixture reproduces that shape: a compact, genuine element, and a distant
@@ -2635,14 +2661,14 @@ def test_one_locus_is_not_reported_as_two_nested_imes(tmp_path):
     kept = ime_rows[0]
     assert int(kept["start"]) == 199000 and int(kept["end"]) == 204100
 
-    # The orphaned loner is still REPORTED - separately, and as the weakest class
+    # The orphaned loner is still REPORTED — separately, and as the weakest class
     # its evidence supports. A relaxase with no integrase beside it is a
     # conjugative region, not an element with boundaries. This is the same shape
     # seen on the real CP011419.1, where the loner's own compact locus came out
     # as its own small call rather than being folded into the element 150 kb away.
     assert all(int(row["length_bp"]) < 100000 for row in rows)
     # The blob is never BUILT, so this is a refusal to merge rather than a
-    # suppression after the fact - and the audit says which gene caused it.
+    # suppression after the fact — and the audit says which gene caused it.
     assert "system_merge_refused_loner_only_link" in audit_reasons(audit)
 
 
@@ -2708,7 +2734,7 @@ def test_a_nested_call_with_an_att_boundary_beats_the_larger_one():
 
 
 def test_the_larger_call_survives_when_it_is_the_one_with_the_att_boundary():
-    """Key 1 again, the other way round - because "keep the smaller one" would be
+    """Key 1 again, the other way round — because "keep the smaller one" would be
     wrong. A 100 kb ICE genuinely contains smaller blocks of machinery, and when
     the LARGE call is the one with the att evidence it is the element."""
     outer = nesting_row("c1|ice-1000:90000", "c1", 1000, 90000, mge_class="ice",
@@ -2727,7 +2753,7 @@ def test_machinery_coherence_is_reported_but_never_decides():
     operon", on the reasoning that conjugation genes form an operon. Measured on
     the benchmark that premise is false for exactly the elements we care about:
     20 of 37 ice calls (54%) have an anchor-free hole wider than the 15 kb
-    window, among them R391 (28,354 bp), SPI-7 (42,039) and Tn4371 (15,120) -
+    window, among them R391 (28,354 bp), SPI-7 (42,039) and Tn4371 (15,120) —
     the spec's own positive controls. Large ICEs carry cargo BETWEEN their
     machinery genes. The rule deleted a 193 kb ICE in favour of a 7 kb element
     inside it, so it was removed; machinery_gap_bp is still reported for a reader
@@ -2748,7 +2774,7 @@ def test_nested_calls_with_nothing_to_separate_them_keep_the_outer_one():
     It already contains every base and every anchor the inner call had, so the
     inner one is cargo of it rather than a second finding. This is the EBI
     Mobilome Annotation Pipeline's convention, adopted here as a design decision
-    (their code is CC BY-NC-SA and is never copied - see spec §11).
+    (their code is CC BY-NC-SA and is never copied — see spec §11).
     """
     outer = nesting_row("c1|ime-1000:90000", "c1", 1000, 90000, machinery_gap_bp=200)
     inner = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, machinery_gap_bp=100)
@@ -2761,7 +2787,7 @@ def test_nested_calls_with_nothing_to_separate_them_keep_the_outer_one():
 def test_an_ime_nested_inside_an_ice_is_still_reported():
     """Two DIFFERENT classes nested are two different elements, and both stand.
 
-    An IME sitting inside an ICE is real cargo - and the more mobile of the two
+    An IME sitting inside an ICE is real cargo — and the more mobile of the two
     findings, since it can be picked up by a helper independently. Suppressing it
     would lose the answer a reader most needs. This pass only removes a duplicate
     description of ONE locus, which is what a same-class nest is.
@@ -2778,7 +2804,7 @@ def test_an_ime_nested_inside_an_ice_is_still_reported():
 
 def test_overlapping_calls_that_do_not_nest_are_both_kept():
     """Partial overlap is not containment. Two calls that merely share some bases
-    are two findings with a shared neighbourhood, and both are reported - the
+    are two findings with a shared neighbourhood, and both are reported — the
     rule is deliberately narrow."""
     left = nesting_row("c1|ime-1000:50000", "c1", 1000, 50000)
     right = nesting_row("c1|ime-40000:90000", "c1", 40000, 90000)
@@ -2834,7 +2860,7 @@ def test_machinery_gap_bp_measures_the_widest_hole_in_the_machinery(tmp_path):
     assert len(rows) == 1
     # SCENE_CDS anchors: 50000-51200, 55000-56600, 57000-58700, 63000-65500.
     # The widest hole is between the coupling protein and VirB4: 63000-58700-1.
-    # Every gap here is small - this is one operon, which is the point.
+    # Every gap here is small — this is one operon, which is the point.
     assert rows[0]["machinery_gap_bp"] == "4299"
 
 
@@ -2844,9 +2870,10 @@ def test_two_calls_on_the_same_interval_collapse_to_the_better_evidenced_one():
     This appears when two machinery clusters resolve onto the SAME att pair: both
     are widened to the element the repeats define, and two rows come out with the
     same start and end. Measured on ICEEc2 (GU725392) once the att search was
-    fixed - an `ime` row and an `ice` row, both 27-92263. score.py's tie-break
-    then reported the `ime`, i.e. tier 5 for an element correctly identified as a
-    tier-6 ICE.
+    fixed — an `ime` row and an `ice` row, both 27-92263. The benchmark's scorer
+    (phase7_benchmark/score.py, which lives with the benchmark rather than in
+    this repo) broke the tie towards the `ime`: tier 5 for an element correctly
+    identified as a tier-6 ICE.
 
     The same-class nesting rule cannot catch this: the classes differ, and the
     intervals nest in neither direction because they are equal.
@@ -2866,7 +2893,7 @@ def test_two_calls_on_the_same_interval_collapse_to_the_better_evidenced_one():
 
 
 def test_an_ime_genuinely_inside_an_ice_is_not_collapsed():
-    """Cross-class nesting stays two findings - only EQUAL intervals collapse.
+    """Cross-class nesting stays two findings — only EQUAL intervals collapse.
 
     An IME sitting inside an ICE is two real elements, and the IME is the more
     mobile finding. The identical-interval rule must not become a back door that
@@ -2882,18 +2909,16 @@ def test_an_ime_genuinely_inside_an_ice_is_not_collapsed():
     assert len(kept) == 2
 
 
-# ---------------------------------------------------------------------------
-# Fragmented (draft) assemblies.
+# ── Fragmented (draft) assemblies ────────────────────────────────────────────
 #
 # Everything below was written after the module was measured on drafts for the
 # first time. Until then every validation had been on CLOSED genomes, where
-# spans_contigs was TRUE on 0 of 63 calls - so the guards that exist for
+# spans_contigs was TRUE on 0 of 63 calls — so the guards that exist for
 # fragmentation had never been exercised by a test or by a benchmark. The
 # fragmented-assembly validation cut 40 benchmark genomes to three contiguities
 # (~150 kb, ~50 kb and ~20 kb N50), re-annotated all 120 assemblies and re-ran
 # the whole chain; the numbers quoted in these tests come from it.
 # Full write-up: docs/mobilome_draft_assemblies.md.
-# ---------------------------------------------------------------------------
 
 
 def test_assembly_contiguity_reports_n50_and_contig_count():
@@ -2901,7 +2926,7 @@ def test_assembly_contiguity_reports_n50_and_contig_count():
     longer. Checked on a hand-computable case so the arithmetic is visible.
 
     100 + 50 + 30 + 20 = 200 kb total, half is 100 kb; the longest contig alone
-    reaches it, so N50 is 100 kb - not the median contig length (40 kb), which
+    reaches it, so N50 is 100 kb — not the median contig length (40 kb), which
     is the usual way of getting this wrong.
     """
     stats = ci.assembly_contiguity({
@@ -2929,7 +2954,7 @@ def test_assembly_contiguity_of_a_closed_genome_is_the_genome():
 
 
 def test_assembly_contiguity_is_none_when_there_are_no_contigs():
-    """No lengths means no claim - the caller stays silent rather than writing a
+    """No lengths means no claim — the caller stays silent rather than writing a
     row of zeros that reads like a measurement."""
     assert ci.assembly_contiguity({}) is None
 
@@ -2959,7 +2984,7 @@ def test_every_run_writes_one_assembly_contiguity_audit_row(tmp_path):
 
     A reader opening the element table cannot tell a closed genome from a
     300-contig draft, and every caveat in this module depends on that
-    difference - so the contig count and N50 are recorded once per sample,
+    difference — so the contig count and N50 are recorded once per sample,
     unconditionally, for closed genomes too.
     """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
@@ -3014,7 +3039,7 @@ def test_an_ice_resting_on_another_contigs_apparatus_says_so(tmp_path):
 
     On a fragmented assembly the tra operon routinely lands on a different
     contig from the relaxase, so a cluster with no mating-pair gene of its own
-    is still called an ICE when the typed system's other hits are elsewhere -
+    is still called an ICE when the typed system's other hits are elsewhere —
     without that exemption real ICEs are demoted the moment an assembly breaks.
 
     The cost is a row that contradicts itself to anyone who does not know the
@@ -3027,7 +3052,7 @@ def test_an_ice_resting_on_another_contigs_apparatus_says_so(tmp_path):
     cds = [
         gff_cds("contig_1", 50000, 51200, "+", "S1_00010", "Phage integrase family protein"),
         gff_cds("contig_1", 55000, 56600, "+", "S1_00015", "TrwC relaxase domain-containing protein"),
-        # The mating bridge, on the OTHER contig - the assembly broke between them.
+        # The mating bridge, on the OTHER contig — the assembly broke between them.
         gff_cds("contig_2", 90000, 92000, "+", "S1_00620", "conjugal transfer protein TraB"),
     ]
     # One typed system, hits split across the break.
@@ -3077,20 +3102,20 @@ def test_an_ice_with_its_own_apparatus_is_not_flagged(tmp_path):
 def test_a_denovo_repeat_family_is_rejected_using_the_whole_assembly(tmp_path):
     """A repeat with copies on OTHER contigs is not an att site.
 
-    att_search already refuses a de novo repeat with more than two copies - attL
+    att_search already refuses a de novo repeat with more than two copies — attL
     and attR and nothing else. But it counts copies on the contig it was handed,
     and on a closed genome the contig IS the assembly, so nobody noticed the two
     questions were different. On a draft they are not: a family with 30 copies
     genome-wide can show only two on one contig.
 
     Measured on the fragmented benchmark: all 35 de novo repeats reported on
-    drafts had exactly 2 copies on their own contig, but 10 had 3-30 across the
-    assembly - one of them an 89 bp repeat with 30 copies attached to a
+    drafts had exactly 2 copies on their own contig, but 10 had 3–30 across the
+    assembly — one of them an 89 bp repeat with 30 copies attached to a
     high-confidence call. On closed genomes all 29 de novo repeats have 2
     assembly-wide copies, so this guard is a no-op there.
 
     The fixture: the same motif twice on the element's contig (the pair the
-    search finds) and twice more on a second contig - the copies a fragmented
+    search finds) and twice more on a second contig — the copies a fragmented
     assembly hides from a per-contig count.
     """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [
@@ -3133,7 +3158,7 @@ def test_a_denovo_repeat_unique_in_the_assembly_is_still_reported(tmp_path):
 
     Same fixture with the extra copies removed: two copies in the whole
     assembly, which is what a real attL/attR pair looks like. The repeat is
-    still reported as a lead for a human to follow - and still does not move the
+    still reported as a lead for a human to follow — and still does not move the
     element, which was always the rule for de novo boundaries.
     """
     conjscan = write_conjscan(tmp_path / "best_solution.tsv", [

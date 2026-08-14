@@ -1,16 +1,25 @@
 """Unit tests for gtdb_amrfinder_organism.py.
 
-Everything here is pure text handling, so no GTDB-Tk, no AMRFinderPlus and no
-database are needed. The summary files are built on the fly in pytest's tmp_path
-with the real GTDB-Tk 2.x column layout, so the tests also prove the column
-lookup works when `classification` is not the first column.
+The mapper sits between GTDB-Tk and AMRFinderPlus. It reads the summary GTDB-Tk
+wrote into 03.taxonomy/{sample} and emits one line naming an AMRFinderPlus
+--organism, or a genuinely empty file. Rule amrfinderplus passes --organism (and
+--mutation_all, which is meaningless without it) only when that file has
+something in it, so what these tests really pin down is when the flag is given
+and when it is withheld.
 
 What matters biologically: a WRONG --organism makes AMRFinderPlus score the
 genome against another organism's curated point-mutation list, which is worse
 than no --organism at all. So the bulk of these tests are about refusing to
 match, not about matching.
 
-Run: pytest workflow/scripts/mobilome/test_gtdb_amrfinder_organism.py -q
+Everything is pure text handling, so no GTDB-Tk, no AMRFinderPlus and no database
+are needed. The summary files are built on the fly in pytest's tmp_path with the
+real GTDB-Tk 2.x column layout, so the tests also prove the column lookup works
+when `classification` is not the first column. The two regression anchors at the
+end of the file are the exception — they read a real GTDB-Tk summary and the real
+GTDB taxonomy from disk, and skip themselves wherever those are absent.
+
+Run: pytest workflow/scripts/80_mobilome/test_gtdb_amrfinder_organism.py -q
 """
 
 import os
@@ -130,9 +139,10 @@ def test_exact_species_match_for_every_genus_with_two_curated_species():
 
 def test_genus_level_match_for_the_genus_organisms():
     # AMRFinderPlus curates these per genus AND nearly everything GTDB files
-    # under the unsuffixed genus really is that organism (E. coli 98.3% of
-    # g__Escherichia, S. enterica 100% of g__Salmonella in R226), so matching on
-    # the genus alone is safe here.
+    # under the unsuffixed genus really is that organism — 97.8% of g__Escherichia
+    # and 100% of g__Salmonella in the shipped R232 rules (98.3% / 100% in R226),
+    # against a 95% bar. Which genera clear it is not assumed here: the verdicts
+    # are generated per GTDB release into gtdb_organism_genus_rules.tsv.
     for genus, species in [
         ("Escherichia", "Escherichia coli"),
         ("Salmonella", "Salmonella enterica"),
@@ -213,7 +223,7 @@ def test_gtdb_suffixed_species_epithet_blocks_a_species_level_organism():
     assert "suffixed species" in reason
 
 
-# ── GTDB moved the genus but kept the species: the hand-checked exceptions ───
+# ── GTDB moved the genus but kept the species: the equivalence table ─────────
 #
 # Why this section exists. GTDB uses the same "_A/_B/_E" suffix for two very
 # different things, and the difference decides whether AMRFinderPlus may be told
@@ -221,17 +231,26 @@ def test_gtdb_suffixed_species_epithet_blocks_a_species_level_organism():
 #   * suffix on the GENUS  — GTDB broke up a genus NCBI keeps whole. The species
 #     moves to a new genus name but keeps its epithet, so
 #     "s__Enterococcus_B faecium" IS NCBI's Enterococcus faecium.
-#   * suffix on the EPITHET — GTDB split the species itself, so
-#     "faecalis_A" is a different taxon from NCBI's E. faecalis.
-# Only the first kind may be mapped, and only for names checked by hand against
-# the GTDB release (see GTDB_SPECIES_EQUIVALENCES in the script).
+#   * suffix on the EPITHET — GTDB is saying it cannot safely attach that name
+#     here, so "faecalis_A" is presumed a different taxon from NCBI's
+#     E. faecalis.
+# The first kind is accepted on agreement alone. The second is accepted only on
+# overwhelming evidence (≥99% of the cluster agreeing, across ≥20 genomes), which
+# most of the shipped table's rows in fact are — every Helicobacter pylori_* row
+# is an epithet suffix overridden that way.
+#
+# Nothing on that list is hand-typed. generate_gtdb_organism_table.py applies
+# both rules to every GTDB species cluster in a release's own metadata and writes
+# gtdb_organism_equivalences.tsv, which the script loads into
+# GTDB_SPECIES_EQUIVALENCES at import.
 
 def test_gtdb_split_genus_still_matches_enterococcus_faecium():
     # The case that motivated this exception: GTDB R226 has no unsuffixed
-    # "Enterococcus faecium" at all, so before the exception table every
-    # E. faecium isolate silently ran AMRFinderPlus without --organism and none
-    # of its curated point mutations (daptomycin liaR/liaS/cls, linezolid 23S)
-    # could ever be reported.
+    # "Enterococcus faecium" at all (nor does R232 — the regression anchor at the
+    # end of this file re-checks that against the installed release), so before
+    # the exception table every E. faecium isolate silently ran AMRFinderPlus
+    # without --organism and none of its curated point mutations (daptomycin
+    # liaR/liaS/cls, linezolid 23S) could ever be reported.
     organism, reason = gao.map_classification(
         lineage("Enterococcus_B", "Enterococcus_B faecium"))
     assert organism == "Enterococcus_faecium"
@@ -268,9 +287,9 @@ def test_placeholder_species_inside_the_split_genus_is_still_blocked():
 
 
 def test_suffixed_genus_not_in_the_exception_table_is_still_blocked():
-    # The general rule is unchanged: only names on the hand-checked list get
-    # through, and the audit says so rather than leaving the reader guessing why
-    # one Enterococcus_B was accepted and this was not.
+    # The general rule is unchanged: only names the generated table earned a row
+    # for get through, and the audit names that file rather than leaving the
+    # reader guessing why one Enterococcus_B was accepted and this was not.
     organism, reason = gao.map_classification(
         lineage("Klebsiella_A", "Klebsiella_A pneumoniae"))
     assert organism == ""
@@ -286,19 +305,19 @@ def test_exception_table_maps_only_onto_real_amrfinder_organisms():
 
 def test_exception_table_holds_only_same_species_naming_artefacts():
     """Structural guard on the GENERATED table: every entry must be a NAMING
-    ARTEFACT for the SAME species AMRFinderPlus curates - GTDB moved a suffix
-    onto the genus, the epithet, or both - never a genuinely different species
+    ARTEFACT for the SAME species AMRFinderPlus curates — GTDB moved a suffix
+    onto the genus, the epithet, or both — never a genuinely different species
     that merely happens to share an NCBI label.
 
-    This table is now built by generate_gtdb_organism_table.py from a GTDB
-    release's own metadata, covering both patterns that pattern finds real
-    examples of: genus suffixed / epithet plain (Campylobacter_D jejuni is
-    C. jejuni) AND genus plain / epithet suffixed (Helicobacter pylori_C is
-    still H. pylori). This test does not re-derive the evidence behind either
-    pattern - that needs the multi-hundred-MB metadata file, which a fast unit
-    test must not require - it only checks the SHAPE every entry must have:
-    once every GTDB suffix is stripped from both tokens, the result must name
-    the exact organism the entry claims, not a look-alike.
+    The table is built by generate_gtdb_organism_table.py from a GTDB release's
+    own metadata, and covers both patterns it finds real examples of: genus
+    suffixed / epithet plain (Campylobacter_D jejuni is C. jejuni) AND genus plain
+    / epithet suffixed (Helicobacter pylori_C is still H. pylori). This test does
+    not re-derive the evidence behind either pattern — that needs the
+    multi-hundred-MB metadata file, which a fast unit test must not require — it
+    only checks the SHAPE every entry must have: once every GTDB suffix is
+    stripped from both tokens, the result must name the exact organism the entry
+    claims, not a look-alike.
     """
     for gtdb_name, organism in gao.GTDB_SPECIES_EQUIVALENCES.items():
         gtdb_genus, gtdb_epithet = gtdb_name.split(" ")
@@ -307,7 +326,7 @@ def test_exception_table_holds_only_same_species_naming_artefacts():
 
         # The whole reason an entry is IN this table is that the plain rules
         # (exact species match, or a safe genus rule) would not already have
-        # matched it without help - so it must carry a suffix somewhere.
+        # matched it without help — so it must carry a suffix somewhere.
         assert genus_is_suffixed or epithet_is_suffixed, gtdb_name
         assert not gao.is_placeholder_species(gtdb_epithet), gtdb_name
 
@@ -318,7 +337,7 @@ def test_exception_table_holds_only_same_species_naming_artefacts():
             assert epithet_base == ncbi_epithet, gtdb_name
         else:
             ncbi_genus = organism
-        # Once stripped, the GTDB genus must equal the organism's own genus -
+        # Once stripped, the GTDB genus must equal the organism's own genus —
         # not merely start with it, which would also accept a wrong relative.
         assert genus_base == ncbi_genus, gtdb_name
 
@@ -543,7 +562,7 @@ def test_summary_without_the_expected_columns(tmp_path):
     assert "no user_genome/classification columns" in reason
 
 
-# ── Finding the summary inside a GTDB-Tk output directory ───────────────────
+# ── Finding the summary inside a GTDB-Tk output directory ────────────────────
 
 def test_find_summary_at_the_top_level(tmp_path):
     # classify_wf leaves a copy/symlink of the summary at the top level.
@@ -787,9 +806,11 @@ def test_output_directories_are_created(tmp_path):
 
 # ── Regression anchor against a real GTDB-Tk file ────────────────────────────
 
-# A real v2 validation run: sample 006 is Pseudomonas_E, classified from both
-# the Illumina and the ONT assembly. The expected answer is "no organism".
-# Skipped automatically on any machine that does not have the validation data.
+# A real v2 validation run: sample 006, classified from both the Illumina and the
+# ONT assembly into the genus GTDB called Pseudomonas_E in R226 and calls
+# Aquipseudomonas in R232. The expected answer either way is "no organism". The
+# path is a local one on this machine, so the test skips itself where the
+# validation data is not present.
 REAL_SUMMARY = ("/media/data/antonielli_dir/BacFlux_v2_validation/"
                 "hybrid_screen_batch2/output_dir/03.taxonomy/006/"
                 "gtdbtk.bac120.summary.tsv")
@@ -805,7 +826,7 @@ def test_real_gtdbtk_summary_gives_no_organism(tmp_path):
     # GTDB R232 (2026-07-27 move from R226) graduated this placeholder genus to
     # a real published name: g__Pseudomonas_E in R226 is g__Aquipseudomonas in
     # R232, the same genus GTDB simply renamed once it had a proper description
-    # - exactly the kind of release-to-release rename GTDB's own FAQ warns
+    # — exactly the kind of release-to-release rename GTDB's own FAQ warns
     # suffix letters are not guaranteed to survive. Either way there is nothing
     # curated for this genus, so the organism stays empty.
     assert "g__Aquipseudomonas" in classification
@@ -864,15 +885,16 @@ def test_gtdb_really_has_no_unsuffixed_enterococcus_faecium():
         assert gtdb_name in gtdb_species_names_matching(genus), gtdb_name
 
 
-# ---------------------------------------------------------------------------
-# Campylobacter: the curated species live in a SUFFIXED genus, and the
-# unsuffixed genus holds only species AMRFinderPlus does not curate.
+# ── Campylobacter: the curated species live in a SUFFIXED genus ──────────────
+# The unsuffixed genus holds only species AMRFinderPlus does not curate.
 #
 # GTDB assigns the genus suffix by where the genus TYPE SPECIES landed. The type
 # species of Campylobacter is C. fetus, which keeps g__Campylobacter, so jejuni
 # and coli were pushed into g__Campylobacter_D. Matching on the unsuffixed genus
-# therefore hits 403 genomes of the wrong species and none of the right ones.
-# ---------------------------------------------------------------------------
+# therefore hits only genomes of the wrong species and none of the right ones:
+# gtdb_organism_genus_rules.tsv scores it 0 appropriate out of 450 in R232 (403
+# in R226). That is why Campylobacter is the one genus-level organism reachable
+# by name alone, through the equivalence table, and never from its bare genus.
 
 
 def test_the_curated_campylobacter_species_are_matched_despite_the_genus_suffix():
@@ -901,19 +923,22 @@ def test_the_unsuffixed_campylobacter_genus_no_longer_matches():
 
 
 def test_well_evidenced_suffixed_epithets_are_admitted():
-    """coli_A and coli_B: n=90 and n=70, both 100% NCBI Campylobacter coli."""
+    """coli_A and coli_B clear the RULE B bar: both 100% NCBI Campylobacter coli,
+    on n=92 and n=72 genomes in the shipped R232 table (90 and 70 in R226)."""
     for species in ("Campylobacter_D coli_A", "Campylobacter_D coli_B"):
         organism, _reason = gao.map_classification(lineage("Campylobacter_D", species))
         assert organism == "Campylobacter", species
 
 
 def test_thinly_evidenced_or_contradicted_suffixed_epithets_are_refused():
-    """The cases the >=99%-and->=20-genomes bar exists to exclude.
+    """The cases the ≥99%-and-≥20-genomes bar exists to exclude, one for each
+    half of it.
 
     jejuni_C is the important one: only 55.6% of its cluster is NCBI C. jejuni
     and the majority is C. LARI, so naive suffix-stripping would have called it
-    C. jejuni. jejuni_A/_B/_D are 100% but on 1-2 genomes, where a single
-    mislabelled genome would flip the vote.
+    C. jejuni. jejuni_A/_B/_D are 100% but on 1–2 genomes, where a single
+    mislabelled genome would flip the vote. None of the four has a row in
+    gtdb_organism_equivalences.tsv, which is what these assertions rest on.
     """
     for species in ("Campylobacter_D jejuni_A", "Campylobacter_D jejuni_B",
                     "Campylobacter_D jejuni_C", "Campylobacter_D jejuni_D"):

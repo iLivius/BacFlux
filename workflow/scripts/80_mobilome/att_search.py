@@ -1,80 +1,74 @@
 #!/usr/bin/env python3
 """Find the attL/attR direct repeats that mark the real ends of an ICE.
 
-WHAT THIS IS FOR
-    CONJscan tells us WHERE the conjugation machinery is, but machinery genes are
-    not the edges of the element. An ICE is typically much larger than the cluster
-    of tra/relaxase genes that identify it, and everything between the true edges
-    - including any AMR gene sitting in the cargo - travels with it when it moves.
-    Reporting the machinery span as if it were the element would therefore
-    UNDERSTATE what is mobile, which for an AMR report is the dangerous direction.
+CONJscan says WHERE the conjugation machinery is, but machinery genes are not the
+edges of the element. An ICE is typically much larger than the cluster of
+tra/relaxase genes that identify it, and everything between the true edges —
+including any AMR gene sitting in the cargo — travels with it when it moves.
+Reporting the machinery span as if it were the element would therefore UNDERSTATE
+what is mobile, which for an AMR report is the dangerous direction. This module
+recovers the real edges from the scar that integration leaves behind.
 
-    This module recovers the real edges from the scar integration leaves behind.
+The biology, in one paragraph. An ICE lives integrated in the host chromosome. It
+got there by site-specific recombination between a short site on the element
+(attP) and a matching site on the chromosome (attB), catalysed by its own
+integrase. Because the two sites are nearly identical, recombination DUPLICATES
+them: one copy ends up at each end of the integrated element, called attL (left)
+and attR (right). They are DIRECT repeats — same sequence, same orientation —
+typically 15–25 bp. A matching pair bracketing the machinery is therefore direct
+physical evidence of where the element starts and stops.
 
-THE BIOLOGY, IN ONE PARAGRAPH
-    An ICE lives integrated in the host chromosome. It got there by site-specific
-    recombination between a short site on the element (attP) and a matching site
-    on the chromosome (attB), catalysed by its own integrase. Because the two
-    sites are nearly identical, recombination DUPLICATES them: one copy ends up at
-    each end of the integrated element, called attL (left) and attR (right). They
-    are DIRECT repeats - same sequence, same orientation - typically 15-25 bp.
-    Finding a matching pair that brackets the machinery is therefore direct
-    physical evidence of where the element starts and stops.
+The favourite landing site is the 3' end of a tRNA gene, and that is not an
+accident: tRNA genes are short, highly conserved and present in every genome, so
+an element targeting one can integrate into essentially any relative without
+disrupting anything — the recombination reconstitutes the tRNA on one side and
+leaves the second copy as the scar on the other. A repeat pair with ONE copy
+inside a tRNA is therefore not merely a repeat that happens to be there; it is
+the exact arrangement the biology predicts, and the search treats it as the
+strongest evidence available.
 
-    The favourite landing site is the 3' end of a tRNA gene. That is not an
-    accident: tRNA genes are short, highly conserved, and present in every
-    genome, so an element that targets one can integrate into essentially any
-    relative without disrupting anything - the recombination reconstitutes the
-    tRNA on one side and leaves the second copy as the scar on the other. So a
-    repeat pair with ONE copy sitting inside a tRNA is not merely a repeat that
-    happens to be there: it is the exact arrangement the biology predicts, and
-    the search below treats that as the strongest evidence it can get.
+One search, not two modes. An earlier version had a tRNA-anchored search that cut
+a fixed 25 bp probe from a tRNA's 3' end and looked for a second copy, tried
+first, with a blind repeat scan as the fallback. It was retired because a
+fixed-length probe cannot work: the ICEKp direct repeat is 17 bp, and a 25 bp
+probe cannot match a 17 bp repeat under any mismatch budget. The measurements and
+the reference tools that settled it are written out above MIN_ATT_REPEAT_BP —
+read that before changing anything here.
 
-ONE SEARCH, NOT TWO MODES
-    An earlier version of this module had two modes: a tRNA-anchored search that
-    cut a fixed 25 bp probe from a tRNA's 3' end and looked for a second copy,
-    tried first, with a blind repeat scan as the fallback. That design was
-    retired because a fixed-length probe cannot work - the ICEKp direct repeat is
-    17 bp, and a 25 bp probe cannot match a 17 bp repeat under any mismatch
-    budget. The measurements and the reference tools that settled it are written
-    out in full above MIN_ATT_REPEAT_BP; read that before changing anything here.
+What runs now is one variable-length search, search_maximal_repeat: take every
+exact repeat shared by the left and right flanks, extend each as far as the two
+sides agree, keep the pairs that bracket the machinery, and rank what survives,
+tRNA-anchored first and then longest. The label on the answer says which kind of
+evidence it rests on:
 
-    What runs now is ONE variable-length search, search_maximal_repeat: take
-    every exact repeat shared by the left and right flanks, extend each as far as
-    the two sides agree, keep the pairs that bracket the machinery, and rank what
-    survives - tRNA-anchored first, then longest. The label on the answer says
-    which kind of evidence it rests on:
+    boundary_method='tRNA'    one copy sits inside an annotated tRNA gene
+    boundary_method='denovo'  neither copy does — a repeat with no biological
+                              story attached, so weaker evidence
+    boundary_method='none'    no credible pair at all
 
-        boundary_method='tRNA'    one copy sits inside an annotated tRNA gene
-        boundary_method='denovo'  neither copy does - a repeat with no biological
-                                  story attached, so weaker evidence
-        boundary_method='none'    no credible pair at all
+Only 'tRNA' is ACTED ON downstream: conjscan_to_ice.py reports a 'denovo' pair
+but refuses to move the element's coordinates onto it. 'none' leaves the
+machinery span standing, which is the honest answer for a fragmented assembly
+whose contig ends before the element does.
 
-    Only 'tRNA' is ACTED ON downstream: conjscan_to_ice.py reports a 'denovo'
-    pair but refuses to move the element's coordinates onto it. 'none' leaves the
-    machinery span standing, which is the honest answer for a fragmented assembly
-    whose contig ends before the element does.
+The failure mode this guards against: insertion sequences are themselves flanked
+by repeats — terminal inverted repeats, plus the short direct repeat of target
+DNA they duplicate on transposition. A region holding several IS copies is
+therefore FULL of direct repeats that have nothing to do with ICE integration,
+and run over raw sequence they swamp every real signal. So the flanks are MASKED
+against the ISEScan calls first (see mask_intervals); the spec names this as the
+single most likely way to get att search wrong.
 
-THE FAILURE MODE THIS GUARDS AGAINST
-    Insertion sequences are themselves flanked by repeats - terminal inverted
-    repeats, plus the short direct repeat of target DNA they duplicate on
-    transposition. A genome region containing several IS copies is therefore FULL
-    of direct repeats that have nothing whatsoever to do with ICE integration. Run
-    the de novo scan over raw sequence and those repeats swamp every real signal.
-    So the flanks are MASKED against the ISEScan calls first (see mask_intervals);
-    the spec calls this out as the single most likely way to get this wrong.
+Where it runs: imported by conjscan_to_ice.py, which already holds the candidate
+machinery spans, the Bakta GFF3 (for tRNAs) and the genome. Standard library
+only — a plain dict of k-mers is quick enough at these window sizes, which is why
+no suffix-array tool (vmatch and friends) has to be installed, and why the rule
+that drives it needs no conda environment. Testable with no tool or database
+present: workflow/scripts/80_mobilome/test_att_search.py.
 
-WHERE IT RUNS
-    Imported by conjscan_to_ice.py, which already has the candidate machinery
-    spans, the Bakta GFF3 (for tRNAs) and the genome. Pure text/sequence handling,
-    standard library only - a plain dict of k-mers is far faster than anything
-    these window sizes need, which is why no suffix-array tool (vmatch and
-    friends) has to be installed. Unit-testable with no tool or database present.
-
-COORDINATES
-    Everything crossing this module's boundary is 1-based inclusive, matching
-    GFF3 and every other BacFlux table. Python slicing is 0-based half-open, so
-    conversions happen at the edges of the helpers below and nowhere else.
+Coordinates: everything crossing this module's boundary is 1-based inclusive,
+matching GFF3 and every other BacFlux table. Python slicing is 0-based half-open,
+so the conversions happen at the edges of the helpers below and nowhere else.
 """
 
 import argparse
@@ -85,56 +79,63 @@ import re
 import sys
 
 
-# ── Tunables ────────────────────────────────────────────────────────────────
+# ── Search window, repeat floor, and element size bounds ────────────────────
 
 # How far beyond the machinery span to look for the element's real ends.
 #
 # 50 kb rather than the original 30 kb, measured: on SPI-7 (AL513382) the correct
 # attR sits in tRNA-Phe 5,800 bp OUTSIDE a 30 kb window, so the element was
 # reported 50 kb short for want of somewhere to look. Widening to 50 kb recovers
-# it. Going further does not help - 80 kb, 120 kb and 200 kb windows change no
-# element's answer on the benchmark - so this is the point where the curve flattens
-# rather than an arbitrary larger number.
+# it. Going further does not help — 80 kb, 120 kb and 200 kb windows change no
+# element's answer on the benchmark — so this is where the curve flattens rather
+# than an arbitrary larger number.
 #
 # The cost of a wider window is more candidate repeats to rank, which is why the
 # ranking rule in search_maximal_repeat matters more at 50 kb than it did at 30.
+#
+# This is the value every run actually uses, not a fallback: conjscan_to_ice.py
+# takes the default of its --att-flank-window-bp flag from here, and rule
+# conjscan_ice never passes that flag.
 DEFAULT_FLANK_WINDOW_BP = 50_000
 
-# NOTE ON THE `DENOVO_` PREFIX below. It is historical: these three constants
-# were written for the blind "Mode B" scan back when there were two modes. There
-# is one search now and they apply to all of it. The names are kept because
-# DENOVO_MAX_CONTIG_COPIES is imported by conjscan_to_ice.py, and renaming one
-# but not the others would read worse than leaving all three alone.
+# The `DENOVO_` prefix on the next three constants is historical: they were
+# written for the blind "Mode B" scan back when there were two modes. There is one
+# search now and they apply to all of it. The names stay because
+# DENOVO_MAX_CONTIG_COPIES is read by conjscan_to_ice.py, and renaming one but not
+# the others would read worse than leaving all three alone.
 
-# Absolute floor, whatever the arithmetic below says. Real att sites are ~15-25 bp
+# Absolute floor, whatever the arithmetic below says. Real att sites are ~15–25 bp
 # and nothing shorter than this is worth reporting even in a tiny window.
 DENOVO_ABSOLUTE_MIN_REPEAT_BP = 12
 
-# How many chance matches we are willing to tolerate when choosing the shortest
-# acceptable repeat length. See minimum_informative_repeat_length: comparing two
-# 50 kb flanks (the shipped window), a 12 bp "repeat" is expected about 150 times
-# purely by chance, so a fixed 12 bp floor would report noise as an element
-# boundary on essentially every genome. This was caught by the unit tests below,
-# which expected random sequence to yield no boundaries and got a confident call
-# instead.
+# How many chance matches to tolerate when choosing the shortest acceptable repeat
+# length. See minimum_informative_repeat_length: between two 50 kb flanks (the
+# shipped window) a 12 bp "repeat" is expected about 150 times over by chance
+# alone, so a flat 12 bp floor would report noise as an element boundary on
+# essentially every genome. This was caught by test_att_search.py, which fed the
+# search random sequence expecting no boundaries and got a confident call.
 DENOVO_MAX_EXPECTED_CHANCE_MATCHES = 0.05
 
-# Sanity bounds on the element the boundaries imply. Defaults mirror the spec's
-# ice.min_element_bp / ice.max_element_bp; the caller passes the configured ones.
+# Sanity bounds on the element the boundaries imply: an att pair implying
+# something smaller or larger than these is not believed. The numbers match the
+# spec's proposed ice.min_element_bp / ice.max_element_bp, but those config keys
+# were never wired up — conjscan_to_ice.py carries its own constants of the same
+# names and values, and rule conjscan_ice passes NEITHER, so in practice both
+# ends of the range only move by editing code.
 DEFAULT_MIN_ELEMENT_BP = 8_000
 DEFAULT_MAX_ELEMENT_BP = 500_000
 
 COMPLEMENT = str.maketrans("ACGTNacgtn", "TGCANtgcan")
 
 
-# ── Sequence and annotation input ───────────────────────────────────────────
+# ── Read the genome and the tRNA genes Bakta called ─────────────────────────
 
 def read_fasta(path):
     """Read a FASTA into {sequence_id: sequence}, upper-cased.
 
-    Input:  any nucleotide FASTA - here the genome Bakta annotated, so the IDs
+    Input:  any nucleotide FASTA — here the genome Bakta annotated, so the IDs
             match the GFF3's seqids and every coordinate lines up.
-    Output: dict of id -> sequence string. The id is the first whitespace-
+    Output: dict of id → sequence string. The id is the first whitespace-
             separated token of the header, the same convention the rest of
             BacFlux uses, so 'NZ_CP006659.2 Klebsiella...' keys on
             'NZ_CP006659.2'.
@@ -174,7 +175,7 @@ def parse_trna_features(gff3_path):
 
     Bakta appends its own FASTA after a `##FASTA` line; parsing stops there so
     sequence lines are never mistaken for annotation. Anything malformed is
-    skipped rather than raising - a missing tRNA costs precision on one element,
+    skipped rather than raising — a missing tRNA costs precision on one element,
     while a crash costs the whole sample.
     """
     trnas = []
@@ -233,7 +234,7 @@ def reverse_complement(sequence):
 def mask_intervals(sequence, intervals):
     """Blank out the given 1-based inclusive intervals with N.
 
-    Input:  a contig sequence, plus the intervals to hide - in practice every
+    Input:  a contig sequence, plus the intervals to hide — in practice every
             insertion sequence ISEScan called on that contig.
     Output: a new string of the same length with those stretches replaced by N.
 
@@ -244,15 +245,16 @@ def mask_intervals(sequence, intervals):
     masking removes those decoys before they can outrank the real att site. The
     spec names this as the most likely way to get att search wrong.
 
-    Masking deliberately does NOT shift coordinates - the string keeps its length
-    - so every position reported afterwards still refers to the real genome.
+    Masking deliberately does NOT shift coordinates — the string keeps its full
+    length — so every position reported afterwards still refers to the real
+    genome.
     """
     if not intervals:
         return sequence
 
     characters = list(sequence)
     for start, end in intervals:
-        # Clamp into the sequence and convert 1-based inclusive -> 0-based slice.
+        # Clamp into the sequence and convert 1-based inclusive → 0-based slice.
         first = max(1, min(start, end)) - 1
         last = min(len(sequence), max(start, end))
         for position in range(first, last):
@@ -260,20 +262,19 @@ def mask_intervals(sequence, intervals):
     return "".join(characters)
 
 
-# ── Reading the tRNA annotation ─────────────────────────────────────────────
+# ── Does a candidate repeat copy sit inside a tRNA gene? ────────────────────
 #
-# These four helpers answer one question between them: does a candidate repeat
-# copy sit inside an annotated tRNA gene, and if so which one? That is the test
-# that separates an integration scar from a pair of ordinary paralogous genes,
-# and it is used in two places - search_maximal_repeat, to rank and to reject,
-# and count_repeat_copies_outside_trnas, to count credibly.
+# These four helpers answer that one question between them. It is the test that
+# separates an integration scar from a pair of ordinary paralogous genes, and it
+# is used in two places — search_maximal_repeat, to rank and to reject, and
+# count_repeat_copies_outside_trnas, to count credibly.
 
 
 def trna_covering(copy, trnas):
     """Which annotated tRNA gene, if any, does this att copy sit inside?
 
     Same test as overlaps_any_trna but returns the FEATURE rather than a boolean,
-    because the caller needs to know which amino acid the tRNA carries - see
+    because the caller needs to know which amino acid the tRNA carries — see
     same_trna_species below for why that distinction matters.
     """
     start, end = copy[0], copy[1]
@@ -284,13 +285,13 @@ def trna_covering(copy, trnas):
 
 
 def trna_species(trna):
-    """The amino acid a tRNA carries: 'tRNA-Phe(gaa)' -> 'phe'.
+    """The amino acid a tRNA carries: 'tRNA-Phe(gaa)' → 'phe'.
 
     Bakta writes tRNA products as tRNA-<AminoAcid>(<anticodon>). Only the amino
     acid is taken, so the several anticodons of one amino acid count as the same
-    species - they are the paralogues the guard below is aimed at.
-    Returns '' when the product cannot be parsed, which makes the caller fall back
-    to the old, stricter behaviour rather than guessing.
+    species — they are the paralogues the guard below is aimed at. An unparseable
+    product returns '', which makes same_trna_species fall back to its older,
+    stricter answer rather than guess.
     """
     if not trna:
         return ""
@@ -301,15 +302,14 @@ def trna_species(trna):
 def same_trna_species(left_trna, right_trna):
     """True when both att copies sit in tRNAs carrying the SAME amino acid.
 
-    THE DISTINCTION THIS DRAWS, and why it was worth adding. The guard in
-    search_maximal_repeat rejects a repeat whose two copies both sit inside tRNA
-    genes, on the reasoning that those are two paralogous copies of one tRNA
+    The guard in search_maximal_repeat rejects a repeat whose two copies both sit
+    inside tRNA genes, reasoning that those are two paralogous copies of one tRNA
     rather than the scar of an integration event. That reasoning is sound for
     paralogues and WRONG for anything else, because a genome's tRNA genes are not
     all copies of each other.
 
     Measured on ICEEc2 (GU725392): its real 22 bp att pair sits in tRNA-Phe at
-    one end and tRNA-Ser at the other - two DIFFERENT tRNA species, so not
+    one end and tRNA-Ser at the other — two DIFFERENT tRNA species, so not
     paralogues at all. The blanket rule threw the correct boundary away, and the
     element was reported 37 kb short of its true extent. Requiring the SAME amino
     acid keeps the guard's power against real paralogues while letting an element
@@ -359,16 +359,16 @@ def minimum_informative_repeat_length(left_flank_bp, right_flank_bp):
     bases with probability 4**-k. For the shipped 50 kb flanks that is ~149
     expected matches at k=12, ~2.3 at k=15, and ~0.04 at k=18.
 
-    At the shipped window this returns 18 bp - and it also returned 18 at the old
+    At the shipped window this returns 18 bp — and it also returned 18 at the old
     30 kb window, so widening the window did NOT move the floor. Worth knowing
     before anyone tunes DEFAULT_FLANK_WINDOW_BP expecting it to.
 
-    ⚠ THIS IS A FLOOR, NOT A FILTER — READ THIS BEFORE TRUSTING IT.
-    The formula above assumes DNA is a random string of four equally likely
-    letters. Real chromosomes are nothing of the sort: they carry rRNA operons
-    (7 copies in a typical enterobacterium), REP/BIME elements (hundreds of
-    copies), prophage remnants and paralogous gene families. Between two large
-    windows of a REAL genome an exact 18-25 bp direct repeat is COMMON.
+    This is a FLOOR, not a filter, and believing otherwise is the mistake this
+    module already made once. The formula above assumes DNA is a random string of
+    four equally likely letters. Real chromosomes are nothing of the sort: they
+    carry rRNA operons (7 copies in a typical enterobacterium), REP/BIME elements
+    (hundreds of copies), prophage remnants and paralogous gene families. Between
+    two large windows of a REAL genome an exact 18–25 bp direct repeat is COMMON.
 
     Measured on the K. pneumoniae positive control chromosome, 300 randomly
     placed non-ICE spans: this length threshold alone let 22% of them return a
@@ -390,7 +390,7 @@ def minimum_informative_repeat_length(left_flank_bp, right_flank_bp):
 # Anything occurring more often is a repeat FAMILY, and the families are the
 # reason this constant exists. A 25 bp stretch of a 16S rRNA gene is also "an
 # exact direct repeat shared by the two flanks", and it clears every length
-# threshold - but it occurs seven times, because the cell needs seven ribosomal
+# threshold — but it occurs seven times, because the cell needs seven ribosomal
 # RNA operons. REP/BIME elements run to hundreds of copies through
 # enterobacterial intergenic space. Counting copies separates a scar from a
 # family cleanly, where measuring length cannot: it was the length test alone
@@ -417,9 +417,11 @@ def count_repeat_copies(sequence, kmer):
     (rRNA operons certainly do), and a family member pointing the other way is
     still evidence that the sequence is repetitive rather than a unique scar.
 
-    str.count is a C-level scan, so this is cheap enough to run per surviving
-    candidate. It counts NON-OVERLAPPING occurrences, which is exactly right
-    here: an att site that overlaps itself is a tandem repeat, not a scar.
+    Counts NON-OVERLAPPING occurrences, because str.count does: a repeat that
+    overlaps itself is a tandem repeat, not an integration scar, and is counted
+    once. count_repeat_copies_outside_trnas below deliberately does the opposite
+    and steps one base at a time, so the two functions can disagree by a copy or
+    two on a tandem array.
     """
     copies = sequence.count(kmer)
     reverse = reverse_complement(kmer)
@@ -430,7 +432,7 @@ def count_repeat_copies(sequence, kmer):
 
 # ── Maximal-repeat search: what the reference tools actually do ─────────────
 #
-# WHY THIS REPLACED THE FIXED-LENGTH PROBE
+# Why this replaced the fixed-length probe.
 #     The earlier design cut a fixed 25 bp probe from a tRNA 3' end and looked
 #     for a second copy. It could not work, and the reason is measurable: the
 #     ICEKp direct repeat is 17 bp (CCAGTCAGAGGAGCCAA, Lam et al. 2018,
@@ -438,15 +440,15 @@ def count_repeat_copies(sequence, kmer):
 #     match a 17 bp repeat under any mismatch budget. On two clinical
 #     K. pneumoniae isolates it found nothing at 25 bp and pairs appeared at 18.
 #
-#     Bacterial ICE direct repeats span roughly 10-60 bp, so NO single length is
+#     Bacterial ICE direct repeats span roughly 10–60 bp, so NO single length is
 #     defensible. Every reference tool searches variable-length:
 #       ICEfinder2      vmatch -l 15   (script/single.py L286)
 #       icefinder-opt   vmatch -l 15   (2025 fork, unchanged)
 #       DEPhT           BLASTN of the left flank vs the right flank
 #       DBSCAN-SWA      same, 12 bp floor, ranked by bitscore
 #
-# WHY EXACT MAXIMAL REPEATS RATHER THAN BLAST
-#     `vmatch -l N` returns EXACT MAXIMAL repeats with a minimum length - it
+# Why exact maximal repeats rather than BLAST.
+#     `vmatch -l N` returns EXACT MAXIMAL repeats with a minimum length — it
 #     finds a seed and extends it as far as the sequences agree. That is what is
 #     implemented below, in stdlib Python.
 #
@@ -466,11 +468,11 @@ MIN_ATT_REPEAT_BP = 15
 # a region that dense is not one where a clean att pair is going to be found
 # anyway.
 #
-# ⚠ THE CAP IS A TRUNCATION, NOT JUST A BOUND, AND IT IS CURRENTLY SILENT.
+# The cap is a TRUNCATION, not just a bound, and it is currently silent.
 # Hitting it breaks out of the whole scan, so seeds after that point are never
 # examined and a real repeat sitting among them would be missed. The element then
 # reports boundary_method='none', which is indistinguishable from "the flanks
-# carry no repeat" - there is no audit row saying the search was cut short.
+# carry no repeat" — there is no audit row saying the search was cut short.
 # find_maximal_repeats does return a `capped` flag for exactly this purpose, but
 # search_maximal_repeat currently discards it; surfacing it would mean a new
 # audit row in conjscan_to_ice.py, i.e. a change to the output, so it has been
@@ -483,7 +485,7 @@ MAX_SEED_MATCHES = 200_000
 
 
 def find_maximal_repeats(left_seq, right_seq, min_length=MIN_ATT_REPEAT_BP):
-    """Exact maximal repeats shared by two sequences - `vmatch -l` semantics.
+    """Exact maximal repeats shared by two sequences — `vmatch -l` semantics.
 
     Takes in: the two flank sequences, and the shortest repeat worth returning.
     Does:     indexes every min_length-mer of the left flank, then for each
@@ -496,7 +498,8 @@ def find_maximal_repeats(left_seq, right_seq, min_length=MIN_ATT_REPEAT_BP):
 
     Several seeds inside one long repeat all extend to the same maximal repeat,
     so results are de-duplicated on their extended coordinates rather than on
-    the seed - otherwise a 60 bp repeat would be reported 46 times.
+    the seed — otherwise a 60 bp repeat would be reported 46 times, once per
+    15 bp seed inside it.
     """
     hits = []
     if not left_seq or not right_seq or min_length <= 0:
@@ -549,8 +552,8 @@ def find_maximal_repeats(left_seq, right_seq, min_length=MIN_ATT_REPEAT_BP):
                 left_before -= 1
                 right_before -= 1
 
-            # Both walks stop one base PAST the repeat - that is the base where
-            # the sequences stopped agreeing - so step back in to get the repeat
+            # Both walks stop one base PAST the repeat — that is the base where
+            # the sequences stopped agreeing — so step back in to get the repeat
             # itself, 0-based inclusive.
             left_start, left_end = left_before + 1, left_after - 1
             right_start, right_end = right_before + 1, right_after - 1
@@ -571,16 +574,15 @@ def find_maximal_repeats(left_seq, right_seq, min_length=MIN_ATT_REPEAT_BP):
     return hits, capped
 
 
-
 # How many copies of the repeat may sit OUTSIDE a tRNA. Two, not one, and the
 # two cases it has to cover are why:
 #
 #   tRNA-anchored scar : attL is inside the reconstituted host tRNA and is NOT
-#                        counted; attR is outside -> 1 copy outside.
+#                        counted; attR is outside → 1 copy outside.
 #                        Same-species tRNA paralogues are also inside, so a
 #                        genome with five tRNA-Asn genes no longer defeats the
-#                        test - which is what the plain copy count got wrong.
-#   de novo scar       : neither copy is in a tRNA -> 2 copies outside.
+#                        test — which is what the plain copy count got wrong.
+#   de novo scar       : neither copy is in a tRNA → 2 copies outside.
 #
 # Either way a repeat FAMILY is still rejected: rRNA operons and REP/BIME
 # elements have many copies outside tRNAs, which is what this guard was written
@@ -611,7 +613,9 @@ def count_repeat_copies_outside_trnas(sequence, kmer, trnas):
         while start >= 0:
             positions.append(start + 1)        # 1-based
             # Step on by one, not by len(probe), so copies that overlap each
-            # other are all counted - tandem repeats must not hide from this.
+            # other are all counted — a tandem array of the repeat is exactly the
+            # kind of family this guard exists to reject, and must not hide by
+            # being counted once.
             start = sequence.find(probe, start + 1)
 
     outside = 0
@@ -632,12 +636,12 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
               bracket, and the tRNAs on this contig.
     Returns:  a result dict, or None.
 
-    THE RANKING, and why tRNA anchoring is not simply a separate mode.
+    The ranking, and why tRNA anchoring is not a separate mode.
         The previous design had two modes: a tRNA-anchored search and a blind
         one, with the tRNA mode strictly preferred and run FIRST off its own
         fixed-length probe. That is the wrong shape. ICEfinder divides the labour
-        differently and better - the tRNA LOCATES a candidate site, the repeat
-        search DELIMITS it - so there is one search here, and the tRNA is a
+        differently and better — the tRNA LOCATES a candidate site, the repeat
+        search DELIMITS it — so there is one search here, and the tRNA is a
         property of the candidates it returns rather than a separate way of
         finding them.
 
@@ -649,7 +653,7 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
         in that strict order. Length says how unlikely the match is by chance;
         sitting in a tRNA says the match is where integration actually happens.
         The second is evidence about the biology and the first is only evidence
-        against coincidence, so length is never allowed to outvote the anchor -
+        against coincidence, so length is never allowed to outvote the anchor —
         see the note at the ranking itself for the SPI-7 measurement that settled
         this.
 
@@ -670,24 +674,24 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
         return None
 
     # The floor is the LARGER of two requirements, and both are needed:
-    #   * MIN_ATT_REPEAT_BP (15) - ICEfinder2's published floor, below which a
+    #   * MIN_ATT_REPEAT_BP (15) — ICEfinder2's published floor, below which a
     #     repeat is too short to be a credible att site whatever the statistics;
-    #   * the chance-match floor for THESE window sizes - because two 50 kb
+    #   * the chance-match floor for THESE window sizes — because two 50 kb
     #     flanks share a 15 bp repeat by luck about 2.3 times over, so a flat 15
     #     would report noise on any large window. Verified: reinstating this is
     #     what stopped random sequence yielding confident boundaries again.
     #
-    # At the shipped 50 kb window this resolves to 18 bp - as it also did at the
+    # At the shipped 50 kb window this resolves to 18 bp — as it also did at the
     # old 30 kb window, so widening the window did not move the floor.
     #
-    # ⚠ NOTE THE AWKWARD BIT, because it is easy to misread. The published ICEKp
-    # direct repeat is 17 bp, which is BELOW this 18 bp floor - the module's
-    # motivating example would not clear its own threshold if the search were
-    # looking for that 17 bp core on its own. It is not: the search returns
-    # MAXIMAL repeats, so what it actually reports on those genomes is the longer
-    # repeat that CONTAINS the published core and extends past it on one or both
-    # sides. That is consistent with the measurement recorded above
-    # MIN_ATT_REPEAT_BP - nothing was found at 25 bp and pairs appeared at 18.
+    # The awkward bit, because it is easy to misread: the published ICEKp direct
+    # repeat is 17 bp, which is BELOW this 18 bp floor, so the module's motivating
+    # example would not clear its own threshold if the search were looking for
+    # that 17 bp core on its own. It is not. The search returns MAXIMAL repeats,
+    # so what it reports on those genomes is the longer repeat that CONTAINS the
+    # published core and runs past it on one or both sides — consistent with the
+    # measurement recorded above MIN_ATT_REPEAT_BP, where nothing was found at
+    # 25 bp and pairs appeared at 18.
     effective_min = max(min_repeat_bp,
                         minimum_informative_repeat_length(len(left_flank), len(right_flank)))
     repeats, _capped = find_maximal_repeats(left_flank, right_flank, effective_min)
@@ -713,7 +717,7 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
         right_in_trna = right_trna is not None
         # Two copies of the SAME tRNA are paralogues, not an integration scar.
         # Two copies in DIFFERENT tRNA species are a real possibility and used to
-        # be discarded here - see same_trna_species for the ICEEc2 measurement.
+        # be discarded here — see same_trna_species for the ICEEc2 measurement.
         if left_in_trna and right_in_trna and same_trna_species(left_trna, right_trna):
             continue
 
@@ -723,17 +727,17 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
         # The plain "occurs at most twice" rule is right for a de novo repeat but
         # WRONG for the tRNA-targeting elements that matter most, and it silently
         # rejected the real thing. ICEKp integrates at tRNA-Asn, so its att core
-        # is a piece of the tRNA 3' end - and a genome carrying five tRNA-Asn
+        # is a piece of the tRNA 3' end — and a genome carrying five tRNA-Asn
         # genes therefore contains that sequence five times whether or not any
         # ICE is present. Measured on both clinical isolates: the published ICEKp
         # repeat CCAGTCAGAGGAGCCAA occurs 5x, so the old rule threw it away.
         #
         # What integration actually leaves is asymmetric:
-        #   attL  -> inside the reconstituted host tRNA
-        #   attR  -> the second copy, out in ordinary sequence
-        #   other tRNA paralogues of the same species -> also inside tRNAs
+        #   attL  → inside the reconstituted host tRNA
+        #   attR  → the second copy, out in ordinary sequence
+        #   other tRNA paralogues of the same species → also inside tRNAs
         # so a genuine scar has exactly ONE copy outside any tRNA. Verified on
-        # both genomes: 5 copies, 4 inside tRNAs, 1 outside - and that one is
+        # both genomes: 5 copies, 4 inside tRNAs, 1 outside — and that one is
         # attR, giving a 59,517 bp element in each.
         #
         # The guard keeps all its power against the families it was written for:
@@ -744,7 +748,7 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
 
         anchored = left_in_trna or right_in_trna
 
-        # RANK BY ANCHORING FIRST, THEN BY LENGTH.
+        # Rank by anchoring FIRST, then by length.
         #
         # This used to rank on a single score, length + a fixed bonus when the
         # repeat was anchored, so that anchoring "broke ties between repeats of
@@ -761,7 +765,7 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
         # lands on the curated interval.
         #
         # Length still decides among anchored candidates, and among unanchored
-        # ones - it is only no longer allowed to outvote the anchor itself. The
+        # ones — it is only no longer allowed to outvote the anchor itself. The
         # comparison is strictly greater-than, so among equals the first
         # candidate seen wins, and find_maximal_repeats hands them over longest
         # first.
@@ -790,8 +794,8 @@ def search_maximal_repeat(sequence, element_start, element_end, trnas=(),
                 break
 
     return build_result(
-        # 'tRNA' when one copy sits in a tRNA - the arrangement integration
-        # leaves - and 'denovo' otherwise. Downstream only ACTS on tRNA-anchored
+        # 'tRNA' when one copy sits in a tRNA — the arrangement integration
+        # leaves — and 'denovo' otherwise. Downstream only ACTS on tRNA-anchored
         # boundaries, so this label still carries the same weight it always did.
         method="tRNA" if anchored else "denovo",
         left_copy=(left_start, left_end, 0),
@@ -809,17 +813,17 @@ def build_result(method, left_copy, right_copy, att_sequence, mismatches,
                  trna_name, trna_start, trna_end, repeat_orientation):
     """Package one att-site call into the dict conjscan_to_ice.py writes out.
 
-    Keys mirror the spec's Phase 3 output: attL, attR, att_seq, tRNA,
-    boundary_method - plus the refined element interval the boundaries imply and
-    the evidence (repeat length) behind the call.
+    Keys mirror the spec's Phase 3 output — attL, attR, att_seq, tRNA,
+    boundary_method — plus the refined element interval those boundaries imply
+    and the evidence (repeat length) behind the call.
 
-    ON `mismatches`, WHICH IS ALWAYS 0. The search is now exact - maximal repeats
-    are grown only while the two flanks agree base for base - so every call made
-    today passes 0, and the att_mismatches column in the output table is
-    constant. The parameter is kept because the column is part of the published
-    output schema and because a future mismatch-tolerant search (BLAST-style, see
-    the note above MIN_ATT_REPEAT_BP) would need it again. Do not read a 0 in
-    that column as "we checked and there were none".
+    On mismatches, which is ALWAYS 0. The search is exact: maximal repeats are
+    grown only while the two flanks agree base for base, so every call made today
+    passes 0 and the att_mismatches column of the output table is constant. The
+    parameter stays because that column is part of the published output schema,
+    and because a mismatch-tolerant search (BLAST-style, see the note above
+    MIN_ATT_REPEAT_BP) would need it again. Do NOT read a 0 in that column as
+    "we checked for mismatches and there were none".
     """
     return {
         "boundary_method": method,                       # tRNA | denovo
@@ -840,6 +844,11 @@ def build_result(method, left_copy, right_copy, att_sequence, mismatches,
     }
 
 
+# The answer when no credible att pair was found: same keys as build_result, so
+# conjscan_to_ice.py writes the same columns either way and never has to test for
+# a missing field. element_start/element_end are None on purpose — the caller
+# keeps the machinery span it already had, rather than being handed a boundary it
+# should not act on.
 NO_BOUNDARY_RESULT = {
     "boundary_method": "none",
     "att_left": "NA",
@@ -863,18 +872,17 @@ def find_att_sites(sequence, element_start, element_end, trnas=(),
                    mask=(), flank_window_bp=DEFAULT_FLANK_WINDOW_BP,
                    min_element_bp=DEFAULT_MIN_ELEMENT_BP,
                    max_element_bp=DEFAULT_MAX_ELEMENT_BP):
-    """Find the element's real ends. This is the function conjscan_to_ice.py calls.
+    """Find the element's real ends — the one function conjscan_to_ice.py calls.
 
-    Input:  the contig sequence; the machinery span (1-based inclusive) to
-            bracket; the tRNAs on this contig (from the Bakta GFF3); the
-            intervals to mask (the ISEScan calls); and the search/size bounds.
-    Output: always a dict of the shape above - NO_BOUNDARY_RESULT when nothing
-            was found, never None, so the caller can write the columns
-            unconditionally.
+    Takes in: the contig sequence; the machinery span (1-based inclusive) to
+              bracket; the tRNAs on this contig (from the Bakta GFF3); the
+              intervals to mask (the ISEScan calls); and the search/size bounds.
+    Returns:  always a dict, never None — NO_BOUNDARY_RESULT when nothing was
+              found — so the caller writes its columns unconditionally.
 
     Two steps, and that is the whole function: mask out the insertion sequences,
     then run the one repeat search over what is left. When it finds nothing the
-    machinery span stands unchanged and the report says boundary_method='none' -
+    machinery span stands unchanged and the report says boundary_method='none',
     the correct answer for an assembly whose contig ends before the element does.
     """
     if not sequence or element_start is None or element_end is None:
@@ -889,8 +897,8 @@ def find_att_sites(sequence, element_start, element_end, trnas=(),
     # Masking against the IS calls applies to the WHOLE search now. Under the old
     # design the tRNA-anchored half was deliberately left UNMASKED, because its
     # probe came from an annotated tRNA and was trusted on that basis. There is
-    # no privileged probe any more - every candidate is found by the same repeat
-    # search - so IS terminal repeats would flood it exactly as they flood a
+    # no privileged probe any more — every candidate is found by the same repeat
+    # search — so IS terminal repeats would flood it exactly as they flood a
     # blind scan. The spec calls this the single most likely way to get this
     # wrong.
     masked_sequence = mask_intervals(sequence, mask)
@@ -904,7 +912,12 @@ def find_att_sites(sequence, element_start, element_end, trnas=(),
 
 
 def group_by_contig(records, contig_key="contig"):
-    """Bucket a list of dicts by contig, so per-contig lookups are not O(n) each."""
+    """Bucket parsed tRNA rows into {contig: [row, ...]}.
+
+    conjscan_to_ice.py (and the CLI below) call this on the Bakta tRNAs before
+    looping over candidate elements, so each element is handed only the features
+    on its own contig instead of the whole genome's.
+    """
     grouped = {}
     for record in records:
         grouped.setdefault(record[contig_key], []).append(record)
@@ -916,9 +929,11 @@ def group_by_contig(records, contig_key="contig"):
 def main(argv=None):
     """Run the att search over a TSV of intervals and print what it found.
 
-    Not used by the workflow - conjscan_to_ice.py imports the functions above
-    directly - but invaluable for testing a hypothesis against a real genome
+    Not used by the workflow — conjscan_to_ice.py imports the functions above
+    directly — but invaluable for testing a hypothesis against a real genome
     without running Snakemake, and it keeps this module honestly executable.
+    Any TSV with contig/start/end columns will do, including the module's own
+    {sample}_ice_candidates.tsv.
     """
     parser = argparse.ArgumentParser(
         description="Find attL/attR direct repeats bracketing an element.")

@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Unit tests for workflow/scripts/build_bakta_replicons.py.
+"""Unit tests for workflow/scripts/15_replicons/build_bakta_replicons.py.
+
+The script under test builds the small table that tells Bakta which contigs of a
+long-read assembly are circular. That matters because Pyrodigal, the gene caller
+Bakta uses, only calls genes running across the origin on a sequence marked
+circular — on a closed chromosome that is a handful of real genes, dnaA among
+them. Getting the table wrong therefore costs annotation, and getting it wrong
+in the confident direction bakes a made-up replicon type into a record people
+read as fact.
 
 These need no tools and no databases: tiny in-memory fixtures (a FASTA, a Flye
 assembly_info.txt and a dnaapler reorientation summary) go through the parsers
@@ -11,8 +19,8 @@ breaking either one makes Bakta exit with a single unhelpful line:
   * the replicon file is never empty while the assembly has at least one record.
 
 Run either way:
-    pytest workflow/scripts/tests/test_build_bakta_replicons.py
-    python workflow/scripts/tests/test_build_bakta_replicons.py
+    pytest workflow/scripts/15_replicons/test_build_bakta_replicons.py
+    python workflow/scripts/15_replicons/test_build_bakta_replicons.py
 """
 
 import os
@@ -21,7 +29,6 @@ import tempfile
 import unittest
 
 # Import the module under test regardless of where the runner starts from.
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import build_bakta_replicons as br  # noqa: E402
 
 
@@ -35,7 +42,7 @@ def write_temp(content, suffix=".txt"):
     return handle.name
 
 
-# ── Fixtures ─────────────────────────────────────────────────────────────────
+# ── Building the three inputs: contigs, Flye info, dnaapler summary ──────────
 # Five contigs, each exercising one decision path:
 #   contig_1  circular + strong dnaA        -> chromosome / circular
 #   contig_2  circular + weak repA          -> contig / circular
@@ -85,7 +92,11 @@ DNAAPLER_SUMMARY = DNAAPLER_HEADER + (
 
 def build(fasta=FASTA, flye=FLYE_INFO, dnaapler=DNAAPLER_SUMMARY,
           min_coverage=80.0, min_identity=40.0):
-    """Run the whole parse+join chain on the given fixtures -> {contig: row}."""
+    """Run the whole parse+join chain on the given fixtures.
+
+    Returns ({contig: row}, rows) — the dict for readable assertions about one
+    contig, the list for anything that depends on file order.
+    """
     contig_ids = br.read_contig_ids(write_temp(fasta, ".fasta"))
     topology = br.parse_flye_info(write_temp(flye))
     markers = br.parse_dnaapler_summary(write_temp(dnaapler, ".tsv"))
@@ -93,6 +104,13 @@ def build(fasta=FASTA, flye=FLYE_INFO, dnaapler=DNAAPLER_SUMMARY,
                          min_coverage, min_identity)
     return {row["contig"]: row for row in rows}, rows
 
+
+# ── Type and topology: one contig per decision path ──────────────────────────
+# The two columns come from different places and are believed to different
+# degrees. Topology is a MEASUREMENT, read straight from Flye's "circ." column,
+# so it is reported whatever else is unknown. Type is an INFERENCE from a single
+# dnaapler hit, so it is only claimed when that hit is strong, and otherwise
+# falls back to the neutral "contig" Bakta would have assumed anyway.
 
 class TestTypeAndTopology(unittest.TestCase):
 
@@ -136,6 +154,13 @@ class TestTypeAndTopology(unittest.TestCase):
         self.assertEqual(rows["contig_1"]["marker"], "dnaA")
 
 
+# ── The status strings dnaapler writes instead of a marker name ──────────────
+# When dnaapler has nothing to reorient a contig by it does not leave the row
+# out — it fills the whole row with a status word. Those words land in the
+# numeric columns too, so the parser meets "Contig_ignored" where it expected a
+# coverage percentage. Every one of them must come back as an untyped contig
+# rather than a crash or, worse, a type read out of a status string.
+
 class TestDnaaplerStatusStrings(unittest.TestCase):
     """Each status string dnaapler can write into EVERY column must be safe."""
 
@@ -166,11 +191,18 @@ class TestDnaaplerStatusStrings(unittest.TestCase):
         self.assertIn("no_marker(autocomplete_method_mystery)", row["reason"])
 
 
+# ── When the join fails, and when it only partly succeeds ────────────────────
+# All three inputs join on the first whitespace token of the contig name. A
+# PARTIAL join is normal biology — dnaapler only reports contigs it could
+# reorient. A ZERO join means the IDs stopped matching, usually because a later
+# step renamed the contigs, and that one has to stop the run: see the comment
+# inside the first test for why a warning was not enough.
+
 class TestGracefulDegradation(unittest.TestCase):
 
     def test_zero_overlap_join_is_fatal(self):
-        # Simulates the silent failure this script exists to catch: a later step
-        # renamed the contigs, so neither table joins.
+        # Simulates the silent failure build_bakta_replicons.py exists to catch:
+        # a later step renamed the contigs, so neither table joins.
         #
         # This case USED to be only a warning, and the row-building half below still
         # shows why that was not enough: with nothing joined, build_rows produces a
@@ -205,7 +237,7 @@ class TestGracefulDegradation(unittest.TestCase):
         partial_markers = br.parse_dnaapler_summary(
             write_temp(DNAAPLER_SUMMARY, ".tsv")
         )
-        partial_markers.pop(next(iter(partial_markers)))  # drop one reoriented contig
+        partial_markers.pop(next(iter(partial_markers)))  # drop a reoriented contig
         flye_matches, dnaapler_matches = br.report_join_health(
             contig_ids, topology, partial_markers
         )
@@ -221,6 +253,13 @@ class TestGracefulDegradation(unittest.TestCase):
         self.assertTrue(all(row["type"] == "contig" for row in rows))
         self.assertTrue(all(row["topology"] == "linear" for row in rows))
 
+
+# ── What Bakta will and will not accept in the file ──────────────────────────
+# Bakta's replicon parser has no tolerance and no useful diagnostics, so these
+# are shape checks against ITS expectations rather than checks of our own logic:
+# exactly five tab-separated fields per row, no header line, and never an empty
+# file when the assembly has records. The audit TSV alongside it is ours and does
+# carry a header.
 
 class TestFileInvariants(unittest.TestCase):
 

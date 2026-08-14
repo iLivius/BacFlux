@@ -1,22 +1,32 @@
 """Tests for name_ice_elements.py — putting curated ICEberg names on ICE calls.
 
-WHAT THIS LAYER MUST NOT DO
-    It labels elements; it does not decide them. conjscan_to_ice.py works out what
-    is an ICE from machinery evidence, and nothing here may create, move, drop or
-    re-type an element. Several tests below exist purely to hold that line — in
-    particular that a `conjugative_region`, which has no integrase and is
-    explicitly NOT an ICE, can never be handed an ICE name.
+This layer labels elements; it does not decide them. conjscan_to_ice.py works out
+what is an ICE from machinery evidence, and nothing here may create, move, drop
+or re-type an element. Several tests below exist purely to hold that line — in
+particular that a `conjugative_region`, which has no integrase and is explicitly
+NOT an ICE, can never be handed an ICE name.
+
+The BLAST rows are written out by hand below, so none of this needs an ICEberg
+download or a blastn run. The naming layer itself is off unless a user configures
+mobilome.iceberg.urls or mobilome.iceberg.dir; ICEberg publishes no licence, so
+BacFlux ships the URL and never the data.
+
+Run: pytest workflow/scripts/80_mobilome/test_name_ice_elements.py -q
 """
 
 import name_ice_elements as ni
 
 
-# ── Fixtures ─────────────────────────────────────────────────────────────────
+# ── Building an ICEberg BLAST row and an ICE candidate row ───────────────────
 
 def iceberg_hit(contig="contig_1", name="ICEKp1", accession="CP012345.1",
                 pident="99.5", length=50_000, qstart=100_000, qend=150_000,
                 sstart=1, send=50_000, bitscore="90000", slen=50_000):
-    """One BLAST row against an ICEberg-shaped defline."""
+    """One BLAST row against an ICEberg-shaped defline.
+
+    q* fields are our contig, s* fields the curated reference, and slen its full
+    length — the three the naming decision turns on.
+    """
     subject = f"ICEberg|1174|{name}|GenBank|{accession}|{sstart}..{send}"
     return {
         "qseqid": contig, "sseqid": subject, "pident": str(pident),
@@ -40,7 +50,7 @@ def reasons(audit_rows):
     return {row["reason"] for row in audit_rows}
 
 
-# ── Defline parsing ──────────────────────────────────────────────────────────
+# ── Pulling the element name out of an ICEberg defline ───────────────────────
 
 def test_the_element_name_is_the_third_pipe_field():
     """ICEberg deflines are pipe-delimited and regular. Names contain hyphens
@@ -57,7 +67,12 @@ def test_an_unexpected_defline_keeps_the_hit():
     assert accession == ""
 
 
-# ── The core naming behaviour ────────────────────────────────────────────────
+# ── When a curated name is earned, and when it is not ────────────────────────
+# Two independent measures have to agree before a bare name is given: how much of
+# OUR element the hit covers (a curated element clipping our edge is not the same
+# element) and how much of the REFERENCE is present inside our interval (less than
+# most of it, and the element is only "-like"). Both thresholds are the naming
+# cascade's convention, not a biological boundary.
 
 def test_an_overlapping_curated_element_supplies_the_name():
     rows, audit = ni.name_elements("S1", [ice_row()], [iceberg_hit()])
@@ -113,10 +128,11 @@ def test_a_conjugative_region_never_receives_an_ice_name():
 
 
 def test_naming_never_changes_coordinates_or_type():
-    """Even on a perfect match, the element's own extent and class are untouched -
+    """Even on a perfect match, the element's own extent and class are untouched —
     the curated record is used for its NAME, not to redraw our call."""
     row = ice_row(start=100_000, end=150_000)
-    # A curated element much larger than ours, as really happens on KPNIH1.
+    # A curated element much larger than ours, which is what really happens on
+    # the K. pneumoniae positive control.
     hit = iceberg_hit(sstart=1, send=200_000, slen=200_000, length=50_000)
     rows, _audit = ni.name_elements("S1", [row], [hit])
     assert rows[0]["start"] == "100000"
@@ -126,7 +142,12 @@ def test_naming_never_changes_coordinates_or_type():
 
 def test_a_much_larger_reference_is_reported_as_such():
     """The useful side effect of naming: it shows how far our boundaries fall
-    short. On KPNIH1 our ICE spans 40 kb where ICEberg's record spans 58 kb."""
+    short. On the K. pneumoniae positive control (ATCC BAA-2146, CP006659.2) our
+    ICE call now spans 54,943 bp against ICEberg's 58,048 bp for the same element,
+    ICEKpnATCCBAA-2146-1 — we recover 0.946 of it and stop 3,138 bp inside its far
+    end. The 40 kb below is the wider gap that same element showed before the att
+    search was reworked (2026-07-31), when the interval was only the machinery
+    span; see docs/mobilome_worked_example.md."""
     row = ice_row(start=100_000, end=140_000)          # 40,001 bp
     hit = iceberg_hit(qstart=100_000, qend=140_000, length=40_000,
                       sstart=1, send=58_000, slen=58_000)
@@ -136,7 +157,7 @@ def test_a_much_larger_reference_is_reported_as_such():
     assert "floor" in matched[0]["detail"]
 
 
-# ── Ambiguity ────────────────────────────────────────────────────────────────
+# ── One real element matching many ICEberg entries ───────────────────────────
 
 def test_near_identical_alternatives_are_counted():
     """ICEs of one species are near-identical across strains, so a single real
@@ -165,7 +186,10 @@ def test_several_hsps_of_one_reference_are_not_counted_as_alternatives():
     assert int(rows[0]["iceberg_alternatives"]) == 0
 
 
-# ── Graceful degradation ─────────────────────────────────────────────────────
+# ── Degrading when ICEberg has nothing to say ────────────────────────────────
+# Most environmental isolates carry no catalogued ICE, and the database is off
+# altogether unless a URL is configured, so "no name" is the ordinary outcome.
+# The element and its mobility tier must survive it untouched.
 
 def test_no_blast_hits_leaves_everything_unnamed_but_intact():
     rows, audit = ni.name_elements("S1", [ice_row()], [])
@@ -182,7 +206,7 @@ def test_like_is_judged_on_the_part_inside_the_element():
     """The whole genome is blasted, so a curated element can match well beyond our
     interval. Judging "-like" on the full HSP answers "how much of the curated
     element is anywhere on this contig?" when the question is "how much of it is
-    in the thing we are naming?" - and the first reading hands a bare, confident
+    in the thing we are naming?" — and the first reading hands a bare, confident
     name to an element we have only partly found."""
     row = ice_row(start=100_000, end=110_000)          # our call: 10 kb
     # The curated element matches 50 kb of contig, only 10 kb of it inside us.

@@ -542,7 +542,7 @@ over.
 
 **First, the two searches are the same search.** BacFlux's att search has not used
 `blastn` since commit `9c05c3e`; it computes **exact maximal repeats in standard-
-library Python** (`workflow/scripts/mobilome/att_search.py`), which is vmatch's
+library Python** (`workflow/scripts/80_mobilome/att_search.py`), which is vmatch's
 own semantics. To test that properly rather than argue it, a second search was
 built on vmatch's actual data structure — prefix-doubling suffix array, Kasai LCP
 array, cross-flank MEM enumeration — and run against ours on every real flank

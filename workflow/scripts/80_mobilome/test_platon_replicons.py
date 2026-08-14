@@ -1,15 +1,19 @@
-"""Tests for platon_replicons.py — the per-contig replicon call.
+"""Tests for platon_replicons.py — the per-contig "chromosome or plasmid?" call.
 
-WHY THIS FILE MATTERS
-    This script decides, for every contig, "chromosome or plasmid?", and that
-    single answer drives tiers 5 and 6 of the mobility ladder. Getting it wrong
-    in the CHROMOSOME direction is the worst error the module can make: every AMR
-    gene on a missed plasmid is then reported as a tier 1 "intrinsic candidate",
-    which is precisely the claim a reader would use to conclude the resistance is
-    a species trait and not transferable.
+That single answer drives tiers 5 and 6 of the mobility ladder, and getting it
+wrong in the CHROMOSOME direction is the worst error the module can make: every
+AMR gene on a missed plasmid is then reported as a tier 1 "intrinsic candidate",
+which is precisely the claim a reader would use to conclude the resistance is a
+species trait and not transferable.
 
-    The tests below concentrate on the four ways Platon and geNomad can combine,
-    because that is where that error was hiding.
+The tests concentrate on the four ways Platon and geNomad can combine, because
+that is where that error was hiding, and on what happens when geNomad was never
+run — it is opt-in, so that is the ordinary case, not an error.
+
+No tool and no database is needed: the fixtures below build a directory shaped
+like Platon's output in pytest's tmp_path.
+
+Run: pytest workflow/scripts/80_mobilome/test_platon_replicons.py -q
 """
 
 import os
@@ -17,16 +21,16 @@ import os
 import platon_replicons as pr
 
 
-# ── Fixtures ─────────────────────────────────────────────────────────────────
+# ── Building a Platon output directory and a concordance table ───────────────
 
 def write_platon_dir(tmp_path, prefix="contigs_final",
                      plasmids=(), chromosomes=(), table_rows=()):
     """Build a directory shaped like Platon's output.
 
-    Platon writes three things this script reads: a per-contig TSV, a FASTA of
-    the contigs it called chromosomal, and a FASTA of the ones it called plasmid.
-    Any of them can legitimately be missing or header-only — a genome with no
-    plasmid produces no plasmid FASTA at all — so the fixtures allow that.
+    Platon writes three things platon_replicons.py reads: a per-contig TSV, a
+    FASTA of the contigs it called chromosomal, and a FASTA of the ones it called
+    plasmid. Any of them can legitimately be missing or header-only — a genome
+    with no plasmid produces no plasmid FASTA at all — so the fixtures allow that.
     """
     directory = tmp_path / "platon"
     directory.mkdir(exist_ok=True)
@@ -50,7 +54,9 @@ def write_concordance(tmp_path, rows):
     """Build a {sample}_plasmid_concordance.tsv as rule plasmid_concordance does.
 
     Its rows are the UNION of the two tools' plasmid calls, so a contig appears
-    only when at least one of them thought it was a plasmid.
+    only when at least one of them thought it was a plasmid. A contig both tools
+    called chromosomal is therefore ABSENT, which is why "not in this file" can
+    never be read as "geNomad disagreed".
     """
     header = ["sample", "contig", "platon_call", "genomad_call",
               "genomad_score", "agreement", "confidence"]
@@ -66,7 +72,11 @@ def rows_by_contig(rows):
     return {row["contig"]: row for row in rows}
 
 
-# ── The four Platon x geNomad outcomes ───────────────────────────────────────
+# ── The four ways Platon and geNomad can combine ─────────────────────────────
+# Platon stays the default caller and geNomad is only ever consulted, never
+# allowed to overrule an active Platon call. The `replicon_call_source` column
+# records which of the two decided, so a reader can always see how much backing a
+# plasmid call has.
 
 def test_both_tools_agree_the_contig_is_a_plasmid(tmp_path):
     """The easy case: Platon called it, geNomad agrees. Nothing changes except
@@ -109,8 +119,10 @@ def test_a_plasmid_platon_never_classified_is_rescued_by_genomad(tmp_path):
 
     assert rows["p_missed"]["replicon"] == "plasmid"
     assert rows["p_missed"]["replicon_call_source"] == "genomad"
-    # Mobility is deliberately NOT guessed - Platon's conjugation counts are what
-    # type it and they do not exist here. CONJscan resolves tier 5 vs 6 instead.
+    # Mobility is deliberately NOT guessed — the conjugation/mobilization gene
+    # counts that type a plasmid come from Platon's own table, and Platon never
+    # saw this contig. Whether it is tier 5 or tier 6 is left to CONJscan, which
+    # scans the whole proteome independently.
     assert rows["p_missed"]["plasmid_mobility"] == "unknown"
     assert "geNomad" in rows["p_missed"]["mobility_evidence"]
 
@@ -130,8 +142,8 @@ def test_without_genomad_the_same_contig_stays_unknown(tmp_path):
 def test_a_straight_disagreement_is_flagged_not_silently_resolved(tmp_path):
     """Platon says chromosome, geNomad says plasmid.
 
-    The call is NOT flipped - Platon is the default caller and made an active
-    call - but the conflict has to be visible, because if geNomad is right then
+    The call is NOT flipped — Platon is the default caller and made an active
+    call — but the conflict has to be visible, because if geNomad is right then
     calling the gene intrinsic is exactly wrong.
     """
     platon_dir = write_platon_dir(tmp_path, chromosomes=["c_disputed"])
@@ -170,7 +182,7 @@ def test_platon_only_plasmid_keeps_its_own_call(tmp_path):
     assert rows["p1"]["plasmid_mobility"] == "conjugative"
 
 
-# ── Graceful degradation ─────────────────────────────────────────────────────
+# ── Degrading gracefully when geNomad never ran ──────────────────────────────
 
 def test_a_missing_concordance_file_is_a_silent_no_op(tmp_path):
     """geNomad is opt-in, so its absence is normal, not an error."""
@@ -179,7 +191,7 @@ def test_a_missing_concordance_file_is_a_silent_no_op(tmp_path):
 
 
 def test_a_header_only_concordance_means_no_plasmid_candidates(tmp_path):
-    """Both tools ran and neither found a plasmid - a perfectly normal result for
+    """Both tools ran and neither found a plasmid — a perfectly normal result for
     a genome that has none."""
     concordance = write_concordance(tmp_path, [])
     assert pr.read_genomad_concordance(concordance) == {}

@@ -14,7 +14,7 @@ model, why does BacFlux polish with a methylation-aware one?**
 
 In long-read modes (`nanopore`, `hybrid`) with `medaka_model: auto`, BacFlux asks
 Medaka to resolve the model from the reads themselves, requesting the *bacterial*
-variant — `workflow/scripts/medaka_model_check.py`:
+variant — `workflow/scripts/12_medaka_check/medaka_model_check.py`:
 
 ```
 medaka tools resolve_model --auto_model consensus_bacteria <reads>

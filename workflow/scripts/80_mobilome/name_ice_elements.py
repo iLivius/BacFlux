@@ -1,42 +1,39 @@
 #!/usr/bin/env python3
 """Put curated names on the ICE/IME candidates, using ICEberg.
 
-WHY THIS EXISTS
-    conjscan_to_ice.py works out that an element IS an ICE - it has an integrase,
-    a relaxase and a mating-pair apparatus - but it has no way to say WHICH ICE.
-    Every row came out with mge_name = NA, so a report could say "predicted
-    self-transmissible element" and never "ICEKp1". A name is what lets a reader
-    look the thing up, compare it with the literature, and recognise it in the
-    next isolate.
+conjscan_to_ice.py works out that an element IS an ICE — it has an integrase, a
+relaxase and a mating-pair apparatus — but has no way to say WHICH ICE. Every row
+came out with mge_name = NA, so a report could say "predicted self-transmissible
+element" and never "ICEKp1". A name is what lets a reader look the thing up,
+compare it with the literature, and recognise it in the next isolate.
 
-WHAT IT DOES
-    Takes the ICE/IME table and a BLAST of the whole genome against ICEberg, and
-    for each candidate finds the best curated element overlapping it. It does not
-    create, move or drop any element: the only thing that changes is the name
-    column and the evidence behind it.
+Reads {sample}_ice_candidates.tsv (rule conjscan_ice) and a blastn of the whole
+genome against ICEberg (rule iceberg_blast). Writes the same table with mge_name
+and the naming evidence filled in, plus an audit TSV explaining every candidate
+that could NOT be named. It creates, moves and drops nothing: the only things
+that change are the name column and the evidence behind it, so no AMR gene's
+mobility tier can move because of this step.
 
-WHY IT JOINS BY OVERLAP RATHER THAN BLASTING EACH ELEMENT
-    Blasting the whole genome once is cheaper than extracting every candidate to
-    its own FASTA, and it has a useful side effect: a curated ICE that overhangs
-    our interval still shows up, and the overhang is reported. That matters
-    because our interval is a FLOOR - the machinery span, not the element's true
-    ends, unless a tRNA-anchored att pair was found. On the K. pneumoniae
-    positive control (ATCC BAA-2146, CP006659.2) the ICE call runs
-    4,604,073-4,644,558 while ICEberg's record for the same element
-    (ICEKpnATCCBAA-2146-1) runs 4,603,840-4,661,887: we under-call the right end
-    by about 17 kb, and this script can say so instead of leaving the reader to
-    guess.
+Why it joins by overlap instead of blasting each element: blasting the whole
+genome once costs less than extracting every candidate to its own FASTA, and it
+buys something — a curated ICE that OVERHANGS our interval still shows up, and
+the overhang gets reported. That matters because our interval is a FLOOR, the
+machinery span rather than the element's true ends, unless a tRNA-anchored att
+pair was found. On the K. pneumoniae positive control (ATCC BAA-2146, CP006659.2)
+the ICE call runs 4,604,073-4,644,558 while ICEberg's record for the same element
+(ICEKpnATCCBAA-2146-1) runs 4,603,840-4,661,887: the right end is under-called by
+about 17 kb, and this can say so rather than leave the reader to guess.
 
-A CAVEAT WORTH KNOWING
-    ICEberg entries are derived from published genomes, so if the sample IS one
-    of those genomes (or a close relative) the match will be 100% and the name is
-    exact rather than approximate. That is a real result, not a bug - but do not
-    read "100% identity to ICEKpnATCCBAA-2146-1" as independent confirmation when
-    the sample is ATCC BAA-2146.
+The caveat worth knowing: ICEberg entries are derived from published genomes, so
+when the sample IS one of those genomes (or a close relative) the match comes out
+at 100% and the name is exact rather than approximate. That is a real result, not
+a bug — but "100% identity to ICEKpnATCCBAA-2146-1" is not independent
+confirmation when the sample is ATCC BAA-2146.
 
-WHAT IT PRODUCES
-    A copy of the ICE table with mge_name and the naming evidence filled in, plus
-    an audit TSV explaining every candidate that could NOT be named.
+The whole layer is off unless mobilome.iceberg.urls or mobilome.iceberg.dir is
+set (MOBILOME_NAME_ICE in shared/00_common.smk, which also decides whether
+colocalise.py reads the named table or the raw one). ICEberg publishes no licence
+or terms of use, so BacFlux ships a URL and never the data.
 """
 
 import argparse
@@ -44,8 +41,11 @@ import os
 import sys
 
 
-# Columns requested from `blastn -outfmt 6`, in this order. The rule and this
-# list must be changed together.
+# ── What BLAST gives us, and the three naming thresholds ─────────────────────
+
+# Columns requested from `blastn -outfmt 6`, in this order. rule iceberg_blast
+# spells the same twelve out in its -outfmt string, so the rule and this list
+# must be changed together — a mismatch shifts every field silently.
 BLAST_COLUMNS = [
     "qseqid", "sseqid", "pident", "length",
     "qstart", "qend", "sstart", "send",
@@ -57,18 +57,20 @@ BLAST_COLUMNS = [
 # naming cascade (which wants 80% of the reference): an ICE is mosaic and its
 # cargo varies between strains, so demanding near-completeness would refuse to
 # name exactly the divergent elements a name would help most with.
+# Overridden by mobilome.iceberg.min_overlap_fraction, which rule
+# name_ice_elements always passes.
 DEFAULT_MIN_OVERLAP_FRACTION = 0.50
 
 # Identity floor. Below this the elements are related but not the same, and the
-# name would mislead.
+# name would mislead. Overridden by mobilome.iceberg.min_identity.
 DEFAULT_MIN_IDENTITY = 80.0
 
 # At or above this fraction of the REFERENCE element present, the name is used
 # bare; below it the name is suffixed "-like", because what we have is clearly
 # related to the curated element but is not the whole of it.
 #
-# THIS IS THE ONLY THING THAT CONTROLS THE "-like" SUFFIX, and it is deliberately
-# NOT exposed on the command line - there is no --exact-name-coverage flag, so a
+# This is the ONLY thing that controls the "-like" suffix, and it is deliberately
+# NOT exposed on the command line — there is no --exact-name-coverage flag, so a
 # user who wants to change when a name is hedged has to edit this line. It is
 # named here so that grepping for "-like" or for this constant finds the one
 # place that decides it (applied in name_elements, below).
@@ -77,8 +79,19 @@ EXACT_NAME_REFERENCE_COVERAGE = 0.80
 # Element types that can carry a curated ICEberg name. A conjugative_region has
 # no integrase and is explicitly NOT an ICE (spec §8 phase 4, "report it, do not
 # call it an ICE"), so giving it an ICE name would undo that distinction.
+#
+# Two entries in this set read oddly against what conjscan_to_ice.py actually
+# writes, which is one of: ice, ime, genomic_island, conjugative_region, aice.
+#   * `cime` never arrives — that class is called cime_or_island there and is
+#     written out as `genomic_island`, so the entry is inert.
+#   * `aice` is missing, so an ICEscan AICE call is never given an ICEberg name.
+#     It leaves through the element_type_not_nameable branch below, whose audit
+#     text is written about conjugative regions and integrases and therefore does
+#     not describe an AICE.
 NAMEABLE_ELEMENT_TYPES = {"ice", "ime", "cime", "genomic_island"}
 
+
+# ── Reading ICEberg deflines and the two input files ─────────────────────────
 
 def parse_iceberg_name(subject_id):
     """Pull the element name out of an ICEberg defline.
@@ -103,7 +116,13 @@ def parse_iceberg_name(subject_id):
 
 
 def read_blast_hits(path):
-    """Read the BLAST tabular output. A missing or empty file is not an error."""
+    """Read the BLAST tabular output. A missing or empty file is not an error.
+
+    A line with fewer than the twelve expected fields is skipped rather than
+    padded, because a short line means the columns no longer line up with
+    BLAST_COLUMNS and every value read from it would be attributed to the wrong
+    field. An empty result is normal — a genome with no ICEberg match at all.
+    """
     hits = []
     if not path or not os.path.isfile(path):
         return hits
@@ -120,7 +139,12 @@ def read_blast_hits(path):
 
 
 def read_tsv(path):
-    """Read a TSV into (header, rows-as-dicts), preserving column order."""
+    """Read a TSV into (header, rows-as-dicts), preserving column order.
+
+    Column order is kept because the output is the SAME table with extra columns
+    appended, and a reader comparing the two files side by side should not have
+    to hunt for a column that moved.
+    """
     if not path or not os.path.isfile(path):
         return [], []
     with open(path, encoding="utf-8", errors="replace") as handle:
@@ -131,6 +155,10 @@ def read_tsv(path):
     rows = [dict(zip(header, line.split("\t"))) for line in lines[1:]]
     return header, rows
 
+
+# ── Small shared helpers ─────────────────────────────────────────────────────
+# Coordinates throughout are 1-based and inclusive, the convention BLAST, Bakta
+# and the rest of the mobilome module all use, which is why overlap_bp adds 1.
 
 def to_int(value, default=0):
     try:
@@ -152,12 +180,19 @@ def overlap_bp(a_start, a_end, b_start, b_end):
 
 
 def group_hits_by_contig(hits):
-    """Index BLAST hits by contig so each candidate only scans its own."""
+    """Index BLAST hits by contig so each candidate only scans its own.
+
+    An ICE on contig 3 can only be named by a curated element that matched
+    contig 3 — an interval on one contig says nothing about coordinates on
+    another, and joining across contigs would produce nonsense overlaps.
+    """
     by_contig = {}
     for hit in hits:
         by_contig.setdefault(hit["qseqid"], []).append(hit)
     return by_contig
 
+
+# ── Which curated element best explains this candidate ───────────────────────
 
 def best_match_for_element(element_start, element_end, contig_hits,
                            min_overlap_fraction, min_identity):
@@ -167,14 +202,20 @@ def best_match_for_element(element_start, element_end, contig_hits,
     Does:     keeps hits that overlap the candidate by at least
               min_overlap_fraction OF THE CANDIDATE and reach the identity floor,
               then takes the highest-scoring one.
-    Returns:  (best_hit_dict_or_None, n_comparable) where n_comparable counts the
-              other references that scored within 1% of the winner.
+    Returns:  (best_hit_dict_or_None, n_comparable), where n_comparable counts the
+              distinct OTHER curated elements that fit about as well — within half
+              a percentage point of the winner's identity and within 10% of its
+              overlap, the bands applied below.
 
     Why n_comparable matters: ICEs of one species are often near-identical across
     strains, so a single genuine element routinely matches a dozen ICEberg entries
     at ~100%. Reporting one name without saying that would imply a precision the
     data does not have. On the K. pneumoniae positive control the winning name
     beats six others that are all within 0.01% identity.
+
+    The pool it counts over is whatever rule iceberg_blast returned, which is
+    capped at -max_target_seqs 50, so the number saturates rather than growing
+    without limit.
     """
     element_length = element_end - element_start + 1
     if element_length <= 0:
@@ -220,7 +261,8 @@ def best_match_for_element(element_start, element_end, contig_hits,
         if name == winner_name:
             continue
         # Within half a percentage point of identity, and covering a comparable
-        # amount of our element (within 10%).
+        # amount of our element (within 10%). Both bands are conventions chosen to
+        # catch the near-identical group, not biological boundaries.
         if abs(to_float(hit["pident"]) - winner_identity) > 0.5:
             continue
         if winner_overlap > 0 and abs(shared - winner_overlap) / winner_overlap > 0.10:
@@ -232,6 +274,8 @@ def best_match_for_element(element_start, element_end, contig_hits,
     best_hit["_overlap_fraction"] = best_shared / element_length
     return best_hit, len(comparable_names)
 
+
+# ── What we write ────────────────────────────────────────────────────────────
 
 def audit_row(sample, action, reason, detail, contig="NA", start="NA", end="NA"):
     """One line of the decision trail, same shape as the other mobilome audits."""
@@ -245,7 +289,7 @@ def audit_row(sample, action, reason, detail, contig="NA", start="NA", end="NA")
 AUDIT_COLUMNS = ["sample", "contig", "start", "end", "action", "reason", "detail"]
 
 # EVERY `action` / `reason` PAIR THIS SCRIPT CAN WRITE. Nothing is ever dropped
-# from the ICE table here - this script only ADDS a name column - so there is no
+# from the ICE table here — only a name column is added — so there is no
 # "discarded" action. What the audit records is why an element did or did not get
 # a curated name.
 #
@@ -263,21 +307,27 @@ AUDIT_COLUMNS = ["sample", "contig", "start", "end", "action", "reason", "detail
 #     no_ice_candidates             the ICE table was empty; nothing to name
 #     no_iceberg_hits               BLAST returned nothing against ICEberg
 #     element_type_not_nameable     the element is a type that must NOT carry an
-#                                   ICE name - a conjugative_region has no
+#                                   ICE name — a conjugative_region has no
 #                                   integrase and is deliberately not an ICE, so
-#                                   naming it would undo that distinction
+#                                   naming it would undo that distinction. An
+#                                   aice leaves through here too; see
+#                                   NAMEABLE_ELEMENT_TYPES above.
 
-# Columns this script adds to the ICE table. mge_name already exists there (as
-# NA); the rest are the evidence behind whatever it now says.
+# Columns appended to the ICE table. mge_name already exists there (as NA); these
+# are the evidence behind whatever it now says, and they let a reader judge a name
+# rather than take it on trust.
 ADDED_COLUMNS = [
     "iceberg_accession",       # the GenBank record the curated element came from
     "iceberg_identity",        # percent identity of the best hit
     "iceberg_overlap_fraction",  # how much of OUR element the hit covers
     "iceberg_reference_coverage",  # how much of the CURATED element is present
     "iceberg_alternatives",    # other curated elements that fit about as well
-    "iceberg_reference_span",  # the curated element's own extent, for comparison
+    "iceberg_reference_span",  # despite the name, the curated element's full
+                               # LENGTH in bp (BLAST slen), not a start-end span
 ]
 
+
+# ── Filling in the name, and the evidence behind it ──────────────────────────
 
 def name_elements(sample, element_rows, hits,
                   min_overlap_fraction=DEFAULT_MIN_OVERLAP_FRACTION,
@@ -288,6 +338,11 @@ def name_elements(sample, element_rows, hits,
               genome against ICEberg.
     Does:     for each nameable element, finds the best overlapping curated hit.
     Returns:  (rows, audit_rows). Rows are modified in place; nothing is dropped.
+
+    Every candidate gets every ADDED_COLUMN filled, with NA where naming did not
+    happen, so the table has one shape whether ICEberg matched or not. Downstream
+    only mge_name is read (colocalise.py carries it onto the AMR row); the
+    iceberg_* columns are there for a person deciding whether to trust a name.
     """
     audit_rows = []
     by_contig = group_hits_by_contig(hits)
@@ -340,7 +395,7 @@ def name_elements(sample, element_rows, hits,
         # actually INSIDE our element, not over the whole genome-wide HSP.
         #
         # The whole genome is blasted, so a curated element can match far beyond
-        # our interval - on the K. pneumoniae positive control the ICEberg record
+        # our interval — on the K. pneumoniae positive control the ICEberg record
         # runs 17.5 kb past our call.
         # Judging "-like" on the full HSP therefore answers "how much of the
         # curated element exists anywhere on this contig?" when the question is
@@ -359,7 +414,8 @@ def name_elements(sample, element_rows, hits,
 
         # "-like" when only part of the curated element is present. The element is
         # clearly related, but calling a 55% match by the bare name would claim an
-        # identity the sequence does not support.
+        # identity the sequence does not support. EXACT_NAME_REFERENCE_COVERAGE is
+        # the only thing that decides this, and it is not a command-line flag.
         display_name = name if reference_covered >= EXACT_NAME_REFERENCE_COVERAGE else f"{name}-like"
 
         row["mge_name"] = display_name
@@ -388,11 +444,17 @@ def name_elements(sample, element_rows, hits,
                if reference_length > (end - start + 1) * 1.1 else ""),
             contig=contig, start=start, end=end))
 
-        # Not used for the name, but computed above and worth keeping honest.
+        # reference_start / reference_end are where the hit falls in the CURATED
+        # element's own coordinates. Nothing reports them: iceberg_reference_span
+        # carries the reference's full length (slen) instead, which is the number
+        # the audit line above sets our interval against. The `del` says so out
+        # loud, so nobody hunts for a use that is not there.
         del reference_start, reference_end
 
     return element_rows, audit_rows
 
+
+# ── Writing the two outputs ──────────────────────────────────────────────────
 
 def write_tsv(path, columns, rows):
     """Write a TSV with a header, creating the parent directory if needed."""
@@ -404,6 +466,11 @@ def write_tsv(path, columns, rows):
         for row in rows:
             handle.write("\t".join(str(row.get(column, "NA")) for column in columns) + "\n")
 
+
+# ── Command line ─────────────────────────────────────────────────────────────
+# rule name_ice_elements passes all six flags, the two thresholds coming from
+# mobilome.iceberg.min_identity and mobilome.iceberg.min_overlap_fraction. The
+# defaults below are for a hand run.
 
 def main(argv=None):
     parser = argparse.ArgumentParser(

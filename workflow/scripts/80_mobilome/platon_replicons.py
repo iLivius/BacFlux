@@ -2,60 +2,78 @@
 """Turn Platon's plasmid call into the per-contig replicon table the mobility
 ladder needs.
 
-WHY THIS EXISTS
-    The mobility ladder's top two rungs are about PLASMIDS:
-        tier 5  on a mobilizable plasmid   -> transferable, but needs a helper
-        tier 6  on a conjugative plasmid   -> PREDICTED self-transmissible
-    Deciding between them needs two facts per contig: (a) is it a plasmid at all,
-    and (b) does that plasmid carry the machinery to move itself.
+The top two rungs of the mobility ladder are plasmid questions
+--------------------------------------------------------------
+    tier 5  on a mobilizable plasmid   -> transferable, but needs a helper
+    tier 6  on a conjugative plasmid   -> PREDICTED self-transmissible
 
-    Platon already answers BOTH, which is easy to miss. It splits the assembly
-    into `*.chromosome.fasta` and `*.plasmid.fasta`, and its per-contig table
-    carries `# Conjugation`, `# Mobilization` and `# OriT` columns. So no extra
-    tool is needed for the plasmid case — this script just reads what Platon
-    already worked out and writes it in the shape colocalise.py expects.
+Deciding between them needs two facts per contig: is it a plasmid at all, and
+does that plasmid carry the machinery to move itself.
 
-    (The CHROMOSOMAL case — conjugation machinery sitting on the chromosome, i.e.
-    an ICE — is a different question that Platon structurally cannot answer: it
-    excludes long contigs from consideration entirely. That is CONJscan's job,
-    handled by conjscan_to_ice.py.)
+Platon already answers BOTH, which is easy to miss. It splits the assembly into
+`*.chromosome.fasta` and `*.plasmid.fasta`, and its per-contig table carries
+`# Conjugation`, `# Mobilization` and `# OriT` columns. No extra tool is needed
+for the plasmid case — what happens here is reading what Platon already worked
+out and writing it in the shape colocalise.py expects.
 
-WHAT IT TAKES IN
-    A Platon output directory, as produced by rule plasmid_search:
-        <prefix>.tsv                 per-contig table (may be header-only)
-        <prefix>.chromosome.fasta    contigs Platon called chromosomal
-        <prefix>.plasmid.fasta       contigs Platon called plasmid
+The CHROMOSOMAL case — conjugation machinery sitting on the chromosome, an ICE —
+is a different question Platon structurally cannot answer, because it excludes
+long contigs from consideration entirely. That is CONJscan's job, handled by
+conjscan_to_ice.py.
 
-WHAT IT PRODUCES
-    A TSV with one row per contig:
-        contig, replicon, replicon_id, plasmid_mobility, mobility_evidence
-    consumed by colocalise.py (--replicons).
+What it reads, and what reads it
+--------------------------------
+  --platon-dir  a Platon output directory, from rule plasmid_search:
+                  <prefix>.tsv               per-contig table, may be header-only
+                  <prefix>.chromosome.fasta  contigs Platon called chromosomal
+                  <prefix>.plasmid.fasta     contigs Platon called plasmid
+                source: rule plasmid_search in shared/60_plasmid.smk
+  --contigs     the assembly itself, so contigs Platon never mentioned are still
+                listed, and so their lengths are known
+                source: the final contigs of whichever mode is running
+  --genomad-concordance  geNomad's second opinion, when the user opted in
+                source: rule plasmid_concordance in shared/60_plasmid.smk
 
-    IMPORTANT: a contig MISSING from this table is treated downstream as
-    `unknown`, not as chromosome. That is deliberate — calling something
-    "chromosomal, intrinsic candidate" when we simply never looked would be the
-    most misleading mistake this module could make. So this script lists EVERY
-    contig it can see, and says `unknown` honestly when Platon did not classify
-    one.
+Out comes {sample}_replicon_calls.tsv, one row per contig:
+    contig, replicon, replicon_id, plasmid_mobility, mobility_evidence,
+    replicon_call_source
+read by colocalise.py as --replicons, and by conjscan_to_ice.py, which needs it
+to tell a conjugative PLASMID from an ICE (an ICE integrates into a chromosome by
+definition, so machinery on a contig called `plasmid` is demoted with the audit
+reason ice_demoted_on_plasmid_replicon, and on an `unknown` contig with
+ice_on_unclassified_replicon).
 
-WHY THERE IS NO --out-audit HERE, WHEN EVERY OTHER SCRIPT IN THIS MODULE HAS ONE
-    The project rule is that every filtering decision is auditable with a stated
-    reason. This script honours that rule in a COLUMN rather than in a separate
-    file, and the reason is that it filters nothing: it writes exactly one row per
-    contig it can see, and drops none. There is no discard list to explain.
+A contig MISSING from this table is treated downstream as `unknown`, not as
+chromosome. That is deliberate — calling something "chromosomal, intrinsic
+candidate" when nobody ever looked would be the most misleading mistake this
+module could make. So EVERY contig gets a row, and `unknown` is said honestly
+when Platon did not classify one.
 
-    What it does instead is REASON about each contig, and that reasoning is
-    written out per row in `mobility_evidence` (the Platon gene counts behind a
-    conjugative/mobilisable call) and `replicon_call_source` (which of Platon's
-    outputs the chromosome/plasmid call came from, including the
-    --min-chromosome-bp size rule). So the audit is the table itself. If this
-    script ever starts DROPPING contigs, it needs a real audit file at that point.
+Why this is the one mobilome script with no audit file
+------------------------------------------------------
+The project rule is that every filtering decision is auditable with a stated
+reason. That rule is honoured here in a COLUMN rather than in a separate file,
+because nothing is filtered: one row per contig, none dropped, so there is no
+discard list to explain.
+
+The reasoning is written out per row instead — in `mobility_evidence`, which
+carries the Platon gene counts behind a conjugative or mobilisable call, the text
+of any disagreement between the two tools, and the --min-chromosome-bp size rule
+when the call was inferred from length rather than made by a tool; and in
+`replicon_call_source`, which says WHICH tool decided (platon | genomad | both |
+conflict). The audit is the table itself. If this ever starts DROPPING contigs,
+it needs a real audit file at that point.
 """
 
 import argparse
 import os
 import sys
 
+
+# ── Reading Platon's three outputs ───────────────────────────────────────────
+# Platon splits the assembly into two FASTAs and writes one table. All three are
+# needed: the FASTAs say chromosome or plasmid, the table says how mobile a
+# plasmid is, and a contig can legitimately appear in none of them.
 
 def read_fasta_ids(path):
     """Collect the sequence IDs from a FASTA file.
@@ -106,27 +124,27 @@ def read_platon_table(path):
     return rows
 
 
+# ── geNomad's second opinion, when the user opted in ─────────────────────────
+
 def read_genomad_concordance(path):
     """Read geNomad's second opinion about which contigs are plasmids.
 
-    WHERE IT COMES FROM
-        rule plasmid_concordance (60_plasmid.smk) compares Platon's plasmid call
-        with geNomad's and writes `{sample}_plasmid_concordance.tsv`. Its rows are
-        the UNION of the two tools' plasmid calls, so a contig appears here if
-        EITHER tool thought it was a plasmid — which is exactly the set of contigs
-        where a second opinion can change our mind.
+    Where it comes from: rule plasmid_concordance (shared/60_plasmid.smk) compares
+    Platon's plasmid call with geNomad's and writes
+    `{sample}_plasmid_concordance.tsv`. Its rows are the UNION of the two tools'
+    plasmid calls, so a contig appears there if EITHER tool thought it was a
+    plasmid — exactly the set of contigs where a second opinion can change the
+    answer.
 
-    WHY THE MOBILITY LADDER CARES
-        Platon alone decides tiers 5 and 6, and it can miss a plasmid. When it
-        does, every AMR gene on that contig is reported as "chromosomal, intrinsic
-        candidate" (tier 1) — the module's worst possible error, because it is the
-        direction that hides transferability from the reader.
+    Why the mobility ladder cares: Platon alone decides tiers 5 and 6, and it can
+    miss a plasmid. When it does, every AMR gene on that contig is reported as
+    "chromosomal, intrinsic candidate" (tier 1) — the module's worst possible
+    error, because it is the direction that HIDES transferability from the reader.
 
-    NOTE ON OPTIONALITY
-        geNomad is opt-in (it is academic/non-commercial licensed, so it cannot be
-        BacFlux's default — see the spec §3.1 licensing note). When it was not run
-        this file does not exist, and that is a normal, silent no-op: the caller
-        simply gets an empty dict and Platon decides alone, exactly as before.
+    geNomad is opt-in: it is academic/non-commercial licensed and so cannot be
+    BacFlux's default (spec §3.1). When it was not run this file does not exist,
+    the caller gets an empty dict, and Platon decides alone exactly as before —
+    silently, because that is the shipped configuration and not a fault.
 
     Returns: {contig: {"call": ..., "agreement": ..., "score": ...}}, empty when
              the file is absent, empty or header-only.
@@ -155,6 +173,8 @@ def read_genomad_concordance(path):
     return calls
 
 
+# ── How transferable is one plasmid? ─────────────────────────────────────────
+
 def count_from(record, column):
     """Read one of Platon's count columns as an integer, tolerantly.
 
@@ -172,18 +192,23 @@ def count_from(record, column):
 def classify_plasmid_mobility(record):
     """Decide how transferable one PLASMID contig is, from Platon's own counts.
 
-    The biology, and why the order of these tests matters:
-      * conjugation genes present  -> the plasmid encodes its own mating
+    The biology, and why the tests run in this order:
+      * conjugation genes present -> the plasmid encodes its own mating
         apparatus, so it can move itself. Ladder tier 6, "PREDICTED
         self-transmissible" (never bare "transmissible" — the confirmatory
-        experiment is a mating assay, not software).
+        experiment is a filter or broth mating assay, not software).
       * no conjugation, but a relaxase (mobilization) or an origin of transfer
         (OriT) -> the plasmid can be moved, but only if some OTHER element in
         the same cell supplies the machinery. Ladder tier 5, "mobilisable".
       * neither -> nothing suggests it moves at all.
 
-    Returns (mobility_class, evidence_text). The evidence text is passed
-    straight through to the report so a reader can see WHY, not just WHAT.
+    Conjugation is tested first because a relaxase is PART of a conjugative
+    system, not an alternative to one (spec §8 phase 4 counts relaxase + T4SS
+    together), so testing mobilization first would quietly demote conjugative
+    plasmids to tier 5.
+
+    Returns (mobility_class, evidence_text). The evidence text is passed straight
+    through to the report so a reader can see WHY, not just WHAT.
     """
     n_conjugation = count_from(record, "# Conjugation")
     n_mobilization = count_from(record, "# Mobilization")
@@ -211,6 +236,8 @@ def classify_plasmid_mobility(record):
     return "non-mobilisable", evidence
 
 
+# ── The two size thresholds, and the band of doubt between them ──────────────
+
 # Platon refuses to even look at a contig longer than this — read from its own
 # source (platon/constants.py: MAX_CONTIG_LENGTH = 500000). Anything above it is
 # reported as "too long" and never classified, so it appears in NEITHER the
@@ -225,8 +252,27 @@ PLATON_MAX_CONTIG_LENGTH = 500000
 # the point where "Platon skipped it because it is far too big to be a plasmid"
 # becomes safe to state. Between the two thresholds we say `unknown` and let the
 # confidence cap downstream reflect that we really do not know.
+#
+# rule mobilome_replicons does not pass --min-chromosome-bp, so this default is
+# what every BacFlux run uses. Changing it means adding the flag to that rule's
+# shell block — see docs/mobilome_tuning_guide.md, which lists it as a layer B
+# knob for exactly that reason.
 DEFAULT_MIN_CHROMOSOME_BP = 2000000
 
+
+# ── One row per contig: the decision chain ───────────────────────────────────
+# The branches below are tested in this order, and the order IS the logic. Read
+# them as "the strongest evidence available for this contig, in descending order
+# of how much we trust it":
+#
+#   1. Platon says plasmid                     -> plasmid, mobility typed
+#   2. Platon says chromosome, geNomad says plasmid -> chromosome, flagged conflict
+#   3. Platon says chromosome                  -> chromosome, mobility NA
+#   4. Platon said nothing, geNomad says plasmid -> plasmid, mobility unknown
+#   5. Nobody classified it, and it is over the megaplasmid ceiling -> chromosome,
+#      inferred from length alone
+#   6. Nobody classified it, and a megaplasmid cannot be ruled out -> unknown
+#   7. Anything else                           -> unknown
 
 def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
                min_chromosome_bp=DEFAULT_MIN_CHROMOSOME_BP, genomad_calls=None):
@@ -289,7 +335,7 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
             # opinion there is, so using it is not a promotion but simply reading
             # the available evidence.
             #
-            # WHY THIS CASE EXISTS AND WHY IT MATTERS: without it, such a contig
+            # Why this case exists and why it matters: without it, such a contig
             # falls through to 'unknown' below, and every AMR gene on it is
             # reported as tier 1, "chromosomal, intrinsic candidate". That is the
             # worst error the ladder can make, because it is the direction that
@@ -346,8 +392,11 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
 
         # WHO decided this, so downstream can weight it. A one-tool call is real
         # evidence but weaker than two tools agreeing, and a conflict is weaker
-        # still - colocalise.py caps confidence accordingly rather than treating
-        # every replicon call as equally certain.
+        # still. colocalise.py reads this column and caps the gene's confidence on
+        # it: `genomad` caps at medium (plasmid_called_by_genomad_only), `conflict`
+        # caps at low (replicon_call_tools_disagree). `platon` and `both` cap
+        # nothing, which is why a run without geNomad reads exactly as it did
+        # before the second opinion existed.
         if not genomad_calls:
             call_source = "platon"          # geNomad was not run at all
         elif replicon == "plasmid" and contig in plasmid_ids and genomad_says_plasmid:
@@ -372,12 +421,15 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
     return rows
 
 
+# ── Contig lengths, straight from the assembly FASTA ─────────────────────────
+
 def read_contig_lengths(path):
     """Contig ID -> length, read straight from the assembly FASTA.
 
     Needed because Platon's output alone cannot tell us how long a contig it
     SKIPPED was, and that length is what decides whether an unclassified contig
-    is safely the chromosome or genuinely ambiguous.
+    is safely the chromosome or genuinely ambiguous. It also supplies the full
+    contig list, so a contig neither tool mentioned still gets a row.
     """
     lengths = {}
     if not path or not os.path.exists(path):
@@ -394,6 +446,16 @@ def read_contig_lengths(path):
     return lengths
 
 
+# ── Command line ─────────────────────────────────────────────────────────────
+# The flag names here have DRIFTED from the sibling scripts, and are left that
+# way on purpose, so nobody "tidies" them and breaks the rule that calls them:
+# this script says --contigs where isescan_to_table.py says --genome-fasta and
+# conjscan_to_ice.py / att_search.py say --genome, and it says --out where the
+# others say --out-table. All of them are handed the same assembly FASTA and all
+# write one table; only the names differ. Renaming one silently breaks any
+# command a colleague has saved, and the matching change in 80_mobilome.smk would
+# have to land in the same edit.
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Build the per-contig replicon table from Platon output."
@@ -401,13 +463,6 @@ def main(argv=None):
     parser.add_argument("--sample", required=True, help="Sample name (for messages).")
     parser.add_argument("--platon-dir", required=True,
                         help="Platon output directory for this sample.")
-    # NAMING NOTE, so nobody "tidies" these and breaks the rule that calls them.
-    # This script says --contigs where isescan_to_table.py says --genome-fasta and
-    # conjscan_to_ice.py/att_search.py say --genome, and it says --out where the
-    # others say --out-table. All of them are handed the same assembly FASTA and
-    # all write one table; the names simply drifted. They are left alone because
-    # renaming a flag silently breaks any command a colleague has saved, and the
-    # matching change in 80_mobilome.smk would have to land in the same edit.
     parser.add_argument("--prefix", required=True,
                         help="Platon's file prefix. Both Platon and geNomad name "
                              "every output file after their input's basename, so "

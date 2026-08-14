@@ -76,7 +76,7 @@ workflow/
         hybrid/                 # illumina + nanopore front ends + Polypolish + Snippy
         contigs/                # FastaFlux front end (header-aware contig filter, self-map)
     envs/                       # ONE copy of each env
-    scripts/                    # unchanged (already shared) + scripts/mobilome/ later
+    scripts/                    # unchanged (already shared) + scripts/80_mobilome/ later
 README.md                       # ONE, with a section per mode
 CITATION.cff                    # NEW — machine-readable citation, carries the concept DOI
 docs/
@@ -418,7 +418,7 @@ per v1 (uses wget from the launch env — see README_notes.md item 3, a deferred
 `workflow/rules/shared/60_plasmid.smk` (Platon always; Platon+geNomad concordance when geNomad
 opted in — D9) and `70_phage.smk` (VirSorter2 default / geNomad opt-in + CheckV — D8, revised
 for licensing above). New: `envs/genomad.yaml`, `envs/checkv.yaml` (split from virsorter),
-`envs/virsorter.yaml` (+`mamba>=1.5` packaging fix), `workflow/scripts/plasmid_concordance.py`
+`envs/virsorter.yaml` (+`mamba>=1.5` packaging fix), `workflow/scripts/60_plasmid/plasmid_concordance.py`
 (+18 passing pytest cases), and 00_common additions (`PHAGE_CALLER` default virsorter2,
 geNomad/Platon path constants, conditional rule-all plasmid target). **Gate:** `snakemake -n`
 resolves the correct DAG for BOTH `phage.caller` values — `virsorter2` (5 jobs, zero geNomad
@@ -507,7 +507,7 @@ parses; the dual-genome path resolves correct targets for hybrid.
 
 **Stage 4 — Front ends. ✓ DONE 2026-07-22 (gate passed, all four modes).**
 Delivered `workflow/rules/{illumina,nanopore,hybrid,contigs}/*.smk`, plus
-`shared/15_replicons.smk` + `workflow/scripts/build_bakta_replicons.py` (+16 passing tests)
+`shared/15_replicons.smk` + `workflow/scripts/15_replicons/build_bakta_replicons.py` (+16 passing tests)
 for the Bakta `--replicons` work. **This is the stage that flips `all_targets()` from empty to
 the full pipeline:** `snakemake -n` now plans a complete run for every mode — illumina 41 jobs,
 nanopore 41, hybrid 53, contigs 32. `build_replicons` fires only in the long-read modes (0 jobs
@@ -673,7 +673,7 @@ this stage closed:
 - **Early Medaka-model validation + suggester** (`f2310fe`): `check_medaka_model` validates the
   model right after read filtering and gates the assembler, so a typo/unsupported model fails
   in seconds (with a flowcell/device/accuracy suggestion table) instead of after Flye. Logic in
-  `scripts/medaka_model_check.py` (+15 pytest). Opt-in `medaka_model_fallback_auto`. One
+  `scripts/12_medaka_check/medaka_model_check.py` (+15 pytest). Opt-in `medaka_model_fallback_auto`. One
   documented v1→v2 change: hybrid auto-inference now resolves from `FILT_LONG` like nanopore.
 
 **Stage 4.10 — Real end-to-end validation, contigs mode. ✓ PASSED 2026-07-24.**
@@ -716,7 +716,7 @@ BacFluxL and BacFluxL+ repos (GitHub → read-only) with a banner pointing here;
 stay valid for reproducibility.
 
 **Stage 7 — Mobilome module.**
-Now add it **once** in `shared/80_mobilome.smk` + `scripts/mobilome/`, gated by
+Now add it **once** in `shared/80_mobilome.smk` + `scripts/80_mobilome/`, gated by
 `config.mobilome.run`, following `mobilome_module_SPEC.md`.
 
 **Stage 7 — IMPLEMENTED, and validated on real genomes. ✓ 2026-07-25.**

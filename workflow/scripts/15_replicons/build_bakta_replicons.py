@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build the Bakta --replicons table for a long-read assembly (nanopore/hybrid).
 
-WHY THIS EXISTS
----------------
+Why Bakta has to be told which contigs are circular
+---------------------------------------------------
 Bakta annotates every sequence as a LINEAR CONTIG unless it is told otherwise.
 For a long-read assembly that is wrong and it costs real genes: Pyrodigal (the
 gene caller Bakta uses) branches on topology, and on a sequence marked circular
@@ -14,7 +14,7 @@ Long-read assemblies are the only ones where we KNOW the topology: Flye reports,
 per contig, whether it closed it into a circle. So in nanopore and hybrid mode we
 hand Bakta a small table saying "this contig is circular".
 
-WHAT THE TABLE SAYS, AND WHAT IT DELIBERATELY DOES NOT
+What the table says, and what it deliberately does not
 ------------------------------------------------------
 The table has five fields per contig (see write_replicons for the exact format).
 Two of them carry information:
@@ -34,7 +34,7 @@ The asymmetry is intentional. A false negative (a real chromosome called
 replicon type into an INSDC-shaped annotation record that people will read as
 fact. So we prefer false negatives.
 
-ONE PIN-SENSITIVE DETAIL (re-check on every Bakta version bump)
+One pin-sensitive detail — re-check on every Bakta version bump
 ---------------------------------------------------------------
 In Bakta 1.12.0's parser (bakta/utils.py) the line that would force a
 type="contig" row back to linear is written as a COMPARISON, not an assignment
@@ -42,10 +42,11 @@ type="contig" row back to linear is written as a COMPARISON, not an assignment
 the conservative type="contig" AND still get topology="circular" honoured. If a
 future Bakta fixes that typo, every "contig" row would silently become linear and
 the whole benefit of this table would disappear without an error. The rule that
-calls this script (workflow/rules/shared/15_replicons.smk) carries the same note.
+calls this script (rule build_replicons, shared/15_replicons.smk) carries the
+same note.
 
-INPUTS (all for ONE sample)
----------------------------
+What it reads, all for one sample
+---------------------------------
   --contigs           FINAL_CONTIGS, the assembly Bakta will annotate. This is
                       the JOIN ANCHOR: one output row per record in this file,
                       in file order.
@@ -56,8 +57,8 @@ All three join on the FIRST WHITESPACE TOKEN of the contig name, which is the ID
 Bakta itself uses (BacFlux always passes --keep-contig-headers, and the long-read
 front ends already trim headers to one token with FASTA_HEAD_CMD).
 
-OUTPUTS
--------
+What it writes
+--------------
   --out-replicons  the 5-column, header-less TSV Bakta reads
   --out-audit      one row per contig with the numbers behind every call, so a
                    marginal decision is visible without re-running anything
@@ -66,7 +67,7 @@ OUTPUTS
 
 Stdlib only; runs in the environment Snakemake was launched from, like
 select_contigs_by_taxonomy.py and plasmid_concordance.py. Exercised by
-workflow/scripts/tests/test_build_bakta_replicons.py with no tools or databases.
+scripts/15_replicons/test_build_bakta_replicons.py with no tools or databases.
 """
 
 import argparse
@@ -109,6 +110,8 @@ AUDIT_COLUMNS = [
     "reason",            # "<topology reason>;<type reason>" — see build_rows
 ]
 
+
+# ── Read the three inputs: contig IDs, Flye topology, dnaapler markers ───────
 
 def first_token(text):
     """Return the first whitespace-separated token of a string, without '>'.
@@ -281,6 +284,8 @@ def parse_dnaapler_summary(path):
     return marker_by_contig
 
 
+# ── Turn a dnaapler marker into a Bakta replicon type ────────────────────────
+
 def _as_float(text):
     """Return text as a float, or None when it is not a number.
 
@@ -299,7 +304,7 @@ def classify_type(marker_record, min_coverage, min_identity):
 
     Returns (type, reason) where type is chromosome | plasmid | contig.
 
-    THE "STRONG HIT" RULE: Coverage >= min_coverage AND Identity >= min_identity,
+    The "strong hit" rule: Coverage >= min_coverage AND Identity >= min_identity,
     with the defaults 80.0 and 40.0.
 
       * Coverage is the alignment length as a percentage of the reference
@@ -320,7 +325,7 @@ def classify_type(marker_record, min_coverage, min_identity):
     repA leg will mostly fall back to "contig". That is the intended failure
     direction, and the audit file carries the raw numbers so it stays visible.
 
-    KNOWN BLIND SPOT: for a contig that was ALREADY dnaA-first, dnaapler writes
+    Known blind spot: for a contig that was ALREADY dnaA-first, dnaapler writes
     "Contig_already_reoriented" into every column and the marker identity is
     lost, so no type can be assigned. Rare on a first pass over raw Flye output;
     the norm if dnaapler is ever re-run on an already-oriented assembly.
@@ -347,6 +352,8 @@ def classify_type(marker_record, min_coverage, min_identity):
         return MARKER_TO_TYPE[marker], f"strong_{marker}"
     return "contig", "marker_below_threshold"
 
+
+# ── Join the three sources into one row per contig ───────────────────────────
 
 def build_rows(sample, contig_ids, topology_by_contig, marker_by_contig,
                min_coverage, min_identity):
@@ -393,6 +400,8 @@ def build_rows(sample, contig_ids, topology_by_contig, marker_by_contig,
     return rows
 
 
+# ── Write the Bakta table and the audit trail ────────────────────────────────
+
 def write_replicons(path, rows):
     """Write the table Bakta reads: 5 tab-separated fields, NO header line.
 
@@ -405,7 +414,7 @@ def write_replicons(path, rows):
 
     Example row:  contig_1<TAB>-<TAB>chromosome<TAB>circular<TAB>-
 
-    THE FIELD COUNT IS NOT NEGOTIABLE. Bakta unpacks every row into exactly five
+    The field count is not negotiable. Bakta unpacks every row into exactly five
     variables inside a bare try/except and, on any mismatch, exits with
     "ERROR: wrong replicon table file format!" and nothing else. There is also no
     header line: Bakta would try to unpack it as data.
@@ -417,13 +426,21 @@ def write_replicons(path, rows):
 
 
 def write_audit(path, rows):
-    """Write the per-contig audit table (header + one row per contig)."""
+    """Write the per-contig audit table: header plus one row per contig.
+
+    Nothing downstream reads it — it exists so a marginal call can be checked
+    later, which is why the raw dnaapler Coverage and Identity_Percentage go in
+    unrounded rather than only the verdict they produced. Requested by name in
+    _frontend_targets_for() (00_common.smk) or it would never be built.
+    """
     with open(path, "w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
         writer.writerow(AUDIT_COLUMNS)
         for row in rows:
             writer.writerow([row[column] for column in AUDIT_COLUMNS])
 
+
+# ── Stop the run when the contig IDs did not line up ─────────────────────────
 
 def report_join_health(contig_ids, topology_by_contig, marker_by_contig):
     """Log how well the two tables joined onto the assembly, and warn if badly.
@@ -467,9 +484,12 @@ def report_join_health(contig_ids, topology_by_contig, marker_by_contig):
     return flye_matches, dnaapler_matches
 
 
+# ── Build both tables for one sample ─────────────────────────────────────────
+
 def main():
-    # Arguments are supplied by the build_replicons rule in
-    # workflow/rules/shared/15_replicons.smk.
+    # Every flag is filled in by rule build_replicons in shared/15_replicons.smk,
+    # which is defined only when HAS_LONG_READS — so this script never runs in
+    # illumina or contigs mode, where the topology is genuinely unknown.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sample", required=True,
                         help="Sample name, written into the audit table.")
@@ -495,9 +515,9 @@ def main():
 
     contig_ids = read_contig_ids(args.contigs)
     if not contig_ids:
-        # Bakta hard-exits on an EMPTY replicons file, so say so loudly. The rule
-        # in 40_annotation.smk also tests the file with [ -s ] before passing
-        # --replicons, so this is guarded on both sides.
+        # Bakta hard-exits on an EMPTY replicons file, so say so loudly. rule
+        # annotation in shared/40_annotation.smk also tests the file with [ -s ]
+        # before passing --replicons, so this is guarded on both sides.
         sys.stderr.write(
             f"[build_bakta_replicons] WARNING: no FASTA records in {args.contigs!r}. "
             "Writing an EMPTY replicon table; the annotation rule will skip "
@@ -519,8 +539,10 @@ def main():
     write_replicons(args.out_replicons, rows)
     write_audit(args.out_audit, rows)
 
-    # A short, honest summary for the run log. The two match counts make the
-    # join health visible even when it is not zero.
+    # One summary line into logs/build_replicons_{sample}.log. The two match
+    # counts are the part worth reading: report_join_health only kills the run on
+    # ZERO overlap, so a partial rename shows up here as a count well below the
+    # contig total and nowhere else.
     circular = sum(1 for row in rows if row["topology"] == "circular")
     chromosomes = sum(1 for row in rows if row["type"] == "chromosome")
     plasmids = sum(1 for row in rows if row["type"] == "plasmid")
