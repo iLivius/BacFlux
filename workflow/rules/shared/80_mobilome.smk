@@ -109,12 +109,13 @@
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
 # "../../envs/x.yaml" climbs shared/ → rules/ → workflow/ → workflow/envs/x.yaml.
 #
-# priority: the shared database fetches carry 4 and every per-sample rule carries
-# 3, so when several jobs are ready at once Snakemake starts a download ahead of
-# the per-sample work that will wait on it — the same ordering rule download_amr_db
-# uses in 50_amr.smk. The numbers only rank jobs against each other, and the front
-# end deliberately outranks everything here: assembly runs at 9–10 (see
-# illumina/20_assembly.smk and its siblings).
+# Scheduling order is left entirely to the DAG. This file used to carry a
+# priority: on every rule; those were removed in v2.0.0 because Snakemake's
+# default scheduler maximises the SUM of the priorities of the jobs it starts,
+# unweighted by how many cores each takes — so a fan-out of small per-sample
+# jobs outscores the one big job the numbers were meant to start first, and
+# the scheme did the opposite of its intent whenever more than a couple of
+# jobs were ready at once.
 
 
 # ── How much of an HMM profile a protein must match (--coverage-profile) ──
@@ -307,7 +308,6 @@ if MOBILOME_RUN:
             script = ISESCAN_TABLE_SCRIPT,
         log:
             LOGS + "/mobilome_contig_lengths_{sample}.log"
-        priority: 3
         shell:
             """
             python {params.script} \
@@ -350,7 +350,6 @@ if MOBILOME_RUN:
             script = ORGANISM_SCRIPT,
         log:
             LOGS + "/mobilome_amrfinder_organism_{sample}.log"
-        priority: 3
         shell:
             """
             python {params.script} \
@@ -413,7 +412,6 @@ if MOBILOME_RUN:
         threads: capped_cpus(8)
         log:
             LOGS + "/mobilome_amrfinderplus_{sample}.log"
-        priority: 3
         shell:
             # The organism file is EMPTY whenever no curated organism matched,
             # which is the common case for environmental isolates. An empty file
@@ -496,7 +494,6 @@ if MOBILOME_RUN:
         threads: capped_cpus(8)
         log:
             LOGS + "/mobilome_isescan_{sample}.log"
-        priority: 3
         shell:
             # `|| true` on the tool itself, then create the directory
             # unconditionally: "no IS found" exits non-zero on some inputs and is
@@ -550,7 +547,6 @@ if MOBILOME_RUN:
             boundary_bp = MOBILOME_BOUNDARY_BP,
         log:
             LOGS + "/mobilome_isescan_table_{sample}.log"
-        priority: 3
         shell:
             """
             python {params.script} \
@@ -592,7 +588,6 @@ if MOBILOME_RUN:
             "../../envs/macsyfinder.yaml"
         log:
             LOGS + "/mobilome_conjscan_models.log"
-        priority: 4
         shell:
             """
             mkdir -p {output.models}
@@ -650,7 +645,6 @@ if MOBILOME_RUN:
         threads: capped_cpus(8)
         log:
             LOGS + "/mobilome_conjscan_{sample}.log"
-        priority: 3
         shell:
             """
             rm -rf {output.conjscan_dir}
@@ -723,7 +717,6 @@ if MOBILOME_RUN:
                 local_dir = ICESCAN_LOCAL,
             log:
                 LOGS + "/mobilome_icescan_models.log"
-            priority: 4
             shell:
                 """
                 exec > {log} 2>&1
@@ -891,7 +884,6 @@ if MOBILOME_RUN:
             threads: capped_cpus(8)
             log:
                 LOGS + "/mobilome_icescan_{sample}.log"
-            priority: 3
             shell:
                 """
                 rm -rf {output.icescan_dir}
@@ -1001,7 +993,6 @@ if MOBILOME_RUN:
             ),
         log:
             LOGS + "/mobilome_conjscan_ice_{sample}.log"
-        priority: 3
         shell:
             # best_solution.tsv is absent when MacSyFinder found nothing; the
             # script treats a missing file as "no systems" and still writes a
@@ -1073,7 +1064,6 @@ if MOBILOME_RUN:
                 "../../envs/tncentral.yaml"
             log:
                 LOGS + "/mobilome_tncentral_db.log"
-            priority: 4
             shell:
                 """
                 exec > {log} 2>&1
@@ -1201,7 +1191,6 @@ if MOBILOME_RUN:
             threads: capped_cpus(8)
             log:
                 LOGS + "/mobilome_tncentral_blast_{sample}.log"
-            priority: 3
             shell:
                 """
                 blastn \
@@ -1254,7 +1243,6 @@ if MOBILOME_RUN:
                 min_coverage = TNCENTRAL_MIN_COVERAGE,
             log:
                 LOGS + "/mobilome_name_elements_{sample}.log"
-            priority: 3
             shell:
                 """
                 python {params.script} \
@@ -1310,7 +1298,6 @@ if MOBILOME_RUN:
                 "../../envs/tncentral.yaml"
             log:
                 LOGS + "/mobilome_iceberg_db.log"
-            priority: 4
             shell:
                 """
                 exec > {log} 2>&1
@@ -1409,7 +1396,6 @@ if MOBILOME_RUN:
             threads: capped_cpus(8)
             log:
                 LOGS + "/mobilome_iceberg_blast_{sample}.log"
-            priority: 3
             shell:
                 """
                 blastn \
@@ -1462,7 +1448,6 @@ if MOBILOME_RUN:
                 min_overlap = ICEBERG_MIN_OVERLAP,
             log:
                 LOGS + "/mobilome_name_ice_{sample}.log"
-            priority: 3
             shell:
                 """
                 python {params.script} \
@@ -1536,7 +1521,6 @@ if MOBILOME_RUN:
                 "../../envs/tncentral.yaml"
             log:
                 LOGS + "/mobilome_isosdb_db.log"
-            priority: 4
             shell:
                 """
                 exec > {log} 2>&1
@@ -1618,7 +1602,6 @@ if MOBILOME_RUN:
             threads: capped_cpus(16)
             log:
                 LOGS + "/mobilome_assembly_depth_{sample}.log"
-            priority: 3
             shell:
                 """
                 bbmap.sh \
@@ -1661,7 +1644,6 @@ if MOBILOME_RUN:
             threads: capped_cpus(16)
             log:
                 LOGS + "/mobilome_isosdb_map_{sample}.log"
-            priority: 3
             shell:
                 """
                 bbmap.sh \
@@ -1719,7 +1701,6 @@ if MOBILOME_RUN:
                 min_copies = ISOSDB_MIN_COPIES,
             log:
                 LOGS + "/mobilome_is_copy_number_{sample}.log"
-            priority: 3
             shell:
                 """
                 python {params.script} \
@@ -1789,7 +1770,6 @@ if MOBILOME_RUN:
             ),
         log:
             LOGS + "/mobilome_replicons_{sample}.log"
-        priority: 3
         shell:
             """
             python {params.script} \
@@ -1866,7 +1846,6 @@ if MOBILOME_RUN:
             ),
         log:
             LOGS + "/mobilome_colocalisation_{sample}.log"
-        priority: 3
         shell:
             """
             python {params.script} \

@@ -57,9 +57,8 @@ if HAS_LONG_READS and USE_MEDAKA:
             "../../envs/medaka.yaml"
         log:
             LOGS + "/check_medaka_model_{sample}.log"
-        # Runs before the assembler; give it high priority so the scheduler picks
-        # it up promptly and a bad model surfaces as early as possible.
-        priority: 10
+        # Runs before the assembler, and the assembler waits on its output, so
+        # the DAG already guarantees the order — nothing here needs a nudge.
         shell:
             # On failure, echo the log (which holds the suggestion table — the
             # whole point of this rule) to stderr so it lands on the Snakemake

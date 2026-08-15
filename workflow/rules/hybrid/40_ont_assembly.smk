@@ -84,7 +84,6 @@ rule ont_assembly:
     threads: CPUS
     log:
         LOGS + "/ont_assembly_{sample}.log"
-    priority: 10
     shell:
         """
         flye \
@@ -153,7 +152,6 @@ rule fix_start:
     threads: capped_cpus(24)
     log:
         LOGS + "/fix_start_{sample}.log"
-    priority: 9
     shell:
         """
         dnaapler all \
@@ -232,7 +230,6 @@ if USE_MEDAKA:
         threads: capped_cpus(8)
         log:
             LOGS + "/long_read_consensus_{sample}.log"
-        priority: 9
         shell:
             # check_medaka_model already validated the NAME (or resolved auto), so
             # a failure here is a RUNTIME one — model weights not installed and no

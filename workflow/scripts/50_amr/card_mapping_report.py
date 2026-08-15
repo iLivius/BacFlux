@@ -1,34 +1,31 @@
 #!/usr/bin/env python3
-"""Turn the two CARD read-mapping passes into one annotated, tiered report.
+"""Annotate the CARD read-mapping coverage table so a hit list is not mistaken
+for a resistome.
 
-Reads the strict and relaxed BBMap coverage tables written by rule map_amr_db
-(shared/50_amr.smk) — the same trimmed reads mapped onto CARD's protein homolog
-model twice, at read identity 0.99 and 0.95 — plus CARD's own aro_index.tsv,
-and writes one row per CARD reference sequence that reached the coverage
-threshold at either setting. rule card_mapping_report runs it and puts the
-result in 05.amr/mapping/{sample}/{sample}_CARD_report.tsv. That file is the
-one to open; the two covstats tables and v1's AMR_legend stay beside it as the
-raw evidence.
+Reads the BBMap coverage table written by rule map_amr_db (shared/50_amr.smk) —
+trimmed reads mapped onto CARD's protein homolog model — plus CARD's own
+aro_index.tsv, and writes one row per CARD reference sequence whose covered
+length reached the threshold. rule card_mapping_report runs it and puts the
+result in 05.amr/mapping/{sample}/{sample}_CARD_report.tsv. That file is the one
+to open; the covstats table and v1's AMR_legend stay beside it as raw evidence.
 
-The two covstats must be the SAME sample against the SAME reference, differing
-only in the identity filter — the rule guarantees that by having the relaxed
-pass reuse the index the strict pass built. --min-covered (70 by default, from
-CARD_MIN_COVERED in 00_common.smk) is the fraction of a reference sequence's
-length that reads must cover, at one setting or the other, for it to reach the
-report at all.
+--min-covered (70 by default, from CARD_MIN_COVERED in 00_common.smk) is the
+fraction of a reference sequence's length that reads must cover for it to reach
+the report at all. It, not read identity, is where this leg's specificity comes
+from — which matters, because of the following.
 
-Why the same reads are mapped twice
------------------------------------
-The CARD leg maps trimmed reads straight onto CARD's reference sequences, so it
-sees genes the assembly collapsed or lost. It has always mapped at a read
-identity of 0.99 — near-exact matching. That gives excellent specificity and
-poor sensitivity: a real but divergent member of a resistance family simply
-goes missing. The rule now maps twice, strict and relaxed, and this script joins
-the two passes so a gene found only at the relaxed setting is REPORTED AS SUCH
-rather than lost. A `divergent` call is information, not merely extra
-sensitivity: it says a variant of this family is present but the reference
-allele is not. How much that buys was measured rather than assumed, and it is
-less than one would expect — see rule map_amr_db in shared/50_amr.smk.
+Why there is one coverage column and no "divergent" tier
+--------------------------------------------------------
+There briefly were two. Between 2026-08-14 and 2026-08-15 the rule mapped twice,
+at read identity 0.99 and 0.95, and this script reported a gene found only at the
+looser setting as `divergent`. That could never have worked. BBMap's `idfilter`
+does not filter the primary alignment of a properly-paired read, so both passes
+in fact ran at BBMap's default minid of 0.76: across all 56 genomes of the strain
+collection the two coverage tables differed on eight rows, none of them within
+fifty points of the calling threshold. The rule now makes ONE pass, with `minid=`,
+which does apply, at the 0.76 that had been in force since v1 regardless of what
+the code said. See the long note above rule map_amr_db for the source reference
+and the measurement.
 
 Why a raw CARD hit list overstates the resistome
 ------------------------------------------------
@@ -63,11 +60,7 @@ The table it writes, column by column
                         source: aro_index.tsv "ARO Name", falling back to the
                                 last pipe-field of the defline when the
                                 accession is missing from the index
-  detection             exact | divergent
-                        source: which pass cleared --min-covered
-  covered_percent_id99  how much of the reference sequence's LENGTH the reads
-  covered_percent_id95  covered, one column per identity filter. The numbers in
-                        the names come from --strict-id / --relaxed-id, so a
+  covered_percent       fraction of the reference gene's length covered
                         figure always says which filter produced it.
                         source: column 5 (Covered_percent) of each covstats
   category              resistance_determinant | efflux_other |
@@ -304,20 +297,12 @@ def classify(aro_name, gene_family, mechanism):
 # ── Join the two passes and annotate what cleared either one ────────────────
 
 
-def build_rows(strict, relaxed, aro_index, min_covered, strict_id, relaxed_id):
-    """Join the two coverage maps and annotate every sequence that passed either.
-
-    A sequence qualifies if it reached min_covered at EITHER identity setting.
-    Detection tier:
-        exact     - reached the threshold at the strict identity filter
-        divergent - reached it only at the relaxed one, i.e. a variant of this
-                    family is present but the reference allele is not
-    """
+def build_rows(coverage, aro_index, min_covered):
+    """Annotate every CARD sequence whose covered length reached the threshold."""
     rows = []
-    for defline in sorted(set(strict) | set(relaxed)):
-        covered_strict = strict.get(defline, 0.0)
-        covered_relaxed = relaxed.get(defline, 0.0)
-        if covered_strict < min_covered and covered_relaxed < min_covered:
+    for defline in sorted(coverage):
+        covered = coverage[defline]
+        if covered < min_covered:
             continue
 
         aro_match = ARO_PATTERN.search(defline)
@@ -337,14 +322,11 @@ def build_rows(strict, relaxed, aro_index, min_covered, strict_id, relaxed_id):
             aro_name = without_organism.split("|")[-1].strip()
 
         category, notes = classify(aro_name, gene_family, mechanism)
-        detection = "exact" if covered_strict >= min_covered else "divergent"
 
         rows.append({
             "aro_accession": accession or "NA",
             "aro_name": aro_name or "NA",
-            "detection": detection,
-            f"covered_percent_id{strict_id}": f"{covered_strict:.2f}",
-            f"covered_percent_id{relaxed_id}": f"{covered_relaxed:.2f}",
+            "covered_percent": f"{covered:.2f}",
             "category": category,
             "resistance_mechanism": mechanism or "NA",
             "amr_gene_family": gene_family or "NA",
@@ -355,42 +337,22 @@ def build_rows(strict, relaxed, aro_index, min_covered, strict_id, relaxed_id):
     return rows
 
 
-# ── Command line, ranking, and the per-category summary ─────────────────────
-
-# Arguments come from rule card_mapping_report in shared/50_amr.smk.
-# --strict-id and --relaxed-id only NAME the two coverage columns
-# (covered_percent_id99 / covered_percent_id95). The filtering they refer to
-# happened earlier, inside BBMap in rule map_amr_db, and nothing here can change
-# it: they are passed so that each figure says which pass produced it.
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sample", required=True)
-    parser.add_argument("--covstats-strict", required=True)
-    parser.add_argument("--covstats-relaxed", required=True)
+    parser.add_argument("--covstats", required=True)
     parser.add_argument("--aro-index", required=True)
-    parser.add_argument("--strict-id", default="99",
-                        help="strict identity filter, for the column name (e.g. 99)")
-    parser.add_argument("--relaxed-id", default="95",
-                        help="relaxed identity filter, for the column name (e.g. 95)")
     parser.add_argument("--min-covered", type=float, default=70.0,
                         help="minimum Covered_percent for a sequence to be reported")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
-    strict = parse_covstats(args.covstats_strict)
-    relaxed = parse_covstats(args.covstats_relaxed)
+    coverage = parse_covstats(args.covstats)
     aro_index = parse_aro_index(args.aro_index)
+    rows = build_rows(coverage, aro_index, args.min_covered)
 
-    rows = build_rows(strict, relaxed, aro_index, args.min_covered,
-                      args.strict_id, args.relaxed_id)
-
-    # Sort so the rows a reader should look at first come first: real
-    # determinants above efflux machinery, then by how well covered they are.
-    #
-    # Coverage is taken as the HIGHER of the two figures, not the strict one. A
-    # divergent hit has a strict coverage of 0 by definition, so ranking on the
-    # strict column alone would push every divergent gene to the bottom of its
-    # category — burying exactly the rows the relaxed pass was added to surface.
+    # Sort so the rows a reader should look at first come first: real determinants
+    # above efflux machinery, then by how well covered they are.
     category_order = {
         "resistance_determinant": 0,
         "efflux_other": 1,
@@ -398,16 +360,10 @@ def main():
         "regulator": 3,
         "presence_indicates_susceptibility": 4,
     }
-    strict_column = f"covered_percent_id{args.strict_id}"
-    relaxed_column = f"covered_percent_id{args.relaxed_id}"
     rows.sort(key=lambda r: (category_order.get(r["category"], 9),
-                             -max(float(r[strict_column]),
-                                  float(r[relaxed_column]))))
+                             -float(r["covered_percent"])))
 
-    # Written column order — keep it in step with the column-by-column list in
-    # the module docstring, which is where a reader looks up what each one means.
-    columns = ["aro_accession", "aro_name", "detection", strict_column,
-               f"covered_percent_id{args.relaxed_id}", "category",
+    columns = ["aro_accession", "aro_name", "covered_percent", "category",
                "resistance_mechanism", "amr_gene_family", "drug_class",
                "reference_organism", "note"]
     with open(args.out, "w", encoding="utf-8", newline="") as handle:
@@ -416,18 +372,16 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
-    # A one-line summary per category, so the log says what the table contains
-    # without anyone opening it. Counting by category is the whole point: a bare
-    # total is the number this script exists to stop people quoting.
+    # One line per category, so the log says what the table holds without anyone
+    # opening it. Counting by category is the whole point: a bare total is the
+    # number this script exists to stop people quoting.
     counts = {}
     for row in rows:
         counts[row["category"]] = counts.get(row["category"], 0) + 1
-    divergent = sum(1 for row in rows if row["detection"] == "divergent")
     print(f"Sample {args.sample}: {len(rows)} CARD sequences at >= "
           f"{args.min_covered:.0f}% covered length.")
     for category in sorted(counts, key=lambda c: category_order.get(c, 9)):
         print(f"  {category}: {counts[category]}")
-    print(f"  detected only at the relaxed identity filter (divergent): {divergent}")
     if counts.get("presence_indicates_susceptibility"):
         print("  NOTE: rows flagged 'presence_indicates_susceptibility' are CARD "
               "entries whose resistance mechanism is loss of the gene. Their "

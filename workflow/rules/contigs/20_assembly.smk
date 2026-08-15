@@ -77,7 +77,6 @@ rule filter_contigs:
         contigs = DRAFT_CONTIGS,
     log:
         LOGS + "/filter_contigs_{sample}.log"
-    priority: 9
     shell:
         """
         # Look at the first header only: SPAdes writes the same style for every

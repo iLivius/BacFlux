@@ -57,7 +57,6 @@ rule raw_long_read_qc:
     threads: capped_cpus(8)
     log:
         LOGS + "/raw_long_read_qc_{sample}.log"
-    priority: 10
     shell:
         """
         NanoPlot \
@@ -119,7 +118,6 @@ rule filter_long_reads:
         "../../envs/filtlong.yaml"
     log:
         LOGS + "/filter_long_reads_{sample}.log"
-    priority: 10
     shell:
         """
         filtlong \
@@ -154,7 +152,6 @@ rule filtered_long_read_qc:
     threads: capped_cpus(8)
     log:
         LOGS + "/filtered_long_read_qc_{sample}.log"
-    priority: 10
     shell:
         """
         NanoPlot \

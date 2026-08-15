@@ -99,7 +99,6 @@ rule ont_assembly:
     threads: CPUS
     log:
         LOGS + "/ont_assembly_{sample}.log"
-    priority: 10
     shell:
         """
         flye \
@@ -175,7 +174,6 @@ rule fix_start:
     threads: capped_cpus(24)
     log:
         LOGS + "/fix_start_{sample}.log"
-    priority: 9
     shell:
         """
         dnaapler all \

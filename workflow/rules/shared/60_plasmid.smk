@@ -100,7 +100,6 @@ rule plasmid_search:
     threads: capped_cpus(24)
     log:
         LOGS + "/plasmid_search_{sample}.log"
-    priority: 4
     shell:
         # The BLAST-text check is v1's, unified onto the HARDENED form the two
         # long-read v1 workflows used (BacFluxL / BacFluxL+), because the plain
@@ -202,7 +201,6 @@ if PHAGE_CALLER == "genomad":
             "../../envs/platon.yaml"
         log:
             LOGS + "/plasmid_concordance_{sample}.log"
-        priority: 3
         shell:
             # PLASMID_CONCORDANCE_SCRIPT is a plain 00_common.smk global, which
             # Snakemake substitutes into the shell string like any other name, so

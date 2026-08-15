@@ -116,7 +116,6 @@ if HAS_SHORT_READS:
             "../../envs/bowtie.yaml"
         log:
             LOGS + "/index_contigs_{sample}.log"
-        priority: 8
         shell:
             """
             bowtie2-build \
@@ -166,7 +165,6 @@ if HAS_SHORT_READS:
         threads: CPUS
         log:
             LOGS + "/map_contigs_{sample}.log"
-        priority: 8
         shell:
             """
             bowtie2 \
@@ -216,7 +214,6 @@ elif HAS_LONG_READS:
         threads: CPUS
         log:
             LOGS + "/map_contigs_{sample}.log"
-        priority: 8
         shell:
             """
             minimap2 \
@@ -269,7 +266,6 @@ else:
         threads: CPUS
         log:
             LOGS + "/map_contigs_{sample}.log"
-        priority: 8
         shell:
             # No -x preset: contigs against themselves, exactly as v1 FastaFlux.
             """
@@ -332,7 +328,6 @@ rule blast_contigs:
     threads: capped_cpus(24)
     log:
         LOGS + "/blast_contigs_{sample}.log"
-    priority: 7
     shell:
         """
         BLASTDB={params.dir} \
@@ -395,7 +390,6 @@ if NEEDS_FINAL_BLAST:
         threads: capped_cpus(24)
         log:
             LOGS + "/blast_final_contigs_{sample}.log"
-        priority: 7
         shell:
             """
             BLASTDB={params.dir} \
@@ -454,7 +448,6 @@ rule blob_json:
         # with `>` — so whichever ran second destroyed the other's log. v2 gives
         # each rule its own file.
         LOGS + "/blob_json_{sample}.log"
-    priority: 7
     shell:
         """
         blobtools create \
@@ -496,7 +489,6 @@ rule blob_table:
         "../../envs/blobtools.yaml"
     log:
         LOGS + "/blob_table_{sample}.log"
-    priority: 7
     shell:
         """
         blobtools view \
@@ -605,7 +597,6 @@ rule select_contigs:
         discard_no_hit = DECONTAMINATION["discard_no_hit"],
     log:
         LOGS + "/select_contigs_{sample}.log"
-    priority: 6
     shell:
         """
         python {params.selector:q} \

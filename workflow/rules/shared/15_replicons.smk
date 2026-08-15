@@ -111,7 +111,6 @@ if HAS_LONG_READS:
             min_id = 40.0,
         log:
             LOGS + "/build_replicons_{sample}.log"
-        priority: 6
         shell:
             """
             python {params.script:q} \

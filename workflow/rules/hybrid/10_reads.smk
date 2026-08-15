@@ -69,7 +69,6 @@ rule download_phix:
         link = PHIX_LINK,
     log:
         LOGS + "/download_phix.log"
-    priority: 10
     shell:
         """
         wget {params.link} -O {output.phix} > {log} 2>&1
@@ -100,7 +99,6 @@ rule build_phix:
         "../../envs/bowtie.yaml"
     log:
         LOGS + "/build_phix.log"
-    priority: 10
     shell:
         """
         bowtie2-build \
@@ -153,7 +151,6 @@ rule map_phix:
     threads: CPUS
     log:
         LOGS + "/map_phix_{sample}.log"
-    priority: 10
     shell:
         """
         bowtie2 \
@@ -206,7 +203,6 @@ rule trim_adapters:
     threads: capped_cpus(16)
     log:
         LOGS + "/trim_adapters_{sample}.log"
-    priority: 10
     shell:
         """
         fastp \
@@ -251,7 +247,6 @@ rule raw_long_read_qc:
     threads: capped_cpus(8)
     log:
         LOGS + "/raw_long_read_qc_{sample}.log"
-    priority: 10
     shell:
         """
         NanoPlot \

@@ -107,7 +107,6 @@ rule taxonomic_assignment:
     threads: capped_cpus(24)
     log:
         LOGS + "/taxonomic_assignment_{sample}.log"
-    priority: 5
     shell:
         # GTDBTK_DATA_PATH is how GTDB-Tk finds its reference release; :q quotes
         # the database path in case it contains spaces.

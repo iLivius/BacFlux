@@ -104,7 +104,6 @@ rule annotation:
     threads: capped_cpus(24)
     log:
         LOGS + "/annotation_{sample}.log"
-    priority: 5
     shell:
         # Genus hint for Bakta: drop the "no-hit" line from the composition table,
         # sort what is left, and pass the surviving genus name as --genus.
@@ -230,7 +229,6 @@ rule functional_annotation:
         mem_gb = EGGNOG_DBMEM_GB if EGGNOG_DBMEM else 0,
     log:
         LOGS + "/functional_annotation_{sample}.log"
-    priority: 4
     shell:
         # emapper.py expects both directories to exist already, hence the mkdir.
         # {params.dbmem_flag} is an empty string on the default path and adds
@@ -283,7 +281,6 @@ if not ANTISMASHDB:
             "../../envs/antismash.yaml"
         log:
             LOGS + "/secondary_metabolites_database.log"
-        priority: 4
         shell:
             """
             download-antismash-databases \
@@ -307,7 +304,6 @@ if ANTISMASHDB:
             antismash_db = directory(ANTISMASH_DB_DIR),
         log:
             LOGS + "/secondary_metabolites_database_local.log"
-        priority: 4
         shell:
             """
             mkdir -p {output.antismash_db}
@@ -357,7 +353,6 @@ rule secondary_metabolites_analysis:
     threads: capped_cpus(24)
     log:
         LOGS + "/secondary_metabolites_{sample}.log"
-    priority: 4
     shell:
         """
         antismash \
@@ -419,7 +414,6 @@ if not DBCANDB:
             sha_url = DBCAN_SHA_URL,
         log:
             LOGS + "/cazyme_db_download.log"
-        priority: 4
         shell:
             """
             mkdir -p "{output.dbcan_db}"
@@ -465,7 +459,6 @@ if DBCANDB:
             dbcan_verified = DBCAN_SENTINEL,
         log:
             LOGS + "/cazyme_db_local.log"
-        priority: 4
         shell:
             """
             mkdir -p "{output.dbcan_db}"
@@ -525,7 +518,6 @@ rule cazyme_gene_cluster:
     threads: capped_cpus(24)
     log:
         LOGS + "/cazyme_{sample}.log"
-    priority: 4
     shell:
         """
         # CAZyme annotation of protein sequences

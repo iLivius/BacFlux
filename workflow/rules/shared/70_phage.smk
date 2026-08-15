@@ -151,7 +151,6 @@ if PHAGE_CALLER == "genomad":
                 "../../envs/genomad.yaml"
             log:
                 LOGS + "/genomad_db.log"
-            priority: 9
             shell:
                 """
                 if [ -z "{params.link}" ]; then
@@ -222,7 +221,6 @@ if PHAGE_CALLER == "genomad":
                 genomad_db = directory(GENOMAD_DB_DIR),
             log:
                 LOGS + "/genomad_db_local.log"
-            priority: 9
             shell:
                 # The symlink TARGET must be absolute. A relative
                 # directories.genomad_db would put a relative target inside the view
@@ -279,7 +277,6 @@ if PHAGE_CALLER == "genomad":
         threads: capped_cpus(24)
         log:
             LOGS + "/genomad_{sample}.log"
-        priority: 8
         shell:
             """
             genomad end-to-end \
@@ -338,7 +335,6 @@ if PHAGE_CALLER == "virsorter2":
             threads: capped_cpus(4)
             log:
                 LOGS + "/virsorter2_db.log"
-            priority: 9
             shell:
                 """
                 virsorter setup \
@@ -367,7 +363,6 @@ if PHAGE_CALLER == "virsorter2":
                 vs2_db = directory(VS2_DB_DIR),
             log:
                 LOGS + "/virsorter2_db_local.log"
-            priority: 9
             shell:
                 # Absolute target, for the same reason as in genomad_db_local: a
                 # relative directories.vs2_db would produce links that resolve
@@ -415,7 +410,6 @@ if PHAGE_CALLER == "virsorter2":
         threads: capped_cpus(24)
         log:
             LOGS + "/viral_identification_{sample}.log"
-        priority: 8
         shell:
             # Put the env's own bin first so VS2 subprocesses resolve in-env tools
             # (fix part 3 above); without it they hunt for the nested envs that
@@ -467,7 +461,6 @@ if CHECKVDB:
         threads: capped_cpus(8)
         log:
             LOGS + "/checkv_db_local.log"
-        priority: 9
         shell:
             """
             # Locate the versioned DB folder inside the user's directory the same
@@ -546,7 +539,6 @@ if not CHECKVDB:
         threads: capped_cpus(8)
         log:
             LOGS + "/checkv_db.log"
-        priority: 9
         shell:
             """
             if [ -z "{params.checkv_link}" ]; then
@@ -608,7 +600,6 @@ rule viral_quality:
     threads: capped_cpus(24)
     log:
         LOGS + "/viral_quality_{sample}.log"
-    priority: 7
     shell:
         # The database directory is resolved at runtime rather than being passed in
         # (ported verbatim from v1): find the single genome_db/checkv_reps.faa,

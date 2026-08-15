@@ -69,7 +69,6 @@ rule index_selected_contigs:
         "../../envs/bowtie.yaml"
     log:
         LOGS + "/index_selected_contigs_{sample}.log"
-    priority: 6
     shell:
         """
         bowtie2-build \
@@ -123,7 +122,6 @@ rule map_sel_contigs:
     threads: CPUS
     log:
         LOGS + "/map_sel_contigs_{sample}.log"
-    priority: 6
     shell:
         """
         bowtie2 \
@@ -207,7 +205,6 @@ rule filter_long_reads:
         "../../envs/filtlong.yaml"
     log:
         LOGS + "/filter_long_reads_{sample}.log"
-    priority: 6
     shell:
         """
         # The selected Illumina reads define the target genome, so this single
@@ -235,8 +232,8 @@ rule filter_long_reads:
 #              NANOPLOT_RAW_DIR from hybrid/10_reads.smk it shows exactly what
 #              the short-read-guided filter removed.
 #
-# Identical to rules/nanopore/10_reads.smk apart from `priority`, which is 6 here
-# and 10 there — keep the rest in sync.
+# Identical to rules/nanopore/10_reads.smk. Keep the two in step: a change to
+# the filtlong invocation here belongs there too.
 #
 # `--prefix "{sample}_"` is load-bearing for the same silent-failure reason given
 # in hybrid/10_reads.smk: the MultiQC relabel regex in shared/90_report.smk needs
@@ -251,7 +248,6 @@ rule filtered_long_read_qc:
     threads: capped_cpus(8)
     log:
         LOGS + "/filtered_long_read_qc_{sample}.log"
-    priority: 6
     shell:
         """
         NanoPlot \

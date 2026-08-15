@@ -25,10 +25,10 @@
 # download_amr_db       : fetch and unpack CARD from links.card_link.
 # download_amr_db_local : symlink an already-extracted CARD directory instead.
 #                         Mutually exclusive with download_amr_db.
-# map_amr_db            : BBMap the trimmed pairs onto CARD twice, at strict and
-#                         relaxed read identity, plus v1's AMR_legend.
-# card_mapping_report   : join those two passes with CARD's own aro_index.tsv.
-#                         This is the file to open; the rest is the evidence.
+# map_amr_db            : BBMap the trimmed pairs onto CARD, plus v1's AMR_legend.
+# card_mapping_report   : annotate that coverage table with CARD's own
+#                         aro_index.tsv. This is the file to open; the rest is
+#                         the evidence.
 #
 # Data flow:
 #
@@ -44,14 +44,13 @@
 #                                             ┌────────────────┘
 #                                             ├─► {sample}_AMR_legend.tsv
 #                                             └─► {sample}_covstats.tsv
-#                                                 {sample}_covstats_relaxed.tsv
 #                                                       │
 #                                   card_mapping_report ◄┘
 #                                       └─► {sample}_CARD_report.tsv
 #
 # Inherited from 00_common.smk and never re-derived here: FINAL_CONTIGS, DIR_AMR,
 # LOGS, DATABASES, DATABASE_PATTERN, and — for the CARD leg — CARDDB, CARD_LINK,
-# CARD_TARBALL, CARD_DB_DIR, CARD_STRICT_ID, CARD_RELAXED_ID, CARD_MIN_COVERED,
+# CARD_TARBALL, CARD_DB_DIR, CARD_MIN_IDENTITY, CARD_MIN_COVERED,
 # CARD_REPORT_SCRIPT, TRIM_R1, TRIM_R2, RAM, capped_cpus, HAS_SHORT_READS. The
 # eight-database list lives ONCE in 00_common and drives (a) the per-db fan-out in
 # rule all, (b) the {db} wildcard constraint, and (c) the summary input — one
@@ -108,7 +107,6 @@ rule amr_contigs:
         "../../envs/abricate.yaml"
     log:
         LOGS + "/amr_{db}_in_{sample}_contigs.log"
-    priority: 4
     shell:
         # :q lets Snakemake shell-quote each value safely (paths / db name / log).
         """
@@ -156,7 +154,6 @@ rule AMR_summary:
         "../../envs/abricate.yaml"
     log:
         LOGS + "/AMR_summary_{sample}.log"
-    priority: 3
     shell:
         """
         abricate --summary {input} > {output.amr_summary} 2> {log}
@@ -210,7 +207,6 @@ if HAS_SHORT_READS:
                 link = CARD_LINK,
             log:
                 LOGS + "/download_amr.log"
-            priority: 9
             shell:
                 """
                 mkdir -p {output.card_dir}
@@ -241,7 +237,6 @@ if HAS_SHORT_READS:
                 card_dir = temp(directory(CARD_DB_DIR)),
             log:
                 LOGS + "/download_amr_db_local.log"
-            priority: 9
             shell:
                 """
                 mkdir -p {output.card_dir}
@@ -273,48 +268,42 @@ if HAS_SHORT_READS:
     #              all done.
     #   card_dir = the extracted CARD database from download_amr_db (or the
     #              symlinked view from download_amr_db_local).
-    # Does: BBMap TWICE over the same reference — once at a strict read-identity
-    #       filter (0.99, near-exact) and once relaxed (0.95) — then two
-    #       post-processing steps:
-    #       (1) re-sort each covstats by descending Covered_percent, header kept;
-    #       (2) build the v1 human-readable legend from the STRICT pass: for every
-    #           feature covered ≥70%, pull its row out of CARD's aro_index.tsv so
-    #           the output names the drug class and mechanism, not an accession.
-    #       card_mapping_report below then joins the two sorted covstats into one
-    #       annotated table.
+    # Does: one BBMap pass, then two post-processing steps:
+    #       (1) re-sort covstats by descending Covered_percent, header kept;
+    #       (2) build the v1 human-readable legend: for every feature covered
+    #           ≥70%, pull its row out of CARD's aro_index.tsv so the output names
+    #           the drug class and mechanism, not an accession.
+    #       card_mapping_report below then annotates the sorted covstats.
     # Produces:
-    #   covstats         = 05.amr/mapping/{sample}/{sample}_covstats.tsv
-    #   covstats_relaxed = 05.amr/mapping/{sample}/{sample}_covstats_relaxed.tsv
-    #   amr_legend       = 05.amr/mapping/{sample}/{sample}_AMR_legend.tsv
-    #   plus three temp() intermediates: BBMap's ref/ index and the two unsorted
-    #   covstats. covstats and amr_legend are the paths _downstream_targets()
-    #   requests by name; covstats_relaxed rides along because the same rule
-    #   writes it.
+    #   covstats   = 05.amr/mapping/{sample}/{sample}_covstats.tsv
+    #   amr_legend = 05.amr/mapping/{sample}/{sample}_AMR_legend.tsv
+    #   plus two temp() intermediates: BBMap's ref/ index and the unsorted
+    #   covstats. Both kept paths are requested by name in _downstream_targets().
     # Consumed by: the user (terminal AMR products, not fed into MultiQC) and by
     #              card_mapping_report below.
     #
-    # Why two identity filters. 0.99 alone answers "is this exact reference allele
-    # here?" and says nothing when the isolate carries a divergent member of the
-    # same family. Mapping again at 0.95 gives that second answer, and reporting
-    # the two side by side keeps the strict call's specificity while making a
-    # divergent hit visible instead of simply absent.
+    # WHY minid= AND NOT idfilter=, WHICH IS WHAT THIS RULE USED UNTIL v2.0.0.
+    # `idfilter` does not filter the primary alignment of a properly-paired read.
+    # In BBMap 39.33's own source, align2/AbstractMapThread.java::processIDFilter
+    # clears the mapping only `if(!r.paired() && identity < IDFILTER)`, and the loop
+    # that filters the remaining sites runs `for(int i=sites.size()-1; i>0; i--)` —
+    # it stops before index 0, so the top site is never reached and the
+    # `if(i==0){removedTop=true;}` inside it is dead code. The editfilter sibling
+    # forty lines below uses `i >= 0` with no pairing guard, which is why subfilter
+    # bites and idfilter does not.
     #
-    # How much that actually buys, measured rather than assumed: on four real
-    # environmental isolates (one Pseudomonad, three Bacilli) the relaxed pass
-    # mapped ~2% more bases and promoted NO extra CARD sequence past the 70%
-    # coverage threshold. So the honest claim is not "0.95 finds a lot more" — it
-    # is that "nothing at 0.95 either" is now a recorded observation instead of an
-    # untested assumption. Note also how far 0.95 reaches: identity is per READ, so
-    # on 150 bp reads it tolerates ~7 mismatches and recovers genes down to roughly
-    # 95% nucleotide identity to the CARD reference — within-family allelic
-    # variation, not a distant homolog. Anything more divergent needs a
-    # protein-level search, which is what the ABRicate and AMRFinderPlus legs on
-    # the contigs are for.
+    # Measured on real BacFlux reads (sample AIT1176, 400k pairs) under the old
+    # idfilter=0.99: 1240 alignments retained, 1238 of them BELOW 99% identity, the
+    # lowest at 48.59%. So every CARD read-mapping result this workflow produced
+    # from v1 onward was screened at BBMap's default minid=0.76, not at the 0.99
+    # the code and the README both claimed.
     #
-    # The second pass reuses the index the first one built (no ref= on the second
-    # invocation, so BBMap loads it from path= rather than rebuilding it). Measured
-    # cost of the whole rule: 9.7 s for the first pass including indexing, 8.7 s
-    # for the second, on a 5 Mb genome at 16 threads.
+    # The number below is therefore not a tightening — it states what has always
+    # been running, using the flag that actually enforces it. Deliberately NOT
+    # raised to 0.99: at minid=0.99 the same reads keep 2 alignments instead of
+    # 1240, which would gut the one AMR leg that is immune to assembly collapse.
+    # Specificity here comes from requiring ≥70% of the reference gene's LENGTH to
+    # be covered, not from per-read identity, and that requirement is unchanged.
     #
     # PRESERVED FROM v1, ALL KNOWN WARTS, DELIBERATELY NOT FIXED:
     #   * path={output.bbmap_temp} where bbmap_temp already ends in /ref, so BBMap
@@ -342,28 +331,23 @@ if HAS_SHORT_READS:
         output:
             bbmap_temp = temp(directory(DIR_AMR + "/mapping/{sample}/ref")),
             covstats_temp = temp(DIR_AMR + "/mapping/{sample}/{sample}_covstats_temp.tsv"),
-            covstats_relaxed_temp = temp(DIR_AMR + "/mapping/{sample}/{sample}_covstats_relaxed_temp.tsv"),
             covstats = DIR_AMR + "/mapping/{sample}/{sample}_covstats.tsv",
-            covstats_relaxed = DIR_AMR + "/mapping/{sample}/{sample}_covstats_relaxed.tsv",
             amr_legend = DIR_AMR + "/mapping/{sample}/{sample}_AMR_legend.tsv",
         params:
             # CARD ships several models; the protein homolog model is the one that
             # holds acquired resistance genes (not the mutation-based models).
             card_target = "nucleotide_fasta_protein_homolog_model.fasta",
-            # Read-identity filters for the two passes. Kept as plain numbers here,
-            # not config keys, for the same reason the 0.99 always was: they are a
-            # methods decision, not a per-run knob. CARD_STRICT_ID / CARD_RELAXED_ID
-            # are 00_common globals, shared with card_mapping_report so the two
-            # rules cannot drift apart on which filter produced which file.
-            min_id = CARD_STRICT_ID,
-            min_id_relaxed = CARD_RELAXED_ID,
+            # Minimum read identity, passed as minid= and NOT as idfilter=. That
+            # distinction is the whole story of this rule — see the block above the
+            # rule. CARD_MIN_IDENTITY is a 00_common global so this rule and
+            # card_mapping_report cannot disagree about what produced the numbers.
+            min_id = CARD_MIN_IDENTITY,
             max_ram = min(RAM, 32),
         conda:
             "../../envs/bbmap.yaml"
         threads: capped_cpus(24)
         log:
             LOGS + "/map_amr_{sample}.log"
-        priority: 5
         shell:
             # Column 5 of BBMap's covstats is Covered_percent; the >=70 threshold
             # and the legend header text below are v1's, kept verbatim. The awk
@@ -374,7 +358,7 @@ if HAS_SHORT_READS:
               -in2={input.r2} \
               ref={input.card_dir}/{params.card_target} \
               path={output.bbmap_temp} \
-              idfilter={params.min_id} \
+              minid={params.min_id} \
               idtag \
               -Xmx{params.max_ram}g \
               threads={threads} \
@@ -384,27 +368,6 @@ if HAS_SHORT_READS:
 
             (head -n 1 {output.covstats_temp} > {output.covstats}) && \
             tail -n +2 {output.covstats_temp} | awk -F'\t' '{{print $5 "\t" $0}}' | sort -t$'\t' -k1,1nr | cut -f2- >> {output.covstats}
-
-            # Second, relaxed pass. The missing ref= is deliberate: with only path=
-            # given, BBMap loads the index the strict pass just wrote instead of
-            # rebuilding it, so this costs one extra alignment pass and no extra
-            # indexing. Everything else is identical to the strict pass, because the
-            # two coverage figures are only comparable if nothing but the identity
-            # filter changed between them.
-            bbmap.sh \
-              -in={input.r1} \
-              -in2={input.r2} \
-              path={output.bbmap_temp} \
-              idfilter={params.min_id_relaxed} \
-              idtag \
-              -Xmx{params.max_ram}g \
-              threads={threads} \
-              ambiguous=best \
-              secondary=f \
-              covstats={output.covstats_relaxed_temp} >> {log} 2>&1
-
-            (head -n 1 {output.covstats_relaxed_temp} > {output.covstats_relaxed}) && \
-            tail -n +2 {output.covstats_relaxed_temp} | awk -F'\t' '{{print $5 "\t" $0}}' | sort -t$'\t' -k1,1nr | cut -f2- >> {output.covstats_relaxed}
 
             echo "#AMR features with a covered length of at least 70%" > {output.amr_legend}
             (head -n 1 {input.card_dir}/aro_index.tsv >> {output.amr_legend}) && \
@@ -427,8 +390,8 @@ if HAS_SHORT_READS:
     # divergent allele shows up as `divergent` rather than as nothing at all.
     #
     # Takes in:
-    #   covstats         = the strict (0.99) sorted coverage table from map_amr_db.
-    #   covstats_relaxed = the relaxed (0.95) one, same rule, same reference.
+    #   covstats = the sorted coverage table from map_amr_db.
+
     #   card_dir         = the CARD database, for aro_index.tsv.
     # Does: runs card_mapping_report.py, which joins the two tables on the ARO
     #       accession carried in the BBMap defline, attaches CARD's AMR Gene Family
@@ -455,17 +418,10 @@ if HAS_SHORT_READS:
         input:
             card_dir = CARD_DB_DIR,
             covstats = DIR_AMR + "/mapping/{sample}/{sample}_covstats.tsv",
-            covstats_relaxed = DIR_AMR + "/mapping/{sample}/{sample}_covstats_relaxed.tsv",
         output:
             card_report = DIR_AMR + "/mapping/{sample}/{sample}_CARD_report.tsv",
         params:
             report_script = CARD_REPORT_SCRIPT,
-            # Bare integers, used only to name the report's two coverage columns
-            # (covered_percent_id99 / covered_percent_id95) so each figure says
-            # which filter produced it. Derived from the same globals map_amr_db
-            # filters on, so renaming a filter renames its column with it.
-            id_label = round(CARD_STRICT_ID * 100),
-            id_label_relaxed = round(CARD_RELAXED_ID * 100),
             # Minimum covered length for a CARD sequence to reach the report. The
             # same 70% the v1 legend uses, so the two files agree on what counts
             # as present.
@@ -474,16 +430,12 @@ if HAS_SHORT_READS:
             "../../envs/platon.yaml"
         log:
             LOGS + "/card_mapping_report_{sample}.log"
-        priority: 5
         shell:
             """
             python {params.report_script} \
               --sample {wildcards.sample} \
-              --covstats-strict {input.covstats} \
-              --covstats-relaxed {input.covstats_relaxed} \
+              --covstats {input.covstats} \
               --aro-index {input.card_dir}/aro_index.tsv \
-              --strict-id {params.id_label} \
-              --relaxed-id {params.id_label_relaxed} \
               --min-covered {params.min_covered} \
               --out {output.card_report} > {log} 2>&1
             """

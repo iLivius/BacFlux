@@ -97,7 +97,6 @@ rule stage_qc_genomes:
         table_text = qc_genome_table_text,
     log:
         LOGS + "/stage_qc_genomes_{sample}.log"
-    priority: 6
     shell:
         # {params.copy_cmds} expands to one `cp` line per genome. Snakemake formats
         # the shell TEMPLATE only and never re-scans a substituted value for {}
@@ -152,7 +151,6 @@ rule genome_assembly_evaluation:
     threads: capped_cpus(24)
     log:
         LOGS + "/assembly_evaluation_{sample}.log"
-    priority: 5
     shell:
         # The shell expands the *.fasta glob, not Snakemake; the files are
         # guaranteed to be there because genomes_dir is an input of this rule.
@@ -212,7 +210,6 @@ rule completeness_and_contamination:
     threads: capped_cpus(24)
     log:
         LOGS + "/completeness_and_contamination_{sample}.log"
-    priority: 5
     shell:
         # `checkm qa` takes the lineage_wf OUTPUT directory as its second
         # positional argument — the one holding bins/ and storage/ — and not the
@@ -284,7 +281,6 @@ if HAS_READS:
             java_mem = min(RAM, 64)
         log:
             LOGS + "/map_evaluation_{sample}.log"
-        priority: 5
         shell:
             """
             qualimap bamqc \

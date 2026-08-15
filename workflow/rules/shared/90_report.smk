@@ -253,7 +253,6 @@ rule multiqc:
         "../../envs/multiqc.yaml"
     log:
         LOGS + "/multiqc.log"
-    priority: 2
     shell:
         # r""" so backslashes in the regex block survive to the YAML file.
         #

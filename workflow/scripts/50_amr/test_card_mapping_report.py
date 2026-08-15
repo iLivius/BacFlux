@@ -6,15 +6,13 @@ covstats lines (copied verbatim from a finished run, trailing space and all) and
 a cut-down aro_index.tsv holding only the accessions those lines mention.
 
 The script joins TWO BBMap passes over the same sample — one at a near-exact read
-identity, one relaxed — so that a divergent member of a resistance family is
-reported as `divergent` instead of vanishing. It then attaches CARD's own
+identity — and attaches CARD's own
 classification, because plenty of CARD entries are efflux subunits, regulators or
 porins rather than acquired resistance genes.
 
 What is actually being checked here is the part that can silently go wrong. The
 join key is an ARO accession dug out of a free-text defline; the classification
-comes from CARD's own controlled vocabulary; and the "divergent" call depends on
-two coverage figures being compared the right way round. Each of those is tested
+comes from CARD's own controlled vocabulary. Each of those is tested
 against a case where getting it wrong would produce a plausible-looking but wrong
 report rather than a crash.
 
@@ -48,25 +46,9 @@ COVSTATS_STRICT = "\n".join([
     # An outer-membrane porin whose LOSS confers resistance. Present here, which
     # means the susceptible state, not resistance.
     "gb|CP000647.1|+|0-1104|ARO:3003480|OmpK36 [Klebsiella pneumoniae] \t30.00\t1104\t0.55\t99.5000\t1098\t95\t95\t0.55\t30\t5.00",
-    # Below the coverage threshold at both settings: must never reach the report.
-    "gb|XX000000.1|+|0-800|ARO:3009999|GhostGene [Nowhere bacterium] \t2.00\t800\t0.50\t11.0000\t88\t5\t5\t0.50\t2\t1.00",
-    "",
-])
-
-# Same sample at the relaxed identity filter. Two deliberate differences:
-#   * OXA-58's coverage is unchanged (it matched exactly, so it stays `exact`);
-#   * a second beta-lactamase, CTX-M-15, only clears the threshold here. That is
-#     the `divergent` case — a variant of the family is present, but not this
-#     reference allele.
-COVSTATS_RELAXED = "\n".join([
-    "#ID\tAvg_fold\tLength\tRef_GC\tCovered_percent\tCovered_bases\tPlus_reads\tMinus_reads\tRead_GC\tMedian_fold\tStd_Dev",
-    "gb|AE004091.2|+|2810008-2813197|ARO:3000804|MexF [Pseudomonas aeruginosa PAO1] \t41.00\t3189\t0.65\t100.0000\t3189\t460\t460\t0.67\t45\t15.00",
-    "gb|AE004091.2|+|179521-182569|ARO:3003681|TriC [Pseudomonas aeruginosa PAO1] \t19.00\t3048\t0.65\t97.0000\t2956\t200\t200\t0.65\t11\t17.00",
-    "gb|AE004091.2|+|4292297-4292998|ARO:3000829|CpxR [Escherichia coli] \t12.50\t702\t0.53\t99.0000\t695\t62\t62\t0.53\t12\t4.00",
-    "gb|FJ234049.1|+|0-861|ARO:3001864|OXA-58 [Acinetobacter baumannii] \t25.00\t861\t0.40\t98.0000\t844\t70\t70\t0.40\t25\t6.00",
-    "gb|CP000647.1|+|0-1104|ARO:3003480|OmpK36 [Klebsiella pneumoniae] \t30.00\t1104\t0.55\t99.5000\t1098\t95\t95\t0.55\t30\t5.00",
     "gb|AY044436.1|+|0-876|ARO:3001872|CTX-M-15 [Escherichia coli] \t14.00\t876\t0.52\t92.0000\t806\t40\t40\t0.52\t14\t7.00",
-    "gb|XX000000.1|+|0-800|ARO:3009999|GhostGene [Nowhere bacterium] \t3.00\t800\t0.50\t19.0000\t152\t8\t8\t0.50\t3\t1.00",
+    # Below the coverage threshold: must never reach the report.
+    "gb|XX000000.1|+|0-800|ARO:3009999|GhostGene [Nowhere bacterium] \t2.00\t800\t0.50\t11.0000\t88\t5\t5\t0.50\t2\t1.00",
     "",
 ])
 
@@ -103,10 +85,9 @@ def rows_by_name(rows):
 
 def build_default_rows():
     """Run the whole join over the fixtures with the workflow's real settings."""
-    strict = cmr.parse_covstats(write_temp(COVSTATS_STRICT))
-    relaxed = cmr.parse_covstats(write_temp(COVSTATS_RELAXED))
+    coverage = cmr.parse_covstats(write_temp(COVSTATS_STRICT))
     index = cmr.parse_aro_index(write_temp(ARO_INDEX))
-    return cmr.build_rows(strict, relaxed, index, 70.0, "99", "95")
+    return cmr.build_rows(coverage, index, 70.0)
 
 
 # ── Reading BBMap covstats and CARD's index ─────────────────────────────────
@@ -128,14 +109,14 @@ class TestParsers(unittest.TestCase):
 
     def test_header_and_blank_lines_are_not_rows(self):
         coverage = cmr.parse_covstats(write_temp(COVSTATS_STRICT))
-        self.assertEqual(len(coverage), 6)
+        self.assertEqual(len(coverage), 7)
 
     def test_a_truncated_final_row_is_skipped_not_fatal(self):
         # A killed BBMap can leave a half-written last line. Losing that one row
         # is preferable to losing the whole report.
         truncated = COVSTATS_STRICT + "gb|AE004091.2|+|1-2|ARO:30008"
         coverage = cmr.parse_covstats(write_temp(truncated))
-        self.assertEqual(len(coverage), 6)
+        self.assertEqual(len(coverage), 7)
 
     def test_an_empty_covstats_is_fatal_not_an_empty_report(self):
         # map_amr_db runs without `set -e`, so a BBMap pass that dies still lets
@@ -272,23 +253,10 @@ class TestClassify(unittest.TestCase):
 class TestBuildRows(unittest.TestCase):
 
     def test_only_sequences_clearing_the_threshold_are_reported(self):
-        # Five from the strict pass plus CTX-M-15, which only the relaxed pass
-        # sees. GhostGene clears neither and must not appear.
+        # GhostGene sits at 11% covered and must not appear; the other six do.
         rows = rows_by_name(build_default_rows())
         self.assertNotIn("GhostGene", rows)
         self.assertEqual(len(rows), 6)
-
-    def test_a_gene_seen_only_at_the_relaxed_filter_is_called_divergent(self):
-        rows = rows_by_name(build_default_rows())
-        self.assertIn("CTX-M-15", rows)
-        self.assertEqual(rows["CTX-M-15"]["detection"], "divergent")
-        self.assertEqual(rows["CTX-M-15"]["covered_percent_id99"], "0.00")
-        self.assertEqual(rows["CTX-M-15"]["covered_percent_id95"], "92.00")
-
-    def test_a_gene_seen_at_the_strict_filter_is_called_exact(self):
-        rows = rows_by_name(build_default_rows())
-        self.assertEqual(rows["OXA-58"]["detection"], "exact")
-        self.assertEqual(rows["OXA-58"]["covered_percent_id99"], "98.00")
 
     def test_the_aro_accession_is_pulled_from_the_defline_by_pattern(self):
         # Positional splitting would break the moment CARD changed the number of
@@ -314,30 +282,14 @@ class TestBuildRows(unittest.TestCase):
         # CARD's FASTA and its index come from the same release, but a user can
         # point the two at different ones. That must degrade to an unclassified
         # row, not to a KeyError halfway through a 56-genome run.
-        strict = cmr.parse_covstats(write_temp(COVSTATS_STRICT))
+        coverage = cmr.parse_covstats(write_temp(COVSTATS_STRICT))
         empty_index = cmr.parse_aro_index(write_temp("ARO Accession\tARO Name\n"))
-        rows = rows_by_name(cmr.build_rows(strict, {}, empty_index, 70.0, "99", "95"))
+        rows = rows_by_name(cmr.build_rows(coverage, empty_index, 70.0))
         self.assertIn("MexF", rows)
         self.assertEqual(rows["MexF"]["amr_gene_family"], "NA")
         # With no mechanism to go on it falls through to the neutral label rather
         # than guessing.
         self.assertEqual(rows["MexF"]["category"], "resistance_determinant")
-
-    def test_the_two_coverage_columns_are_named_after_the_filters(self):
-        strict = cmr.parse_covstats(write_temp(COVSTATS_STRICT))
-        relaxed = cmr.parse_covstats(write_temp(COVSTATS_RELAXED))
-        index = cmr.parse_aro_index(write_temp(ARO_INDEX))
-        rows = cmr.build_rows(strict, relaxed, index, 70.0, "98", "90")
-        self.assertIn("covered_percent_id98", rows[0])
-        self.assertIn("covered_percent_id90", rows[0])
-
-
-# ── End to end, through main() ──────────────────────────────────────────────
-# These drive the CLI exactly as the Snakemake rule does, and most of what they
-# check is the SORT: the file is read from the top, so acquired determinants have
-# to sit above the chromosomal efflux machinery, and a divergent hit must not be
-# pushed to the bottom by the empty strict-coverage column it has by definition.
-class TestMain(unittest.TestCase):
 
     def run_main(self, min_covered="70"):
         """Drive the CLI exactly as the Snakemake rule does; return the TSV lines."""
@@ -346,11 +298,8 @@ class TestMain(unittest.TestCase):
         sys.argv = [
             "card_mapping_report.py",
             "--sample", "sampleA",
-            "--covstats-strict", write_temp(COVSTATS_STRICT),
-            "--covstats-relaxed", write_temp(COVSTATS_RELAXED),
+            "--covstats", write_temp(COVSTATS_STRICT),
             "--aro-index", write_temp(ARO_INDEX),
-            "--strict-id", "99",
-            "--relaxed-id", "95",
             "--min-covered", min_covered,
             "--out", out,
         ]
@@ -364,8 +313,7 @@ class TestMain(unittest.TestCase):
     def test_the_header_is_the_documented_column_set(self):
         lines = self.run_main()
         self.assertEqual(lines[0].split("\t"), [
-            "aro_accession", "aro_name", "detection",
-            "covered_percent_id99", "covered_percent_id95", "category",
+            "aro_accession", "aro_name", "covered_percent", "category",
             "resistance_mechanism", "amr_gene_family", "drug_class",
             "reference_organism", "note",
         ])
@@ -377,16 +325,6 @@ class TestMain(unittest.TestCase):
         names = [line.split("\t")[1] for line in lines[1:]]
         self.assertEqual(names[:2], ["OXA-58", "CTX-M-15"])
         self.assertEqual(names[-1], "OmpK36")
-
-    def test_a_divergent_hit_is_not_buried_by_its_empty_strict_column(self):
-        # CTX-M-15 has a strict coverage of 0 by definition. Ranking on the strict
-        # column alone would drop it below every exact hit in its category, which
-        # is the opposite of what the relaxed pass was added for. Here it beats
-        # nothing else in its category, so the check is that it stays adjacent to
-        # OXA-58 rather than falling to the end of the file.
-        lines = self.run_main()
-        names = [line.split("\t")[1] for line in lines[1:]]
-        self.assertLess(names.index("CTX-M-15"), names.index("MexF"))
 
     def test_an_isolate_with_no_hits_writes_a_header_only_file(self):
         # A genome carrying nothing is a normal, common result. It must produce a

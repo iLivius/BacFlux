@@ -112,7 +112,6 @@ rule short_read_correction:
     threads: capped_cpus(24)
     log:
         LOGS + "/short_read_correction_{sample}.log"
-    priority: 9
     shell:
         """
         mkdir -p $(dirname {output.draft_copy})
@@ -220,7 +219,6 @@ rule compare_hybrid_assemblies:
     threads: capped_cpus(24)
     log:
         LOGS + "/compare_hybrid_assemblies_{sample}.log"
-    priority: 5
     shell:
         """
         snippy \

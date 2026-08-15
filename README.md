@@ -1,5 +1,5 @@
 # BacFlux
-A single workflow covering bacterial genome assembly, quality control, annotation and antimicrobial resistance — including, optionally, whether a resistance gene sits on something that can move.
+A single workflow covering bacterial genome assembly, quality control, annotation and antimicrobial resistance — including whether a resistance gene sits on something that can move.
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥9.10.1-brightgreen.svg)](https://snakemake.readthedocs.io/en/stable/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11143917.svg)](https://doi.org/10.5281/zenodo.11143917)
@@ -18,14 +18,14 @@ Livio Antonielli, 2026
 ```
 
 ## Synopsis
-`BacFlux` is a comprehensive and automated bioinformatics workflow for the processing and analysis of bacterial genomic data. It integrates several powerful tools, each performing a specific task, into a seamless workflow managed by Snakemake.
+`BacFlux` is a comprehensive and automated bioinformatics workflow for the processing and analysis of bacterial genomic data. [NOTE: this sounds too generic: It integrates several powerful tools, each performing a specific task, into a seamless workflow managed by Snakemake.]
 
 **v2.0.0 is one workflow with four entry points.** Whatever you sequenced, the data converges on the same downstream analysis, so results are comparable across sequencing strategies:
 
 | `mode:` | Input | Front end |
 |---|---|---|
 | `illumina` | Illumina paired-end reads | PhiX removal, `fastp`, `SPAdes` |
-| `nanopore` | Oxford Nanopore reads | `NanoPlot`, `Filtlong`, `Flye`, `Medaka`, `dnaapler` |
+| `nanopore` | [NOTE: So, the official name is Oxford Nanopore Technologies, and, at least once, I would use it to justify why then we always mention it as ONT, however, I am wondering in this case if we should stick to the plural i.e. "Technologies" or use the singular forms, as an adjective introducing "reads": Oxford Nanopore Technology reads] | `NanoPlot`, `Filtlong`, `Flye`, `Medaka`, `dnaapler` |
 | `hybrid` | Illumina + Nanopore | ONT assembly polished with the short reads (`Polypolish`), plus a `Snippy` comparison of the two assemblies |
 | `contigs` | Pre-assembled genomes (FASTA) | contig filtering only — this is the former `FastaFlux` |
 
@@ -53,18 +53,18 @@ From there every mode runs the same shared analysis: decontamination, assembly Q
 Read this section if you used `BacFlux` v1.x, `FastaFlux`, `BacFluxL` or `BacFluxL+`.
 
 ### Four workflows became one
-v1 was four sibling workflows that shared roughly two-thirds of their rules and drifted apart with every change. v2 merges them into a single repository with one Snakefile that dispatches on a `mode:` key in the config:
+[NOTE: I agree but still, this intro sounds awful and almost discrediting my old work. Find somethig better: v1 was four sibling workflows that shared roughly two-thirds of their rules and drifted apart with every change.] v2 merges them into a single repository with one Snakefile that dispatches on a `mode:` key in the config:
 
 | v1 | v2 |
 |---|---|
-| `BacFlux` (Illumina short reads) | `mode: illumina` |
+| `BacFlux` (Illumina reads) | `mode: illumina` |
 | `FastaFlux` (pre-assembled contigs) | `mode: contigs` |
-| `BacFluxL` (Nanopore long reads) | `mode: nanopore` |
-| `BacFluxL+` (Illumina + Nanopore) | `mode: hybrid` |
+| `BacFluxL` (ONT reads) | `mode: nanopore` |
+| `BacFluxL+` (Illumina + ONT) | `mode: hybrid` |
 
 With v2.0.0 the `BacFluxL` and `BacFluxL+` repositories are retired in favour of this one. Their existing DOIs stay valid, so analyses already published with them remain citable and reproducible.
 
-### Your old command
+[NOTE: Unnecessary. I would actually avoid to expose us to criticisms regarding the old workflows that my put also the new one under a bad light: ### Your old command
 ```bash
 # v1, short reads
 snakemake --sdm conda --jobs 4 --cores 12
@@ -90,9 +90,9 @@ snakemake --sdm conda --configfile config/config_custom.yaml --cores 12
 >
 > *(If you cloned fresh, this does not apply to you — there is no old file to collide with.)*
 
-**`--jobs` is gone on purpose, and you should not add it back.** For a local run `--jobs`/`-j` is an alias for `--cores`, not an independent "N jobs of M cores each" setting. Combining the two was measured to allow real CPU oversubscription: two rules each declaring 8 threads, launched with `--jobs 2 --cores 8`, both got their full 8 threads and ran at the same time — 16 real threads against a declared budget of 8. Every CPU-bound rule in v2 declares Snakemake's built-in `threads:`, so **`--cores N` alone is now the complete and correct CPU ceiling**.
+**`--jobs` is gone on purpose, and you should not add it back.** For a local run `--jobs`/`-j` is an alias for `--cores`, not an independent "N jobs of M cores each" setting. Combining the two was measured to allow real CPU oversubscription: two rules each declaring 8 threads, launched with `--jobs 2 --cores 8`, both got their full 8 threads and ran at the same time — 16 real threads against a declared budget of 8. Every CPU-bound rule in v2 declares Snakemake's built-in `threads:`, so **`--cores N` alone is now the complete and correct CPU ceiling**.]
 
-### The output directory is renumbered
+[NOTE: It is already complicated for a new user to get used to the output of the new workflow, no need to make a historical comparison. Just say that the output numbering and part of its logic changed. Then, let's show the user how the output structure is organized, in the relevant section:### The output directory is renumbered
 v1 numbered the shared stages differently in each workflow (taxonomy was `03`, `04` or `09` depending on how many front-end stages came before it). v2 groups all technology-specific work under two fixed parents, so every shared stage has the same number in every mode:
 
 | v1 (short-read) | v2 |
@@ -108,13 +108,13 @@ v1 numbered the shared stages differently in each workflow (taxonomy was `03`, `
 | — | `08.mobilome` (new, opt-in) |
 | `09.report` | `09.report` |
 
-There is no in-place upgrade: point `output_dir` at a fresh directory rather than trying to reuse a v1 one.
+There is no in-place upgrade: point `output_dir` at a fresh directory rather than trying to reuse a v1 one.]
 
 ### Other changes worth knowing before you run
-- **Sample names may now contain underscores.** Three of the four v1 workflows forbade them; v2 allows them everywhere. The exact rule is in [Configuration](#configuration).
-- **GTDB moved from R226 to R232, and GTDB-Tk from 2.6.1 to 2.7.2.** GTDB-Tk pins itself to one compatible reference release, so an R226 database will not work with the pinned version. You must download R232; there is no in-place upgrade. Verified on two already-classified genomes: the lineage was identical under both releases.
-- **The Bakta database must be v6.0** (Bakta 1.12.0). If you hold a v5.x database, download the new one.
-- **The virus caller is selectable.** `VirSorter2` remains the default; `geNomad` is opt-in because it is licensed for academic/non-commercial use only. Choosing `geNomad` also turns on a Platon + geNomad plasmid concordance table.
+- **Sample names may now contain underscores.** [NOTE: No need to repeat the in v1 this was different. Stating that in v2 underscores are allowed already tells us everythig. Three of the four v1 workflows forbade them; v2 allows them everywhere.] The exact rule is in [Configuration](#configuration).
+- **GTDB moved from R226 to R232, and GTDB-Tk from 2.6.1 to 2.7.2.** [NOTE: Don't overexplain too much this type of change. A user has to go already through a lot and these are unnecessary details: GTDB-Tk pins itself to one compatible reference release, so an R226 database will not work with the pinned version. You must download R232; there is no in-place upgrade. Verified on two already-classified genomes: the lineage was identical under both releases.]
+- **The Bakta database must be v6.0** (Bakta 1.12.0). [NOTE: unnecessary detail: If you hold a v5.x database, download the new one.]
+- **The virus caller is selectable.** `VirSorter2` remains the default; [NOTE: Do not discuss about the licensing of the tools or databases. We can reserve a short, independent disclaimer paragraph, towards the end: `geNomad` is opt-in because it is licensed for academic/non-commercial use only.] Choosing `geNomad` also turns on a Platon + geNomad plasmid concordance table.
 - **Several databases can now be supplied from a copy you already hold** (`checkv_db`, `vs2_db`, `antismash_db`, `dbcan_db`, `card_db`, `genomad_db`), which skips the download entirely. `BacFlux` only ever reads those paths.
 - **The mobilome module is new and off by default.** See [the mobilome module](#the-mobilome-module).
 - **`workdir:` is gone.** In v1 Snakemake changed into `output_dir` at parse time. It no longer does, so relative input paths now resolve against the directory you launched from, which is what most people expect. `output_dir` may still be given as a relative path; it is resolved to an absolute one automatically.
@@ -183,7 +183,7 @@ The analysis of bacterial WGS data often involves a complex series of steps usin
 
 `BacFlux` integrates several best-in-class bioinformatic tools into a cohesive pipeline, automating tasks from quality control and assembly to annotation, taxonomic classification, identification of antimicrobial resistance genes and viral sequences.
 
-Unifying the four v1 workflows serves the same purpose one level up. The four shared most of their rules, so every fix had to be applied three or four times by hand and the copies drifted. Writing a step once means it behaves identically whether your isolate was sequenced on Illumina, on Nanopore, on both, or arrived as a finished assembly — and it is what makes a cross-technology comparison of the results defensible.
+[NOTE: This is something I would tell a friend in front of a beer: Unifying the four v1 workflows serves the same purpose one level up. The four shared most of their rules, so every fix had to be applied three or four times by hand and the copies drifted. Writing a step once means it behaves identically whether your isolate was sequenced on Illumina, on Nanopore, on both, or arrived as a finished assembly — and it is what makes a cross-technology comparison of the results defensible.]
 
 By providing a user-friendly and automated solution, `BacFlux` allows researchers to focus on interpreting the biological meaning of their data.
 
@@ -202,7 +202,7 @@ Here's a breakdown of the `BacFlux` workflow. Steps 01–02 depend on which mode
 
     * **Assembly**, per mode:
         - `illumina`: [SPAdes](https://github.com/ablab/spades), then contigs filtered on minimum length (≥500 bp) and coverage (≥2x).
-        - `nanopore`: [Flye](https://github.com/mikolmogorov/Flye), reoriented to a conventional start position with [dnaapler](https://github.com/gbouras13/dnaapler) and polished with [Medaka](https://github.com/nanoporetech/medaka).
+        - `nanopore`: [Flye](https://github.com/mikolmogorov/Flye), reoriented to a conventional start position with [dnaapler](https://github.com/gbouras13/dnaapler) and polished with [Medaka](https://github.com/nanoporetech/medaka) [NOTE: would it make sense to flag as optional the tool and rules/steps that are triggerable in the config file?].
         - `hybrid`: the Nanopore assembly above, corrected with the Illumina reads using [Polypolish](https://github.com/rrwick/Polypolish). A [Snippy](https://github.com/tseemann/snippy) comparison between the ONT and Illumina assemblies is reported alongside.
         - `contigs`: no assembler. The supplied FASTA is filtered — using the same length/coverage cutoffs when the headers are SPAdes-style and carry those numbers, and by length only when they do not, because inventing a coverage filter would silently delete real sequence.
 
@@ -260,9 +260,9 @@ BacFlux downloads automatically all dependencies and several databases. However,
     conda create -c conda-forge -c bioconda -n snakemake snakemake
     ```
 
-    *NOTE: a handful of rules run in the environment you launched from rather than in a conda environment of their own — the ones that only download and unpack a database (`wget`, `tar`, `sha256sum`, `awk`) and the small helper scripts of the mobilome module (`python`, standard library only). All of these are present on a normal Linux system and in the Snakemake conda environment, but `wget` in particular is missing from some minimal conda base environments and HPC login shells, where a database download would otherwise fail with a bare "command not found" after the run has already started.*
+[NOTE: Is this note meaning that we do not take care of the installation of these software pieces but "just" provide a heads-up for the user in case of error?: *NOTE: a handful of rules run in the environment you launched from rather than in a conda environment of their own — the ones that only download and unpack a database (`wget`, `tar`, `sha256sum`, `awk`) and the small helper scripts of the mobilome module (`python`, standard library only). All of these are present on a normal Linux system and in the Snakemake conda environment, but `wget` in particular is missing from some minimal conda base environments and HPC login shells, where a database download would otherwise fail with a bare "command not found" after the run has already started.*]
 
-3. **Databases:**
+[NOTE: Is a clear message system implemented regarding missing databases, already?: 3. **Databases:**]
 
     While `BacFlux` automates the installation of all software dependencies, some external databases need to be downloaded manually. If you have already installed them, skip this section and go directly to [configuration](#configuration).
 
@@ -311,7 +311,7 @@ BacFlux downloads automatically all dependencies and several databases. However,
         wget -c 'ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz'
         gunzip nucl_gb.accession2taxid.gz
         ```
-        *NOTE: the complete NCBI core nt database and taxonomy-related files should take around 300 GB of hard drive space (September 2025). The `nodes.dmp` and `names.dmp` files from the taxdump must sit in this same directory — BlobTools reads them from there.*
+        *NOTE: the complete NCBI core nt database and taxonomy-related files should take around 300 GB of hard drive space (July 2026). The `nodes.dmp` and `names.dmp` files from the taxdump must sit in this same directory — BlobTools reads them from there.*
 
     * `eggNOG diamond` database:
         ```bash
@@ -398,7 +398,7 @@ Before running `BacFlux`, copy `config/config.yaml` and edit your copy with a te
 
     `*` `#` `@` `%` `^` `/` `!` (space) `?` `&` `:` `;` `|` `<` `>`
 
-    Everything else is accepted, **including the underscore** (`_`) and the dot (`.`). This is a change from v1, where three of the four workflows forbade underscores. A dotted file name in `contigs` mode such as `my.genome.fasta` is read as sample `my.genome` — the last dot splits off the extension, earlier dots stay part of the name. The check lives in one place and applies identically to all four modes.
+    Everything else is accepted, **including the underscore** (`_`) and the dot (`.`). This is a change from [NOTE: Just came into my mind. We keep mentioning either "v1" or "v2", throughout the entire README, referring to the previous or current workflow flavour, obviously. But is this either canonical for this kind of software or documentation, or obvious enough for a user who is perhaps unaware of the previous pipeline's features?: v1, where three of the four workflows forbade underscores.] A dotted file name in `contigs` mode such as `my.genome.fasta` is read as sample `my.genome` — the last dot splits off the extension, earlier dots stay part of the name. The check lives in one place and applies identically to all four modes.
 
 - `directories`
 
@@ -428,12 +428,12 @@ Before running `BacFlux`, copy `config/config.yaml` and edit your copy with a te
     Download URLs for the databases the workflow fetches itself. These should work as they are; change them only if a link breaks or to update a database version.
 
     - [card_link](https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2): the Comprehensive Antibiotic Resistance Database (`CARD`). Read in `illumina` and `hybrid` only.
-    - checkv_link: the `CheckV` database. The default points at an unmodified Zenodo mirror of CheckV's own database, because the official NERSC host is frequently unreachable. Ignored when `directories.checkv_db` is set.
+    - checkv_link: the `CheckV` database. The default points at an unmodified Zenodo mirror of CheckV's own database, because the [NOTE: shall we introduce the link behind "NERSC"? i.e. https://www.nersc.gov/: official NERSC] host is frequently unreachable. Ignored when `directories.checkv_db` is set.
     - [dbcan_link](https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz): the `dbCAN` database for `run_dbcan` v5.1.2.
     - [phix_link](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015): the PhiX genome reference used by Illumina as a sequencing control. Read in `illumina` and `hybrid` only.
     - genomad_link / genomad_md5: only read when `phage.caller: genomad`. The default is the geNomad authors' own Zenodo copy of their database, for the same hosting reason as CheckV. Change the MD5 whenever you change the link — a mismatch stops the run.
 
-    *NOTE on the dbCAN pin: `dbcan` is deliberately pinned to 5.1.2, with a version-pinned Zenodo copy of its database, for reproducibility. This is a considered choice, not a workaround: run_dbcan's official mirror only ever hosts the current database, and moving to 5.2.x is not a drop-in swap — subcommand arguments and output schema changed, and on the same input 5.2.9 called 205 CAZyme genes against 5.1.2's 315. The ~110 dropped genes were almost all weak single-tool (`dbCAN_sub`-only) hits that 5.2.9 correctly filters through an e-value fix 5.1.2 ignores, so 5.2.9 is arguably more correct — but the numbers differ materially, while the high-confidence (2–3 tool) calls are preserved either way. Power users should read 5.1.2's weak `dbCAN_sub`-only hits with that in mind.*
+    *NOTE on the dbCAN pin: `dbcan` is deliberately pinned to 5.1.2, with a version-pinned Zenodo copy of its database, for reproducibility. [NOTE: the following explanation is welcome but needs to be simpler and less mumbo jumbo to be helpful: This is a considered choice, not a workaround: run_dbcan's official mirror only ever hosts the current database, and moving to 5.2.x is not a drop-in swap — subcommand arguments and output schema changed, and on the same input 5.2.9 called 205 CAZyme genes against 5.1.2's 315. The ~110 dropped genes were almost all weak single-tool (`dbCAN_sub`-only) hits that 5.2.9 correctly filters through an e-value fix 5.1.2 ignores, so 5.2.9 is arguably more correct — but the numbers differ materially, while the high-confidence (2–3 tool) calls are preserved either way. Power users should read 5.1.2's weak `dbCAN_sub`-only hits with that in mind.]*
 
 - `resources`
 
@@ -444,7 +444,7 @@ Before running `BacFlux`, copy `config/config.yaml` and edit your copy with a te
 
   These describe your machine; `--cores N` on the command line is what actually enforces the budget at run time. Set `--cores` to the same value as `threads`, and do not pass `--jobs`.
 
-- `parameters`
+[NOTE: Information provided here, with real, practical examples, is pure gold. But I would not mention this in the README, which we should simplify, and keep it for the documentation webpage. Actually, see how we handled this for MetaFlux, available here: https://github.com/iLivius/MetaFlux :- `parameters`
 
     1. **Database selection**: `BacFlux` requires specifying the version of the `NCBI nt` database for `BLAST` operations. You can choose between the `core_nt` and `nt_prok` versions. By default the configuration file is set to use the `core_nt` database. For instructions on installing the `BLAST` database, refer to the [installation](#installation).
 
@@ -485,11 +485,11 @@ Before running `BacFlux`, copy `config/config.yaml` and edit your copy with a te
         >
         > Check `contig_taxonomy_decisions.tsv` before trusting the *absence* of a plasmid. If small mobile replicons matter to your question, consider `mode: off` or an explicit include list. The same limitation applies in reverse: a genuine contaminant of the same genus but a different species cannot be caught by a genus-level rule at all.
         >
-        > **In `hybrid` mode this bites twice.** Only the Illumina reads mapping to the *selected* contigs are passed to Filtlong as its short-read reference, and ONT reads not covered by that reference score as low quality and are discarded before Flye ever sees them. So a contig dropped here can take its long reads with it, and the sequence disappears from the assembly rather than merely from the taxonomy table. This is independent of `long_read_qc` above; both can delete a plasmid, for different reasons, and both should be ruled out.
+        > **In `hybrid` mode this bites twice.** Only the Illumina reads mapping to the *selected* contigs are passed to Filtlong as its short-read reference, and ONT reads not covered by that reference score as low quality and are discarded before Flye ever sees them. So a contig dropped here can take its long reads with it, and the sequence disappears from the assembly rather than merely from the taxonomy table. This is independent of `long_read_qc` above; both can delete a plasmid, for different reasons, and both should be ruled out.]
 
-- `phage`
+[NOTE: Keep the licensing and commercial caveat for a short, specific section below, do not poison the README with this, all the time: - `phage`
 
-    `caller: virsorter2` (default) or `genomad`. See [licensing](#licensing-and-commercial-use) before choosing `genomad`: it is licensed for academic/non-commercial use only. Choosing it also turns on the Platon + geNomad plasmid concordance; on the default, geNomad never runs and the plasmid deliverable is Platon's `verified_plasmids.txt`.
+    `caller: virsorter2` (default) or `genomad`. See [licensing](#licensing-and-commercial-use) before choosing `genomad`: it is licensed for academic/non-commercial use only. Choosing it also turns on the Platon + geNomad plasmid concordance; on the default, geNomad never runs and the plasmid deliverable is Platon's `verified_plasmids.txt`].
 
 - `mobilome`
 
@@ -519,21 +519,21 @@ The same command runs all four modes — which one you get is decided by `mode:`
 
 *NOTE: starting from Snakemake version 8.4.7, the `--use-conda` option has been deprecated. Use `--software-deployment-method conda` or `--sdm conda` instead.*
 
-**CPU budget.** `--cores N` is the one knob, and it is sufficient on its own: every CPU-bound rule declares Snakemake's built-in `threads:`, which `--cores` enforces automatically. Verified after the conversion from the older custom-resource mechanism: with `--cores 24` the per-rule caps are respected (the VirSorter2 database rule stays at 4, ONT QC and Medaka at 8, adapter trimming at 16, the rest 24); with `--cores 8` Snakemake caps every request at 8 by itself, except the rules whose own lower cap correctly wins. **Do not add `--jobs`/`-j`** — for local execution it is an alias for `--cores`, and passing both can silently reintroduce the oversubscription the ceiling exists to prevent.
+[NOTE: Here and everywhere else through out the README, where relevant: safe these extensive details, tricks and heads-up for the MkDocs documentation website: **CPU budget.** `--cores N` is the one knob, and it is sufficient on its own: every CPU-bound rule declares Snakemake's built-in `threads:`, which `--cores` enforces automatically. Verified after the conversion from the older custom-resource mechanism: with `--cores 24` the per-rule caps are respected (the VirSorter2 database rule stays at 4, ONT QC and Medaka at 8, adapter trimming at 16, the rest 24); with `--cores 8` Snakemake caps every request at 8 by itself, except the rules whose own lower cap correctly wins. **Do not add `--jobs`/`-j`** — for local execution it is an alias for `--cores`, and passing both can silently reintroduce the oversubscription the ceiling exists to prevent.
 
-**Restarting.** Snakemake only redoes what is missing or out of date, so a run interrupted for any reason can simply be relaunched with the same command. Change a config value and only the affected steps are recomputed. Downloaded databases live under `output_dir` and the conda environments under `.snakemake/conda` in the launch directory, so keeping both stable across runs avoids re-downloading and rebuilding them.
+**Restarting.** Snakemake only redoes what is missing or out of date, so a run interrupted for any reason can simply be relaunched with the same command. Change a config value and only the affected steps are recomputed. Downloaded databases live under `output_dir` and the conda environments under `.snakemake/conda` in the launch directory, so keeping both stable across runs avoids re-downloading and rebuilding them.]
 
 [⬆ Back to Table of Contents](#table-of-contents)
 
 ## The mobilome module
-**Optional. Off by default. Read the [licensing](#licensing-and-commercial-use) section before turning it on.**
+[NOTE: keep things less explicit. This module is off by default. If we really have to provide a justification for this I'd rather opt for an excuse such as that it needs more time, or computational resources (is it actually the case? Please correct me, in case not), or because it is very specific and might be not of interest for every analysis round. But in general, let's just report the BacFlux main license and disclainmer about each tool or database license, in the short, reelvant section , at the end of the documentation, only: **Optional. Off by default. Read the [licensing](#licensing-and-commercial-use) section before turning it on.**]
 
-### The question it answers
-For each AMR gene detected in the genome: **is it embedded in a mobile genetic element, and if so, how transferable is that element?**
+[NOTE: Here and below, about the mobilome module rationale, technical aspects, output, tricks, etc: pure gold but not for the README that should be dry. Keep all information for the web documentation, as in MetaFlux: ### The question it answers
+For each AMR gene detected in the genome: **is it embedded in a mobile genetic element, and if so, how transferable is that element?**]
 
-That is the distinction regulators actually ask about. EFSA's framing is *intrinsic* versus *acquired* resistance — intrinsic being roughly species-wide, chromosomal and not transferable, acquired being horizontally gained and possibly able to move again. A resistance gene that is part of a species' normal chromosomal repertoire is a very different risk from the same activity sitting on a conjugative plasmid, because only the second can move into another bacterium.
+[NOTE: that's fine but we should report a reference for these claims, unless we did already (please, check): That is the distinction regulators actually ask about. EFSA's framing is *intrinsic* versus *acquired* resistance — intrinsic being roughly species-wide, chromosomal and not transferable, acquired being horizontally gained and possibly able to move again. A resistance gene that is part of a species' normal chromosomal repertoire is a very different risk from the same activity sitting on a conjugative plasmid, because only the second can move into another bacterium.]
 
-This module produces the **supporting evidence** for that judgement. It does not produce the judgement, it is not "EFSA-compliant" and does not claim to be, and every mobility call is a **prediction** — the confirmatory experiment is a filter or broth mating assay, not software.
+[NOTE: stop reporting in the documentation what it clearly looks like an internal note, heads-up, comment, between me and you. Actually, check if this kind of leaks are somewhere else in the documentation and I missed to flag them: This module produces the **supporting evidence** for that judgement. It does not produce the judgement, it is not "EFSA-compliant" and does not claim to be, and every mobility call is a **prediction** — the confirmatory experiment is a filter or broth mating assay, not software.]
 
 ### The mobility ladder
 Every AMR gene gets one tier, lowest to highest:
@@ -550,7 +550,7 @@ Every AMR gene gets one tier, lowest to highest:
 One case is reported separately and never counted as mobilisation: an IS that has landed **inside** the AMR coding sequence, which usually inactivates the gene (`is_inside_amr_cds`).
 
 ### Two things to keep in mind about the output
-1. **On a fragmented (short-read) assembly, a located IS count is a floor, not a count.** IS elements are the single biggest cause of contig breaks, because multiple identical copies collapse in the assembly graph. The AMR gene and its flanking IS very often land on different contigs — the exact structure you are trying to detect is what destroyed the assembly. Every row therefore carries `dist_to_contig_end`, `is_at_contig_boundary` and `spans_contigs`, and the IS summary reports what fraction of calls sit at a contig end. Read those.
+1. **On a fragmented (short-read) assembly, a located IS count is a floor, not a count.** [NOTE: do we have documented evidences for this claim, actually?: IS elements are the single biggest cause of contig breaks, because multiple identical copies collapse in the assembly graph.] The AMR gene and its flanking IS very often land on different contigs — the exact structure you are trying to detect is what destroyed the assembly. Every row therefore carries `dist_to_contig_end`, `is_at_contig_boundary` and `spans_contigs`, and the IS summary reports what fraction of calls sit at a contig end. Read those.
 2. **Published IS-detection false-discovery rates are 8–24% even on curated data.** The output is deliberately tiered evidence (`confidence`: high / medium / low) and never a bare count.
 
 ### Turning it on
@@ -562,17 +562,17 @@ That is the whole switch. It adds two tools — `ISEScan` and `CONJscan`/`MacSyF
 
 `AMRFinderPlus` is run with `--organism` derived from the GTDB-Tk call where a confident mapping exists, which unlocks curated **point mutations** — the intrinsic, chromosomal, non-transferable determinants tier 1 rests on, and something ABRicate structurally cannot see. There is no official GTDB → AMRFinderPlus organism convention (GTDB's own FAQ states there is no direct translation to NCBI taxa), so `BacFlux` uses a hand-checked, project-local table. It is documented and audited, not authoritative: every decision, **including every refusal**, is written to `{sample}_amrfinder_organism_audit.tsv` with its reason, and a genome with no confident mapping simply gets no `--organism` rather than a guess. Re-check the table when you change the GTDB release. `ABRicate` and the CARD read-mapping leg are unaffected and keep running as before — the three AMR legs are complementary, not redundant.
 
-### Optional layers
-Each of these is skipped unless you configure it, and each writes a `PROVENANCE.txt` recording the source, fetch date, checksum and sequence count — because none of these endpoints is versioned, and without that there is no way to say later which release a result came from.
+[NOTE: Are the following steps on, if the mobilome module is activated in the config, or they need further tuning in the config, to start? :### Optional layers]
+[NOTE: I need to understand what do you mean for this because I don't remember: Each of these is skipped unless you configure it, and each writes a `PROVENANCE.txt` recording the source, fetch date, checksum and sequence count — because none of these endpoints is versioned, and without that there is no way to say later which release a result came from.]
 
 | Layer | Config key | What it adds | Licence |
 |---|---|---|---|
-| **ICEscan models** | `mobilome.icescan.run` + `url`/`dir` | a second MacSyFinder model set run alongside CONJscan, adding the IME and AICE classes and extra integrase profiles. Over 12 curated IMEs, detections went from 3 to 5 — and detections whose called length is within a factor of two of the published length from 1 to 4 | **CC BY-NC-SA 4.0**, non-commercial |
+| **ICEscan models** | `mobilome.icescan.run` + `url`/`dir` | a second MacSyFinder model set run alongside CONJscan, adding the IME and AICE classes and extra integrase profiles. Over 12 curated IMEs, detections went [NOTE: this is an exquisitely internal thing that nobody would understand and actually nobody has to know. It was part of the developing and tuning: from 3 to 5 — and detections whose called length is within a factor of two of the published length from 1 to 4] | [NOTE: all this licensing here and below is not necessary: **CC BY-NC-SA 4.0**, non-commercial] |
 | **TnCentral** | `mobilome.tncentral.url`/`dir` | curated transposon and integron names — this is what makes **tier 4** reachable at all. A curated hit is not an inference and gets architectures right that the pattern rules miss (notably IS*26*, whose copies sit in direct orientation and break the same-orientation rule tier 3 depends on) | "All Rights Reserved"; no terms page exists |
 | **ICEberg 3.0** | `mobilome.iceberg.urls`/`dir` | names the ICE/IME candidates CONJscan already found. Changes no gene's tier — it turns "predicted self-transmissible element" into a name you can look up | no licence or terms statement published |
 | **ISOSDB copy number** | `mobilome.isosdb.fasta_url` + `family_map_url` | maps reads against an IS database to estimate how many IS copies the assembler collapsed. Turns the "the count is a floor" warning into a number. Changes no gene's tier. *`illumina` and `hybrid` only — it needs reads* | MIT (from the pseudoR repository) |
 
-### What it outputs
+[NOTE: As we said already, this is another example of things that will end up in the MkDocs-powered documenation for the github.io webpage. However, we will need to provide better, more in depth explanation, with tables and better graphical evidence, to explain and put more value on the output. Isn't this one of the parts that distinguish more than others BacFlux 2.0, compared to many other microbial genomic bioinformatic workflows?: ### What it outputs
 Everything lands in `08.mobilome/{sample}/`. The headline deliverable is:
 
 - **`{sample}_amr_mobility.tsv`** — one row per AMR gene, 46 columns: the gene and its AMRFinderPlus evidence (`amrfinder_method`, identity, coverage, `amr_partial_at_contig_end`), its replicon (chromosome or plasmid id), its `mge_context` (`none` / `is_adjacent` / `composite` / `unit_transposon` / `integron` / `ice` / `ime` / `plasmid`), the measured `distance_bp` and orientation, the IS family and flanking counts, the conjugation machinery behind a tier 5/6 call (`relaxase_type`, `mpf_type`, `machinery_intact`), element boundaries where they could be established (`attL`, `attR`, `boundary_method`), the contig-edge honesty flags, and finally `mobility_tier` and `confidence`.
@@ -588,11 +588,11 @@ Plasmids and prophages are mobile genetic elements too, so the layout can read a
 | `06.plasmids`, `07.phages` | *what replicons and prophages are in this genome?* (detection) | always |
 | `08.mobilome` | *is each AMR gene in a mobile element, and how transferable?* (interpretation), plus IS / transposon / integron / ICE detection | opt-in |
 
-Stage 08 **consumes** 06 and 07 rather than re-detecting them.
+Stage 08 **consumes** 06 and 07 rather than re-detecting them.]
 
 [⬆ Back to Table of Contents](#table-of-contents)
 
-## Licensing and commercial use
+[NOTE: This is how I would explain things to a colleague in my office, very pragmatically, but I would not address what can be used commercially or not, so directly, in the documentation. Limit yourself to report the licensing types and then users will either know already or go investigating and come up with their own conclusions and decisions. I do not want to take this responsibility, stating black on white what can be used commercially and what it doesn't: ## Licensing and commercial use
 `BacFlux` itself is **MIT licensed**, and that does not change. It ships code and URLs; it never vendors a third-party database or model set. When an optional component is licence-encumbered, you download it yourself, under your own agreement with the licensor — the same arrangement `bakta_db`, `gtdbtk_db`, `platon_db` and the CARD link have always had. Share-alike terms attach to distributed source, not to execution, so running such a tool does not affect `BacFlux`'s own licence.
 
 That protects the *workflow's* licence. It does not tell you whether *your* use is permitted, so:
@@ -608,13 +608,13 @@ That protects the *workflow's* licence. It does not tell you whether *your* use 
 
 **The optional naming databases carry unclear terms.** TnCentral publishes an "© All Rights Reserved" notice and no terms page at all — commercial use is not merely unresolved, the site does not address it. ICEberg 3.0 publishes no licence, terms or reuse statement anywhere. Both are opt-in and neither is redistributed by `BacFlux`. ISOSDB is the one mobilome database with no redistribution question attached: it ships in the pseudoR repository under MIT.
 
-**ISfinder** requires written authorisation to download and forbids redistribution; the TnCentral endpoints that carry ISfinder content are deliberately not wired into the config.
+**ISfinder** requires written authorisation to download and forbids redistribution; the TnCentral endpoints that carry ISfinder content are deliberately not wired into the config.]
 
-Finally, no code from EBI's `mobilome-annotation-pipeline` is used here. Three of its scripts are derived from ICEfinder2 and carry CC BY-NC-SA headers, which would be incompatible with MIT. Reading them to understand an approach is fine and is what was done; only conventions were adopted — Sequence Ontology terms, an element ID format, the discard-with-reason pattern, and two numeric thresholds — and conventions are facts, not expression.
+[NOTE: Naive! This is an internal note, not meant ro be seen on a README or public documentation: Finally, no code from EBI's `mobilome-annotation-pipeline` is used here. Three of its scripts are derived from ICEfinder2 and carry CC BY-NC-SA headers, which would be incompatible with MIT. Reading them to understand an approach is fine and is what was done; only conventions were adopted — Sequence Ontology terms, an element ID format, the discard-with-reason pattern, and two numeric thresholds — and conventions are facts, not expression.]
 
 [⬆ Back to Table of Contents](#table-of-contents)
 
-## Validation
+[NOTE: Gold. But for a nicely, completelty dedicated section in the webpage MkDocs documentation, as I did for MetaFlux: ## Validation
 The unified workflow was checked against the v1 baselines: given the same reads, tool versions, read mode and thread count, long-read mode reproduced the published `BacFluxL` assembly byte for byte. The helper scripts carry unit tests that run outside Snakemake (`pytest workflow/scripts` — 420 tests at the time of writing).
 
 The mobilome module's ICE/IME caller was benchmarked against **ICEberg's curated coordinates**. The numbers below are the current ones. The methods and the reasoning behind the parameters are written up in `docs/` — `methods_att_and_small_plasmids.md` (the *att*-site search), `methods_icescan_union.md` (the second model set) and `mobilome_worked_example.md` (one genome end to end); the per-element benchmark tables are kept with the benchmark run itself, outside this repository.
@@ -648,7 +648,7 @@ Two limitations are not visible in the numbers above, and both change how the ou
 - **Tier 4** (inside a *named* transposon or integron) depends entirely on the opt-in TnCentral layer, and **no run retained on disk has ever assigned it**. The naming layer has produced exactly one curated hit on real data — `bla`KPC-2 inside Tn*7247* in a clinical *K. pneumoniae* isolate — and that gene scored **tier 6**, because the transposon sits on a conjugative plasmid and the plasmid evidence outranks it. Tier 4 is reached only when a named element is the *strongest* context available, which in practice means a chromosomal one, and no genome tested so far has produced that combination.
 - **Tier 5** is exercised, but only by one of its two routes. Every tier 5 row on disk is a gene on a mobilisable plasmid. **No AMR gene in any run has been assigned an IME context**, so the "inside an IME" half of tier 5 is untested end to end — which matters, because the IME pilot is the weaker half of the module to begin with (5 of 12).
 
-Neither gap is a reason to distrust tiers 1 and 6. Both are a reason to treat a tier 4 or tier 5 call as an unvalidated code path rather than a measured one, and to say so if it appears in a dossier.
+Neither gap is a reason to distrust tiers 1 and 6. Both are a reason to treat a tier 4 or tier 5 call as an unvalidated code path rather than a measured one, and to say so if it appears in a dossier.]
 
 [⬆ Back to Table of Contents](#table-of-contents)
 
@@ -672,7 +672,7 @@ The workflow output reflects the steps described in the [description](#descripti
     - **dbcan**: carbohydrate-active enzyme and substrate annotation by [dbCAN3](https://github.com/bcb-unl/run_dbcan) (v5.1.2).
 
 - `05.amr`: antimicrobial resistance features are investigated with two complementary approaches:
-    - **mapping**: reads filtered by [fastp](https://github.com/OpenGene/fastp) (v1.0.1) are mapped to the CARD database (v4.0.1) using [BBMap](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/) (v39.33) with minimum identity = 0.99. Mapping results are parsed and features with a covered length of at least 70% are reported in the `AMR legend` file. *Short-read modes only.*
+    - **mapping**: reads filtered by [fastp](https://github.com/OpenGene/fastp) (v1.0.1) are mapped to the CARD database (v4.0.1) using [BBMap](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/) (v39.33) with minimum read identity = 0.76 (BBMap's default; the rule previously passed `idfilter=0.99`, which BBMap does not apply to the primary alignment of a paired read, so 0.76 is what has always been in force). Mapping results are parsed and features with a covered length of at least 70% are reported in the `AMR legend` file. *Short-read modes only.*
     - **abricate**: the delivered genome is screened for AMR elements and virulence factors using [ABRicate](https://github.com/tseemann/abricate) (v1.2.0) against eight databases. [EFSA thresholds](https://efsa.onlinelibrary.wiley.com/doi/full/10.2903/j.efsa.2023.8323) are applied: hits must show **≥80% identity and ≥70% gene-length coverage** to be considered.
 
 - `06.plasmids`: the genome is screened for plasmid replicons with [Platon](https://github.com/oschwengers/platon) (v1.7) and results verified by BLAST search to avoid false positives. Contigs ascertained as plasmids are reported in `{sample}/platon/verified_plasmids.txt`. If geNomad is opted in, `{sample}/{sample}_plasmid_concordance.tsv` compares the two callers.
@@ -697,7 +697,7 @@ The workflow output reflects the steps described in the [description](#descripti
 [⬆ Back to Table of Contents](#table-of-contents)
 
 ## Acknowledgements
-This work was originally supported by the [Austrian Science Fund (FWF)](https://www.fwf.ac.at/en/) under Project I6030-B.
+This work was originally supported by the [Austrian Science Fund (FWF)](https://www.fwf.ac.at/en/) under Project I6030-B. [NOTE: let's add here a nice recognition to Anthropic and Claude. I got Claude Max 20x for free for 6 months within their Open Source Program.]
 
 ## Citation
 Antonielli, L., Großkinsky, D. K., Koch, H., Trognitz, F., Sanchez Mejia, A., & Nagel, M. (2024). BacFlux: A workflow for bacterial short-read assembly, QC, annotation, and more. Zenodo. https://doi.org/10.5281/zenodo.11143917

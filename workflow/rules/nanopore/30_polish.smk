@@ -95,7 +95,6 @@ if USE_MEDAKA:
         threads: capped_cpus(24)
         log:
             LOGS + "/long_read_consensus_{sample}.log"
-        priority: 9
         shell:
             # check_medaka_model already validated the NAME (or resolved auto), so
             # a failure here is a RUNTIME one — model weights not installed (no
@@ -149,7 +148,6 @@ rule finalize_contigs:
         final = FINAL_CONTIGS,
     log:
         LOGS + "/finalize_contigs_{sample}.log"
-    priority: 9
     shell:
         """
         mkdir -p $(dirname {output.final})

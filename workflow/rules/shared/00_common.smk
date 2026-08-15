@@ -369,28 +369,30 @@ PLASMID_CONCORDANCE_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "60_plasmid",
 # report is its own rule instead of two more lines of shell inside map_amr_db.
 CARD_REPORT_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "50_amr", "card_mapping_report.py")
 
-# The two read-identity filters the CARD leg maps at, and the coverage threshold
-# above which a CARD sequence is called present.
-#   0.99 (strict)  — near-exact matching. High specificity: a hit means THIS
-#                    reference allele is in the sample. It is the v1 setting and
-#                    the number the AMR_legend has always used.
-#   0.95 (relaxed) — recovers divergent members of the same family. Environmental
-#                    isolates sit much further from CARD's mostly-clinical
-#                    references than clinical isolates do, so at 0.99 alone a real
-#                    but divergent gene is simply absent from the output rather
-#                    than reported as divergent.
-#   70%            — minimum fraction of the reference gene's LENGTH covered by
-#                    reads. Length coverage, not read count: a short conserved
-#                    domain pulling in reads is not a gene being present.
-# Globals rather than per-rule params because map_amr_db filters on them and
-# card_mapping_report names its columns after them; if they drifted apart, the
-# report would label a column with an identity it was not produced at.
+# The two numbers that decide what the CARD read-mapping leg calls present.
+#
+#   0.76 — minimum READ identity, handed to BBMap as `minid=`. This is not a
+#          choice so much as a disclosure: from v1 until v2.0.0 the rule passed
+#          `idfilter=0.99`, which does not filter the primary alignment of a
+#          properly-paired read (see the long note above rule map_amr_db in
+#          shared/50_amr.smk), so every result the leg ever produced was screened
+#          at BBMap's default of 0.76. Writing 0.76 here changes no output; it
+#          stops the code claiming a stringency it never had. It is deliberately
+#          not raised: at a real 0.99 the same reads keep 2 alignments instead of
+#          1240, which would gut the one AMR leg immune to assembly collapse.
+#
+#   70%  — minimum fraction of the reference gene's LENGTH covered by reads.
+#          Length coverage, not read count: a short conserved domain pulling in
+#          reads is not a gene being present. THIS is where the leg's specificity
+#          comes from, which is why the loose identity floor is tolerable.
+#
+# Globals rather than per-rule params so map_amr_db and card_mapping_report cannot
+# disagree about what produced the numbers.
 # (The legend leg of map_amr_db still writes 70 into its awk and its header text
 # by hand. That shell block is preserved verbatim from v1 and is left alone on
 # purpose; if CARD_MIN_COVERED ever changes, change it there too.)
-CARD_STRICT_ID   = 0.99
-CARD_RELAXED_ID  = 0.95
-CARD_MIN_COVERED = 70
+CARD_MIN_IDENTITY = 0.76
+CARD_MIN_COVERED  = 70
 
 # Mobilome helper scripts (workflow/scripts/80_mobilome/). Each is stdlib-only Python,
 # is invoked by a rule in shared/80_mobilome.smk, and is unit-tested outside

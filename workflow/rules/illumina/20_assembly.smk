@@ -70,7 +70,6 @@ rule illumina_assembly:
         ram = RAM
     log:
         LOGS + "/illumina_assembly_{sample}.log"
-    priority: 10
     shell:
         """
         OMP_NUM_THREADS={threads} \
@@ -119,7 +118,6 @@ rule filter_contigs:
         contigs = SPADES_CONTIGS,
     output:
         contigs = DRAFT_CONTIGS,
-    priority: 9
     shell:
         """
         cat {input.contigs} | \
