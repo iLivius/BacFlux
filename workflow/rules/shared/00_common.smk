@@ -494,9 +494,9 @@ ICE_AUDIT                = MOBILOME_DIR + "/{sample}_ice_discarded.tsv"
 # BLAST against TnCentral. This is what makes ladder tier 4 ("inside a NAMED unit
 # transposon or integron") reachable at all — colocalise.py has always known how
 # to award it, but until this layer existed nothing produced an element of the
-# right type. (No retained run has actually produced a tier-4 call yet — see the
-# README's "What the benchmark does not show".) Fetched once and shared by every
-# sample, like the CONJscan models.
+# right type. (No retained run has actually produced a tier-4 call yet — see
+# "What the benchmark does not show" in docs/mobilome/validation.md.) Fetched
+# once and shared by every sample, like the CONJscan models.
 TNCENTRAL_DB_DIR         = DIR_MOBILOME + "/tncentral_db"       # a DIRECTORY (rule tncentral_db)
 TNCENTRAL_FASTA          = TNCENTRAL_DB_DIR + "/tncentral.fa"
 TNCENTRAL_BLAST_DB       = TNCENTRAL_DB_DIR + "/tncentral_v5"   # a PREFIX, not a file
@@ -1092,22 +1092,64 @@ _mobilome_cfg = config.get("mobilome", {}) or {}
 # ── Long-read QC: how aggressively to subset ONT reads ──
 # Unrelated to the mobilome block around it. These decide which ONT reads reach
 # the assembler, and they are the single biggest lever on SMALL PLASMID recovery.
-# Read by filter_long_reads in nanopore/10_reads.smk and hybrid/30_ont_reads.smk —
-# but only the hybrid rule passes --length_weight. The nanopore rule leaves
-# filtlong's own default in place, so setting length_weight has no effect there.
-# Measured on K. pneumoniae TUM24772, whose 5,596 bp Col plasmid we lost entirely:
+# Read by filter_long_reads in nanopore/10_reads.smk and hybrid/30_ont_reads.smk,
+# but only the hybrid rule passes --length_weight on to filtlong. The nanopore
+# rule never does, so setting that key has no effect there, and illumina/contigs
+# have no long reads at all: of the four modes, only hybrid uses it.
 #
-#   614 raw ONT reads map to that plasmid
-#    93 survive at length_weight 10  (the old hard-coded value) — 85% destroyed
-#   602 survive at length_weight 1   (filtlong's own default)   — 98% recovered
+# HOW THE FILTER WORKS. Filtlong ranks reads by
+#     (Length^lw x MeanQ^mqw)^(1/(lw+mqw)) x WindowQ
+# and --keep_percent deletes the bottom of that ranking. Raising length_weight
+# makes length dominate it. A plasmid cannot produce reads longer than itself, so
+# a small plasmid's reads sit near the bottom by construction.
 #
-# Filtlong scores a read as (Length^lw x MeanQ^mqw)^(1/(lw+mqw)) x WindowQ, so
-# raising length_weight makes length dominate the ranking. A 5.6 kb plasmid
-# cannot produce reads longer than 5.6 kb, so its reads sit at the bottom of a
-# length-dominated ranking and are the first discarded by --keep_percent.
-# Ryan Wick's Feb 2026 read-QC benchmark reports the same effect independently:
-# length-weighted filtlong wiped out sub-10 kb plasmids in 3 of 5 test genomes
-# and produced MORE structural errors as a result.
+# WHICH KEY ACTUALLY COSTS A PLASMID. Measured on K. pneumoniae TUM24772
+# (BioProject PRJNA1168299, closed genome GCA_043950115.1, chromosome
+# CP171785.1) — a clinical test isolate, NOT one of the BAA-2146 / KPNIH1
+# mobilome positive controls; this project has confused those before. Its 5,596 bp
+# Col2 plasmid (pMTY24772_Col2, CP171790.1) is missing from our assembly and
+# complete in the Illumina data. Of the 603 raw ONT reads mapping to it
+# (minimap2 -x map-ont vs CP171790.1, alignment block >= 1 kb), the number that
+# survive filtering:
+#
+#                                     length_weight 10   length_weight 1
+#     keep_percent 90 (the old value)         93              413
+#     keep_percent 95 (what ships)           500              502
+#
+# At the keep_percent we ship, changing length_weight is worth TWO reads; at the
+# old 90 it is worth 320. The plasmid was destroyed by 90 and 10 acting together,
+# and either change alone recovers most of it. Both keys matter; keep_percent is
+# the one to reach for.
+#
+# SO WHY IS length_weight STILL 1? Because the two keys protect different size
+# classes, and that only shows in the read-length distribution. Reads per band,
+# same sample (the raw ONT set holds 2,954 reads of 1-3 kb and 3,418 of 3-6 kb):
+#
+#                             1-3 kb    3-6 kb
+#     keep_percent 90, lw 10       0       318
+#     keep_percent 95, lw 10       0     2,666
+#     keep_percent 90, lw  1     123     2,331
+#     keep_percent 95, lw  1     605     2,935
+#
+# length_weight 10 empties the 1-3 kb band at BOTH keep_percent values. Raising
+# keep_percent rescues the 3-6 kb band, which is why it rescued this 5.6 kb
+# plasmid, but only lowering length_weight rescues 1-3 kb. Put plainly:
+# keep_percent protects plasmids of a few kb, length_weight protects plasmids
+# under ~3 kb.
+#
+# HONEST LIMIT: no setting tried here assembled that plasmid, raw unfiltered
+# reads included. Getting its reads back is necessary, not sufficient — ONT
+# ligation prep under-represents small circular plasmids by roughly 4-fold, and
+# that half is unfixable in silico. See docs/methods_att_and_small_plasmids.md.
+#
+# Ryan Wick's Feb 2026 read-QC benchmark hits the same failure, but read it
+# before citing it: his arm ran filtlong at its OWN DEFAULTS (--target_bases,
+# length_weight 1 — what we now ship) and still erased the sub-10 kb plasmids in
+# 3 of 5 test genomes, with more structural errors as a result. So it is not
+# confirmation of the length_weight 10 finding above; it is a warning that the
+# default weighting is already enough when you cull hard to a target, which is
+# what nanopore mode does. He recommends --length_weight 0. Discussion in
+# docs/methods_att_and_small_plasmids.md.
 # https://rrwick.github.io/2026/02/05/read_qc_testing.html
 _lrqc = (config.get("parameters", {}) or {}).get("long_read_qc", {}) or {}
 FILTLONG_MIN_LENGTH    = int(_lrqc.get("min_length", 1000))
@@ -1234,6 +1276,38 @@ if MOBILOME_RUN:
 #
 # This block sits with the resource accessors conceptually, but is placed here
 # because it calls _config_bool (defined just above).
+# CONJScan model-package version, pinned. See the long note on the params block of
+# rule conjscan_models in shared/80_mobilome.smk for why this must not float: the
+# package's relaxase profiles decide AMR mobility tiers 5 and 6, and 2.1.0 is the
+# version behind every published number in docs/mobilome/validation.md.
+CONJSCAN_VERSION = "2.1.0"
+
+# SPAdes k-mer ladder. "auto" (the default) means: pass no -k at all, so SPAdes picks
+# the ladder from the read length it measures itself — 21,33,55,77 for 150 bp reads,
+# 21,33,55,77,99,127 only at 250 bp and above. Giving -k switches that selection OFF,
+# which is why the value is empty rather than a list when auto is in force.
+#
+# Anything else is passed through verbatim as `-k <value>`, for pinning the ladder or
+# overriding SPAdes on unusual data. Validated here rather than at job time so a typo
+# stops the run in seconds: every k must be an odd integer below 128 (SPAdes' own
+# limit), and they must ascend.
+_spades_kmers_cfg = str((config.get("parameters", {}) or {}).get("spades_kmers", "auto") or "auto").strip()
+if _spades_kmers_cfg.lower() == "auto":
+    SPADES_KMER_FLAG = ""
+else:
+    try:
+        _ks = [int(v) for v in _spades_kmers_cfg.replace(" ", "").split(",") if v]
+    except ValueError:
+        sys.exit(f"[BacFlux] parameters.spades_kmers must be 'auto' or a comma-separated "
+                 f"list of odd integers below 128 (got: '{_spades_kmers_cfg}').")
+    _bad = [k for k in _ks if k % 2 == 0 or k < 1 or k > 127]
+    if not _ks or _bad:
+        sys.exit(f"[BacFlux] parameters.spades_kmers: every k must be an odd integer "
+                 f"below 128; offending value(s): {_bad or 'none given'}.")
+    if _ks != sorted(_ks):
+        sys.exit("[BacFlux] parameters.spades_kmers must ascend, e.g. 21,33,55,77.")
+    SPADES_KMER_FLAG = "-k " + ",".join(str(k) for k in _ks)
+
 _eggnog_params = (config.get("parameters", {}) or {}).get("eggnog") or {}
 EGGNOG_DBMEM = _config_bool(_eggnog_params.get("dbmem"), False)
 EGGNOG_DBMEM_GB = 42   # eggnog.db is 39 GB on disk; 42 leaves headroom for emapper.

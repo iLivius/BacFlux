@@ -34,7 +34,8 @@
 # ──────────────────────── Draft assembly (SPAdes) ──────────────
 # Takes in: r1 / r2 = TRIM_R1 / TRIM_R2, the fastp-trimmed, PhiX-free pairs
 #           written by rule trim_adapters (hybrid/10_reads.smk).
-# Does:     SPAdes --isolate over k = 21,33,55,77,99,127. OMP_NUM_THREADS is
+# Does:     SPAdes --isolate over the k-mer ladder set by parameters.spades_kmers
+#           (default auto, sized by SPAdes from the reads). OMP_NUM_THREADS is
 #           exported so the OpenMP sections obey the same budget as -t instead of
 #           grabbing every core on the machine.
 # Produces:
@@ -57,6 +58,11 @@ rule illumina_assembly:
     output:
         dir = directory(SPADES_DIR),
         contigs = SPADES_CONTIGS,
+    params:
+        # Identical to the illumina front end on purpose: the two SPAdes calls must stay
+        # in step. Empty when parameters.spades_kmers is auto, so SPAdes chooses the
+        # ladder from the read length it measures.
+        kmers = SPADES_KMER_FLAG,
     conda:
         "../../envs/spades.yaml"
     threads: CPUS
@@ -67,7 +73,7 @@ rule illumina_assembly:
     shell:
         """
         OMP_NUM_THREADS={threads} \
-        spades.py -k 21,33,55,77,99,127 --isolate \
+        spades.py {params.kmers} --isolate \
           --pe1-1 {input.r1} \
           --pe1-2 {input.r2} \
           -o {output.dir} \

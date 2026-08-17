@@ -571,8 +571,8 @@ if MOBILOME_RUN:
     # at the user's request, under the user's own agreement with the licensor,
     # exactly as this workflow already treats bakta_db, blast_db and the rest.
     # BacFlux's own MIT licence is unaffected. Turning the mobilome module on
-    # means accepting that dependency — it is stated in the README and printed
-    # at parse time.
+    # means accepting that dependency — it is set out in docs/about/licensing.md
+    # and printed at parse time.
     #
     # Takes in: nothing (a network fetch).
     # Produces: 08.mobilome/conjscan_models/ — one shared copy for all samples.
@@ -586,6 +586,20 @@ if MOBILOME_RUN:
             models = directory(CONJSCAN_MODELS_DIR),
         conda:
             "../../envs/macsyfinder.yaml"
+        params:
+            # PINNED, and not merely "current". Between CONJScan 2.0.2 and 2.1.0 the
+            # T4SS_MOBH profile's gathering threshold went 15.9 -> 100 "due to low
+            # specificity", and a new T4SS_MOBM relaxase profile was added. Both are
+            # RELAXASE profiles, which is the anchor separating mobility tier 5 from
+            # tier 6 — so an unpinned install can change published mobility calls with
+            # no diff in this repository to explain it. 2.1.0 is what produced the
+            # results in docs/mobilome/validation.md, including the MOBM call that did
+            # not exist before it. Raising this pin is a decision to re-validate.
+            #
+            # msf_data/macsydata accept a PEP 508 requirement, and resolve versions from
+            # the model repository's TAGS — which is why the releases page shows fewer
+            # versions than are installable.
+            version = CONJSCAN_VERSION,
         log:
             LOGS + "/mobilome_conjscan_models.log"
         shell:
@@ -597,10 +611,21 @@ if MOBILOME_RUN:
             }} > {log}
 
             if command -v msf_data >/dev/null 2>&1; then
-                msf_data install --target {output.models} CONJScan >> {log} 2>&1
+                msf_data install --target {output.models} 'CONJScan=={params.version}' >> {log} 2>&1
             else
-                macsydata install --target {output.models} CONJScan >> {log} 2>&1
+                macsydata install --target {output.models} 'CONJScan=={params.version}' >> {log} 2>&1
             fi
+
+            # Provenance, for the same reason every other database rule writes one:
+            # this package is versioned upstream but not dated, and its profiles decide
+            # AMR mobility tiers.
+            {{
+              echo "CONJScan model package"
+              echo "requested version : {params.version}"
+              echo "installed         : $(grep -h '^vers' {output.models}/CONJScan/metadata.yml 2>/dev/null | head -1)"
+              echo "fetched           : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "licence           : CC BY-NC-SA 4.0 (Institut Pasteur / CNRS), academic and non-commercial use only"
+            }} > {output.models}/PROVENANCE.txt
             """
 
     # ── conjscan — conjugation machinery on THIS genome ──
@@ -680,9 +705,12 @@ if MOBILOME_RUN:
         #          enzyme that nicks the DNA to start transfer) but NO mating
         #          apparatus, so it moves only by borrowing one from a
         #          conjugative element in the same cell (mobility tier 5);
-        #   AICE = the actinomycete elements that do not conjugate at all and
-        #          instead push single-stranded DNA between hyphae with an
-        #          FtsK/SpoIIIE translocase.
+        #   AICE = the actinomycete elements, which do conjugate into another
+        #          cell but not by that route: a TraB translocase of the
+        #          FtsK/SpoIIIE family carries the element across as
+        #          DOUBLE-stranded DNA, with no relaxase and no mating bridge
+        #          (Possoz et al. 2001, PMID 11679075), so they sit off the
+        #          mobility ladder rather than on one of its rungs.
         # It also carries integrase profiles CONJscan lacks. Only some of those
         # are trusted as element integrases — that judgement lives in the caller
         # (conjscan_to_ice.py), not here.

@@ -2,7 +2,7 @@
 #
 # Turn the cleaned read pairs into contigs, then drop the contigs that cannot be
 # real isolate sequence. SPAdes --isolate is tuned for a single high-coverage
-# bacterial culture, and its multi-k run (21,33,55,77,99,127) resolves both
+# bacterial culture, and its multi-k run resolves both
 # low-complexity and repeat-rich regions in one pass.
 #
 # Stage chain: TRIM_R1/TRIM_R2 → illumina_assembly → SPADES_CONTIGS →
@@ -31,7 +31,8 @@
 # Takes in: r1, r2 = TRIM_R1 / TRIM_R2, the fastp-trimmed, PhiX-free pairs written
 #           by rule trim_adapters (illumina/10_reads.smk).
 # Does:     one SPAdes de novo assembly per sample in --isolate mode, over the six
-#           k-mer sizes 21,33,55,77,99,127. OMP_NUM_THREADS is exported so the
+#           the k-mer ladder set by parameters.spades_kmers (default auto, which
+#           lets SPAdes size it from the reads). OMP_NUM_THREADS is exported so the
 #           OpenMP parts of SPAdes obey the same thread budget as the -t flag;
 #           without it they default to every core on the machine, which
 #           oversubscribes a multi-sample run. -m is a hard RAM ceiling in GB.
@@ -63,6 +64,10 @@ rule illumina_assembly:
     output:
         dir = directory(SPADES_DIR),
         contigs = SPADES_CONTIGS,
+    params:
+        # Empty when parameters.spades_kmers is auto, so SPAdes chooses the ladder from
+        # the read length it measures. See the note on SPADES_KMER_FLAG in 00_common.smk.
+        kmers = SPADES_KMER_FLAG,
     conda:
         "../../envs/spades.yaml"
     threads: CPUS
@@ -73,7 +78,7 @@ rule illumina_assembly:
     shell:
         """
         OMP_NUM_THREADS={threads} \
-        spades.py -k 21,33,55,77,99,127 --isolate \
+        spades.py {params.kmers} --isolate \
           --pe1-1 {input.r1} \
           --pe1-2 {input.r2} \
           -o {output.dir} \
