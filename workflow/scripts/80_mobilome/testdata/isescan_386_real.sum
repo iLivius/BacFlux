@@ -1,8 +1,0 @@
-# seqid                                                      family         nIS %Genome          bps4IS          dnaLen
-contig_1                                                     IS110            4    0.13            5561         4177018
-contig_1                                                     IS21             4    0.13            5543         4177018
-contig_1                                                     IS256            3    0.09            3689         4177018
-contig_1                                                     IS3              6    0.11            4512         4177018
-contig_1                                                     IS481            9    0.23            9682         4177018
-contig_1                                                     ISNCY            5    0.14            5818         4177018
-contigs_final.fasta                                          total           31    0.82           34805         4234994

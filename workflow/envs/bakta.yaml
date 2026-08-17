@@ -3,5 +3,5 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bakta=1.12.0
-  - diamond=2.1.24
+  - bakta=1.12.1
+  - diamond=2.2.5

@@ -47,7 +47,7 @@
 
 
 # ────────────────── Plasmid calling (Platon) ───────────────────
-# Platon (v1.7, pinned in envs/platon.yaml) sorts every contig of the finished
+# Platon (v1.8, pinned in envs/platon.yaml) sorts every contig of the finished
 # assembly into plasmid or chromosome from replicon-distribution scores — protein
 # families weighted by how often they sit on a plasmid rather than a chromosome.
 # Always runs: the default path and the geNomad path both need its calls.
