@@ -153,7 +153,7 @@ def test_a_family_absent_from_isosdb_reports_NA_not_a_negative_delta():
 
     Read naively that says "the assembly collapsed nothing, we over-called", when
     the truth is "this database has nothing to say about this organism". Measured
-    on hybrid sample 006 (Aquipseudomonas): 17 IS located, 1 of 22,713 ISOSDB
+    on a hybrid validation isolate: 17 IS located, 1 of 22,713 ISOSDB
     entries covered end to end. Absence of a nucleotide match is not evidence of
     absence of copies, so it must report NA.
     """

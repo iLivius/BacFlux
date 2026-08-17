@@ -637,3 +637,68 @@ def test_a_trna_anchored_pair_beats_a_longer_unanchored_one():
     assert att.same_trna_species({"name": "tRNA-Gly(gcc)"}, {"name": "tRNA-Gly(tcc)"})
     # An unreadable product falls back to "treat as the same", the safer answer.
     assert att.same_trna_species({"name": "tRNA"}, {"name": "tRNA-Ser(gct)"})
+
+
+# ── The two copy counters: one guard, two scopes ────────────────────────────
+
+def test_what_each_copy_counter_counts():
+    """Pin the counting convention of both copy counters — neither was pinned.
+
+    The two differ in two independent ways, and only one of them bites.
+    count_repeat_copies uses str.count, which skips past each hit it finds, while
+    count_repeat_copies_outside_trnas steps one base at a time and so also sees
+    copies that overlap each other; that WALK can only tell them apart on a
+    periodic repeat, which an att site is not. What does separate them in normal
+    use is SCOPE: only the second discounts copies inside tRNAs. Both are pinned
+    here, with the direction each falls.
+    """
+    # The published ICEKp direct repeat (Lam et al. 2018), 17 bp. It has no
+    # period shorter than itself: sliding it along by 1..16 bases never lines it
+    # up with itself, so two copies of it can never overlap.
+    icekp = "CCAGTCAGAGGAGCCAA"
+    assert all(icekp[shift:] != icekp[:len(icekp) - shift]
+               for shift in range(1, len(icekp)))
+
+    # Two ordinary copies, far apart: both counters say 2, which is the attL and
+    # attR of a scar and passes both guards.
+    background = random_sequence(5_000, seed=1207)
+    scar = plant(plant(background, 1_000, icekp), 3_000, icekp)
+    assert att.count_repeat_copies(scar, icekp) == 2
+    assert att.count_repeat_copies_outside_trnas(scar, icekp, []) == 2
+    assert att.count_repeat_copies(scar, icekp) <= att.DENOVO_MAX_CONTIG_COPIES
+    assert (att.count_repeat_copies_outside_trnas(scar, icekp, [])
+            <= att.MAX_ATT_COPIES_OUTSIDE_TRNA)
+
+    # Five copies back to back. str.count counts each PLACE the repeat sits, so a
+    # tandem array of a non-periodic repeat is five copies under both
+    # conventions — over both limits, rejected either way.
+    tandem = plant(background, 1_000, icekp * 5)
+    assert att.count_repeat_copies(tandem, icekp) == 5
+    assert att.count_repeat_copies_outside_trnas(tandem, icekp, []) == 5
+
+    # The one case where the two WALKS part company: a periodic k-mer. (AT)9
+    # lines up with itself every 2 bases, so 40 bp of AT stutter holds 12
+    # overlapping copies but only 2 that do not overlap. Nothing upstream filters
+    # low-complexity sequence out, so a tract like this can reach the counters,
+    # and the direction of the disagreement is the part that matters: within this
+    # one sequence only the stepping count is over its limit, so the tRNA-aware
+    # guard rejects the tract as a repeat family and the plain count does not.
+    # (In the assembly-wide caller the plain counts are summed over every contig,
+    # so a stutter this common would exceed the limit there too.)
+    #
+    # Written out with its own G/C flanks rather than planted into the random
+    # background, so a neighbouring A or T cannot lengthen the run and shift the
+    # count.
+    microsatellite = "AT" * 9
+    stutter = "GGGG" + "AT" * 20 + "CCCC"
+    non_overlapping = att.count_repeat_copies(stutter, microsatellite)
+    overlapping = att.count_repeat_copies_outside_trnas(stutter, microsatellite, [])
+    assert (non_overlapping, overlapping) == (2, 12)
+    assert non_overlapping <= att.DENOVO_MAX_CONTIG_COPIES
+    assert overlapping > att.MAX_ATT_COPIES_OUTSIDE_TRNA
+
+    # Copies inside tRNAs are the scope difference, not the step difference: the
+    # tRNA-aware counter discounts them, which is what lets a tRNA-derived att
+    # site survive its own paralogues.
+    covering_trna = [trna_feature("contig_1", 950, 1_030, "+")]
+    assert att.count_repeat_copies_outside_trnas(scar, icekp, covering_trna) == 1

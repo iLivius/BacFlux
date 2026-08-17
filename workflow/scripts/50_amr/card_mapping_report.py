@@ -20,7 +20,7 @@ There briefly were two. Between 2026-08-14 and 2026-08-15 the rule mapped twice,
 at read identity 0.99 and 0.95, and this script reported a gene found only at the
 looser setting as `divergent`. That could never have worked. BBMap's `idfilter`
 does not filter the primary alignment of a properly-paired read, so both passes
-in fact ran at BBMap's default minid of 0.76: across all 56 genomes of the strain
+in fact ran at BBMap's default minid of 0.76: across a validation batch the strict
 collection the two coverage tables differed on eight rows, none of them within
 fifty points of the calling threshold. The rule now makes ONE pass, with `minid=`,
 which does apply, at the 0.76 that had been in force since v1 regardless of what

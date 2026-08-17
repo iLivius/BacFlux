@@ -417,11 +417,27 @@ def count_repeat_copies(sequence, kmer):
     (rRNA operons certainly do), and a family member pointing the other way is
     still evidence that the sequence is repetitive rather than a unique scar.
 
-    Counts NON-OVERLAPPING occurrences, because str.count does: a repeat that
-    overlaps itself is a tandem repeat, not an integration scar, and is counted
-    once. count_repeat_copies_outside_trnas below deliberately does the opposite
-    and steps one base at a time, so the two functions can disagree by a copy or
-    two on a tandem array.
+    Same guard as count_repeat_copies_outside_trnas below — is this repeat a
+    FAMILY rather than a single integration scar? — asked at a different scope.
+    This one asks it of the whole assembly, a contig at a time, and counts every
+    copy. That one asks it of the single contig being delimited, and does not
+    count copies sitting inside annotated tRNA genes, because tRNA paralogy
+    already explains those. So the two routinely disagree, and usually the
+    tRNA-aware one is the LOWER of the two.
+
+    They also walk the sequence differently, and that part matters much less than
+    it looks. str.count jumps past each hit it finds; the other steps on one base,
+    so it also sees copies that overlap each other. But two copies can only
+    overlap if the repeat still reads the same after sliding it along by fewer
+    bases than its own length — if it is periodic, i.e. a microsatellite rather
+    than an integration scar. The ICEKp repeat CCAGTCAGAGGAGCCAA is not.
+
+    So a tandem array does NOT slip past this function by being "counted once":
+    five copies of a non-periodic repeat back to back are five hits either way,
+    over DENOVO_MAX_CONTIG_COPIES. The one shape that does divide the two walks is
+    low-complexity sequence, which nothing upstream filters out — 40 bp of AT
+    stutter holds 12 overlapping copies of (AT)9 but only 2 that do not overlap.
+    Both conventions are pinned by test_what_each_copy_counter_counts.
     """
     copies = sequence.count(kmer)
     reverse = reverse_complement(kmer)
@@ -613,9 +629,12 @@ def count_repeat_copies_outside_trnas(sequence, kmer, trnas):
         while start >= 0:
             positions.append(start + 1)        # 1-based
             # Step on by one, not by len(probe), so copies that overlap each
-            # other are all counted — a tandem array of the repeat is exactly the
-            # kind of family this guard exists to reject, and must not hide by
-            # being counted once.
+            # other are counted too. Only a periodic repeat — a low-complexity
+            # tract, not an att site — can have any, so setting aside the tRNAs
+            # discounted below, this walk almost never parts company with
+            # count_repeat_copies above, which uses str.count and skips past each
+            # hit. A tandem array of an ordinary repeat is rejected by both, for
+            # having many copies; see that function's docstring.
             start = sequence.find(probe, start + 1)
 
     outside = 0

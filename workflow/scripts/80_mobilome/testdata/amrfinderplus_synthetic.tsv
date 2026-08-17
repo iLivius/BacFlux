@@ -1,0 +1,6 @@
+Protein id	Contig id	Start	Stop	Strand	Element symbol	Element name	Scope	Type	Subtype	Class	Subclass	Method	Target length	Reference sequence length	% Coverage of reference	% Identity to reference	Alignment length	Closest reference accession	Closest reference name	HMM accession	HMM description
+SAMPLE_00010	contig_1	150000	151460	-	emhC	efflux RND transporter outer membrane subunit EmhC	plus	AMR	AMR	EFFLUX	EFFLUX	BLASTP	NA	NA	NA	NA	NA	NA	NA	NA	NA
+SAMPLE_00011	contig_1	151460	154610	-	emhB	efflux RND transporter permease subunit EmhB	plus	AMR	AMR	EFFLUX	EFFLUX	BLASTP	NA	NA	NA	NA	NA	NA	NA	NA	NA
+SAMPLE_00250	contig_1	400000	401254	-	mexE	multidrug efflux RND transporter periplasmic adaptor subunit MexE	plus	AMR	AMR	EFFLUX	EFFLUX	BLASTP	NA	NA	NA	NA	NA	NA	NA	NA	NA
+SAMPLE_00400	contig_1	600000	600452	+	aac(6')	aminoglycoside 6'-N-acetyltransferase	core	AMR	AMR	AMINOGLYCOSIDE	AMINOGLYCOSIDE	BLASTP	NA	NA	NA	NA	NA	NA	NA	NA	NA
+SAMPLE_00500	contig_1	800000	801176	+	ampC	class C beta-lactamase	core	AMR	AMR	BETA-LACTAM	BETA-LACTAM	HMM	NA	NA	NA	NA	NA	NA	NA	NA	NA

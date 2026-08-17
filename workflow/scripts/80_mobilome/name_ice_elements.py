@@ -76,19 +76,44 @@ DEFAULT_MIN_IDENTITY = 80.0
 # place that decides it (applied in name_elements, below).
 EXACT_NAME_REFERENCE_COVERAGE = 0.80
 
-# Element types that can carry a curated ICEberg name. A conjugative_region has
-# no integrase and is explicitly NOT an ICE (spec §8 phase 4, "report it, do not
-# call it an ICE"), so giving it an ICE name would undo that distinction.
+# Element types that can carry a curated ICEberg name. conjscan_to_ice.py writes
+# exactly one of five — ice, ime, aice, genomic_island, conjugative_region — and
+# every one has to appear either here or in NOT_NAMEABLE_ELEMENT_TYPES below;
+# test_name_ice_elements.py fails if one is in neither, or if something is listed
+# here that the classifier cannot emit.
 #
-# Two entries in this set read oddly against what conjscan_to_ice.py actually
-# writes, which is one of: ice, ime, genomic_island, conjugative_region, aice.
-#   * `cime` never arrives — that class is called cime_or_island there and is
-#     written out as `genomic_island`, so the entry is inert.
-#   * `aice` is missing, so an ICEscan AICE call is never given an ICEberg name.
-#     It leaves through the element_type_not_nameable branch below, whose audit
-#     text is written about conjugative regions and integrases and therefore does
-#     not describe an AICE.
-NAMEABLE_ELEMENT_TYPES = {"ice", "ime", "cime", "genomic_island"}
+# `aice` is in the set because there is something to match. The database this
+# layer searches (ICEberg's ICE_seq_all + IME_seq_all, 1,774 records) holds 26
+# whose name begins AICE — AICEFraal5456, AICESare1562, … — and the classic
+# actinomycete elements are catalogued alongside them under their historical
+# names instead: SLP1 and pMEA100 are both there, and both are AICEs (te Poele
+# et al. 2008, PMID 18523858). The class was added to conjscan_to_ice.py after
+# this file was written and never added here, so AICE calls were refused a name
+# for no stated reason.
+#
+# A name changes no tier: `aice` stays in colocalise.py's
+# CONTEXT_ONLY_ELEMENT_TYPES, so an AMR gene inside one keeps tier 1 and its
+# capped confidence either way. The name is for the reader, who can then look the
+# element up.
+#
+# Untested in practice, and say so: an AICE call needs the ICEscan model set
+# (mobilome.icescan.run, off by default), a name needs this layer
+# (mobilome.iceberg.urls, empty by default), and AICEs live in actinomycetes —
+# Streptomyces, Frankia, Salinispora, Mycobacterium. No benchmark run has taken
+# this path. It is written from the catalogue's contents, not from a result.
+NAMEABLE_ELEMENT_TYPES = {"ice", "ime", "aice", "genomic_island"}
+
+# The one type that must NEVER carry an ICEberg name, and the sentence the audit
+# uses to say why. The reason lives next to the type rather than in the audit
+# call, because the old hard-coded sentence explained integrases to every refused
+# element — which is how an AICE, which has an integrase by definition, was told
+# it did not have one.
+NOT_NAMEABLE_ELEMENT_TYPES = {
+    "conjugative_region":
+        "a conjugative region has a relaxase and a mating apparatus but no "
+        "integrase, so it is deliberately not called an ICE (spec §8 phase 4, "
+        "\"report it, do not call it an ICE\") and an ICE name would undo that",
+}
 
 
 # ── Reading ICEberg deflines and the two input files ─────────────────────────
@@ -307,11 +332,13 @@ AUDIT_COLUMNS = ["sample", "contig", "start", "end", "action", "reason", "detail
 #     no_ice_candidates             the ICE table was empty; nothing to name
 #     no_iceberg_hits               BLAST returned nothing against ICEberg
 #     element_type_not_nameable     the element is a type that must NOT carry an
-#                                   ICE name — a conjugative_region has no
-#                                   integrase and is deliberately not an ICE, so
-#                                   naming it would undo that distinction. An
-#                                   aice leaves through here too; see
-#                                   NAMEABLE_ELEMENT_TYPES above.
+#                                   ICE name. Today that means exactly one thing,
+#                                   a conjugative_region: no integrase, so not an
+#                                   ICE, so no ICE name. The detail sentence is
+#                                   looked up per type from
+#                                   NOT_NAMEABLE_ELEMENT_TYPES, so a type added
+#                                   later gets its own reason instead of
+#                                   inheriting this one.
 
 # Columns appended to the ICE table. mge_name already exists there (as NA); these
 # are the evidence behind whatever it now says, and they let a reader judge a name
@@ -364,13 +391,18 @@ def name_elements(sample, element_rows, hits,
             row.setdefault(column, "NA")
 
         if element_type not in NAMEABLE_ELEMENT_TYPES:
-            # A conjugative_region has no integrase and is deliberately NOT called
-            # an ICE. Hanging an ICE name on it would quietly undo that.
+            # Why this type is refused, in its own words. An unknown type — one a
+            # future class forgot to declare — falls back to a sentence that
+            # states only what we actually know, rather than borrowing another
+            # type's biology.
+            why = NOT_NAMEABLE_ELEMENT_TYPES.get(
+                element_type,
+                "it is not one of the types this layer names ("
+                + ", ".join(sorted(NAMEABLE_ELEMENT_TYPES)) + ")")
             audit_rows.append(audit_row(
                 sample, "not_applicable", "element_type_not_nameable",
                 f"{row.get('mge_id', '?')}: type '{element_type}' does not take an "
-                "ICEberg name. A conjugative region has no integrase, so it is not "
-                "an ICE, and naming it as one would contradict the classification.",
+                f"ICEberg name - {why}.",
                 contig=contig, start=start, end=end))
             continue
 

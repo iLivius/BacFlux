@@ -115,10 +115,9 @@ rule annotation:
         # the key after the ':' starts with the word "bases", `-n` scores every
         # line 0, and GNU sort breaks the resulting all-way tie on the whole line,
         # reversed. What survives is the alphabetically LAST genus. Worked through
-        # on the four-genus sample recorded in 00_common.smk — Aneurinibacillus
-        # 0.40 of the DNA, Bacillus 0.29, Paenibacillus 0.16, Brevibacillus 0.11 —
-        # the name handed to Bakta is Paenibacillus, not the genus holding most of
-        # the genome.
+        # on a four-genus composition file — 0.40 of the DNA on the first genus,
+        # then 0.29, 0.16 and 0.11 — where the name handed to Bakta is the third
+        # of them, not the genus holding most of the genome.
         #
         # It stays a hint, not a filter: a wrong genus costs annotation accuracy,
         # never contigs or reads, and nothing in the run announces it.

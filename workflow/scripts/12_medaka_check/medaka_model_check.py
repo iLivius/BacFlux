@@ -38,7 +38,7 @@ methylation leaves in canonical basecalls. That is a different job from
 Dorado's modified-base calling, and it is still the right model for reads
 basecalled without one. It does assume native, unamplified DNA: on an
 amplified library pin the matching standard model explicitly instead — see
-docs/methods_medaka_model_choice.md.
+docs/about/medaka-model.md.
 
 Runs inside the Medaka conda env, so `medaka` is on PATH. Only
 list_available_models() and resolve_from_reads() call the tool; the parsing,

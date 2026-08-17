@@ -19,7 +19,8 @@ The layer is opt-in, because naming needs the TnCentral database and BacFlux
 never ships it — every rule here lives behind MOBILOME_NAME_ELEMENTS, which needs
 the mobilome module switched on AND mobilome.tncentral.url or .dir set. Worth
 knowing before reading a report: tier 4 has never actually been assigned in a
-retained run — see the README's "What the benchmark does not show".
+retained run — see "What the benchmark does not show" in
+docs/mobilome/validation.md.
 
 Why a curated name is worth a whole tier
 ----------------------------------------

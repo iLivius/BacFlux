@@ -94,8 +94,14 @@ rule raw_long_read_qc:
 #
 # GOTCHA: setting parameters.long_read_qc.length_weight has NO effect in this
 # mode. There is no --length_weight below, so filtlong uses its own default of 1.
-# That key reaches filtlong in hybrid mode only — which is where a 5,596 bp Col
-# plasmid was lost at length_weight 10 (the read counts are in config.yaml).
+# That key reaches filtlong in hybrid mode only.
+#
+# keep_percent, above, DOES apply here, and it is the key to reach for if a small
+# plasmid goes missing. On K. pneumoniae TUM24772 the reads covering a 5,596 bp
+# Col2 plasmid went from 93 of 603 at the old keep_percent 90 to 500 at the 95
+# that now ships, without touching length_weight. Note that recovering the reads
+# did NOT recover the plasmid: nothing we tried assembled it. The full 2x2 of
+# read counts is in config.yaml, next to the long_read_qc block.
 #
 # Hybrid's whole flag set differs (--trim --split --length_weight, and no
 # --target_bases) because there the decontaminated Illumina reads, not a coverage

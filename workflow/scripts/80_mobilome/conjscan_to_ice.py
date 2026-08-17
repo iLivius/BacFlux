@@ -66,7 +66,7 @@ Three pieces of machinery decide what an element can actually do:
     ** The coupling protein is NOT counted as a T4SS/MPF component here. **
     That distinction is the whole difference between "can move itself" and
     "can be moved by someone else's machinery" (spec §2.5, ladder tiers 5 vs 6),
-    and it is exactly what the real validation sample showed: sample 386 has a
+    and it is exactly what a validation isolate showed: it has a
     relaxase plus a coupling protein on the chromosome and NO mating-pair
     apparatus, so it is mobilisable, not self-transmissible.
 
@@ -132,10 +132,12 @@ an AMR gene's mobility tier. The other three are recognised, but as context only
 
 That split is deliberate, not an oversight. A decayed island with only an
 integrase is PASSIVE; a conjugative region with no integrase has no established
-boundaries; an AICE travels by neither of the two routes the ladder's top rungs
-describe. None of the three may raise a resistance gene's tier. They are still
-written to the table — the spec says "report it, do not call it an ICE" — and
-the true class is always available in the `mge_class` column.
+boundaries; an AICE conjugates, but not by the relaxase + type IV secretion
+route, which is the only route the ladder's top two rungs are defined by, so
+neither rung measures anything about it. None of the three may raise a
+resistance gene's tier. They are still written to the table — the spec says
+"report it, do not call it an ICE" — and the true class is always available in
+the `mge_class` column.
 
 Context only is not the same as ignored. All three names sit in colocalise.py's
 CONTEXT_ONLY_ELEMENT_TYPES: an AMR gene inside one of them stays at tier 1 when
@@ -168,7 +170,7 @@ reused — the `contig|type-start:end` identifier format and the discard-with-
 reason file — and conventions are facts, not expression.
 
 Standalone CLI, Python standard library only, exercised by test_conjscan_to_ice.py
-with small hand-built fixtures plus the real CONJscan output of sample 386.
+with small hand-built fixtures plus the real CONJscan output of a validation isolate.
 """
 
 import argparse
@@ -194,10 +196,11 @@ ANCHOR_RELAXASE = "relaxase"        # T4SS_MOB* — nicks the DNA, pilots the st
 ANCHOR_T4CP = "t4cp"                # coupling protein — the motor, not the bridge
 ANCHOR_T4SS = "t4ss"                # mating-pair formation apparatus (MPF)
 ANCHOR_INTEGRASE = "integrase"      # site-specific recombinase, from Bakta
-# AICE machinery: an actinomycete element that moves as DOUBLE-STRANDED DNA
-# between Streptomyces hyphae, pushed through the septal pore by a FtsK/SpoIIIE
-# translocase. It has no relaxase and no mating bridge, so it is NOT conjugation
-# and this class is never counted as conjugation machinery anywhere below.
+# AICE machinery: an actinomycete element that DOES conjugate into another cell,
+# but with a TraB translocase (FtsK/SpoIIIE family) carrying DOUBLE-STRANDED DNA
+# instead of a relaxase nicking one strand and a mating bridge pulling it across.
+# A different route, not an absent one — so it gets its own anchor class and is
+# never counted as a relaxase or a mating bridge anywhere below.
 ANCHOR_AICE = "aice_machinery"
 
 # The order anchor classes are listed in, so the `anchor_classes` column reads
@@ -291,11 +294,13 @@ ICESCAN_EXCLUDED_INTEGRASE_PROFILES = {
 }
 
 # AICE MACHINERY. An AICE (actinomycete integrative and conjugative element)
-# does not conjugate: it encodes a FtsK/SpoIIIE translocase that pushes
-# double-stranded DNA through the septal cross-wall into the next hyphal
-# compartment, plus its own replication initiator. Neither is conjugation
-# machinery, so these are given their own anchor class and are never counted
-# as a relaxase or a mating bridge.
+# does not conjugate by the relaxase + type IV secretion route, which is the
+# only route the ladder's tiers 5 and 6 describe. It conjugates all the same: a
+# TraB translocase of the FtsK/SpoIIIE family carries the element into a
+# recipient cell as DOUBLE-stranded DNA (Possoz et al. 2001, PMID 11679075),
+# and the replication initiator below copies it. Neither protein is a relaxase
+# or a mating bridge, so both get their own anchor class and are never counted
+# as one.
 #
 # Why they may not seed an element on their own: FtsK/SpoIIIE is a core
 # chromosome-partitioning protein present in essentially every bacterium. A
@@ -334,11 +339,12 @@ def anchor_class_for_gene_name(gene_name):
 
     The integrase decisions come FIRST, because both lists below name specific
     profiles and must not be reached by any of the pattern tests underneath.
-    Then relaxases, because the relaxase is the component that decides whether
-    DNA can be transferred at all; then coupling proteins, so that they are NOT
-    swept into the T4SS bucket (see the module docstring — that mistake would
-    turn every mobilisable element into a self-transmissible one); then the AICE
-    translocase, which is not conjugation machinery at all.
+    Then relaxases, because on the relaxase + type IV secretion route the
+    relaxase is the component that decides whether DNA can be transferred at
+    all; then coupling proteins, so that they are NOT swept into the T4SS bucket
+    (see the module docstring — that mistake would turn every mobilisable
+    element into a self-transmissible one); then the AICE translocase, which
+    transfers DNA by a different route and must never be counted as either.
 
     Anything left over is treated as a mating-pair component. That remains the
     safe default because, after the named sets above have been taken out, what
@@ -391,7 +397,7 @@ def hit_is_virb4(hit):
 
     Why this needs two columns rather than one string test: MacSyFinder writes
     the profile that ACTUALLY matched in `gene_name` and keeps the model's own
-    gene in `hit_gene_ref`. The real output of sample 006 shows exactly that —
+    gene in `hit_gene_ref`. The real output of a validation isolate shows exactly that —
     `gene_name = T4SS_MOBM` for a hit found under the model gene `T4SS_MOBB`. So
     a truncated VirB4 that matched the exchangeable traU profile is written as
     `T4SS_I_traU`, and a check that only looked at `gene_name` for the string
@@ -594,23 +600,44 @@ ELEMENT_TYPE_FOR_CLASS = {
 # The mobility sentence for an AICE, and the reason it has no tier.
 #
 # THE BIOLOGY, because this is the one class the spec's ladder does not cover.
-# The ladder's top two rungs are both conjugation: tier 5 is "mobilisable by a
-# helper's conjugation machinery", tier 6 is "self-transmissible by its own".
-# An AICE has neither a relaxase nor a mating-pair apparatus — it is not a
-# conjugative element despite the C in its name. It replicates as a circle and
-# is translocated as DOUBLE-STRANDED DNA through the septal pore between
-# compartments of a Streptomyces mycelium by its own FtsK/SpoIIIE ATPase. So
-# putting it at tier 5 or tier 6 would be a FALSE claim in either direction:
-# it is not waiting for a helper, and it cannot mate with another cell.
-# It therefore gets no tier at all, and says why.
+# An AICE DOES conjugate, and it reaches another cell. What it does not use is
+# the relaxase + type IV secretion route: a translocase of the FtsK/SpoIIIE
+# family — TraB generically, TraSA in pSAM2 — carries the element across as
+# DOUBLE-stranded DNA. Possoz et al. 2001 (PMID 11679075) concluded this for
+# pSAM2 from differential SalI methylation, hedged in their own words as
+# "probably transferred to the recipient as double-stranded DNA" but called
+# "the first experimental evidence for the transfer of double-stranded DNA
+# during bacterial conjugation"; Vogelmann et al. 2011 (PMID 21505418) states
+# it without the hedge and measured the TraB pore at ~3.1 nm, wide enough for a
+# duplex.
+#
+# Where the old "single-stranded, stays in the mycelium" wording came from, so
+# that nobody puts it back: an AICE does make single-stranded DNA — as a
+# rolling-circle replication intermediate INSIDE one cell (te Poele et al. 2008,
+# PMID 18523858). That strand is a copying intermediate, not what crosses.
+#
+# So why no tier, if it transfers? Not because of the biology — because of our
+# own bookkeeping. Tiers 5 and 6 are DEFINED by machinery: tier 5 is "a relaxase
+# but no mating apparatus, so a helper must supply one", tier 6 is "relaxase
+# plus its own mating apparatus". An AICE carries neither protein, so neither
+# tier is measuring anything about it. And the AICE branch's own validation at
+# the shipped --coverage-profile is nil (docs/methods_icescan_union.md §7):
+# reading its real transfer ability as tier 6 would be the worse error of the
+# two. It therefore gets no tier, and the row says the mechanism in words.
 AICE_MOBILITY = (
-    "predicted transferable within the mycelium by FtsK/SpoIIIE translocation "
-    "(actinomycete AICE); not on the conjugation mobility ladder"
+    "predicted transferable into another cell as double-stranded DNA by a TraB "
+    "translocase (FtsK/SpoIIIE family); not on the conjugation mobility ladder, "
+    "whose tiers describe only relaxase + type IV secretion transfer"
 )
+# The cell says why there is no tier and nothing else. The "treat this call as
+# unvalidated" caveat is NOT repeated here: it is already written, in full, into
+# the audit row that every AICE gets (reason class_taken_from_icescan_aice_model).
 AICE_TIER_REASON = (
-    "no tier: the mobility ladder's tiers 5 and 6 are both conjugation, and an "
-    "AICE conjugates by neither route - it moves as double-stranded DNA between "
-    "hyphal compartments. Reporting it at either tier would be a false claim."
+    "no tier: tiers 5 and 6 are DEFINED by relaxase + type IV secretion "
+    "conjugation machinery, which an AICE does not carry - it transfers "
+    "double-stranded DNA through a TraB/FtsK-SpoIIIE translocase instead "
+    "(Possoz et al. 2001, PMID 11679075). It does conjugate; the ladder simply "
+    "has no rung that measures this route."
 )
 # An AICE is not a broken ICE, and `missing_components` must not read as though
 # it were: the relaxase and mating bridge are absent BY DEFINITION, not missing.
@@ -1303,7 +1330,7 @@ def read_conjscan_hits(path, source=SOURCE_CONJSCAN):
     """Read CONJscan's best_solution.tsv into one dict per machinery hit.
 
     Input: the file written by `macsyfinder --models CONJScan/Chromosome all`.
-    Its real shape (verified on sample 386, MacSyFinder 2.1.6 / CONJScan 2.1.0):
+    Its real shape (verified on a validation isolate, MacSyFinder 2.1.6 / CONJScan 2.1.0):
     three '#' banner lines, then a 22-column header, then one row per gene, with
     BLANK LINES separating systems.
 
@@ -2757,9 +2784,10 @@ def build_candidates(sample, clusters, systems, contig_lengths,
                 sample, "kept_flagged", "class_taken_from_icescan_aice_model",
                 "ICEscan assembled its AICE model here (FtsK/SpoIIIE translocase, "
                 "a Rep protein and an integrase) and the anchors agree. Reported "
-                "as an AICE: it moves as double-stranded DNA between hyphal "
-                "compartments, so it is given NO mobility tier - tiers 5 and 6 "
-                "are both conjugation and an AICE does neither. CAVEAT: the only "
+                "as an AICE: it conjugates into another cell as double-stranded "
+                "DNA, but not by the relaxase + type IV secretion route, so it is "
+                "given NO mobility tier - tiers 5 and 6 are defined by machinery "
+                "it does not carry. CAVEAT: the only "
                 "AICE boundary we have validated (AICEScab56241) was recovered at "
                 "MacSyFinder --coverage-profile 0.3, not the 0.5 used here; at 0.5 "
                 "neither AICE call on the benchmark overlaps a curated one. Treat "

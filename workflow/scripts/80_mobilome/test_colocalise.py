@@ -1176,17 +1176,18 @@ def test_reversed_element_coordinates_are_repaired(tmp_path):
 # ── Regression anchor: the real AMRFinderPlus output for 006 ─────────────────
 #
 # Runs only when the shared fixture is present. Sample 006 is a Pseudomonas_E
-# with five chromosomal, intrinsic-looking AMR genes (efflux pumps + AmpC) and
-# nothing acquired — so the honest answer is five tier-1 rows, and this is the
-# one test here whose input nobody wrote by hand.
+# Five chromosomal, intrinsic-looking AMR genes (efflux pumps + AmpC) and nothing
+# acquired, in a real AMRFinderPlus column layout — so the honest answer is five
+# tier-1 rows. The identifiers and coordinates are invented; only the shape of the
+# table and the gene symbols are real.
 
 REAL_AMRFINDER = os.path.join(os.path.dirname(__file__), "testdata",
-                              "amrfinderplus_006_real.tsv")
+                              "amrfinderplus_synthetic.tsv")
 
 
 @pytest.mark.skipif(not os.path.exists(REAL_AMRFINDER),
-                    reason="shared testdata/amrfinderplus_006_real.tsv not present")
-def test_real_sample_006_is_five_intrinsic_candidates(tmp_path):
+                    reason="shared testdata/amrfinderplus_synthetic.tsv not present")
+def test_five_chromosomal_efflux_genes_are_five_intrinsic_candidates(tmp_path):
     out_table = str(tmp_path / "mobility.tsv")
     out_audit = str(tmp_path / "audit.tsv")
     lengths = write_tsv(tmp_path / "lengths.tsv", LENGTH_HEADER,
@@ -1194,7 +1195,7 @@ def test_real_sample_006_is_five_intrinsic_candidates(tmp_path):
     replicons = write_tsv(tmp_path / "replicons.tsv", REPLICON_HEADER,
                           [["contig_1", "chromosome", "contig_1", "NA", "NA"]])
     co.main([
-        "--sample", "006",
+        "--sample", "sampleA",
         "--amrfinder", REAL_AMRFINDER,
         "--replicons", replicons,
         "--contig-lengths", lengths,
@@ -1372,6 +1373,52 @@ def test_a_gene_inside_a_conjugative_region_is_not_an_intrinsic_candidate(tmp_pa
     assert row["mge_id"] == "REGION_1"
     assert row["confidence"] != "high"
     assert "inside_context_only_element" in audit_reasons(audit)
+
+
+def test_a_gene_inside_an_aice_is_context_only_and_correctly_described(tmp_path):
+    """The first test of the AICE branch — there were none until now.
+
+    An AICE (actinomycete integrative and conjugative element, from the ICEscan
+    model set) integrates into the chromosome like an ICE and does transfer into
+    another cell, but as double-stranded DNA through an FtsK/SpoIIIE-family
+    translocase, with no relaxase and no mating-pair apparatus. Tiers 5 and 6 are
+    defined by that machinery, so neither describes it and the tier stays at 1 —
+    the same context-only handling a conjugative region and a genomic island get.
+
+    The rest of the test is about the sentence, because a wrong explanation in
+    the audit is worse than none. The old shared wording told AICE rows that "a
+    conjugative region without an integrase has no established boundaries" — an
+    AICE is not one, and has an integrase by definition — called it "a aice", and
+    said the gene was not mobilisable, which is the one thing an AICE certainly
+    is.
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000)],
+        ice_rows=[ice_row(start=5000, end=25000, mge_id="AICE_1",
+                          mge_name="NA", element_type="aice",
+                          mobility=("predicted transferable as double-stranded DNA; "
+                                    "not on the conjugation mobility ladder"),
+                          has_relaxase="FALSE", has_t4ss="FALSE", has_t4cp="FALSE",
+                          relaxase_type="NA", mpf_type="NA",
+                          mpf_typed_system="FALSE")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "1"          # never 5 or 6: no conjugation machinery
+    assert row["mge_context"] == "aice"
+    assert row["mge_id"] == "AICE_1"
+    assert row["confidence"] != "high"
+    assert "inside_context_only_element" in audit_reasons(audit)
+
+    detail = [line["detail"] for line in audit
+              if line["reason"] == "inside_context_only_element"][0]
+    assert "an AICE" in detail                  # the article, and the usual spelling
+    assert "a aice" not in detail
+    assert "conjugative region" not in detail   # it is not one, and has an integrase
+    assert "does transfer" in detail            # it moves; the ladder just cannot score it
+    assert "not enough to call it mobilisable" not in detail
 
 
 def test_a_gene_just_outside_an_ime_is_reported_with_its_distance(tmp_path):

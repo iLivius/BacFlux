@@ -392,7 +392,7 @@ def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
         # estimate comes out at zero, and the delta goes NEGATIVE. Read naively
         # that says "the assembly collapsed nothing, we over-called", when the
         # truth is "this database has nothing to say about this organism".
-        # Measured on hybrid sample 006 (Aquipseudomonas): 17 IS located by
+        # Measured on a hybrid validation isolate: 17 IS located by
         # ISEScan, 1 of 22,713 ISOSDB entries covered end to end, delta -7.3 on
         # the IS3 family alone.
         #

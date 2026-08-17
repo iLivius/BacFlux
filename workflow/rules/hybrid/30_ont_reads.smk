@@ -192,14 +192,17 @@ rule filter_long_reads:
         split = 1000,
         keep_percent = FILTLONG_KEEP_PERCENT,
         # keep_percent (the line above) and length_weight were both hard-coded
-        # here once, at 90 and 10. Ten is ten times filtlong's own default, which
-        # lets length dominate the ranking — and a small plasmid cannot produce
-        # long reads, so its reads sink to the bottom and go first. On
-        # K. pneumoniae TUM24772 only 93 of the 614 ONT reads covering a 5,596 bp
-        # Col plasmid survived at 10, against 602 at 1, and the plasmid never made
-        # it into the assembly. Both are config keys now, defaulting to 95 and 1.
-        # The scoring formula and Ryan Wick's independent Feb 2026 benchmark of the
-        # same effect sit next to FILTLONG_LENGTH_WEIGHT in shared/00_common.smk.
+        # here once, at 90 and 10, and together they destroyed the 5,596 bp Col2
+        # plasmid of K. pneumoniae TUM24772: 93 of the 603 ONT reads covering it
+        # survived. keep_percent is the one to reach for — at 95, the value that
+        # now ships, 500 survive even with length_weight left at 10 — but both
+        # keys matter: at the old 90, dropping length_weight to 1 on its own also
+        # recovers most of them (413). length_weight 1 additionally protects a
+        # size class keep_percent cannot: at 10 the 1-3 kb read band is emptied
+        # whatever keep_percent says. Both are config keys now, defaulting to 95
+        # and 1. The full 2x2, the read-length bands, the strain's accessions and
+        # what Ryan Wick's Feb 2026 benchmark does and does not say about this all
+        # sit next to FILTLONG_LENGTH_WEIGHT in shared/00_common.smk.
         length_weight = FILTLONG_LENGTH_WEIGHT,
     conda:
         "../../envs/filtlong.yaml"

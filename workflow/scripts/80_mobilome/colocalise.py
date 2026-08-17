@@ -630,16 +630,18 @@ ELEMENT_TYPE_SYNONYMS = {
     "genomic_island": "genomic_island",
     "island": "genomic_island",
     "cime": "genomic_island",        # a CIME is an integrated, non-mobile island
-    # An AICE — an actinomycete integrative element, from the ICEscan model set.
-    # Despite the C in the name it does NOT conjugate: it has no relaxase and no
-    # mating-pair apparatus, and moves as double-stranded DNA between the
-    # compartments of a Streptomyces mycelium, pushed through the septal pore by
-    # its own FtsK/SpoIIIE translocase. Both mobility tiers at the top of the
-    # ladder are conjugation — tier 5 "mobilisable by a helper", tier 6
-    # "self-transmissible" — so an AICE belongs to neither and is recognised here
-    # as CONTEXT ONLY, like the two classes above it: it sets the neighbourhood
-    # and caps confidence, and can raise no tier. Without this entry it parsed as
-    # None and was dropped with an "unrecognised element_type" line.
+    # An AICE — an actinomycete integrative and conjugative element, from the
+    # ICEscan model set. It does conjugate into another cell, but not by the
+    # relaxase + type IV secretion route, which is the only route tiers 5 and 6
+    # describe: an FtsK/SpoIIIE-family translocase (TraB in Streptomyces
+    # plasmids, TraSA in pSAM2) pushes it across as DOUBLE-stranded DNA — shown
+    # on pSAM2 by Possoz et al. 2001, PMID 11679075. conjscan_to_ice.py's
+    # AICE_MOBILITY carries the longer version and the second citation.
+    # So it is recognised here as CONTEXT ONLY, like the two classes above: it
+    # sets the neighbourhood and caps confidence, and raises no tier — not
+    # because it cannot move, but because tiers 5 and 6 measure machinery it
+    # does not carry. Without this entry it parsed as None and was dropped with
+    # an "unrecognised element_type" line.
     "aice": "aice",
 }
 
@@ -648,6 +650,36 @@ ELEMENT_TYPE_SYNONYMS = {
 # turn "nothing found" into an honest "something is here, but it does not prove
 # mobility".
 CONTEXT_ONLY_ELEMENT_TYPES = {"conjugative_region", "genomic_island", "aice"}
+
+# How each of those three is named in the audit line, and why the tier stays
+# where it is. One entry per type, because the three reasons are different
+# biology: one sentence covering all three says something false about at least
+# one of them. The old shared sentence explained "a conjugative region has no
+# integrase" to AICE rows, which have an integrase by definition, and called the
+# element "a aice" while doing it.
+#
+# Each value is (what to call it in prose, why the tier does not move).
+CONTEXT_ONLY_ELEMENT_WORDING = {
+    "conjugative_region": (
+        "a conjugative region",
+        "a conjugative region has no integrase, so its boundaries are not "
+        "established and there is no telling how much around the gene would "
+        "travel with it",
+    ),
+    "genomic_island": (
+        "a genomic island",
+        "a genomic island carries no conjugation machinery of its own",
+    ),
+    # This one says "does transfer" on purpose. An AICE is mobile; what it lacks
+    # is the relaxase and mating-pair apparatus that tiers 5 and 6 are defined
+    # by, so the ladder has no rung to put it on.
+    "aice": (
+        "an AICE",
+        "an AICE does transfer into another cell, but as double-stranded DNA "
+        "through an FtsK/SpoIIIE-family translocase, and tiers 5 and 6 are "
+        "defined by the relaxase and mating-pair apparatus it does not carry",
+    ),
+}
 
 
 def parse_mobile_elements(path):
@@ -2204,13 +2236,12 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                 tier=1, context="is_adjacent",
             )
         elif containing_context_element is not None:
-            # No IS nearby, but the gene sits INSIDE a conjugative region or a
-            # genomic island. These deliberately do not raise the tier — a
-            # conjugative region with no integrase has no established boundaries,
-            # and an island carries no conjugation machinery — but calling such a
-            # gene an "intrinsic candidate" at high confidence is plainly wrong:
-            # something mobile-element-shaped is sitting on top of it. Report the
-            # context, cap the confidence, and say why.
+            # No IS nearby, but the gene sits INSIDE a conjugative region, a
+            # genomic island or an AICE. None of the three raises the tier, each
+            # for its own reason (see CONTEXT_ONLY_ELEMENT_WORDING) — but calling
+            # such a gene an "intrinsic candidate" at high confidence is plainly
+            # wrong: something mobile-element-shaped is sitting on top of it.
+            # Report the context, cap the confidence, and say why.
             row["mge_context"] = containing_context_element["element_type"]
             row["mge_id"] = containing_context_element["id"]
             row["mge_name"] = containing_context_element["name"] or "NA"
@@ -2218,14 +2249,19 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
             context_elements = [containing_context_element]
             base_confidence = "medium"
             caps.extend(element_quality_caps(containing_context_element))
+            # An unknown type — one a future class forgot to declare — gets a
+            # sentence that claims no biology, rather than borrowing another
+            # type's.
+            element_type = containing_context_element["element_type"]
+            description, why_no_tier = CONTEXT_ONLY_ELEMENT_WORDING.get(
+                element_type,
+                ("a " + element_type.replace("_", " "),
+                 "this element type is reported as context only"))
             add_audit(
                 "tier_not_raised", "inside_context_only_element",
-                f"the gene lies inside {containing_context_element['id']}, a "
-                f"{containing_context_element['element_type'].replace('_', ' ')}. That is "
-                "not enough to call it mobilisable - a conjugative region without an "
-                "integrase has no established boundaries, and an island carries no "
-                "conjugation machinery of its own - but it is not an intrinsic "
-                "chromosomal gene either",
+                f"the gene lies inside {containing_context_element['id']}, "
+                f"{description}. The tier stays at 1 because {why_no_tier}. "
+                "It is not an intrinsic chromosomal gene either",
                 tier=1, context=row["mge_context"],
             )
 

@@ -281,7 +281,7 @@ class TestBuildRows(unittest.TestCase):
     def test_an_accession_missing_from_the_index_still_produces_a_row(self):
         # CARD's FASTA and its index come from the same release, but a user can
         # point the two at different ones. That must degrade to an unclassified
-        # row, not to a KeyError halfway through a 56-genome run.
+        # row, not to a KeyError halfway through a batch.
         coverage = cmr.parse_covstats(write_temp(COVSTATS_STRICT))
         empty_index = cmr.parse_aro_index(write_temp("ARO Accession\tARO Name\n"))
         rows = rows_by_name(cmr.build_rows(coverage, empty_index, 70.0))

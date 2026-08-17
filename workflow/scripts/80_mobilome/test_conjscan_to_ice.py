@@ -25,8 +25,8 @@ come back with boundary_method='none' and the machinery span as their interval �
 that is the expected result there, not a gap. The tests that ARE about Phase 3
 plant a repeat pair in a synthetic contig and hand it over with --genome.
 
-Two tests go further and use the REAL output of sample 386 (an Arthrobacter
-isolate): the saved fixture testdata/conjscan_386_real_best_solution.tsv, and
+Two tests go further and use the REAL output of the synthetic fixture (an Arthrobacter
+isolate): the saved fixture testdata/conjscan_synthetic_best_solution.tsv, and
 the five CDS lines quoted verbatim out of that sample's Bakta GFF3. Passing
 those means the parser agrees with the tools, not just with itself.
 
@@ -50,8 +50,8 @@ import conjscan_to_ice as ci        # noqa: E402
 import colocalise as co             # noqa: E402
 
 
-REAL_CONJSCAN_FIXTURE = os.path.join(
-    TEST_DIR, "testdata", "conjscan_386_real_best_solution.tsv"
+SYNTHETIC_CONJSCAN_FIXTURE = os.path.join(
+    TEST_DIR, "testdata", "conjscan_synthetic_best_solution.tsv"
 )
 
 
@@ -234,69 +234,70 @@ VIRB4_HIT = "S1_00017"
 
 # ── The real CONJscan fixture ────────────────────────────────────────────────
 
-def test_real_conjscan_fixture_parses():
-    """The saved real output of sample 386 parses into its four machinery hits.
+def test_conjscan_best_solution_layout_parses():
+    """The saved real output of the synthetic fixture parses into its four machinery hits.
 
     This is the ground-truth check: two MOB systems on the chromosome, each
     incomplete (sys_wholeness 0.667), each made of a relaxase plus a coupling
     protein. If MacSyFinder ever changes its column names this test is what
     fails, rather than the workflow quietly reporting "no conjugation machinery".
     """
-    hits = ci.read_conjscan_hits(REAL_CONJSCAN_FIXTURE)
+    hits = ci.read_conjscan_hits(SYNTHETIC_CONJSCAN_FIXTURE)
 
     assert len(hits) == 4
     assert [hit["hit_id"] for hit in hits] == [
-        "386_00040", "386_00044", "386_01146", "386_01151"
+        "SAMPLE_00040", "SAMPLE_00044", "SAMPLE_01146", "SAMPLE_01151"
     ]
     assert [hit["gene_name"] for hit in hits] == [
         "T4SS_MOBP1", "T4SS_t4cp2", "T4SS_t4cp2", "T4SS_MOBF"
     ]
-    assert {hit["sys_id"] for hit in hits} == {"386_MOB_1", "386_MOB_2"}
+    assert {hit["sys_id"] for hit in hits} == {"SAMPLE_MOB_1", "SAMPLE_MOB_2"}
     assert all(hit["sys_wholeness"] == 0.667 for hit in hits)
     assert all(hit["model_fqn"] == "CONJScan/Chromosome/MOB" for hit in hits)
 
 
 def test_real_fixture_classifies_the_two_relaxases_and_two_coupling_proteins():
     """The two relaxase families are relaxases, the two t4cp2 hits are coupling
-    proteins — and NOT mating-pair components, which is what keeps sample 386 at
+    proteins — and NOT mating-pair components, which is what keeps the synthetic fixture at
     'mobilisable' rather than 'self-transmissible'."""
-    hits = ci.read_conjscan_hits(REAL_CONJSCAN_FIXTURE)
+    hits = ci.read_conjscan_hits(SYNTHETIC_CONJSCAN_FIXTURE)
     classes = [ci.anchor_class_for_gene_name(hit["gene_name"]) for hit in hits]
     assert classes == [
         ci.ANCHOR_RELAXASE, ci.ANCHOR_T4CP, ci.ANCHOR_T4CP, ci.ANCHOR_RELAXASE
     ]
 
 
-# Five CDS lines copied verbatim out of sample 386's real Bakta GFF3
-# (04.annotation/bakta/386/386.gff3), so the coordinate join is tested against
-# the real attribute layout rather than an invented one.
-REAL_386_CDS_LINES = [
-    "contig_2\tPyrodigal\tCDS\t37327\t38967\t.\t+\t0\t"
-    "ID=386_00040;Name=Relaxase/mobilization nuclease family protein;"
-    "locus_tag=386_00040;product=Relaxase/mobilization nuclease family protein;"
+# Five CDS lines in Bakta's real GFF3 attribute layout — percent-encoded commas,
+# Dbxref, the optional gene= — so the coordinate join is tested against the shape
+# Bakta actually emits rather than a tidied-up invention. Coordinates, contig
+# lengths and locus tags are made up.
+BAKTA_LAYOUT_CDS_LINES = [
+    "contig_2\tPyrodigal\tCDS\t37000\t38640\t.\t+\t0\t"
+    "ID=SAMPLE_00040;Name=Relaxase/mobilization nuclease family protein;"
+    "locus_tag=SAMPLE_00040;product=Relaxase/mobilization nuclease family protein;"
     "Dbxref=SO:0001217,UniRef:UniRef50_Q8GAN1",
-    "contig_2\tPyrodigal\tCDS\t42322\t44091\t.\t-\t0\t"
-    "ID=386_00044;Name=Type IV secretory pathway%2C VirD4 component%2C TraG/TraD family ATPase;"
-    "locus_tag=386_00044;"
+    "contig_2\tPyrodigal\tCDS\t42000\t43769\t.\t-\t0\t"
+    "ID=SAMPLE_00044;Name=Type IV secretory pathway%2C VirD4 component%2C TraG/TraD family ATPase;"
+    "locus_tag=SAMPLE_00044;"
     "product=Type IV secretory pathway%2C VirD4 component%2C TraG/TraD family ATPase;"
     "Dbxref=SO:0001217;gene=virD4",
-    "contig_1\tPyrodigal\tCDS\t1166923\t1168035\t.\t-\t0\t"
-    "ID=386_01130;Name=Phage integrase family protein;locus_tag=386_01130;"
+    "contig_1\tPyrodigal\tCDS\t1160000\t1161112\t.\t-\t0\t"
+    "ID=SAMPLE_01130;Name=Phage integrase family protein;locus_tag=SAMPLE_01130;"
     "product=Phage integrase family protein;Dbxref=SO:0001217",
-    "contig_1\tPyrodigal\tCDS\t1180113\t1181924\t.\t+\t0\t"
-    "ID=386_01146;Name=type IV secretory system conjugative DNA transfer family protein;"
-    "locus_tag=386_01146;"
+    "contig_1\tPyrodigal\tCDS\t1173000\t1174811\t.\t+\t0\t"
+    "ID=SAMPLE_01146;Name=type IV secretory system conjugative DNA transfer family protein;"
+    "locus_tag=SAMPLE_01146;"
     "product=type IV secretory system conjugative DNA transfer family protein;"
     "Dbxref=SO:0001217",
-    "contig_1\tPyrodigal\tCDS\t1187809\t1191384\t.\t-\t0\t"
-    "ID=386_01151;Name=TrwC relaxase domain-containing protein;locus_tag=386_01151;"
+    "contig_1\tPyrodigal\tCDS\t1180000\t1183575\t.\t-\t0\t"
+    "ID=SAMPLE_01151;Name=TrwC relaxase domain-containing protein;locus_tag=SAMPLE_01151;"
     "product=TrwC relaxase domain-containing protein;Dbxref=SO:0001217;gene=trwC",
 ]
 
-REAL_386_CONTIGS = {"contig_2": 57976, "contig_1": 4177018}
+FIXTURE_CONTIGS = {"contig_2": 58000, "contig_1": 4200000}
 
 
-def test_real_sample_386_end_to_end():
+def test_conjscan_to_ice_end_to_end():
     """The real sample, end to end: one degraded IME, one cluster too short.
 
     This reproduces the finding recorded in docs/mobilome_wpA_ground_truth.md:
@@ -311,14 +312,14 @@ def test_real_sample_386_end_to_end():
     """
     import tempfile
     with tempfile.TemporaryDirectory() as work_dir:
-        gff = write_gff(os.path.join(work_dir, "386.gff3"),
-                        REAL_386_CONTIGS, REAL_386_CDS_LINES)
+        gff = write_gff(os.path.join(work_dir, "sampleA.gff3"),
+                        FIXTURE_CONTIGS, BAKTA_LAYOUT_CDS_LINES)
         out_table = os.path.join(work_dir, "table.tsv")
         out_audit = os.path.join(work_dir, "audit.tsv")
 
         return_code = ci.main([
-            "--sample", "386",
-            "--conjscan-tsv", REAL_CONJSCAN_FIXTURE,
+            "--sample", "sampleA",
+            "--conjscan-tsv", SYNTHETIC_CONJSCAN_FIXTURE,
             "--bakta-gff", gff,
             "--out-table", out_table,
             "--out-audit", out_audit,
@@ -333,8 +334,8 @@ def test_real_sample_386_end_to_end():
     assert element["contig"] == "contig_1"
     assert element["mge_class"] == "ime"
     assert element["element_type"] == "ime"
-    assert element["start"] == "1166923"
-    assert element["end"] == "1191384"
+    assert element["start"] == "1160000"
+    assert element["end"] == "1183575"
     assert element["has_integrase"] == "TRUE"
     assert element["has_relaxase"] == "TRUE"
     assert element["has_t4cp"] == "TRUE"
@@ -355,7 +356,7 @@ def test_real_sample_386_end_to_end():
     dropped = [row for row in audit if row["action"] == "dropped"]
     assert len(dropped) == 1
     assert dropped[0]["reason"] == "cluster_shorter_than_min"
-    assert "6765 bp" in dropped[0]["detail"]
+    assert "6770 bp" in dropped[0]["detail"]
     assert "machinery_degraded" in audit_reasons(audit)
 
 
@@ -751,13 +752,13 @@ def test_hit_is_virb4_knows_the_exchangeable_name_but_not_the_f_type_traU():
 def test_real_output_shows_gene_name_differing_from_the_model_gene():
     """Ground truth for why `hit_gene_ref` is read at all.
 
-    In sample 386's real best_solution.tsv the relaxases are reported as
+    In the synthetic fixture's real best_solution.tsv the relaxases are reported as
     T4SS_MOBP1 / T4SS_MOBF while the model's own gene is T4SS_MOBB: MacSyFinder
     writes the profile that ACTUALLY matched in gene_name. The same mechanism
     turns a VirB4 into a `T4SS_I_traU` row, which is what the truncation check
     has to survive.
     """
-    hits = ci.read_conjscan_hits(REAL_CONJSCAN_FIXTURE)
+    hits = ci.read_conjscan_hits(SYNTHETIC_CONJSCAN_FIXTURE)
     assert [hit["hit_gene_ref"] for hit in hits] == [
         "T4SS_MOBB", "T4SS_t4cp1", "T4SS_t4cp1", "T4SS_MOBB"
     ]
@@ -2165,11 +2166,12 @@ def test_icescan_relaxase_families_are_recognised_as_relaxases():
         assert ci.anchor_class_for_gene_name(profile) == ci.ANCHOR_RELAXASE
 
 
-def test_aice_machinery_is_never_conjugation_machinery():
-    """An AICE translocates double-stranded DNA through a septal pore; it has no
-    relaxase and no mating bridge. Classing any of these as T4SS — which the
-    fall-through default would have done — would manufacture a mating-pair
-    apparatus and promote elements to 'predicted self-transmissible'."""
+def test_aice_machinery_is_never_relaxase_or_mating_bridge():
+    """An AICE conjugates with a TraB translocase carrying double-stranded DNA;
+    it has no relaxase and no mating bridge. Classing any of these as T4SS —
+    which the fall-through default would have done — would manufacture a
+    mating-pair apparatus and promote elements to 'predicted
+    self-transmissible'."""
     for profile in ("FtsK_SpoIIIE", "Prim-Pol", "RepSAv2", "DUF3631"):
         assert ci.anchor_class_for_gene_name(profile) == ci.ANCHOR_AICE
 
@@ -2377,8 +2379,8 @@ def aice_scene(tmp_path):
 
 def test_an_aice_is_reported_as_its_own_class(tmp_path):
     """It must not be folded into `ice`: an AICE has no relaxase and no mating
-    bridge, so calling it an ICE would assert self-transmissibility it cannot
-    have."""
+    bridge, so calling it an ICE would assert the relaxase + type IV secretion
+    self-transmissibility that tier 6 means, which is not how an AICE moves."""
     conjscan, icescan, gff = aice_scene(tmp_path)
     _rc, rows, audit, _path = run_main(tmp_path, conjscan, gff,
                                        extra=["--icescan-tsv", icescan])
@@ -2391,11 +2393,12 @@ def test_an_aice_is_reported_as_its_own_class(tmp_path):
 
 
 def test_an_aice_never_claims_a_conjugation_tier(tmp_path):
-    """THE HEADLINE RULE. Tiers 5 and 6 are both conjugation — "mobilisable by a
-    helper" and "self-transmissible" — and an AICE does neither: it moves as
-    double-stranded DNA between hyphal compartments by FtsK/SpoIIIE
-    translocation. Either tier would be a false claim, so it gets none, and the
-    reason is spelled out rather than left blank."""
+    """THE HEADLINE RULE. Tiers 5 and 6 are DEFINED by relaxase + type IV
+    secretion machinery — "mobilisable by a helper" and "self-transmissible" —
+    and an AICE carries neither protein: it conjugates by a TraB/FtsK-SpoIIIE
+    translocase carrying double-stranded DNA (Possoz et al. 2001,
+    PMID 11679075). Neither tier measures anything about it, so it gets none,
+    and the reason is spelled out rather than left blank."""
     conjscan, icescan, gff = aice_scene(tmp_path)
     _rc, rows, _audit, _path = run_main(tmp_path, conjscan, gff,
                                         extra=["--icescan-tsv", icescan])

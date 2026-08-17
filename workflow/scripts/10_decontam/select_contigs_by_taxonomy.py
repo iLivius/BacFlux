@@ -502,9 +502,9 @@ def write_composition(path, counts, total, bases=None, total_bases=0):
     Auto mode picks its target genus on the contig count, so a genus can win the
     vote on many short contigs while another genus holds far more of the actual
     genome. When that happens the two columns disagree and the file says so at a
-    glance. A real case: one isolate listed Bacillus first on contig share (0.30
-    vs 0.26) while Aneurinibacillus held more DNA (0.40 vs 0.29) — the wrong half
-    of a single genome was kept, and the count-only report gave no hint of it.
+    glance — a case seen in testing had the winning genus ahead on contig share
+    (0.30 vs 0.26) while a related genus held more DNA (0.40 vs 0.29), so the
+    wrong half of a single genome was kept and a count-only report gave no hint.
 
     Sorted by DNA, because that is the more honest ranking of "what is this
     sample mostly made of".
@@ -534,17 +534,17 @@ def write_composition(path, counts, total, bases=None, total_bases=0):
 # worth a second look. Both are REPORTING thresholds — they change no keep/remove
 # decision, they only decide whether a warning is printed.
 #
-# Two is deliberate, and measured. A clean isolate has ONE genus holding
-# essentially all of its DNA: 54 of 56 isolates in the batch these numbers came
-# from looked exactly like that, so the second major genus is already abnormal.
-# The two exceptions were the only two problem samples in the batch, and they
-# failed in opposite directions — which is why the warning names both causes:
-#   - one genome split across related genera (Aneurinibacillus 40% / Bacillus 29%
-#     / Paenibacillus 16% / Brevibacillus 11%; ended up 28% complete, 0% contaminated)
-#   - a genuine two-organism culture (Priestia 61% / Bacillus 39%; 100% complete
-#     and 104% CONTAMINATED, i.e. two genomes in one assembly)
-# Zero false positives against the other 54. Still only one batch, so treat it as
-# a well-supported starting point rather than a universal constant.
+# Two is deliberate, and empirical. A clean isolate has ONE genus holding
+# essentially all of its DNA, so a second genus above the threshold is already
+# abnormal. Calibrated against a validation batch in which the only samples to trip
+# it were the only genuinely problematic ones, and they failed in OPPOSITE
+# directions — which is why the warning names both causes:
+#   - one genome scattered across several related genera by BLAST, where filtering
+#     then discarded half of it (CheckM: complete assembly 99%, filtered 28%)
+#   - a genuine two-organism culture, where CheckM reported the assembly 100%
+#     complete and over 100% CONTAMINATED, i.e. two genomes in one bin
+# No false positives in that batch, but it is one batch: treat these as a
+# well-supported starting point rather than a universal constant.
 MAJOR_GENUS_BASE_FRACTION = 0.05
 CONFUSED_GENUS_COUNT = 2
 
@@ -566,12 +566,13 @@ def warn_if_selection_looks_wrong(bases, total_bases, removed_bases):
     relatives. The selector cannot tell that apart from real contamination, and
     without this warning it proceeds silently either way.
 
-    Measured on a 56-isolate batch: 55 samples had a single genus holding
-    essentially all the DNA and discarded almost nothing (<3%). The one failure
-    had FOUR genera above 5% and discarded 52% of the assembly — half of a single
-    Aneurinibacillus genome that BLAST had scattered across 14 genus labels.
-    The separation was total, but it is one bad sample against 55 good ones, so
-    treat these numbers as a first cut rather than a calibrated cutoff.
+    Calibrated on a validation batch: almost every sample had a single genus
+    holding essentially all the DNA and discarded under 3% of the assembly. The
+    one failure had FOUR genera above 5% and discarded 52% — half of a single
+    genome that BLAST had scattered across more than a dozen genus labels because
+    the species is thinly represented in the nucleotide database. The separation
+    was total, but it rests on one bad sample, so treat these numbers as a first
+    cut rather than a calibrated cutoff.
 
     Input:  per-genus base counts, the assembly total, and how much is being
             removed (all in bp).

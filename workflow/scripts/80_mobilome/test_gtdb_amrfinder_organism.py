@@ -806,9 +806,9 @@ def test_output_directories_are_created(tmp_path):
 
 # ── Regression anchor against a real GTDB-Tk file ────────────────────────────
 
-# A real v2 validation run: sample 006, classified from both the Illumina and the
+# A real v2 validation run: a validation isolate, classified from both the Illumina and the
 # ONT assembly into the genus GTDB called Pseudomonas_E in R226 and calls
-# Aquipseudomonas in R232. The expected answer either way is "no organism".
+# that genus in R232. The expected answer either way is "no organism".
 #
 # The file itself is a local validation artefact and is deliberately NOT in the
 # repository, so point the test at your own copy through the environment:
@@ -834,7 +834,7 @@ def test_real_gtdbtk_summary_gives_no_organism(tmp_path):
     # suffix letters are not guaranteed to survive. Either way there is nothing
     # curated for this genus, so the organism stays empty.
     assert "g__Aquipseudomonas" in classification
-    assert "Aquipseudomonas" in reason
+    assert "that genus" in reason
     # Both hybrid rows were seen and agreed.
     assert "006_illumina" in reason and "006_ont" in reason
 

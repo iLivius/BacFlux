@@ -127,6 +127,37 @@ def test_a_conjugative_region_never_receives_an_ice_name():
     assert "element_type_not_nameable" in reasons(audit)
 
 
+def test_every_class_the_classifier_emits_is_decided_here():
+    """The two files have to agree on the vocabulary, and nothing enforced that.
+
+    conjscan_to_ice.py can write five element types. This layer either names one
+    or refuses it on the record; a type in NEITHER set falls through to the
+    refusal branch and is silently denied a name for no stated reason. That is
+    what happened to `aice` when the class was added to the classifier and not
+    here.
+
+    The second assertion runs the check backwards: a type listed as nameable that
+    the classifier cannot emit is dead code pretending to be a decision. `cime`
+    was one — the CIME class is written out as `genomic_island`, so a `cime` row
+    never arrives.
+    """
+    # The only test here that reaches into the other script, so it is imported
+    # inside the test rather than at the top of the file.
+    import conjscan_to_ice as ci
+
+    emitted = set(ci.ELEMENT_TYPE_FOR_CLASS.values())
+    decided = ni.NAMEABLE_ELEMENT_TYPES | set(ni.NOT_NAMEABLE_ELEMENT_TYPES)
+
+    assert emitted <= decided, (
+        f"conjscan_to_ice.py emits {sorted(emitted - decided)}, which this layer "
+        "neither names nor refuses on the record")
+    assert ni.NAMEABLE_ELEMENT_TYPES <= emitted, (
+        f"{sorted(ni.NAMEABLE_ELEMENT_TYPES - emitted)} is listed as nameable but "
+        "conjscan_to_ice.py cannot produce it")
+    assert not (ni.NAMEABLE_ELEMENT_TYPES & set(ni.NOT_NAMEABLE_ELEMENT_TYPES)), (
+        "a type cannot be both nameable and refused")
+
+
 def test_naming_never_changes_coordinates_or_type():
     """Even on a perfect match, the element's own extent and class are untouched —
     the curated record is used for its NAME, not to redraw our call."""
