@@ -294,40 +294,99 @@ blunt-end adapter. **Rapid (transposase) prep shows no such bias.**
 This is unfixable *in silico*.
 ([Microbial Genomics](https://pmc.ncbi.nlm.nih.gov/articles/PMC8549360/))
 
-**2. Length-weighted read QC — ours.** Wick's Feb 2026 read-QC benchmark (5
-genomes, 11 assemblers) found length-weighted filtlong **wiped out sub-10 kb
-plasmids in 3 of the 5 genomes that had them**, and consequently produced *more*
-structural errors. <https://rrwick.github.io/2026/02/05/read_qc_testing.html>
-
-BacFlux had `--length_weight 10`, ten times filtlong's default of 1. Filtlong
-scores reads as
+**2. Our own read QC.** BacFlux hard-coded `--keep_percent 90 --length_weight 10`;
+filtlong's own default for the second is 1. Filtlong scores reads as
 
 ```
 (Length^lw × MeanQ^mqw)^(1/(lw+mqw)) × WindowQ
 ```
 
-so at `lw=10` the ranking is dominated by length, and `--keep_percent` then
-deletes the bottom of it. **A plasmid cannot produce reads longer than itself**,
-so its reads sit at the bottom by construction.
+and `--keep_percent` deletes the bottom of that ranking. **A plasmid cannot
+produce reads longer than itself**, so its reads sit at the bottom by
+construction, and the more length dominates the score the further down they sit.
+
+Wick's Feb 2026 read-QC benchmark (5 genomes, 11 assemblers) found the same
+failure and is worth reading carefully, because it does **not** say what we first
+took it to say. His `Filtlong-defaults` arm ran filtlong at its **own defaults**
+(`--target_bases` = 100 × genome size, so `length_weight` 1 — the value we now
+ship), and that arm *"removed all reads below 10 kbp, essentially erasing these
+plasmids"* in the 3 of 5 genomes that had sub-10 kb plasmids, with more
+structural errors as a result. So it is not independent confirmation of our
+`length_weight 10` finding: it is a warning that filtlong's default length
+weighting is already enough to erase small plasmids once you cull hard to a
+target. His recommendation is to go **below** the default —
+`--length_weight 0 --window_q_weight 0`. Note this bears directly on `nanopore`
+mode, which culls with `--target_bases` exactly as his arm did.
+<https://rrwick.github.io/2026/02/05/read_qc_testing.html>
 
 ### Measured on our own data
 
-TUM24772, whose 5,596 bp Col plasmid was missing from the assembly while sitting
-complete in the Illumina data:
+*Klebsiella pneumoniae* **TUM24772** — BioProject PRJNA1168299, closed genome
+GCA_043950115.1, chromosome CP171785.1. A clinical test isolate, and **not** one
+of the BAA-2146 / KPNIH1 mobilome positive controls; this project has conflated
+those before, so the distinction is worth stating. Its 5,596 bp Col2 plasmid
+(pMTY24772_Col2, CP171790.1) was missing from our assembly while sitting complete
+in the Illumina data.
 
-| ONT read set | reads mapping to the plasmid |
-|---|---|
-| raw | **614** |
-| `length_weight 10` (old default) | **93** — 85% destroyed |
-| `length_weight 1`, no `keep_percent` | **602** — 98% recovered |
+Reads mapping to that plasmid, for all four combinations of the two keys. Counts
+are `minimap2 -x map-ont` against `CP171790.1`, keeping reads with an alignment
+block of at least 1 kb; on that measure the **raw** read set holds **603**:
 
-Read-length distribution, same sample: 47.0% of raw reads were ≤6 kb; after
-filtering, **3.1%**, with the **1–3 kb bin emptied entirely** despite every read
-in it being above `min_length`. Total bases barely moved (208 → 227 Mb), so this
-was never about depth — only about *which* reads survived.
+| | `length_weight 10` | `length_weight 1` |
+|---|---|---|
+| **`keep_percent 90`** — the old value | **93** | 413 |
+| **`keep_percent 95`** — what ships | 500 | **502** |
 
-**Fix applied:** `parameters.long_read_qc.length_weight` now defaults to **1**
-and `keep_percent` to **95**, both configurable.
+**Both keys matter, and `keep_percent` is the one to reach for.** At the 95 that
+now ships, changing `length_weight` is worth two reads; at the old 90 it is worth
+320. The plasmid needed 90 and 10 acting together to disappear, and either change
+on its own brings most of it back.
+
+> **Correction, 2026-08-16.** This section previously showed two arms only and
+> concluded the plasmid was lost to `length_weight`. Filling in the missing arms
+> of the 2×2 — they were run for this correction; the original experiment had no
+> `keep_percent 95` arm at all — reverses that conclusion, and takes two figures
+> with it:
+>
+> - The **602** quoted here and in three other places was measured with **no
+>   `--keep_percent` at all** (arm `C_no_keeppct`), which is not a configuration
+>   BacFlux can produce — both filtlong rules always pass the flag. The shipped
+>   defaults give **502**. The **614** raw figure quoted alongside it does not
+>   reproduce either; on the measure above the raw set holds 603.
+> - "93 — too few for Flye to assemble it" implied that some other setting did
+>   assemble it. **None did.** Re-checked against the six Flye runs still on
+>   disk: no arm, raw unfiltered reads included, produced a 5,596 bp contig, and
+>   every arm misses that same replicon. (The arms are not otherwise identical —
+>   `D_permissive` also fails to close the 87.9 kb replicon — but no arm trades
+>   one of those for the Col2 plasmid.)
+
+### So why is `length_weight` still 1?
+
+Because the two keys protect different size classes, which only shows in the
+read-length distribution. Reads per band, same sample — the raw ONT set holds
+2,954 reads of 1–3 kb and 3,418 of 3–6 kb:
+
+| | 1–3 kb | 3–6 kb |
+|---|---|---|
+| `keep_percent 90`, `lw 10` | **0** | 318 |
+| `keep_percent 95`, `lw 10` | **0** | 2,666 |
+| `keep_percent 90`, `lw 1` | 123 | 2,331 |
+| `keep_percent 95`, `lw 1` | 605 | 2,935 |
+
+`length_weight 10` empties the 1–3 kb band at **both** `keep_percent` values.
+Raising `keep_percent` rescues the 3–6 kb band, which is why it rescued this
+5.6 kb plasmid, but only lowering `length_weight` rescues 1–3 kb. Put plainly:
+**`keep_percent` protects plasmids of a few kb; `length_weight` protects plasmids
+under ~3 kb**, and this one happened to sit in `keep_percent`'s range.
+
+Total bases barely moved across the arms (208 → 227 Mb), so none of this was ever
+about depth — only about *which* reads survived. At the old 90/10, 3.1% of kept
+reads were ≤6 kb, against 47.0% of the raw set.
+
+**Fix applied:** `parameters.long_read_qc.keep_percent` now defaults to **95**
+(was 90) and `length_weight` to **1** (was 10), both configurable. Note that
+`length_weight` reaches filtlong in **hybrid mode only** — the `nanopore` rule
+never passes `--length_weight`, so in two of the four modes the key does nothing.
 
 ### The doubled-circle artifact
 
@@ -345,7 +404,7 @@ duplication and expects to run inside the Autocycler pipeline.
 
 | option | effort | verdict |
 |---|---|---|
-| **`length_weight` 10 → 1** | one line | **done.** Recovers 98% of the plasmid's reads |
+| **`keep_percent` 90 → 95** (and `length_weight` 10 → 1) | two lines | **done.** Recovers 502 of the plasmid's 603 reads — but *not* the assembled plasmid |
 | **SPAdes rescue** | ~½ day, no new deps | Published recommendation, not a hack: small plasmids "usually appear as circular contigs" in a short-read graph ([Wick/Judd/Holt](https://pmc.ncbi.nlm.nih.gov/articles/PMC9980784/)). We already write `assembly_graph_with_scaffolds.gfa` |
 | **Plassembler** | ~½ day + a database | **MIT, bioconda 1.8.3**, purpose-built. Pools reads that do *not* map to the Flye contigs and hybrid-assembles them with Unicycler — exactly where a Flye-absent plasmid lands. Can **reuse our existing Flye assembly** (`--flye_directory`), and writes empty outputs when it finds nothing, so the DAG never breaks. Cost: PLSDB is mandatory (`-d`, no skip flag) and states **no licence at all** — handle exactly as TnCentral/ICEberg per spec §5.5 |
 | **Hybracter** | large | MIT, bioconda, wraps Plassembler — but replaces the *entire* assembly stage and nests Snakemake inside Snakemake, with two schedulers competing for cores |
@@ -387,8 +446,9 @@ not biology. (This page previously attributed that run to KPNIH1; `NZ_CP006660.1
 is a BAA-2146 replicon, and KPNIH1 is `CP008827.1`.)
 
 **It did not cause the TUM24772 loss** — that plasmid survived decontamination
-(verified: present in `contigs_filt.fasta`) and was lost purely to
-`length_weight`. Both mechanisms must be ruled out separately.
+(verified: present in `contigs_filt.fasta`), and was lost at the read-filtering
+step instead, to `keep_percent 90` and `length_weight 10` acting together. Both
+mechanisms must be ruled out separately.
 
 **How to check, then fix:** see the annotated `decontamination:` block in
 `config/config.yaml`. In short: read

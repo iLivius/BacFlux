@@ -86,8 +86,9 @@ that the ICE and *att* work did not touch. They remain representative.
 `BAA-2146_amr_mobility.tsv` has 66 rows reaching tiers 1, 2, 3, 5 and 6 — but
 **every `mge_name` is `NA`**, because this run did not have the optional TnCentral
 naming layer switched on. Tier 4 ("inside a *named* transposon or integron") is
-therefore not exercised anywhere in this example. See the README's *What the
-benchmark does not show* for why that gap is worth knowing about.
+therefore not exercised anywhere in this example. See *What the benchmark does not
+show* in [`../mobilome/validation.md`](../mobilome/validation.md) for why that gap is
+worth knowing about.
 
 ## Files
 

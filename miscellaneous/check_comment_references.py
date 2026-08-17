@@ -46,6 +46,7 @@ RUN
 """
 
 import argparse
+import difflib
 import os
 import re
 import sys
@@ -54,7 +55,7 @@ import sys
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Files whose comments we read. Env YAMLs are conda pins with no prose.
-SOURCE_SUFFIXES = (".smk", ".py", ".sh")
+SOURCE_SUFFIXES = (".smk", ".py", ".sh", ".md")
 SOURCE_NAMES = ("Snakefile",)
 SKIP_DIRS = {".git", ".snakemake", "__pycache__", "ref"}
 
@@ -79,6 +80,17 @@ PATH_REFERENCE = re.compile(
 GLOBAL_REFERENCE = re.compile(r"\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b")
 
 # A dotted config key, all lowercase: mobilome.run, parameters.long_read_qc.min_length
+# A snake_case identifier written either in backticks or as the first line of a
+# Mermaid node label — the two places BacFlux's documentation names a rule.
+# How close a name must be to a real rule before it is called a probable typo.
+# 0.70 is empirical: 'check_medaka_check' scores 0.72 against 'check_medaka_model',
+# the actual mistake this check exists for. Raising it past 0.75 misses that; lowering
+# it much below 0.70 starts pairing unrelated names that merely share a prefix.
+NEAR_MISS_CUTOFF = 0.70
+
+SNAKE_NAME = re.compile(r"`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`"
+                        r"|\[([a-z][a-z0-9]*(?:_[a-z0-9]+)+)(?:<br/>|\])")
+
 CONFIG_REFERENCE = re.compile(r"\b([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)\b")
 
 # A comment that is deliberately describing what something USED to be called is
@@ -145,7 +157,11 @@ def comment_lines(path):
                     inside_shell = False
                 continue
 
-            if stripped.startswith("#"):
+            if path.endswith(".md"):
+                # A Markdown file is prose end to end: there is nothing to strip and
+                # no shell block to be inside.
+                yield number, raw.rstrip("\n"), False
+            elif stripped.startswith("#"):
                 yield number, stripped.lstrip("#").strip(), inside_shell
 
 
@@ -219,6 +235,18 @@ def check():
     globals_defined = collect_defined_globals()
     config_keys = collect_config_keys()
 
+    # Every snake_case name that legitimately is NOT a rule: config keys, output
+    # column names, filenames, constants. Without this the near-miss check would
+    # flag things like `amr_gene_family` for merely resembling a rule.
+    defined_elsewhere = set()
+    for _p in source_files():
+        try:
+            _t = open(_p, encoding="utf-8", errors="replace").read()
+        except Exception:                                   # noqa: BLE001
+            continue
+        defined_elsewhere.update(re.findall(r"^\s*([a-z][a-z0-9_]+)\s*[:=]", _t, re.M))
+    defined_elsewhere.update(k.split(".")[-1] for k in config_keys)
+
     problems = []
     advisories = []
     shell_comments = []
@@ -256,6 +284,25 @@ def check():
                                                                 # ../../envs/ hop works
                 if not os.path.exists(os.path.join(REPO_ROOT, candidate)):
                     problems.append(f"{where}: path does not exist: {candidate}")
+
+            for match in SNAKE_NAME.findall(text):
+                # Two alternatives in the pattern, so findall yields a pair; exactly
+                # one half is ever populated.
+                bare = match[0] or match[1]
+                if bare in rules or bare in defined_elsewhere:
+                    continue
+                near = difflib.get_close_matches(bare, sorted(rules), n=1, cutoff=NEAR_MISS_CUTOFF)
+                if near:
+                    # ADVISORY, not a failure. Measured on this repo the ratio is about
+                    # nine false alarms to one real find: output column names
+                    # (plasmid_score, same_replicon) and config keys are legitimately
+                    # snake_case and resemble rule names closely. As a gate it would be
+                    # switched off within a week; as a list you read after editing the
+                    # documentation it is worth having, because it does catch the real
+                    # thing — 'check_medaka_check' for 'check_medaka_model', which no
+                    # exact-match test can see.
+                    advisories.append(
+                        f"{where}: '{bare}' is not a rule; did you mean '{near[0]}'?")
 
             for name in GLOBAL_REFERENCE.findall(text):
                 if name in globals_defined:

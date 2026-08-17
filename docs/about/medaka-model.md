@@ -1,8 +1,9 @@
-# Method reference: Dorado basecalling and the Medaka polishing model
+# The Medaka polishing model
 
-*Destined for the MkDocs site, and intended to be quotable in a methods section.
-Every claim here carries its source, and the last section states plainly which
-claims come from primary documentation and which are inference.*
+Why BacFlux polishes an ONT assembly with a bacterial methylation model when Dorado
+basecalled it with a canonical one. Written to be quotable in a methods section: every
+claim carries its source, and the last section states plainly which come from primary
+documentation and which are inference.
 
 Established 2026-08-04 by reading Medaka's own source and ONT's documentation,
 prompted by a reasonable objection: **if Dorado basecalled without a methylation

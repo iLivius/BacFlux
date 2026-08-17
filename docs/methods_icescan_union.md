@@ -26,7 +26,7 @@ comparing two arms that differ **only** by whether the ICE caller was given
 > 92,237 bp (0.98); SPI-7 is listed at 83,403 bp and is now 133,582 bp against a
 > curated 133,500. Current per-element numbers live in `results_final.tsv` and
 > `ime_results_final.tsv` in the benchmark tree, and the current headline figures
-> are in the README's Validation section and in `methods_ebi_comparison.md`.
+> are in `docs/mobilome/validation.md` and in `methods_ebi_comparison.md`.
 >
 > Those two tables are kept as they were measured rather than refreshed, because
 > refreshing one arm and not the other would destroy the comparison. Treat them
@@ -345,23 +345,42 @@ threshold is a separate question, separately measurable, and is not decided here
 ## 7. AICE — a third class, and an honest statement of its validation
 
 An **AICE** (actinomycete integrative and conjugative element) is found in
-*Streptomyces* and relatives. It integrates into the chromosome like an ICE, but
-it has **no relaxase and no mating-pair apparatus**. It moves between hyphal
-compartments of the mycelium using a **TraB / FtsK-SpoIIIE translocase**, which
-pumps **double-stranded** DNA — unlike classical conjugation, which transfers a
-single strand nicked by a relaxase.
+*Streptomyces* and relatives. It integrates into the chromosome like an ICE, and
+it **does conjugate into another cell** — but it has **no relaxase and no
+mating-pair apparatus**. A **TraB / FtsK-SpoIIIE translocase** carries it across
+as **double-stranded** DNA, where classical conjugation transfers a single strand
+nicked by a relaxase. Possoz *et al.* 2001 (PMID 11679075) concluded this for
+pSAM2 from differential SalI methylation — hedged in their own words as
+"probably transferred to the recipient as double-stranded DNA", but called "the
+first experimental evidence for the transfer of double-stranded DNA during
+bacterial conjugation". Vogelmann *et al.* 2011 (PMID 21505418) states it
+without the hedge and measured the TraB pore at ~3.1 nm, wide enough for one.
+(The translocase is TraB generically; pSAM2's copy is TraSA.)
 
-The mobility ladder (spec §2.5) has no tier for this. Tiers 5 and 6 are both
-statements *about conjugation*, so placing an AICE at either would be a false
-claim. It is therefore reported as its own thing:
+> **Correction, 2026-08-15 — an AICE does make single-stranded DNA, but not the
+> kind that travels.** It copies itself by rolling-circle replication *inside*
+> one cell, and that intermediate is single-stranded (te Poele *et al.* 2008,
+> PMID 18523858). Until this date BacFlux confused that intermediate with the
+> transferred molecule and described an AICE as pushing single-stranded DNA
+> around a mycelium, in code comments, in the config and here. Both halves were
+> wrong: the DNA that crosses is double-stranded, and it crosses into another
+> cell.
+
+The mobility ladder (spec §2.5) has no tier for this, and the reason is
+bookkeeping rather than biology. Tiers 5 and 6 are **defined by machinery**: tier
+5 is "a relaxase but no mating apparatus, so a helper must supply one", tier 6 is
+"a relaxase plus its own". An AICE carries neither protein, so neither tier is
+measuring anything about it — and with this branch's validation at nil (below),
+reading its real transfer ability as tier 6 would be the worse of the two errors.
+It is therefore reported as its own thing:
 
 | field | value |
 |---|---|
 | `element_type` | `aice` — never folded into `ice` |
 | `mge_class` | its own class |
 | `mobility_tier` | `NA`, never blank |
-| `mobility_tier_reason` | explicit: *"no tier: the mobility ladder's tiers 5 and 6 are both conjugation, and an AICE conjugates by neither route…"* |
-| `mobility` | *"predicted transferable within the mycelium by FtsK/SpoIIIE translocation (actinomycete AICE); not on the conjugation mobility ladder"* |
+| `mobility_tier_reason` | explicit: *"no tier: tiers 5 and 6 are DEFINED by relaxase + type IV secretion conjugation machinery, which an AICE does not carry…"* |
+| `mobility` | *"predicted transferable into another cell as double-stranded DNA by a TraB translocase (FtsK/SpoIIIE family); not on the conjugation mobility ladder, whose tiers describe only relaxase + type IV secretion transfer"* |
 | `missing_components` | *"none expected (an AICE has no relaxase and no mating-pair apparatus)"* — so the row does not read as a degraded ICE |
 
 `colocalise.py` carries `"aice"` in both `ELEMENT_TYPE_SYNONYMS` and

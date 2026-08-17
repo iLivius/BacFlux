@@ -33,8 +33,9 @@ record*, not a work order. See the box below before acting on anything in it.
 >    reliable on a fragmented short-read assembly — is still entirely real and is
 >    the reason the module reports contig-edge flags on every row.
 >
-> For what the module actually does and how well it works, read the README's
-> *Validation* section, [`methods_att_and_small_plasmids.md`](methods_att_and_small_plasmids.md),
+> For what the module actually does and how well it works, read
+> [`mobilome/validation.md`](mobilome/validation.md),
+> [`methods_att_and_small_plasmids.md`](methods_att_and_small_plasmids.md),
 > [`methods_icescan_union.md`](methods_icescan_union.md),
 > [`methods_ebi_comparison.md`](methods_ebi_comparison.md) and
 > [`mobilome_worked_example.md`](mobilome_worked_example.md).
@@ -88,6 +89,14 @@ Run with `snakemake --sdm conda`. Conda-per-rule is the dependency model. Everyt
 > The tool versions below are also v1: v2 runs **GTDB-Tk 2.7.2 against GTDB R232**,
 > not 2.6.1 / R226. The table is kept only because §1.5 and the surrounding
 > reasoning refer to it.
+>
+> ⚠ **CARD read mapping — corrected 2026-08-16.** The row below said "minid 0.99",
+> which was never true of any release. The rule passed BBMap `idfilter=0.99`, and
+> `idfilter` does not filter the primary alignment of a read: the leg has always
+> screened at BBMap's default `minid=0.76`, with the specificity coming from the
+> ≥70% covered-length gate, not from identity. v2.0.0 makes the rule pass
+> `minid=0.76` explicitly so the code states what it does. The identity floor was
+> deliberately **not** raised. See `analysis/amr.md` and `reference/configuration.md`.
 
 **Known facts (from v1.3.1 release notes, verified):**
 - ABRicate runs as a **named wildcard rule `amr_contigs`** across multiple databases (anonymous per-database rules were replaced in v1.3.1). So there are *several* ABRicate outputs per sample — the mobilome module must choose one (or merge) rather than assume a single file.
@@ -102,7 +111,7 @@ Run with `snakemake --sdm conda`. Conda-per-rule is the dependency model. Everyt
 | Contig taxonomy audit | `contig_taxonomy_decisions.tsv` | decontamination selector |
 | Bakta annotation | `05.annotation/bakta/{sample}/{sample}.{gff3,tsv,faa,fna,gbff}` | Bakta v1.12.0 |
 | ABRicate AMR/virulence | `06.AMR/…` | ABRicate v1.2.0, EFSA thresholds ≥80% id / ≥70% cov |
-| CARD read mapping | `06.AMR/AMR_mapping/…` | BBMap v39.33 vs CARD v4.0.1, minid 0.99, ≥70% covered length |
+| CARD read mapping | `06.AMR/AMR_mapping/…` | BBMap v39.33 vs CARD v4.0.1, ~~minid 0.99~~ **minid 0.76** (see the correction above), ≥70% covered length |
 | Plasmid calls | `07.plasmids/…` incl. `verified plasmids` file | Platon v1.7 + BLAST verification |
 | Prophage | `08.phages/…` | VirSorter2 v2.2.4 + CheckV v1.0.3 |
 | Taxonomy | `04.taxonomy/…` | GTDB-Tk v2.6.1 (GTDB R226) |
@@ -132,9 +141,12 @@ Paste the results into §1.2 and delete the warning above.
 
 *(Done, but not here: this was carried out against the real Snakefile and written
 up in [`mobilome_wpA_ground_truth.md`](mobilome_wpA_ground_truth.md) instead of
-being pasted back into §1.2. Note also that these commands are themselves v1 —
-in v2 the rules live in `workflow/rules/{shared,illumina,nanopore,hybrid,contigs}/*.smk`
-rather than in one `workflow/Snakefile`. At the time this was written the config to
+being pasted back into §1.2. Note also that these commands are themselves v1 and no
+longer run — in v2 the rules live in
+`workflow/rules/{shared,illumina,nanopore,hybrid,contigs}/*.smk`
+rather than in one `workflow/Snakefile`, and `workflow/FastaFlux` (named here and in
+§1.1) was **deleted** in v2.0.0, its job taken over by `mode: contigs`. At the time
+this was written the config to
 read was `config/config_v2.yaml`; the v1/v2 cutover has since happened and it is
 simply `config/config.yaml` now — see `unification_migration_plan.md` Stage 1.)*
 
@@ -478,8 +490,8 @@ Composite call = short parser over `pairs.tsv`: same contig, ≥2 IS hits, **sam
 *Was "BacFluxL only". **Built, and it runs in all four v2 modes** — a hybrid dry
 run prints "Mobilome module: ON" like any other. Phases 0–6 are implemented in
 `workflow/scripts/80_mobilome/` (`att_search.py`, `conjscan_to_ice.py`,
-`colocalise.py`); Phase 7 was carried out and is written up in the README's
-Validation section and in `methods_ebi_comparison.md`. The single biggest
+`colocalise.py`); Phase 7 was carried out and is written up in
+`docs/mobilome/validation.md` and in `methods_ebi_comparison.md`. The single biggest
 departure from the plan below is Phase 3 — see the superseded-probe box in it.*
 
 Design principle: **build an evidence integrator, not an ICE finder.** Only genuinely new algorithm is att-site search.
@@ -683,5 +695,5 @@ from the plan: step 4's "tiers 1–4" in practice reaches tier 3 without the
 optional TnCentral layer, because **tier 4 requires a curated name** and that
 layer is opt-in; and **tier 4 has never actually been assigned** in any retained
 run, because on the one occasion the naming layer did match a curated transposon
-the gene was on a conjugative plasmid and scored tier 6 instead. See the README's
-"What the benchmark does not show".*
+the gene was on a conjugative plasmid and scored tier 6 instead. See "What the
+benchmark does not show" in `docs/mobilome/validation.md`.*

@@ -111,7 +111,7 @@ Deferred to WP-B/C implementation (not on the WP-A critical path).
 
 # AMRFinderPlus 4.2.7 OUTPUT CONTRACT (verified by a real run, 2026-07-24)
 
-Ran, successfully (exit 0, 62 s), on real v2 output — sample 006 (Pseudomonas_E),
+Ran, successfully (exit 0, 62 s), on real v2 output — a validation isolate (Pseudomonas_E),
 proving spec §12 Q1 empirically:
 
 ```
@@ -146,7 +146,7 @@ finds nothing. Column names above are copied from the real header.**
   method value is how a truncated hit (typically at a contig end) is signalled —
   that is the honest short-read fragmentation flag the spec asks for.
 
-## Real result on sample 006 (sanity anchor for tests)
+## Real result on a validation isolate (sanity anchor for tests)
 
 5 AMR rows, all Type=AMR, all on contig_1 (the chromosome): emhC, emhB, mexE
 (EFFLUX), aac(6') (AMINOGLYCOSIDE), ampC (BETA-LACTAM); Methods BLASTP x2, HMM x3.
@@ -174,7 +174,7 @@ Plus a hard chromosome/plasmid split as FASTA:
 Platon ALREADY reports `# Mobilization`, `# OriT` and `# Conjugation` per contig.
 That distinguishes ladder tier 5 (mobilisable — needs a helper) from tier 6
 (conjugative — predicted self-transmissible) FOR PLASMID CONTIGS directly, with
-no extra tool. Real example, sample 386 contig_2 (a confirmed 58 kb plasmid):
+no extra tool. Real example, a validation isolate contig_2 (a confirmed 58 kb plasmid):
 `# Mobilization = 1`, `# Conjugation = 1`, `# OriT = 0`, `Inc Type(s) = 0`.
 
 So the replicon-call input for WP-D is built as:
@@ -236,7 +236,7 @@ moment the input layout changes.
 FragGeneScan then hmmsearch; several minutes on a 4.2 Mb genome with 8 threads.
 Not a trivial rule — it deserves a real thread allocation.
 
-## ISEScan RESULTS SCHEMA (from the real run — 31 IS on sample 386)
+## ISEScan RESULTS SCHEMA (from the real run — 31 IS on a validation isolate)
 
 Output lands in `<outdir>/<input-parent-dir-name>/<input-basename>.{tsv,csv,gff,sum,is.fna,orf.faa,orf.fna,out,raw}`
 (plus `proteome/` and `hmm/` working dirs). The main table is the **`.tsv`**.
@@ -269,7 +269,7 @@ contig_1 ISEScan terminal_inverted_repeat  36   53 . + . ID=contig_1_IS_1_TIR;pa
 And a `.sum` per-family summary (nIS, %Genome, bps4IS, dnaLen) — useful for the QC
 line but BacFlux computes its own contig-boundary statistics, which `.sum` lacks.
 
-REAL RESULT, sample 386 (Arthrobacter, 4.23 Mb, 2 contigs incl. a 58 kb plasmid):
+REAL RESULT, a validation isolate (Arthrobacter, 4.23 Mb, 2 contigs incl. a 58 kb plasmid):
 31 IS elements — 18 complete, 13 partial; families IS481 (9), IS3 (6), ISNCY (5),
 IS21 (4), IS110 (4), IS256 (3); 0.82% of the genome. **All 31 on contig_1 (the
 chromosome); none on the plasmid contig.** Saved as test fixtures:
@@ -367,7 +367,7 @@ is emitted in genome order, so the ordering assumption holds.
 - Also written: `all_systems.tsv`, `best_solution_summary.tsv` (a per-model COUNT
   matrix, one row per replicon), `rejected_candidates.tsv`, `hmmer_results/`.
 
-## REAL RESULT — sample 386 (Arthrobacter), and why it matters
+## REAL RESULT — a validation isolate (Arthrobacter), and why it matters
 
 Two MOB systems found ON THE CHROMOSOME, each `sys_wholeness = 0.667` (i.e.
 INCOMPLETE):

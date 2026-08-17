@@ -1,0 +1,43 @@
+/* ── Page width ──────────────────────────────────────────────────────────────
+ * Material's default content column is tuned for prose (~45 rem). BacFlux's
+ * documentation is mostly wide tables and flowcharts, and a Mermaid diagram is
+ * scaled down to fit its container — so in a narrow column the whole drawing,
+ * text included, shrinks until it cannot be read. Widening the grid is what
+ * actually makes the diagrams legible; the font-size rules below only help once
+ * the drawing is no longer being squeezed.
+ */
+.md-grid {
+  max-width: 1360px;
+}
+
+/* ── Mermaid diagrams ────────────────────────────────────────────────────────
+ * Mermaid's own `%%{init: fontSize}%%` block is overridden by mkdocs-material's
+ * initialisation, so label size is set here, where nothing overrides it.
+ *
+ * Deliberately NOT set here: any fill or text colour. Overriding those is what
+ * made the architecture diagram unreadable — first in dark mode, then in light.
+ * Material ignores `color:` in a Mermaid `classDef`, so a custom fill keeps the
+ * theme's text colour and one of the two modes always loses. The theme drives the
+ * colours from the palette and gets both modes right; leave it alone.
+ */
+.mermaid .nodeLabel,
+.mermaid .nodeLabel p,
+.mermaid span.nodeLabel,
+.mermaid .edgeLabel,
+.mermaid foreignObject div {
+  font-size: 15px !important;
+  line-height: 1.35 !important;
+}
+
+/* Subgraph titles ("PART 1 …") orient the reader, so give them more weight. */
+.mermaid .cluster-label,
+.mermaid .cluster-label p,
+.mermaid .cluster-label foreignObject div {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+/* A diagram wider than the column scrolls rather than shrinking further. */
+.mermaid {
+  overflow-x: auto;
+}

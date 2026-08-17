@@ -1,0 +1,70 @@
+# Rebuilds and publishes the MkDocs site (docs/) to GitHub Pages on every push to
+# main. This is the standard deployment pattern documented by mkdocs-material itself
+# (squidfunk.github.io/mkdocs-material/publishing-your-site/) — nothing bespoke here.
+#
+# What happens on a push to main:
+#   1. GitHub checks out the repo on a temporary Ubuntu runner.
+#   2. Installs Python and the exact mkdocs-material version verified locally (pinned
+#      below, so a future mkdocs-material release can't silently break this build).
+#   3. Runs `mkdocs gh-deploy`, which builds the site and force-pushes the result to
+#      the gh-pages branch (created automatically on first run if it doesn't exist).
+#   4. GitHub Pages (once pointed at the gh-pages branch in repo Settings) serves
+#      whatever is on that branch — so the live site updates within about a minute.
+#
+# A failed run here (e.g. a broken link with strict mode, though CI does not run
+# --strict — see below) does not take the live site down: gh-pages simply keeps
+# whatever it last successfully published until the next successful run.
+#
+# One-time setup this file does NOT do for you (both are in repo Settings on
+# GitHub, not something a workflow file can turn on for itself):
+#   - Settings -> Actions -> General -> Workflow permissions -> "Read and write
+#     permissions". Without this, the gh-deploy push step is rejected.
+#   - Settings -> Pages -> Source -> Deploy from a branch -> gh-pages. This can only
+#     be selected after the branch exists, i.e. after this workflow has run once.
+
+name: docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch: # lets you trigger a rebuild by hand from the Actions tab,
+                      # without needing a new commit — useful the first time, or
+                      # to confirm the setup works before touching any docs.
+
+permissions:
+  contents: write # gh-deploy needs to push to the gh-pages branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          # No cache: pip here — that option needs a requirements.txt or
+          # pyproject.toml to key the cache against, and this repo has neither
+          # (the one dependency below is a plain pip install, not a lockfile).
+          # Without a matching file it fails outright at setup rather than just
+          # skipping the cache, which is what actually broke the first run.
+
+      - run: pip install mkdocs-material==9.7.7
+
+      # No --strict here: a genuinely broken link should fail loudly when caught
+      # locally (mkdocs build --strict, already part of the normal editing routine
+      # for this docs set), but a hard CI failure over something cosmetic is not
+      # worth blocking a docs update over. gh-deploy still fails the whole job (and
+      # leaves the previous version live) if the build itself errors outright.
+      #
+      # The `paths:` filter above means this job does not fire on a rule-file or
+      # script change. That matters here in a way it does not for the sibling
+      # workflows: docs/ also holds BacFlux's internal working documents, which
+      # mkdocs.yml excludes from the site (see exclude_docs there). Editing one of
+      # those does trigger this job, and correctly rebuilds nothing new.
+      - run: mkdocs gh-deploy --force

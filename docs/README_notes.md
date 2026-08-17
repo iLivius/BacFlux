@@ -16,7 +16,7 @@ treated as the final wording. Delete each entry once it's actually folded into t
 >
 > **So the README must document the SIMPLE form:**
 > ```bash
-> snakemake --sdm conda --cores 24 --configfile config/config_v2.yaml
+> snakemake --sdm conda --cores 24 --configfile config/config.yaml
 > ```
 > `--cores N` alone. No `--resources cpus=N`. Still never `--jobs`/`-j`.
 >
@@ -38,7 +38,15 @@ under-explained.**
 
 ### The problem
 
-`README.md`, "Running BacFlux" section, currently tells every user to launch with:
+> **DONE 2026-08-16 — the two command blocks below are HISTORICAL QUOTATIONS of v1's
+> README, kept to show what was wrong. Do not run either of them.** The README was
+> rewritten for v2.0.0 and now documents `--cores N` alone; the launch commands live
+> at `docs/getting-started/quick-start.md` and `docs/reference/running.md`. The second
+> command is doubly dead: `workflow/FastaFlux` was **deleted** in v2.0.0 — pre-assembled
+> contigs are now `mode: contigs` through the one Snakefile (`docs/modes/contigs.md`).
+> "Same fix for the FastaFlux command" in the numbered list below is therefore moot.
+
+`README.md`, "Running BacFlux" section, used to tell every user to launch with:
 
 ```bash
 snakemake --sdm conda --jobs 4 --cores 12
@@ -311,7 +319,7 @@ model reference, it fails with:
 ValueError: Input file did not contain precisely 1 basecaller model reference.
 ```
 
-The CDRTa11 ONT test data has **no basecaller tag at all** — verified on both the raw FASTQ
+The <test-isolate> ONT test data has **no basecaller tag at all** — verified on both the raw FASTQ
 and the filtlong output, so this is a property of the data, not of which file BacFlux feeds
 in. `auto` simply cannot work for such a dataset, in v1 or v2. That is exactly why the
 BacFluxL baseline pins the model explicitly.

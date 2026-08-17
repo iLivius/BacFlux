@@ -86,7 +86,7 @@ should not be read as ranking them. MAP's own documentation notes that its
 current release does not run gene-level AMR association, which is precisely the
 step BacFlux's module exists to perform.
 
-A practical consequence for users, worth stating in the README: for a full
+A practical consequence for users, worth stating in the documentation: for a full
 mobilome inventory of an isolate, or for anything metagenomic, MAP is the right
 tool and BacFlux writes `{sample}_contigs.fna` and `{sample}.gbk` ready to feed it.
 Consuming MAP's `mobilome.gff.gz` carries no licensing consequence for BacFlux
@@ -648,8 +648,9 @@ publication.
 - **CONJScan and ICEscan model sets are both CC BY-NC-SA 4.0** (Institut
   Pasteur/CNRS; ICEscan is an ICEfinder2 fork of CONJScan 2.0.1 by the same
   authors). They are **fetched at runtime from a configured URL and never
-  vendored**, the mobilome module is **off by default**, and the README carries
-  the non-commercial notice — the same pattern BacFlux already uses for every
+  vendored**, the mobilome module is **off by default**, and
+  `docs/about/licensing.md` carries the non-commercial notice — the same pattern
+  BacFlux already uses for every
   licence-encumbered database.
 - **Consuming MAP's `mobilome.gff.gz` output carries no licensing consequence**
   for BacFlux. Users who want a full mobilome census are pointed at MAP in the

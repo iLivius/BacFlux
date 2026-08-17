@@ -4,3 +4,8 @@ config/config_custom.yaml
 
 __pycache__/
 *.pyc
+
+# MkDocs build output. The Markdown sources in docs/ and mkdocs.yml ARE tracked;
+# site/ is the generated HTML, rebuilt on demand and published to the gh-pages
+# branch rather than committed here.
+site/

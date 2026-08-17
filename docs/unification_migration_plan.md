@@ -537,7 +537,7 @@ pin-sensitive and nothing detects a future Bakta change silently reverting it to
 closed Unicycler/NCBI input genome is annotated as linear contigs.
 
 **Stage 4.5 — Real end-to-end validation, illumina mode. ✓ PASSED 2026-07-22.**
-Full run on strain CDRTa11 at `<validation-root>/illumina/`
+Full run on strain <test-isolate> at `<validation-root>/illumina/`
 (see its `RUN_NOTES.md` for the complete table and the caveats). 10/10 steps, zero errors,
 every stage compared against the v1.3.1 baseline in `BacFlux_test/output_dir`:
 
@@ -687,7 +687,7 @@ BacFlux's own assemblies — 3 SPAdes-origin, 3 Flye-origin, deliberately mixing
 
 - **The decontamination screen demonstrably works**: raw SPAdes drafts were cleaned
   (399_spades 211→75 contigs, 006_spades 88→50), while already-decontaminated / long-read
-  genomes were correctly left untouched (CDRTa11 35→35; the three Flye drafts unchanged).
+  genomes were correctly left untouched (<test-isolate> 35→35; the three Flye drafts unchanged).
 - **Also first real use of the Stage-4.9 shared-database feature** (`directories.vs2_db` /
   `antismash_db` / `dbcan_db` pointed at the screening batches' copies — ~25 GB not re-fetched)
   and of the shared local-view rules in a production run.
@@ -746,7 +746,7 @@ runtime failure rather than a parse error:
 - CONJscan's models are CC BY-NC-SA (fetched, never vendored), and `macsydata` is
   deprecated in favour of `msf_data`.
 
-*Validation.* Ran for real through Snakemake against the existing `hybrid_screen_batch2`
+*Validation.* Ran for real through Snakemake against the existing `<validation-batch>`
 output (`--rerun-triggers mtime`, so only the 29 new jobs ran): **29/29 steps, exit 0**,
 13 files per sample. Biology checked by hand, not just exit codes:
 - 006 → 5 AMR genes, all tier 1 `intrinsic_candidate`, high confidence; 17 IS.

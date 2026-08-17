@@ -1,7 +1,7 @@
 # BacFlux v2.0.0 — mobilome positive-control validation
 #
 # WHY THIS RUN EXISTS: every real sample screened so far (006, 015, 386,
-# CDRTa11) is an environmental/low-resistance isolate, so the mobilome module
+# <test-isolate>) is an environmental/low-resistance isolate, so the mobilome module
 # has only ever been proven on tier 1 (intrinsic) and one degraded IME. It has
 # never watched tiers 3/5/6 fire on a genome with a REAL acquired AMR gene on a
 # real plasmid, where independent published literature gives external ground
@@ -41,9 +41,9 @@ directories:
   checkv_db: <db-root>/checkv/
   # Reuse already-downloaded shared databases rather than re-fetching ~25 GB for
   # a run that has nothing biologically to do with those samples.
-  vs2_db: <validation-root>/hybrid_screen_batch1/output_dir/07.phages/vs2_db
-  antismash_db: <validation-root>/hybrid_screen_batch1/output_dir/04.annotation/antismash/databases
-  dbcan_db: <validation-root>/hybrid_screen_batch1/output_dir/04.annotation/dbcan/dbcan_db_v5.1.2
+  vs2_db: <validation-root>/<validation-batch>/output_dir/07.phages/vs2_db
+  antismash_db: <validation-root>/<validation-batch>/output_dir/04.annotation/antismash/databases
+  dbcan_db: <validation-root>/<validation-batch>/output_dir/04.annotation/dbcan/dbcan_db_v5.1.2
 links:
   dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
   checkv_link: https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz

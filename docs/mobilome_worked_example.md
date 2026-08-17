@@ -1,7 +1,9 @@
 # Worked example: reading a mobilome report
 
-*Destined for the MkDocs site, not the README — it is too long for a README and
-works better as a page a user can read once and then keep as a reference.*
+*The long form. The reader-facing version is
+[`docs/mobilome/worked-example.md`](mobilome/worked-example.md), on the
+documentation site; this file keeps the full detail and the corrections made along
+the way.*
 
 This page walks through a real BacFlux mobilome run on a genome whose answer is
 already known from the literature, so every call can be checked against
@@ -45,8 +47,8 @@ Config: `BacFlux_v2_validation/kpnih1_positive_control/config.yaml`.
 > None of this affects `BacFlux`'s own MIT licence — share-alike attaches to
 > distributed source, not to execution, and none of these are vendored. It does
 > affect whether *you* may run this configuration. Full detail and the citation
-> list: [`CITATIONS.md`](../CITATIONS.md) and the README's *Licensing and
-> commercial use* section.
+> list: [`CITATIONS.md`](../CITATIONS.md) and
+> [`docs/about/licensing.md`](about/licensing.md).
 
 ---
 
@@ -176,7 +178,8 @@ mating-pair apparatus. Always read the tier **and** the confidence together.
 > **unexercised**: it is reached only when a curated name is the *strongest*
 > evidence available, which in practice means a chromosomal element recovered at
 > ≥80% of its reference length, and no genome tested so far has produced that
-> combination. See the README's *What the benchmark does not show*.
+> combination. See *What the benchmark does not show* in
+> [`docs/mobilome/validation.md`](mobilome/validation.md).
 
 Tier 4 needs the **TnCentral naming layer** (`mobilome.tncentral.url`). Without
 it nothing produces a `unit_transposon` element, and a gene that a curated
@@ -373,8 +376,9 @@ element at exactly that locus and so it can be scored:
 **The lesson survives the better numbers.** Even at 0.946 recovered, our interval
 is still a **floor**: it ends 3,138 bp inside the curated element, and any AMR
 gene in that last 3 kb would be scored as though it were outside the ICE. That is
-the general failure mode, and it is much larger on other genomes — see the README's
-"What the benchmark does not show", where 57% of AMR genes inside curated ICE
+the general failure mode, and it is much larger on other genomes — see "What the
+benchmark does not show" in [`docs/mobilome/validation.md`](mobilome/validation.md),
+where 57% of AMR genes inside curated ICE
 intervals come out at tier 1 precisely because the called edge stops short.
 
 **Two further things to take from this element.** First, `CP006659.2` is **ATCC

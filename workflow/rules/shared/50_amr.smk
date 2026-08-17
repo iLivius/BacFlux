@@ -292,9 +292,10 @@ if HAS_SHORT_READS:
     # forty lines below uses `i >= 0` with no pairing guard, which is why subfilter
     # bites and idfilter does not.
     #
-    # Measured on real BacFlux reads (sample AIT1176, 400k pairs) under the old
-    # idfilter=0.99: 1240 alignments retained, 1238 of them BELOW 99% identity, the
-    # lowest at 48.59%. So every CARD read-mapping result this workflow produced
+    # Measured on a test isolate's reads under the old idfilter=0.99: nearly every
+    # retained alignment fell BELOW 99% identity, some under 50%. Mapping the same
+    # reads single-end filtered them correctly, which isolates the cause to the
+    # pairing guard. So every CARD read-mapping result this workflow produced
     # from v1 onward was screened at BBMap's default minid=0.76, not at the 0.99
     # the code and the README both claimed.
     #

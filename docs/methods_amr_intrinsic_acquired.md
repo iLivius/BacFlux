@@ -1,9 +1,9 @@
 # Method reference: intrinsic versus acquired AMR, and what BacFlux can actually say
 
-*Destined for the MkDocs site, and intended to be quotable in a methods section.
-Every claim carries its source, and the last section states plainly which sources
-are peer-reviewed guidance, which are technical reports, and which claims are
-inference.*
+*Written to be quotable in a methods section: every claim carries its source, and
+the last section states plainly which sources are peer-reviewed guidance, which are
+technical reports, and which claims are inference. The reader-facing summary is
+[`docs/mobilome/mobility-ladder.md`](mobilome/mobility-ladder.md).*
 
 Written 2026-08-14, prompted by three questions that come up whenever someone
 reads an `08.mobilome` table next to a regulatory checklist:
@@ -72,10 +72,9 @@ roughly three dozen, overwhelmingly clinical — *Escherichia*, *Salmonella*,
 *Klebsiella*, *Staphylococcus aureus*, *Campylobacter*, *Pseudomonas aeruginosa*,
 *Enterococcus*, *Vibrio*, *Neisseria* and similar.
 
-On a 56-isolate batch of plant- and environment-associated strains (*Bacillus*,
-*Priestia*, *Peribacillus*, *Paenibacillus*, *Aquipseudomonas*, *Pantoea*,
-*Lysinibacillus*, *Saccharibacillus*, *Aneurinibacillus*, *Paraburkholderia*),
-`--organism` was applied to **0 of 56**. Every
+On a batch of plant- and environment-associated strains — the Bacillaceae and
+soil Pseudomonadota that make up most environmental collections — `--organism`
+was applied to **none of them**. Every
 `{sample}_amrfinder_organism_audit.tsv` recorded the same reason: *no curated
 organism for this taxon*. Every `{sample}_amrfinderplus_mutations.tsv` was
 therefore header-only.
@@ -118,7 +117,7 @@ not `intrinsic`. The qualifier is doing real work and should not be dropped: the
 module observed that a gene is chromosomal with no mobile-element context, which
 is *consistent with* intrinsic and does not establish it.
 
-So the honest framing, which the README also uses: **BacFlux produces supporting
+So the honest framing, which the documentation uses throughout: **BacFlux produces supporting
 evidence for the intrinsic/acquired judgement. It does not produce the
 judgement.** The confirmatory work is a species-wide distribution analysis, plus
 phenotypic testing (MIC against the relevant antimicrobial), per the decision tree
@@ -224,11 +223,10 @@ is what a real acquired gene looks like.
 
 ### Why it is not built into BacFlux
 
-**Coverage.** It spans five species. On the 56-isolate batch that prompted this
-document, **10 samples fall inside those five**; 17 more are *Bacillus* or
-*Priestia* outside them (*B. pumilus*, *B. altitudinis*, *B. halotolerans*,
-*B. safensis*, *B. atrophaeus*, *B. siamensis*, *P. megaterium*), and the
-remaining 29 are other genera entirely. For most of a typical environmental
+**Coverage.** It spans five species. On an environmental batch of the kind this
+document was written from, fewer than a fifth of the isolates fell inside those
+five; roughly another third were *Bacillus* or *Priestia* species outside them,
+and the rest were other genera entirely. For most of a typical environmental
 collection it would return nothing.
 
 **It is a snapshot.** RefSeq at 30 November 2023, dossiers to December 2023. It

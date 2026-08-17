@@ -1,0 +1,148 @@
+site_name: BacFlux
+site_description: Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility
+site_author: Livio Antonielli
+repo_url: https://github.com/iLivius/BacFlux
+repo_name: iLivius/BacFlux
+edit_uri: edit/main/docs/
+
+# Where the Markdown sources live. `mkdocs serve` renders these to a local
+# preview; `mkdocs build` writes the static site to site/ (gitignored).
+docs_dir: docs
+
+# docs/ is not only the website. It also holds the internal working documents
+# this project has always kept there — the module design record, the migration
+# plan, the method write-ups and the pending-clarifications notes. Around forty
+# comments in the rule files and helper scripts point at those paths by name, and
+# `miscellaneous/check_comment_references.py` fails the build if one of them stops
+# resolving, so the files must stay exactly where they are.
+#
+# They are therefore excluded from the site rather than moved. Excluded files are
+# not copied into site/ and do not count as "missing from the nav", so a strict
+# build stays quiet about them. They remain readable on GitHub, which is where
+# their audience already reads them.
+#
+# Patterns are gitignore-style and each one is anchored with a leading slash, so
+# it matches only at the top level of docs/. A public page written later inside
+# docs/mobilome/ is unaffected even if its filename starts with `methods_`.
+#
+# Adding a new file at the top of docs/ that is neither listed here nor in the
+# nav will be built but left unreachable — check both lists when you add one.
+exclude_docs: |
+  /README_notes.md
+  /methods_*.md
+  /mobilome_*.md
+  /unification_migration_plan.md
+  /validation/
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.instant       # click-through without a full page reload
+    - navigation.tracking      # URL follows the section you are reading
+    - navigation.sections      # top-level groups rendered as sidebar sections
+    - navigation.top           # back-to-top button
+    - navigation.indexes       # a section can have its own landing page
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy        # copy button on every code block
+    - content.action.edit      # "edit this page" link back to GitHub
+  palette:
+    # Light mode (default) with a toggle to dark.
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition                 # note/warning/tip callout boxes
+  - attr_list
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details           # collapsible callouts
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:      # nested code blocks, and Mermaid diagrams
+      # Without this block a ```mermaid fence is syntax-highlighted as text
+      # instead of drawn. Material ships the Mermaid runtime itself, so no
+      # extra JavaScript or plugin is needed.
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true    # tabbed content (e.g. per-mode command examples)
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+
+# The nav mirrors how the workflow is built: the four modes differ only in their
+# front end (reads and assembly), and everything from taxonomy onwards is one
+# shared set of rules. So "Modes" covers what is different and "Analysis stages"
+# covers what every mode has in common. The mobilome module gets its own section
+# because it is opt-in, and because it is the part of BacFlux that needs the most
+# explaining before its output can be read safely.
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Reference databases: getting-started/databases.md
+      - Quick start: getting-started/quick-start.md
+      - Choosing a mode: getting-started/choosing-a-mode.md
+      - Coming from v1: getting-started/from-v1.md
+  - Modes:
+      - modes/index.md
+      - Illumina: modes/illumina.md
+      - Nanopore: modes/nanopore.md
+      - Hybrid: modes/hybrid.md
+      - Pre-assembled contigs: modes/contigs.md
+  - Analysis stages:
+      - Decontamination: analysis/decontamination.md
+      - Assembly QC: analysis/assembly-qc.md
+      - Taxonomy: analysis/taxonomy.md
+      - Annotation: analysis/annotation.md
+      - Antimicrobial resistance: analysis/amr.md
+      - Plasmids: analysis/plasmids.md
+      - Prophages: analysis/phages.md
+  - Mobilome module:
+      - mobilome/index.md
+      - The mobility ladder: mobilome/mobility-ladder.md
+      - Turning it on: mobilome/enabling.md
+      - Optional layers: mobilome/optional-layers.md
+      - Reading the output: mobilome/output.md
+      - Draft assemblies: mobilome/draft-assemblies.md
+      - Tuning: mobilome/tuning.md
+      - Worked example: mobilome/worked-example.md
+      - Validation: mobilome/validation.md
+  - Reference:
+      - Configuration: reference/configuration.md
+      - Output files: reference/output.md
+      - Running BacFlux: reference/running.md
+  - Troubleshooting: troubleshooting.md
+  - About:
+      - Rationale: about/rationale.md
+      - The Medaka polishing model: about/medaka-model.md
+      - Licensing: about/licensing.md
+      - Citation and references: about/citation.md
