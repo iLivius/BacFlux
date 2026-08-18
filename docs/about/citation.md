@@ -44,7 +44,7 @@ list, with the licensing notes attached, is in
 | Mapping QC (modes with reads) | QualiMap 2.3 | 40 |
 | Taxonomic placement | GTDB-Tk 2.7.2 against GTDB **R232** | 10, 43 |
 | Annotation | Bakta 1.12.1 (database **v6.0**) | 46 |
-| Functional annotation | eggNOG-mapper 2.1.13 against eggNOG 5.0.2 | 9, 28 |
+| Functional annotation | eggNOG-mapper 2.1.15 against eggNOG 5.0.2 | 9, 28 |
 | Secondary metabolites | antiSMASH 8.0.4 | 4 |
 | CAZymes | run_dbCAN 5.1.2 (dbCAN3) | 54 |
 | AMR and virulence on contigs | ABRicate 1.2.0 — plus the databases below | 47 |

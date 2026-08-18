@@ -153,7 +153,7 @@ one release, for the workflow to fetch:
 | `directories.platon_db` | [Platon](https://github.com/oschwengers/platon?tab=readme-ov-file#database) | **v1.5.0** |
 
 Two of those versions are not yours to pick. The eggNOG release is fixed by the pinned
-eggnog-mapper 2.1.13, which builds its own download URL, so the database cannot drift away
+eggnog-mapper 2.1.15, which builds its own download URL, so the database cannot drift away
 from the tool. And the Platon database is versioned separately from Platon itself — v1.5.0
 is the current database for every Platon from 1.5.0 onwards, including the 1.8 this
 workflow pins, so the two numbers are meant to differ.

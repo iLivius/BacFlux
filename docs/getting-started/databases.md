@@ -17,7 +17,7 @@ local symlink view and never modifies, moves or deletes it.
 |---|---|---|---|
 | `directories.bakta_db` | Bakta | **v6.0** | 3.9 GB light, 84 GB full |
 | `directories.blast_db` | NCBI `core_nt` (or `nt_prok`) with the taxonomy files | — | ~300 GB |
-| `directories.eggnog_db` | eggNOG diamond database | — | ~50 GB | BacFlux pins eggnog-mapper 2.1.13, which annotates against **eggNOG 5.0**, database release **`emapperdb-5.0.2`**. The version is fixed by the tool rather than chosen by you: `download_eggnog_data.py` builds its URL from `__DB_VERSION__` in the installed release, so the database cannot drift away from the pin.
+| `directories.eggnog_db` | eggNOG diamond database | — | ~50 GB | BacFlux pins eggnog-mapper 2.1.15, which annotates against **eggNOG 5.0**, database release **`emapperdb-5.0.2`**. The version is fixed by the tool rather than chosen by you: `download_eggnog_data.py` builds its URL from `__DB_VERSION__` in the installed release, so the database cannot drift away from the pin.
 | `directories.gtdbtk_db` | GTDB | **R232** | 94 GB extracted |
 | `directories.platon_db` | Platon | — | 2.8 GB |
 
@@ -76,7 +76,7 @@ gunzip nucl_gb.accession2taxid.gz
 ### eggNOG
 
 ```bash
-conda create -n eggnog-mapper eggnog-mapper=2.1.13
+conda create -n eggnog-mapper eggnog-mapper=2.1.15
 conda activate eggnog-mapper
 mkdir /data/eggnog_db
 download_eggnog_data.py --data_dir /data/eggnog_db -y

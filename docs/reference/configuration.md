@@ -256,7 +256,7 @@ stops the run rather than quietly resolving to something wrong.
 |---|---|
 | `bakta_db` | A Bakta database, light or full. Also supplies the AMRFinderPlus database at `amrfinderplus-db/latest/`, which the mobilome module uses. |
 | `blast_db` | The directory holding the NCBI nucleotide database; the subfolder named by `parameters.nt_version` is what the contamination screen blasts against. |
-| `eggnog_db` | The eggNOG-mapper database directory. BacFlux pins eggnog-mapper 2.1.13, which annotates against **eggNOG 5.0**, database release **`emapperdb-5.0.2`**. The version is fixed by the tool rather than chosen by you: `download_eggnog_data.py` builds its URL from `__DB_VERSION__` in the installed release, so the database cannot drift away from the pin.
+| `eggnog_db` | The eggNOG-mapper database directory. BacFlux pins eggnog-mapper 2.1.15, which annotates against **eggNOG 5.0**, database release **`emapperdb-5.0.2`**. The version is fixed by the tool rather than chosen by you: `download_eggnog_data.py` builds its URL from `__DB_VERSION__` in the installed release, so the database cannot drift away from the pin.
  |
 | `gtdbtk_db` | A GTDB-Tk release directory. |
 | `platon_db` | The Platon plasmid database, release **v1.5.0** ([DOI 10.5281/zenodo.4066768](https://doi.org/10.5281/zenodo.4066768), 2020-10-05). It is versioned separately from Platon itself: v1.5.0 is the current database for every Platon from 1.5.0 onwards, including the 1.8 pinned here, so the database number trailing the tool number is expected rather than a sign of drift. |

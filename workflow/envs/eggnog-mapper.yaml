@@ -3,4 +3,4 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - eggnog-mapper=2.1.13
+  - eggnog-mapper=2.1.15

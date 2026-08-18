@@ -13,7 +13,7 @@ biosynthetic cluster and an orthologous group all sit on the same coordinates.
 | Tool | Version | Answers | Written to |
 |---|---|---|---|
 | [Bakta](https://github.com/oschwengers/bakta) | 1.12.0 | where the genes are, and what they are called | `04.annotation/bakta/{sample}/` |
-| [eggNOG-mapper](https://github.com/eggnogdb/eggnog-mapper) | 2.1.13 | what each protein's orthologous group is known to do | `04.annotation/eggnog/{sample}/` |
+| [eggNOG-mapper](https://github.com/eggnogdb/eggnog-mapper) | 2.1.15 | what each protein's orthologous group is known to do | `04.annotation/eggnog/{sample}/` |
 | [antiSMASH](https://github.com/antismash/antismash) | 8.0.4 | which biosynthetic gene clusters the genome carries | `04.annotation/antismash/{sample}/` |
 | [run_dbcan](https://github.com/bcb-unl/run_dbcan) | 5.1.2 | which sugars and polysaccharides it can process | `04.annotation/dbcan/{sample}/` |
 
