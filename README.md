@@ -147,8 +147,8 @@ one release, for the workflow to fetch:
 | Config key | Database | Version |
 |---|---|---|
 | `directories.bakta_db` | [Bakta](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) | **v6.0** |
-| `directories.blast_db` | [NCBI core nt](https://ftp.ncbi.nlm.nih.gov/blast/db/), with the taxonomy files beside it | — |
-| `directories.eggnog_db` | [eggNOG](https://github.com/eggnogdb/eggnog-mapper/wiki) diamond database | **emapperdb-5.0.2** |
+| `directories.blast_db` | [NCBI core nt](https://ftp.ncbi.nlm.nih.gov/blast/db/) and taxonomic files | — |
+| `directories.eggnog_db` | [eggNOG](https://github.com/eggnogdb/eggnog-mapper/wiki) diamond database | **v5.0.2** |
 | `directories.gtdbtk_db` | [GTDB](https://ecogenomics.github.io/GTDBTk/installing/index.html) | **R232** |
 | `directories.platon_db` | [Platon](https://github.com/oschwengers/platon?tab=readme-ov-file#database) | **v1.5.0** |
 
