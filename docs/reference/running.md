@@ -19,6 +19,18 @@ snakemake --sdm conda --cores 24 --configfile config/config_custom.yaml
 (`cp config/config.yaml config/config_custom.yaml`), git-ignored so your edits
 survive a `git pull`. See [Quick start](../getting-started/quick-start.md).
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **DAG** | directed acyclic graph — the job graph Snakemake builds from the rules, which decides what runs and in what order |
+    | **RAM** | the machine's memory, as opposed to disk |
+    | **CPU** | a processor core, the unit `--cores` counts |
+    | **OOM** | out of memory — a job killed by the system for using more than the machine had |
+    | **QC** | quality control — the read and assembly checks |
+    | **YAML** | the config file's plain-text format; indentation is significant and tabs are refused |
+    | **GTDB** | Genome Taxonomy Database, the reference GTDB-Tk places each genome in |
+
 ## Launch from the repository root
 
 Three things are anchored to the directory you launch from, so make it the

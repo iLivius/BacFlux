@@ -10,6 +10,14 @@ mode reproduced its predecessor's assembly byte for byte
 ([Rationale](../about/rationale.md)). What changed is how a run is configured and where
 its output lands.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **ONT** | Oxford Nanopore Technologies — the long-read sequencing platform |
+    | **DOI** | digital object identifier — the permanent handle a Zenodo record is cited by |
+    | **GTDB** | Genome Taxonomy Database, the reference used for taxonomic placement |
+
 | Was | Now |
 |---|---|
 | `BacFlux` — Illumina reads | `mode: illumina` |
@@ -31,7 +39,7 @@ KeyError in file ".../workflow/rules/shared/00_common.smk", line 81: 'mode'
 ```
 
 That is the intended behaviour rather than a bug. `config/config_custom.yaml` is
-git-ignored, so it is *your* file and a `git pull` never touches it — which is also why
+git-ignored, so it is your file and a `git pull` never touches it — which is also why
 an old one can still be sitting there.
 
 ```bash
@@ -71,7 +79,7 @@ directory. A relative input path now resolves against the directory you launched
 which is what most people expect. `directories.output_dir` may still be relative; it is
 resolved to an absolute path for you.
 
-One consequence is easy to miss: **the conda environments have moved**. Snakemake
+One consequence is easy to miss: the conda environments have moved. Snakemake
 creates them under `.snakemake/conda` in the launch directory. Launching from the same
 place each time is what stops the 31 environments being rebuilt; `--conda-prefix
 /some/path` puts them somewhere specific, for example shared between projects.
@@ -118,8 +126,8 @@ cleaned down to results and archived.
 One downstream difference is deliberate and appears in the two long-read modes: Bakta
 gains or loses a single feature, because it is now handed a `--replicons` table
 declaring a closed chromosome circular. That makes its gene caller run in closed mode,
-which shifts a couple of marginal start codons. It is 0.02% of the features, and it is
-the better call.
+which shifts a couple of marginal start codons. It is 0.02% of the features, and the
+better call.
 
 ## Next
 

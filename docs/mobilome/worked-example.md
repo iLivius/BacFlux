@@ -14,6 +14,19 @@ The isolates in BacFlux's own validation set are environmental and carry no acqu
 resistance, so they only ever exercise the bottom of the ladder. This genome exercises
 almost all of it.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
+    | **IS** | insertion sequence — the smallest mobile element, carrying only the genes it needs to move itself |
+    | **ICE** | integrative and conjugative element — carries its own conjugation machinery, so it can move itself into another cell |
+    | **T4SS** | type IV secretion system — the mating apparatus that moves DNA between cells |
+    | **T4CP** | type IV coupling protein — links the relaxase to the secretion system |
+    | **HMM** | hidden Markov model — a statistical profile of a gene or protein family |
+    | **FDR** | false discovery rate |
+    | **EFSA** | European Food Safety Authority |
+
 ## Tier 1 — intrinsic candidate
 
 ```text
@@ -25,7 +38,7 @@ ramR_Y59CfsTer13 tier=1  intrinsic_candidate  conf=high
 
 **Point mutations**, not acquired genes: chromosomal changes in the bacterium's own
 *gyrA*, *parC*, *ompK35* and *ramR*. Nothing was acquired, so there is nothing to
-transfer — the cleanest possible tier 1.
+transfer.
 
 They appear at all only because the isolate resolved to `Klebsiella_pneumoniae`, one of
 AMRFinderPlus's curated organisms, so the run passed
@@ -41,7 +54,7 @@ blaCTX-M-15 (chromosomal copy)  tier=2  expression_modulation_not_mobilisation  
 An IS sits upstream, on the gene's own strand. That can supply an outward-reading hybrid
 promoter and raise expression — it does not make the gene mobile. The tier stops here,
 and the confidence is capped at medium because the mechanism is inferred from coordinates
-and strand alone: no transcript was measured, and the audit line says exactly that.
+and strand alone: no transcript was measured, and the audit line says so.
 
 ## Tier 3 — composite transposon
 
@@ -52,8 +65,7 @@ sul1        tier=3  composite_mobilisable_within_cell  conf=high
 ```
 
 Three genes flanked by two copies of the same IS family. `aadA2` + `qacEdelta1` + `sul1`
-is the classic **class 1 integron 3′ conserved segment** — finding them together,
-IS-flanked, on the chromosome is textbook.
+is the classic **class 1 integron 3′ conserved segment**.
 
 ## Tier 5 — on a plasmid, two flavours
 
@@ -70,7 +82,7 @@ tet(A), mph(A), the pco/sil/ars metal-resistance clusters
 Both are tier 5 because the gene *is* on a plasmid — acquired, which is the regulatory
 question. The second group carries a different label because tier 5's generic wording,
 `mobilisable_needs_helper`, would contradict our own evidence about a plasmid we had just
-typed **non**-mobilisable, in the one column most people read.
+typed **non**-mobilisable.
 
 ## Tier 6 — predicted self-transmissible
 
@@ -99,15 +111,14 @@ and the column says so rather than implying containment.
 ## Tier 4 — the naming layer, switched on
 
 The run above was made without the TnCentral layer, so `mge_name` was `NA` on all 66
-rows. Re-running the same genome with the layer on — nothing else changed — is the
-clearest demonstration in these docs of what a curated name buys, because it changes one
+rows. Re-running the same genome with the layer on — nothing else changed — changes one
 gene's answer completely.
 
-`blaCTX-M-15` is the standing example. IS*Ecp1* does not merely sit beside it supplying a
-promoter: IS*Ecp1* **mobilises** it, capturing the gene and moving it as a unit, and
-Tn*Ecp1.1* is that unit. Reporting "expression modulation, not mobilisation" for that
-gene is precisely backwards, which is why a curated hit **overrides** the pattern-based
-call rather than merely agreeing with it. Here is the same gene, both ways:
+`blaCTX-M-15` shows why. IS*Ecp1* does not merely sit beside it supplying a promoter:
+IS*Ecp1* **mobilises** it, capturing the gene and moving it as a unit, and Tn*Ecp1.1* is
+that unit. Reporting "expression modulation, not mobilisation" for that gene is wrong,
+which is why a curated hit **overrides** the pattern-based call rather than merely
+agreeing with it. The same gene, both ways:
 
 | column | layer off | layer on |
 |---|---|---|
@@ -124,7 +135,7 @@ away — but "an IS is adjacent, so expression may change" is a weaker and diffe
 than "the gene sits inside a named transposon that moves it".
 
 **Seven curated elements are named in this genome, and only one produces a tier 4 row.**
-That is the precedence rule doing its job rather than a shortfall:
+That is the precedence rule, not a shortfall:
 
 ```text
 NZ_CP006659.2  chromosome        TnEcp1.1  87%   → tier 4   ← the only one
@@ -188,7 +199,7 @@ the general failure mode, and it is much larger on other genomes — see
 at tier 1 precisely because the called edge stopped short.
 
 Two cautions come with that row. `CP006659.2` is **this isolate's own chromosome
-accession** — ICEberg catalogued this ICE from this very genome, so a 100% identity match
+accession** — ICEberg catalogued this ICE from this genome, so a 100% identity match
 is a self-match, not independent confirmation. And ICEs of one species are near-identical
 across strains, so one real element matches dozens of curated entries (30 others fit about
 as well here). A name from that layer is a **group label, not a unique identification**,
@@ -228,7 +239,7 @@ the sample's composition, and below 1,000 *contigs* it silently substitutes a me
 preset whose assumed composition is 11% virus — which does not describe a finished
 bacterial genome. Run on this genome, it collapsed three genuinely different plasmid
 scores (0.9925, 0.9937, 0.9943) into one identical 0.9991 with the same FDR for all
-three: precise to four decimals, and carrying no discriminating power at all. Use
+three, carrying no discriminating power. Use
 `plasmid_score`, which is populated either way and does discriminate. See
 [Plasmids](../analysis/plasmids.md).
 

@@ -34,6 +34,12 @@ Which of the two end files is the deliverable depends on one config key:
 
 Platon runs either way. See [Prophages](phages.md) for the caller choice itself.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **FDR** | false discovery rate, the expected share of calls at a given score that are wrong |
+
 ## Platon
 
 *Rule `plasmid_search`.*
@@ -72,7 +78,7 @@ line instead. That is a result, not an error.
 
 The BLAST line is an annotation, never a filter — nothing is dropped on the strength of it.
 Both signals can be fooled by the same thing: a mobile element sitting on a genuinely
-chromosomal contig pushes Platon's score *and* that contig's best `nt` hit in the same wrong
+chromosomal contig pushes Platon's score and that contig's best `nt` hit in the same wrong
 direction, so agreement here is weaker evidence than it looks.
 
 Which BLAST table is used differs by mode, and is resolved once at startup:
@@ -157,9 +163,8 @@ NZ_CP006663.1   plasmid      27.1        hit               plasmid       0.9943 
     conflict. Nothing is hidden either way; only that one tier label is conservative.
 
 If both tools called plasmids but **none** of their contig IDs match, the script says so
-loudly in the log. The join has broken — a header not trimmed to its first token somewhere
-upstream — and every genuine `both` / high has quietly split into two single-tool `medium`
-rows.
+in the log. The join has broken — a header not trimmed to its first token somewhere
+upstream — and every genuine `both` / high has split into two single-tool `medium` rows.
 
 ## What the mobility ladder takes from here
 

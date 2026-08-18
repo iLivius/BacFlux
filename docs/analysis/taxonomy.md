@@ -8,9 +8,16 @@ places them on the Genome Taxonomy Database reference tree, then refines the cal
 skani ANI comparisons against the closest reference genomes. The answer is a full
 lineage from domain to species with the ANI evidence behind it.
 
-That matters for a food- and feed-safety workflow. Whether an AMR gene found later
-reads as intrinsic or acquired depends on having the species right in the first place;
-see [the mobility ladder](../mobilome/mobility-ladder.md).
+That matters for a food- and feed-safety workflow: whether an AMR gene found later
+reads as intrinsic or acquired depends on having the species right; see
+[the mobility ladder](../mobilome/mobility-ladder.md).
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **ANI** | average nucleotide identity, the percentage identity between two genomes over the sequence they share |
+    | **AMR** | antimicrobial resistance |
 
 ## The rule
 
@@ -103,7 +110,7 @@ reference tree and the skani sketches on every call.
 
 - `03.taxonomy/{sample}/classify/gtdbtk.bac120.summary.tsv` — the lineage, the closest
   reference genome and its ANI. A species-level call needs the ANI to clear GTDB's
-  threshold; below it, the row stops at genus and that is the honest answer.
+  threshold; below it, the row stops at genus.
 - The genus here against `{sample}_composition.txt` from
   [decontamination](decontamination.md#the-composition-report). A mismatch means the
   contig filter and the classifier disagree about what the isolate is, and the

@@ -16,6 +16,19 @@ genome. A stage a mode cannot produce is simply absent — it is never renumbere
     map is on [Coming from v1](../getting-started/from-v1.md); this page describes only
     what a 2.0.0 run writes.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **QC** | quality control — the read, assembly and completeness checks |
+    | **AMR** | antimicrobial resistance |
+    | **GTDB** | Genome Taxonomy Database, the reference GTDB-Tk places each genome in |
+    | **ANI** | average nucleotide identity, a genome-to-genome similarity measure |
+    | **EFSA** | European Food Safety Authority, whose reporting thresholds the ABRicate leg applies |
+    | **ICE** | integrative and conjugative element — sits in the chromosome and can move itself to another cell |
+    | **IME** | integrative mobilisable element — the same, but needs a helper element to move |
+    | **COG, GO, KEGG, EC** | the ortholog, gene-ontology, pathway and enzyme classifications eggNOG assigns to a protein |
+
 ---
 
 ## The files to read first
@@ -99,7 +112,7 @@ Absent entirely in `contigs` mode, which has no reads to QC.
 |---|---|---|
 | `{sample}/illumina/{sample}_fastp.html` | `trim_adapters` | fastp's adapter- and quality-trimming report, for a human. |
 | `{sample}/illumina/{sample}_fastp.json` | `trim_adapters` | The same numbers for MultiQC. |
-| `{sample}/illumina/{sample}_sel_R{1,2}.fastq` | `map_sel_contigs` | `[hybrid]` The Illumina pairs that mapped as proper pairs to the decontaminated Illumina assembly. Two rules read them, and the first matters more than it looks: Filtlong scores the Oxford Nanopore reads against these pairs, so a contig dropped by the contamination screen takes its long reads with it; Polypolish then uses them to correct the final genome. Kept, not temporary — deleting them would force the whole short-read half to re-run. |
+| `{sample}/illumina/{sample}_sel_R{1,2}.fastq` | `map_sel_contigs` | `[hybrid]` The Illumina pairs that mapped as proper pairs to the decontaminated Illumina assembly. Two rules read them: Filtlong scores the Oxford Nanopore reads against these pairs, so a contig dropped by the contamination screen takes its long reads with it; Polypolish then uses them to correct the final genome. Kept, not temporary — deleting them would force the whole short-read half to re-run. |
 | `{sample}/ont/{sample}_filt.fastq` | `filter_long_reads` | The Oxford Nanopore reads Filtlong kept — what Flye assembled and what Medaka polished with. |
 | `{sample}/ont/raw_qc/`, `{sample}/ont/filt_qc/` | `raw_long_read_qc`, `filtered_long_read_qc` | NanoPlot read-length and quality profiles, before and after filtering. Read side by side: the difference is what the filter did. |
 

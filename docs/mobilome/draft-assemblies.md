@@ -9,6 +9,18 @@ telling you *how big* the element is. Read `mge_class` and `confidence` alongsid
 `spans_contigs` and `at_contig_boundary`, read `boundary_method` before any coordinate,
 and expect more low-confidence calls than a closed genome would give.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
+    | **IS** | insertion sequence — the smallest mobile element, carrying only the genes it needs to move itself |
+    | **ICE** | integrative and conjugative element — carries its own conjugation machinery, so it can move itself into another cell |
+    | **IME** | integrative mobilisable element — carries a relaxase but no apparatus of its own, so it needs a helper element |
+    | **AICE** | actinomycete integrative and conjugative element |
+    | **MPF** | mating pair formation — the apparatus that builds the bridge between two cells |
+    | ***att* site** | the short direct repeat left at each end of an element where it integrated |
+
 ## How this was measured
 
 40 benchmark genomes — 30 carrying curated ICE or IME elements, 12 negative controls —
@@ -50,7 +62,7 @@ the assembly.
 
 Three things there matter more than the rest.
 
-**Detection is flat down to 50 kb N50.** ICE recall is *identical* to the closed genomes
+**Detection is flat down to 50 kb N50.** ICE recall is identical to the closed genomes
 at both 150 kb and 50 kb, and only breaks at 20 kb. The IME arm is weak everywhere,
 closed genomes included: most IME misses are elements below the module's size floor
 (522 bp, 1.2 kb, 5.1 kb) that were already missed before any cutting, so fragmentation
@@ -75,7 +87,7 @@ Not between "good" and "poor" — between **classification** and **extent**.
 |---|---|
 | **≥ 150 kb** | usable as-is. ICE detection identical to closed genomes; every high-confidence call was corroborated by the closed run |
 | **≈ 50 kb** | the **class** is still trustworthy (ICE 15/18, and 91% of calls land on some curated entry for these accessions). The **extent** is not: median 0.34× the true length, 82% of calls with `boundary_method=none`. *Read the class, ignore the length* |
-| **≈ 20 kb** | detection itself starts to go (12/18), 65% of calls are low confidence, and 59% of MacSyFinder's systems join genes from different contigs. Not *wrong*, but it has stopped saying much |
+| **≈ 20 kb** | detection itself starts to go (12/18), 65% of calls are low confidence, and 59% of MacSyFinder's systems join genes from different contigs. Not *wrong*, but no longer informative |
 
 Each sample's own contig count and N50 are written as the **first row** of its
 `{sample}_ice_discarded.tsv` (`action = assembly_qc`), with one sentence saying which
@@ -178,10 +190,10 @@ Values taken verbatim from `{sample}_ice_candidates.tsv` in each run.
 The class demotes for a stated reason: the integrase is lost to a contig break, and
 without one the caller refuses to say "ICE". It does not guess.
 
-**The uncomfortable part** is the *good* column. That call is high confidence with both
-warning flags FALSE, and both flags are literally true — the machinery cluster really is
-entirely on one contig, well away from its ends — while the element continues on contigs
-the caller never looked at. `confidence` answers *is this conjugation machinery, and of
+**Look at the *good* column.** That call is high confidence with both warning flags
+FALSE, and both flags are literally true — the machinery cluster is entirely on one
+contig, well away from its ends — while the element continues on contigs the caller
+never looked at. `confidence` answers *is this conjugation machinery, and of
 what class*. It does **not** answer *does this interval delimit the element*.
 `boundary_method` is the only column that answers the second question, which is why it
 has to be read first. This is not a one-off: at *good*, 5 of the 7 detected-but-broken

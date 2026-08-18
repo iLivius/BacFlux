@@ -7,13 +7,15 @@ deliberately fragmented copies of those genomes to find out what a draft assembl
 costs. This page is that work — what was tested, what it showed, and [what it does
 not show](#what-the-benchmark-does-not-show).
 
-Three terms used throughout. An **ICE** (integrative and conjugative element)
+Terms used throughout. An **ICE** (integrative and conjugative element)
 integrates into the chromosome and carries its own conjugation machinery, so it can
 move itself into another cell. An **IME** (integrative mobilisable element)
 integrates and carries a relaxase — the enzyme that nicks the DNA to start transfer —
 but no apparatus of its own, so it needs a helper element to move. An ***att* site**
 is the short direct repeat left at each end of an element when it integrates; finding
-the pair is how an element's true edges are established.
+the pair is how an element's true edges are established. **AMR** is antimicrobial
+resistance, an **MGE** is a mobile genetic element of any class, and an **AICE** is an
+actinomycete integrative and conjugative element.
 
 !!! warning "Everything the module reports is a prediction from sequence"
 
@@ -45,18 +47,17 @@ by definition.
 caller's calls on that genome the scorer keeps the one with the largest overlap, and
 reports the start offset, the end offset, and the **recovered fraction** — overlapping
 base pairs divided by the curated length. Recovered fraction is a recall measure and
-nothing else; the scorer contains no precision or false-positive code at all, which
-is why the negative control and the call-burden count below have to be read
-alongside it.
+nothing else; the scorer contains no precision or false-positive code, which is why
+the negative control and the call-burden count below have to be read alongside it.
 
 !!! warning "The truth standard is a curation, not the truth"
 
     ICEberg's coordinates are neither perfect nor exhaustive, and this set contains
     one example of each failure: a curated entry whose deposited record cannot
     contain the element it stands for, and a negative-control genome that carries a
-    real, well-known element ICEberg has no entry for. The first penalises every
-    caller; the second rewards a correct call as if it were an error. Both are
-    described where they bite, below.
+    real, well-known element ICEberg has no entry for. The first is counted as a miss
+    for every caller; the second scores a correct call as a false positive. Both are
+    described below.
 
 ## The benchmark genomes
 
@@ -93,7 +94,7 @@ Six are the positive controls named in the design spec; the rest widen the set t
 ### IME pilot — 12 genomes
 
 Sizes deliberately straddle `min_element_bp` (8,000 bp): six of the twelve sit **below**
-the floor, so they are expected misses that measure where the floor actually bites.
+the floor, so they are expected misses that measure what the floor costs.
 
 | Accession | Organism | Curated element | Length | Why this one |
 |---|---|---|--:|---|
@@ -158,7 +159,7 @@ described that way everywhere it appears.**
 
 The misses concentrate at the small end — 522 bp, 1,248 bp and 5,123 bp — where the
 caller's 2 kb floor for IME-shaped machinery and its requirement for two anchor
-classes both bite; and at SGI1 (42 kb) and MGI*Vvu*Tai1 (19 kb), which produced no
+classes both apply; and at SGI1 (42 kb) and MGI*Vvu*Tai1 (19 kb), which produced no
 overlapping call at all.
 
 There is a second, structural limit on this half of the module, and it is visible in
@@ -230,10 +231,10 @@ arm is an IME or an AICE — tier 5 or no tier at all. That is the single most i
 safety property of the layer: it can add elements at the mobilisable end of the ladder,
 it cannot promote anything to the top rung.
 
-Both new IME detections are honest recoveries rather than a bigger interval swallowing
-the answer: Tn*4451* at 0.94 of its curated length (start offset +75 bp) and
-`IME_CdiR20291_ND` at 0.69 (start offset +37 bp) — the two best-bounded IME recoveries
-the caller has produced.
+Both new IME detections fit the curated element closely rather than being oversized
+intervals that merely contain it: Tn*4451* at 0.94 of its curated length (start offset
++75 bp) and `IME_CdiR20291_ND` at 0.69 (start offset +37 bp) — the two best-bounded IME
+recoveries the caller has produced.
 
 It costs something, and the cost is reported. One curated element, `CMGE(TZ080501)`,
 loses 12,324 bp of recovered length because an ICEscan integrase sits 0 bp from the
@@ -323,7 +324,7 @@ rate.
 | EBI pipeline | 64 | 2,881,859 |
 
 One call apart, and BacFlux claims 8.7% fewer base pairs while recovering three more
-curated elements. Neither caller buys recall with volume. This table has to be read
+curated elements. Neither caller achieves recall by volume. This table has to be read
 next to the recall figures, because the scorer keeps a caller's *largest overlapping*
 call: a tool that emitted one enormous call per genome would score well on recovered
 fraction and badly on nothing the scorer measures.
@@ -343,7 +344,7 @@ ICE*Bs1* is a real element missing from the catalogue.
 
 Measured on the elements both callers found — nine chromosomal, five standalone.
 Before the boundary rework, the other pipeline's boundaries were better than ours;
-that is what prompted the fixes, and it is reported plainly.
+that is what prompted the fixes.
 
 | Metric | BacFlux, before | BacFlux, now | EBI pipeline |
 |---|--:|--:|--:|
@@ -561,9 +562,9 @@ repeat-length floor:
 
 Two searches over the same DNA return the same set of repeats, so vmatch would find
 nothing that is not already found, and the search needs no external program at all.
-The same measurement disposes of a tempting follow-up: shipping both searches and
-treating their agreement as a confidence signal would be worthless, because identical
-semantics are *expected* to agree exactly.
+The same measurement disposes of a related idea: shipping both searches and treating
+their agreement as a confidence signal would be worthless, because identical semantics
+are *expected* to agree exactly.
 
 The licence position is secondary but real: bioconda's vmatch recipe declares
 `license: Unknown / OTHER` and vmatch.de is unreachable, so its terms cannot be

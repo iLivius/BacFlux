@@ -7,6 +7,14 @@ It records what each licensor publishes, and draws no conclusion about whether a
 particular use is permitted — that depends on who you are and what you are
 doing, and it is yours to establish with the licensor.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **HMM** | hidden Markov model, a statistical profile used to recognise a protein family |
+    | **ICE** | integrative and conjugative element — moves itself between cells |
+    | **IME** | integrative mobilisable element — needs a helper element to move |
+
 ## BacFlux's own code
 
 [MIT](https://github.com/iLivius/BacFlux/blob/main/LICENSE), © 2024 Livio
@@ -77,11 +85,10 @@ the key in the middle column.
 | **ICEberg 3.0** — names the ICE and IME candidates | `mobilome.iceberg.urls` or `.dir` | **no licence, terms or reuse statement anywhere**; every page carries only *"Copyright © 2023 All Rights Reserved by Microbial Bioinformatics Group in MML, SJTU."* | the publisher's site, checked 2026-07-28 |
 | **ISOSDB** — counts the IS copies the assembly collapsed | `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | **MIT**, in the pseudoR repository | the repository |
 
-Two things here are easy to get backwards. **MacSyFinder is not
-CONJScan**: the engine is GPLv3, the models it loads are CC BY-NC-SA 4.0, and
-it is the models that BacFlux fetches. And **geNomad's bioconda recipe is tagged
-`BSD-4-Clause`, which does not match the raw `LICENSE` file** — the file is what
-was read for the row above.
+**MacSyFinder is not CONJScan**: the engine is GPLv3, the models it loads are
+CC BY-NC-SA 4.0, and it is the models that BacFlux fetches. **geNomad's bioconda
+recipe is tagged `BSD-4-Clause`, which does not match the raw `LICENSE` file** —
+the file is what was read for the row above.
 
 !!! warning "No published terms is not the same as permissive"
 
@@ -118,7 +125,7 @@ of a comment.
 
 ## What a run tells you
 
-The workflow says this out loud rather than leaving it in a document:
+The workflow reports this itself, not only in this document:
 
 - Selecting geNomad prints a notice at parse time, before any job starts
   (`workflow/rules/shared/00_common.smk:123-127`).

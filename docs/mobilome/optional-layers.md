@@ -5,6 +5,18 @@
 described here. Each of them stays off until you give it a source of its own, and
 turning the module on changes none of them.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
+    | **IS** | insertion sequence — the smallest mobile element, carrying only the genes it needs to move itself |
+    | **ICE** | integrative and conjugative element — carries its own conjugation machinery, so it can move itself into another cell |
+    | **IME** | integrative mobilisable element — carries a relaxase but no apparatus of its own, so it needs a helper element |
+    | **AICE** | actinomycete integrative and conjugative element |
+    | ***att* site** | the short direct repeat left at each end of an element where it integrated |
+    | **HMM** | hidden Markov model — a statistical profile of a gene or protein family |
+
 ## The four layers
 
 | Layer | What it adds | Switched on by | Modes | Rules |
@@ -73,7 +85,7 @@ The measured effect is on IMEs: over the 28-genome benchmark, 10 `ime` rows
 without the layer and 21 with it. Turning it off roughly halves the IME rows; it
 does not remove them, because BacFlux's own rules call an IME whenever the anchors
 are an integrase plus a relaxase with no mating apparatus, and CONJscan's MOB
-models supply plenty of those. `aice` really is ICEscan-only. The rest of the
+models supply plenty of those. `aice` calls are ICEscan-only. The rest of the
 numbers, including what the layer does *not* improve, are in
 [Validation](validation.md).
 
@@ -92,15 +104,15 @@ mobilome:
 
 This is the one layer whose `url` is already populated in the shipped config (the
 ICEfinder2 database bundle, ~61 MB, of which only `macsydata/ICEscan` is kept and
-the rest discarded). So `run: true` is genuinely all it takes.
+the rest discarded). So `run: true` is all it takes.
 
 !!! note "Both machinery searches run at the same stringency, and must"
 
     CONJscan and ICEscan are both given `mobilome.coverage_profile` (default
     `0.5`, MacSyFinder's own default). Their hit tables are merged, so different
     stringencies would make an element's class depend on which model set happened
-    to be more permissive — untanglable downstream. What lowering it buys and
-    costs, measured, is on [Tuning](tuning.md).
+    to be more permissive. What lowering it buys and costs, measured, is on
+    [Tuning](tuning.md).
 
 **Outputs.** `08.mobilome/icescan_models/` once per run, and
 `08.mobilome/{sample}/icescan/` per sample. No new column appears in the mobility
@@ -115,10 +127,10 @@ Tier 3 is an **inference**: two IS copies of one family, the right distance
 apart, a gene between them, so we call it a composite transposon. The pattern
 only stays right because of hand-written exceptions to it — IS*26* flanks its
 cargo in *direct* orientation, so it is exempted from the same-orientation test
-every other family has to pass, and without that exemption the most important
-architecture in clinical AMR would be the one BacFlux missed. A TnCentral hit
-needs no such exception. It matches an element somebody characterised, named and
-deposited, whose architecture is already known. Where both fire on one gene the
+every other family has to pass, and without that exemption BacFlux would miss the
+most important architecture in clinical AMR. A TnCentral hit needs no such
+exception. It matches an element somebody characterised, named and deposited,
+whose architecture is already known. Where both fire on one gene the
 curated hit wins, and the composite call it displaced is written to the audit.
 This is the only route to [tier 4](mobility-ladder.md).
 
@@ -133,10 +145,10 @@ mobilome:
 ```
 
 `min_reference_coverage` is measured against the reference, not against your
-contig, and that is the point: a 7 kb transposon inside a 300 kb contig covers 2%
-of the contig and 100% of itself. The question is whether the whole of a known
-element is here — a fragment of a transposon is not that transposon. On a draft
-assembly a low value usually means the element is split across contigs. Both
+contig: a 7 kb transposon inside a 300 kb contig covers 2% of the contig and 100%
+of itself. The question is whether the whole of a known element is here — a
+fragment of a transposon is not that transposon. On a draft assembly a low value
+usually means the element is split across contigs. Both
 thresholds are naming conventions rather than biological boundaries, and every
 hit refused a name reaches the discard audit with the measured identity and
 coverage that refused it.
@@ -173,7 +185,7 @@ do.
 This layer **labels**; it never decides. The caller has already said what is an
 ICE and what class it is, and turning this on cannot change any gene's tier. What
 it changes is "predicted self-transmissible element" into a name like
-`ICEKpnATCCBAA-2146-1`, which is what lets you go and read about the thing.
+`ICEKpnATCCBAA-2146-1`, which is what lets you look the element up.
 
 ```yaml
 mobilome:
@@ -206,9 +218,9 @@ something to grep for.
     It measures how far the module's boundaries fall short. On the
     *K. pneumoniae* ATCC BAA-2146 positive control the ICE call spans 54,943 bp
     against ICEberg's 58,048 bp for the same element: 0.946 of it recovered,
-    stopping 3,138 bp inside its far end, and the naming audit says so in as many
-    words. Any AMR gene in that last 3 kb is scored as though it were outside the
-    ICE. That is the good case — a closed genome where the *att* search found a
+    stopping 3,138 bp inside its far end, and the naming audit records it. Any AMR
+    gene in that last 3 kb is scored as though it were outside the ICE. That is
+    the good case — a closed genome where the *att* search found a
     tRNA-anchored repeat. With `boundary_method = none` the interval is only the
     machinery span and the shortfall is far larger
     ([Draft assemblies](draft-assemblies.md)).
@@ -228,9 +240,9 @@ as well.
 
 ## ISOSDB copy number
 
-The module says repeatedly that on a fragmented assembly the located IS count is
-a **floor, not a count**. True, and unquantified: you cannot tell whether the
-floor is 2 short or 40 short. This layer puts a number on it.
+On a fragmented assembly the located IS count is a **floor**, and an unquantified
+one: you cannot tell whether it is 2 short or 40 short. This layer puts a number
+on it.
 
 Reads are immune to assembly collapse — every copy of an IS contributes its own
 reads whether or not the assembler kept them apart — so an IS present in five
@@ -241,7 +253,7 @@ copy number  ≈  depth over the IS  /  depth over the genome
 ```
 
 Both depths are measured with BBMap at identical settings, one against ISOSDB and
-one against the sample's own assembly, so their ratio means something.
+one against the sample's own assembly, so their ratio is comparable.
 
 ```yaml
 mobilome:
@@ -260,7 +272,7 @@ below 1.0 on purpose: a real single-copy IS lands near 1×, and sampling noise
 plus mapping loss routinely drag it to 0.6–0.8×.
 
 `illumina` and `hybrid` only. In `nanopore` and `contigs` mode there are no short
-reads to map and the layer is simply absent, whatever the config says.
+reads to map and the layer is absent, whatever the config says.
 
 **Outputs.** `08.mobilome/isosdb_db/` once per run;
 `{sample}_isosdb_covstats.tsv`, `{sample}_assembly_covstats.tsv`,
@@ -284,16 +296,14 @@ split is not.
 
     It says how many copies exist, never *where* they are, so it cannot place a
     gene inside anything. Nothing downstream reads it — it is a quality metric on
-    the IS inventory, read by a person, and the honest companion to the "the
-    count is a floor" warning.
+    the IS inventory, read by a person.
 
 ## `PROVENANCE.txt`
 
 Three of these four addresses carry **no version at all**, and the fourth is a
 GitHub `main` branch that can move under you. Fetch `nc/tn` today and again in six
 months and you may get different data from the same URL, with nothing in the file
-to say which is which — and no way, later, to say which release a result came
-from.
+to say which is which.
 
 So each download rule writes a `PROVENANCE.txt` beside the data it fetched,
 recording what actually arrived:
@@ -340,9 +350,9 @@ recoverable.
 ## What the download rules do besides downloading
 
 - **They refuse an error page.** A bot block or a redirect arrives with a 200 and
-  would otherwise be indexed as an empty database that silently names nothing —
-  a wrong answer that looks exactly like a real one. Each rule tests the archive
-  or the FASTA and fails loudly instead, printing the first bytes it received.
+  would otherwise be indexed as an empty database that silently names nothing.
+  Each rule tests the archive or the FASTA and fails loudly instead, printing the
+  first bytes it received.
   TnCentral's server rejects curl's default user-agent, so the rule identifies as
   a browser; if that stops working the rule fails rather than producing an empty
   database.

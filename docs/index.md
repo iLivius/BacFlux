@@ -4,13 +4,22 @@ BacFlux is a [Snakemake](https://snakemake.github.io/) workflow for bacterial
 whole-genome sequencing. It carries one isolate from raw reads — or from a genome you
 already assembled — through assembly, decontamination, quality control, taxonomic
 placement, functional annotation, and screening for resistance genes, virulence
-factors, plasmids and prophages. It can also answer the question that usually comes
-next: for each resistance gene found, is it sitting inside something that can move to
-another bacterium? A single key in the config file, `mode`, decides which of four
-front ends runs. This site documents version **v2.0.0**.
+factors, plasmids and prophages. It can also report, for each resistance gene found,
+whether it sits inside something that can move to another bacterium. A single key in
+the config file, `mode`, decides which of four front ends runs. This site documents
+version **v2.0.0**.
 
 BacFlux belongs to the [BioFlux](https://github.com/stars/iLivius/lists/bioflux)
 family of pipelines.
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **IS** | insertion sequence — the smallest mobile element, carrying only the genes it needs to move |
+    | **AMR** | antimicrobial resistance |
+    | **GTDB** | Genome Taxonomy Database, the reference used for taxonomic placement |
+    | **ICE** | integrative and conjugative element — integrates into the chromosome and carries its own conjugation machinery |
 
 ## The four modes
 
@@ -29,7 +38,7 @@ far the two assemblies still differ.
 
 Each front end ends by writing one file,
 `02.assembly/{sample}/contigs_final.fasta`. Two shared stages sit either side of it:
-decontamination, which *is* the step that writes that file in `illumina` and
+decontamination, which is the step that writes that file in `illumina` and
 `contigs` mode and runs just before the final polish in the two long-read modes; and
 assembly QC, which scores whatever came out (in `hybrid`, both genomes). From
 taxonomy onwards every rule reads `contigs_final.fasta` and nothing else — taxonomy,
@@ -78,12 +87,12 @@ on, it runs AMRFinderPlus over the annotated genome and, for every resistance ge
 calls, reports the mobile-element context around that gene and a mobility tier, on a
 ladder from *chromosomal, no mobile-element context — intrinsic candidate* up to
 *inside an ICE or on a conjugative plasmid — predicted self-transmissible*. That
-distinction, intrinsic versus acquired, is the one regulators ask about, and it is
-not something a gene list alone can answer.
+distinction, intrinsic versus acquired, is the one regulators ask about, and a gene
+list alone cannot answer it.
 
 Every call is a prediction and carries its own confidence tier and contig-edge flags,
-because on a fragmented assembly the structure you are looking for is often the thing
-that broke the assembly. Start at [the mobilome module](mobilome/index.md), and read
+because on a fragmented assembly the structure being looked for is often what broke
+the assembly. Start at [the mobilome module](mobilome/index.md), and read
 [Draft assemblies](mobilome/draft-assemblies.md) before drawing conclusions from a
 short-read run.
 
@@ -102,7 +111,7 @@ short-read run.
 | [Configuration](reference/configuration.md)           | every config key, which modes read it, its default and its trade-off              |
 | [Output files](reference/output.md)                   | what each numbered stage holds and which files are the deliverables               |
 | [Running BacFlux](reference/running.md)               | dry runs, CPU budget, restarting a run                                            |
-| [Troubleshooting](troubleshooting.md)                 | the failures that actually happen, and how to get past them                       |
+| [Troubleshooting](troubleshooting.md)                 | common failures, and how to get past them                                         |
 | [Rationale](about/rationale.md)                       | why one workflow with four entry points                                           |
 | [Citation and references](about/citation.md)          | how to cite BacFlux and the tools that do the work                                |
 

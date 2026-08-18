@@ -19,6 +19,11 @@ It is optional and off by default; everything below assumes you have switched it
     left at each end of an element where it integrated; finding the pair is how an
     element's true edges are established.
 
+    Three more abbreviations appear throughout: **IS** is an insertion sequence, the
+    smallest mobile element, carrying only the genes it needs to move itself; **CDS**
+    is a coding sequence, the stretch of DNA that codes for one protein; and **EFSA**
+    is the European Food Safety Authority.
+
 ## Why a gene's address matters as much as its name
 
 An AMR gene list tells you what an isolate can resist. It does not tell you whether
@@ -149,12 +154,12 @@ tool, model set and database are listed on [Licensing](../about/licensing.md).
 
 ## Three things to know before reading the output
 
-**1. On a fragmented assembly a located IS count is a floor, not a count.** IS
+**1. On a fragmented assembly a located IS count is a lower bound.** IS
 elements are a leading cause of contig breaks: identical copies collapse in the
 assembly graph, so the assembler cannot tell which flank belongs to which copy and
-breaks there — the structure you are trying to detect is often what destroyed the
-assembly. The AMR gene and its flanking IS regularly land on different contigs. Every row therefore carries `dist_to_contig_end`,
-`is_at_contig_boundary` and `spans_contigs`, and the IS summary reports what fraction
+breaks there. The AMR gene and its flanking IS regularly land on different contigs.
+Every row therefore carries `dist_to_contig_end`, `is_at_contig_boundary` and
+`spans_contigs`, and the IS summary reports what fraction
 of IS calls sit within 100 bp of a contig end (`mobilome.contig_boundary_bp`). Read
 those before reading the counts.
 

@@ -41,3 +41,11 @@
 .mermaid {
   overflow-x: auto;
 }
+
+/* Accessions are identifiers, not prose: breaking `NC_000964.3` across two lines
+   makes it unreadable and unsearchable. The benchmark-genome tables have a long
+   final column that squeezes the others, so pin any inline code in the first
+   column to one line and let the wide column absorb the wrapping instead. */
+.md-typeset table:not([class]) td:first-child code {
+  white-space: nowrap;
+}

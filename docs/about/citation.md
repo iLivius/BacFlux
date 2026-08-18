@@ -1,5 +1,17 @@
 # Citation and references
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
+    | **WGS** | whole-genome sequencing |
+    | **EFSA** | European Food Safety Authority |
+    | **QPS** | Qualified Presumption of Safety, EFSA's safety status for well-characterised microorganisms |
+    | **ICE** | integrative and conjugative element — moves itself between cells |
+    | **IME** | integrative mobilisable element — needs a helper element to move |
+    | **MAG** | metagenome-assembled genome, a genome reconstructed from a mixed community |
+
 ## Citing BacFlux
 
 > Antonielli, L., Großkinsky, D. K., Koch, H., Trognitz, F., Sanchez Mejia, A., &
@@ -22,10 +34,10 @@ GitHub and Zenodo read that file to build a citation for you.
 
 ## Cite the tools as well
 
-BacFlux is glue. Almost all of the science it reports comes from other people's
-tools and databases, and the mobilome module in particular is an **integrator**:
-it decides how to combine other tools' calls, and every underlying detection
-belongs to somebody else.
+Almost all of the science BacFlux reports comes from other people's tools and
+databases, and the mobilome module in particular is an **integrator**: it decides
+how to combine other tools' calls, and every underlying detection belongs to
+somebody else.
 
 Which references you need depends on the mode you ran and on which optional
 stages you switched on, so the tables below are grouped that way. The complete
@@ -185,8 +197,8 @@ would not have been realistic without it.
 
 ## Design influence
 
-Work that shaped the mobilome module without contributing code to it — the
-distinction matters, and it is spelled out on [Licensing](licensing.md).
+Work that shaped the mobilome module without contributing code to it; the
+distinction is spelled out on [Licensing](licensing.md).
 
 - **EBI Mobilome Annotation Pipeline** (Apache-2.0).
   <https://github.com/EBI-Metagenomics/mobilome-annotation-pipeline> — from which

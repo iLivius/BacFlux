@@ -6,7 +6,7 @@ arrive as extra contigs. BacFlux asks two questions about every contig — what 
 look like taxonomically, and how deeply is it covered by this sample's own reads — and
 uses the answers to keep the isolate and discard the rest.
 
-The step runs **before** annotation, and that order is the point. A contaminant contig
+The step runs **before** annotation. A contaminant contig
 left in inflates CheckM's contamination estimate, can pull GTDB-Tk off the right
 lineage, and pollutes every gene, AMR and plasmid call after it.
 
@@ -14,6 +14,14 @@ Everything here lives in `workflow/rules/shared/10_decontam.smk`. The screen its
 the same in all four modes; what changes is the aligner behind the coverage track,
 where the screen sits in the assembly chain, and one extra BLAST that only the
 long-read modes need.
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **GTDB** | Genome Taxonomy Database, the reference taxonomy GTDB-Tk classifies against |
+    | **AMR** | antimicrobial resistance |
+    | **QC** | quality control |
 
 ## The chain
 
@@ -48,7 +56,7 @@ that, depends on the mode:
 
 | Mode | Screened draft | Selector writes | Consumed next by |
 |---|---|---|---|
-| `illumina` | SPAdes `contigs_filt.fasta` | `contigs_final.fasta` | every downstream stage — decontamination *is* the last assembly step |
+| `illumina` | SPAdes `contigs_filt.fasta` | `contigs_final.fasta` | every downstream stage — decontamination is the last assembly step |
 | `contigs` | filtered input `contigs_filt.fasta` | `contigs_final.fasta` | as above |
 | `nanopore` | the dnaapler-reoriented Flye assembly | `contaminants/assembly_decontam.fasta` | Medaka, which then produces `contigs_final.fasta` |
 | `hybrid` | the **Illumina** SPAdes draft | `contaminants/contigs_sel.fasta` | the Snippy reference, the QC comparator genome, and — through the reads that map to it — Filtlong's short-read reference |
@@ -92,7 +100,7 @@ storing it, and it is useless once the BAM exists.
     carries no information, so **coverage-based separation in BlobTools is meaningless
     in this mode** — only the taxonomy leg is doing real work. It is also why
     `contigs` mode has no Qualimap report: a mapping-quality chart of a self-alignment
-    would be a chart of nothing.
+    would say nothing.
 
 ## 2. Taxonomy — megablast against NCBI nt
 
@@ -177,14 +185,14 @@ The selector reads the **genus** from that table, which is column 22 of
 `--rank all` output. A row with fewer than 22 fields is skipped rather than
 half-read; an empty genus cell becomes the literal `no-hit`.
 
-This stage is completely mode-independent: same input shape, same command, same output
+This stage is mode-independent: same input shape, same command, same output
 everywhere.
 
 ## 4. The selector — keep or drop, with a reason on every contig
 
 *Rule `select_contigs`, running `workflow/scripts/10_decontam/select_contigs_by_taxonomy.py`.*
 
-This is where contigs are actually kept or thrown away. The script reads the BlobTools
+This is where contigs are kept or thrown away. The script reads the BlobTools
 table, resolves each contig to a genus, applies the configured policy, and writes an
 audit line for every contig either way.
 
@@ -244,7 +252,7 @@ parameters:
     include_genera: "Bacillus"
 ```
 
-**Keep several genera in every sample.** This is the one you asked about.
+**Keep several genera in every sample.**
 
 ```yaml
     mode: include
@@ -320,8 +328,7 @@ run-wide `include_genera`. `AIT1420` stays on `auto` but keeps its unplaced cont
 
 ### Which keys apply to every sample, and which to one
 
-This is the part worth reading twice, because the names do not tell you. **Two** of the
-seven keys are per-sample, not one, and the two behave differently:
+The names do not tell you which. **Two** of the seven keys are per-sample, not one:
 
 | key | applies to | how it combines |
 |---|---|---|
@@ -333,12 +340,12 @@ seven keys are per-sample, not one, and the two behave differently:
 | `include_genera_by_sample` | **one sample** | **adds to** `include_genera` for that sample |
 | `sample_overrides` | **one sample** | **replaces** whatever the row fills in |
 
-So yes: `include_genera: "Bacillus;Priestia"` keeps those two genera in **every** sample
+`include_genera: "Bacillus;Priestia"` keeps those two genera in **every** sample
 of the batch. `exclude_genera` is the same, and `exclude_genera_file` is not a per-sample
 mechanism at all — it is somewhere to put a long shared list so it does not clutter
 `config.yaml`. Inline and file are added together, not chosen between.
 
-The two per-sample keys are where the difference bites:
+The two per-sample keys work differently:
 
 - **`include_genera_by_sample`** is a two-column TSV (`sample`, `genus`). Its genera are
   *added* to the run-wide `include_genera` for that sample. Use it when one isolate
@@ -358,13 +365,14 @@ The two per-sample keys are where the difference bites:
     - via `sample_overrides` with `include_genera = Priestia` → that sample keeps
       **Priestia only**, because the row replaced the list rather than extending it
 
-    Both are reasonable; they are simply not interchangeable, and only one of them is
-    what you usually mean.
+    Both are reasonable; they are not interchangeable.
 
 The order the script resolves them is: run-wide settings first, then
 `include_genera_by_sample` extends the include list, then a matching `sample_overrides`
 row replaces whatever it names. Whatever survives is recorded per contig, with a reason,
 in `contaminants/contig_taxonomy_decisions.tsv`.
+
+### The genus aliases
 
 Aliases apply in `auto` and `include` only. **`exclude` matching stays exact**: a broad
 alias there would delete contigs the user never named.
@@ -450,12 +458,12 @@ sample the taxonomy screen could not place at all.
 
 ## 5. Two ways this step deletes a real plasmid
 
-Both are real, both have bitten, and they have different causes. Rule out both.
+Both have happened, they have different causes, and both are worth ruling out.
 
 ### Route 1 — `bestsum` follows database composition, not biology
 
 Plasmids cross genus boundaries constantly. When a plasmid's best database neighbours
-sit in a different genus from the host, `auto` mode drops it *precisely because* it is
+sit in a different genus from the host, `auto` mode drops it precisely because it is
 mobile.
 
 A measured case: on *K. pneumoniae* ATCC BAA-2146, plasmid pMYS (`NZ_CP006660.1`,

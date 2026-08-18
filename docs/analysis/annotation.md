@@ -6,9 +6,9 @@ Four tools run here, in all four modes, all of them in
 canonical assembly (`02.assembly/{sample}/contigs_final.fasta`), so nothing in this
 stage branches on the sequencing technology.
 
-Bakta goes first and the other three read its output — not the contigs. That is
-deliberate: one gene set underlies every functional layer, so a CAZyme cluster, a
-biosynthetic cluster and an orthologous group all sit on the same coordinates.
+Bakta goes first and the other three read its output, not the contigs, so one gene
+set underlies every functional layer: a CAZyme cluster, a biosynthetic cluster and an
+orthologous group all sit on the same coordinates.
 
 | Tool | Version | Answers | Written to |
 |---|---|---|---|
@@ -20,6 +20,14 @@ biosynthetic cluster and an orthologous group all sit on the same coordinates.
 Three of the four are terminal products — you read them, nothing downstream does.
 Bakta is the exception: MultiQC summarises it, and the optional mobilome module reads
 its proteins and its GFF3.
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **CDS** | coding sequence, the stretch of a gene that is translated into protein |
+    | **rRNA** | ribosomal RNA |
+    | **HMM** | hidden Markov model, a statistical profile of a gene or protein family |
 
 ## Bakta
 
@@ -81,7 +89,7 @@ genes: on a sequence declared circular, Pyrodigal may call a gene running across
 origin instead of leaving two partial CDS at the ends. On a closed chromosome that is
 typically a handful of genes at position 1, often including *dnaA* itself.
 
-Long-read assemblies are the only ones where the topology is actually measured, so
+Long-read assemblies are the only ones where the topology is measured, so
 `build_replicons` writes a small table — topology from Flye's circularity call, type
 from dnaapler's marker hit — and the rule adds `--replicons` when that table exists
 and is not empty. In `illumina` and `contigs` mode the flag is simply absent. See
@@ -120,7 +128,7 @@ reach into a directory you keep.
 
 ### `--dbmem`: the RAM trade-off
 
-This is the slow tail of a BacFlux run, and usually the last rule still going. The
+This is the slowest part of a BacFlux run, and usually the last rule still going. The
 reason is the annotation phase: it does random-access lookups into a 39 GB SQLite
 database, once per seed ortholog. `--dbmem` loads that database wholly into memory so
 the lookups become in-memory ones, and releases it when eggNOG-mapper exits.
@@ -152,10 +160,10 @@ parameters:
 
     The size of the win depends on your storage. On the machine measured, `eggnog.db`
     sits on **NFS**, so every cache miss is a network round-trip — the worst case for
-    random access, and the best case for this flag. On a local SSD expect less. Note
-    also that the three `dbmem` runtimes barely differ despite a 65% spread in protein
-    count: once the database is resident, the fixed ~39 GB load dominates, so the
-    saving grows with genome size and with the number of genomes in the batch.
+    random access, and the best case for this flag. On a local SSD expect less. The
+    three `dbmem` runtimes barely differ despite a 65% spread in protein count: once
+    the database is resident, the fixed ~39 GB load dominates, so the saving grows
+    with genome size and with the number of genomes in the batch.
 
 Two things happen when you switch it on, both at parse time, before any job starts:
 
@@ -193,9 +201,9 @@ closest known relative.
 | **Out** | `04.annotation/antismash/{sample}/` |
 | **Next** | nobody — you |
 
-It runs with `--taxon bacteria` and `--genefinding-tool none`. That second flag is the
-point: **do not re-predict genes, reuse Bakta's calls**, which travel inside the
-`.gbff`. It is why this rule consumes the annotated GenBank file rather than the bare
+It runs with `--taxon bacteria` and `--genefinding-tool none`. The second flag tells
+antiSMASH not to re-predict genes but to reuse Bakta's calls, which travel inside the
+`.gbff`. That is why this rule consumes the annotated GenBank file rather than the bare
 FASTA, and it keeps cluster coordinates on the same gene set as everything else in
 this stage.
 

@@ -7,6 +7,15 @@ Oxford Nanopore Technologies (ONT from here on).
 
 The choice follows from what is on disk, not from preference.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **QC** | quality control |
+    | **AMR** | antimicrobial resistance |
+    | **IS** | insertion sequence — the smallest mobile element, carrying only the genes it needs to move |
+    | **DAG** | directed acyclic graph — the job graph Snakemake plans a run from |
+
 | `mode` | You have | File names BacFlux looks for | Input key |
 |---|---|---|---|
 | `illumina` | Illumina paired-end reads | `{sample}_R1.<ext>` and `{sample}_R2.<ext>` | `input.illumina_dir` |
@@ -43,10 +52,7 @@ hours. Write `mode: ilumina` — one `l` short — and the run stops with:
 config.mode must be one of illumina | nanopore | hybrid | contigs (got: 'ilumina')
 ```
 
-The message quotes back exactly what it found, so the typo is visible rather than
-merely reported.
-
-and a valid run echoes the mode and every sample it found, so the batch can be
+A valid run echoes the mode and every sample it found, so the batch can be
 confirmed from the top of the log:
 
 ```text
@@ -94,8 +100,8 @@ its output *is* `contigs_final.fasta`. See
 
 A few shared steps need something a given mode does not have. They are gated on
 the capability — short reads, long reads, any reads — rather than on the mode name,
-and when the capability is absent the rule is not defined at all, so it does not
-appear in the DAG and nothing waits for it.
+and when the capability is absent the rule is not defined, so it does not appear in
+the DAG and nothing waits for it.
 
 | Shared step | Needs | `illumina` | `nanopore` | `hybrid` | `contigs` |
 |---|---|:-:|:-:|:-:|:-:|
@@ -126,7 +132,7 @@ Four consequences worth knowing before you choose:
   `contigs` mode Bakta treats every sequence as linear.
 - **The mobilome module runs in all four modes, and is believable to different
   degrees in each.** On a fragmented assembly the located insertion-sequence count
-  is a floor rather than a count, because the elements being hunted are a leading
+  is a floor rather than a count, because the elements being detected are a leading
   cause of the contig breaks. Every call therefore carries its distance to the
   contig end, and anything spanning contigs is capped at low confidence. In the
   short-read modes, and only when an ISOSDB source is configured, a read-based
@@ -155,12 +161,11 @@ An unset or non-existent input directory is caught in the same pass:
 [BacFlux] mode=nanopore requires 'input.nanopore_dir' to be set in the config.
 ```
 
-!!! warning "The two cases that are not loud"
+!!! warning "Two cases that do not stop the run"
 
     **`illumina` on a dataset that also has long reads.** It runs to the end and
     quietly ignores `nanopore_dir`. There is nothing to detect: the Illumina half
-    is a perfectly valid `illumina` run. If you meant to use both, the mode is
-    `hybrid`.
+    is a valid `illumina` run. If you meant to use both, the mode is `hybrid`.
 
     **`contigs` on an assembly whose headers are not SPAdes-style.** No length
     filter and no coverage filter are applied — only the headers are trimmed to
@@ -172,8 +177,8 @@ An unset or non-existent input directory is caught in the same pass:
 
 ## Picking one
 
-- **Reads from one instrument** — use that instrument's mode. Nothing about
-  `hybrid` improves a dataset that is missing half of what it needs.
+- **Reads from one instrument** — use that instrument's mode. `hybrid` adds nothing
+  to a dataset with only one technology.
 - **Both technologies for the same isolates** — `hybrid`, and give it two
   directories in which every isolate appears in both. A sample present in only one
   of them stops the run rather than being silently dropped, so filter the
@@ -182,8 +187,8 @@ An unset or non-existent input directory is caught in the same pass:
   repeats** — you need long reads, so `nanopore` or `hybrid`. This is also the only
   route to the circular-replicon information Bakta uses.
 - **A genome from a collaborator, a database, or an earlier assembly** — `contigs`.
-  It runs every analysis stage; it just cannot re-examine evidence that only exists
-  in reads.
+  It runs every analysis stage, but cannot re-examine evidence that only exists in
+  reads.
 - **Something already analysed with a workflow older than v2.0.0** — these four
   modes replace the separate repositories that used to do these jobs. See
   [Coming from v1](from-v1.md).

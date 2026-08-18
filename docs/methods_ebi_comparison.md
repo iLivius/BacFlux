@@ -23,6 +23,12 @@ draft.
     | **T4SS / T4CP** | type IV secretion system and its coupling protein — the apparatus that pushes DNA into the next cell |
     | ***att* site** | the short repeat marking an integrated element's ends |
     | **SO** | Sequence Ontology, the controlled vocabulary used for feature types in GFF output |
+    | **GFF** | the tab-separated annotation format both pipelines write features to |
+    | **AMR** | antimicrobial resistance |
+    | **CDS** | coding sequence — one predicted protein-coding gene |
+    | **IS** | insertion sequence, the smallest kind of mobile element |
+    | **MPF** | mating-pair formation, the class of the mating apparatus a conjugative element carries |
+    | **MAG** | metagenome-assembled genome, a genome reconstructed from a mixed community |
 
 ---
 
@@ -39,7 +45,7 @@ BacFlux's conda environment (`workflow/envs/macsyfinder.yaml`) — but the profi
 HMMs and the system definitions that decide *"is there a conjugation system here
 at all"* are the same models.
 
-The consequence is unavoidable and must not be glossed:
+The consequence must not be glossed over:
 
 > **Agreement at the detection layer is partly tautological.** When both callers
 > find the same element, that is substantially the same engine agreeing with
@@ -101,7 +107,7 @@ should not be read as ranking them. MAP's own documentation notes that its
 current release does not run gene-level AMR association, which is precisely the
 step BacFlux's module exists to perform.
 
-A practical consequence for users, worth stating in the documentation: for a full
+A practical consequence for users: for a full
 mobilome inventory of an isolate, or for anything metagenomic, MAP is the right
 tool and BacFlux writes `{sample}_contigs.fna` and `{sample}.gbk` ready to feed it.
 Consuming MAP's `mobilome.gff.gz` carries no licensing consequence for BacFlux
@@ -340,7 +346,7 @@ The other two misses are real:
 
 **IME pilot: 5/12**, median recovered fraction 0.69. The misses concentrate at the
 small end (522 bp, 1,248 bp, 5,123 bp), where the size floor and the two-anchor
-requirement bite, and at SGI1 (42 kb) and MGIVvuTai1 (19 kb), which produced no
+requirement apply, and at SGI1 (42 kb) and MGIVvuTai1 (19 kb), which produced no
 overlapping call at all. IME detection is the weaker half of this module and
 should be described that way.
 
@@ -393,8 +399,8 @@ Across all 40 genomes:
 | MAP | 64 | 2,881,859 |
 
 One call apart, and BacFlux claims **8.7% fewer** base pairs while recovering
-three more curated elements. **Neither caller buys recall with volume** — the
-higher recall in §4 is not the product of blanketing genomes with calls.
+three more curated elements. **Neither caller achieves recall by volume** — the
+higher recall in §4 does not come from making many more calls.
 
 > **Provenance of these two rows.** `ebi_map/scoring/call_burden.tsv` was written
 > at 09:29 on 2026-07-31 from a snapshot of our calls taken at 09:26 — *before*
@@ -455,7 +461,7 @@ bona fide IME is a domain question this benchmark cannot settle.
 ### 6.3 Boundaries — where MAP was better, and by how much
 
 **Before BacFlux commit `4a93d89`, MAP's boundaries were better than ours. That
-is what prompted the fixes, and it should be reported plainly.**
+is what prompted the fixes.**
 
 Measured on the elements both callers found
 (`ebi_map/scoring/boundary_agreement.tsv`; chromosomal n=9, standalone n=5):
@@ -480,7 +486,7 @@ a 51 bp repeat in ordinary sequence was beating the real 24 bp pair at tRNA-Phe)
 and a flank window of 30 kb when SPI-7's true attR sits 5.8 kb outside it — are
 documented in the commit message of `4a93d89`.
 
-Crucially, the conservative policy was **not** loosened to achieve this: a de novo
+The conservative policy was **not** loosened to achieve this: a de novo
 repeat pair is still *reported and not applied*. Both recovered boundaries are
 tRNA-anchored and so apply under the pre-existing rule.
 
@@ -520,8 +526,8 @@ Read these as constraints on every number above.
 3. **ICEberg coordinates are the truth standard, and they are neither perfect nor
    exhaustive.** One record in this set is demonstrably broken (SXT(HN1), §4.1),
    and one negative-control genome contains a real element ICEberg lacks (ICEBs1,
-   §6.2). Both callers are penalised by the first and rewarded-as-if-wrong by the
-   second.
+   §6.2). The first counts as a miss for both callers; the second scores a correct
+   call as a false positive.
 4. **The negative control gives an upper bound on candidate calls, not a
    false-positive rate.** §6.2.
 5. **`score.py` selects the largest-overlap call.** Where a caller emits several
@@ -566,8 +572,8 @@ window in the benchmark:
 > **35/35 windows, 122 repeats, exact set equality.**
 
 Two searches over the same DNA return the same set of repeats. vmatch would find
-nothing BacFlux does not already find. The same measurement also kills a related
-idea: **treating agreement between two repeat searches as evidence is empty**,
+nothing BacFlux does not already find. The same measurement also disposes of a
+related idea: **treating agreement between two repeat searches as evidence is empty**,
 because when the two searches have identical semantics the agreement is
 guaranteed and therefore carries no information.
 

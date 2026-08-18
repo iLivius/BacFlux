@@ -7,6 +7,13 @@ The example on this page is **Illumina paired-end reads**, the default `mode`. T
 other three modes are the same five steps with a different input directory and one
 or two different keys — see [choosing a mode](choosing-a-mode.md).
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **GTDB** | Genome Taxonomy Database, the reference used for taxonomic placement |
+    | **QC** | quality control |
+
 ```bash
 # 1. Clone
 git clone https://github.com/iLivius/BacFlux.git
@@ -133,8 +140,7 @@ accepted.
 `-n` (`--dry-run`) makes Snakemake work out everything it would do and then stop.
 It costs seconds, and it exercises nearly all of BacFlux's own validation, which
 runs while the plan is being built. Skipping it costs whatever the run manages
-first — and the first thing a real run does is build conda environments and
-download databases.
+first: building conda environments and downloading databases.
 
 The header tells you what BacFlux understood. Read it before committing cores:
 
@@ -219,11 +225,11 @@ itself. **Do not also pass `--jobs`/`-j`** — for a local run it is an alias fo
 `--cores`, and passing both can let rules oversubscribe the machine. The reasoning
 and the measurement are on [running BacFlux](../reference/running.md).
 
-A first run spends a long time before it does any science: a default Illumina run
-builds 19 of the 31 conda environments in `workflow/envs/` and downloads the
-databases BacFlux fetches for itself. Environments are created under
-`.snakemake/conda` in the directory you launched from, so launching from the same
-place each time is what stops them being rebuilt.
+A first run spends a long time on setup: a default Illumina run builds 19 of the 31
+conda environments in `workflow/envs/` and downloads the databases BacFlux fetches
+for itself. Environments are created under `.snakemake/conda` in the directory you
+launched from, so launching from the same place each time is what stops them being
+rebuilt.
 
 The run is resumable. If it is interrupted, repeat the same command and Snakemake
 redoes only what is missing or out of date. Change a config value and only the
@@ -301,5 +307,5 @@ The full layout, stage by stage, is in [output files](../reference/output.md).
 - [Choosing a mode](choosing-a-mode.md) — which of the four your data belongs in.
 - [Configuration](../reference/configuration.md) — every key, with its default.
 - [Running BacFlux](../reference/running.md) — the CPU budget, restarting, where environments and databases live.
-- [Troubleshooting](../troubleshooting.md) — the failures that actually happen.
+- [Troubleshooting](../troubleshooting.md) — common failures.
 - [Coming from v1](from-v1.md) — if you ran BacFlux, FastaFlux, BacFluxL or BacFluxL+ before.

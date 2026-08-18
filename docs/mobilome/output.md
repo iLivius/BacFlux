@@ -10,6 +10,14 @@ Everything lands in `08.mobilome/{sample}/`. Two files carry the result:
 Read them in this order: `{sample}_is_summary.tsv` first (how fragmented is this
 assembly?), then the mobility table, then the audit for any row you intend to quote.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
+    | **IS** | insertion sequence — the smallest mobile element, carrying only the genes it needs to move itself |
+    | **IME** | integrative mobilisable element — integrated in the chromosome, mobilisable only with a helper element |
+
 ## The 46 columns
 
 Coordinates are 1-based and inclusive on both ends, which is what AMRFinderPlus and
@@ -106,9 +114,9 @@ Straight from AMRFinderPlus, which is why these columns exist rather than ABRica
 | `none` | no pair found; the interval is the machinery span and nothing more | no |
 | `NA` | the gene has no ICE/IME context, so there were no boundaries to look for | — |
 
-A de novo repeat never widens an element, and the restraint is measured rather than
-cautious by temperament: on a clinical chromosome, 300 randomly placed 15 kb non-ICE
-spans produced a confident de novo "boundary" 22% of the time — real chromosomes are full
+A de novo repeat never widens an element, and the restraint is measured: on a clinical
+chromosome, 300 randomly placed 15 kb non-ICE spans produced a confident de novo
+"boundary" 22% of the time — real chromosomes are full
 of rRNA operons, REP elements and paralogues. Requiring the repeat to occur exactly twice
 cut that to 16%, and refusing to *act* on one cuts what can reach the AMR table to 1%.
 Widening an element makes every gene inside it cargo, so a fabricated 50 kb boundary
@@ -169,7 +177,7 @@ tier_not_raised   flanking_is_pair_span_too_long
   span 32052 bp > 20000 bp limit
 ```
 
-The composite detector *did* find two flanking IS copies and rejected them, because 32 kb
+The composite detector found two flanking IS copies and rejected them, because 32 kb
 is beyond `max_composite_span_bp`. That is a conservative miss rather than a silent one:
 the measured span is in the file, so a reader who thinks 32 kb is defensible for their
 organism can raise the threshold and re-run.
@@ -178,16 +186,16 @@ organism can raise the threshold and re-run.
 
     `flanking_is_pair_span_too_long`, `flanking_is_different_family`,
     `flanking_is_family_unknown`, `flanking_is_strand_unknown`,
-    `flanking_is_pair_inverted_orientation`. Do not underestimate them: every AMR gene is
-    tested against every nearby IS pair, so on an IS-rich clinical genome these are among
-    the most common lines in the file — `flanking_is_different_family` was the second
+    `flanking_is_pair_inverted_orientation`. Every AMR gene is tested against every
+    nearby IS pair, so on an IS-rich clinical genome these are among the most common
+    lines in the file — `flanking_is_different_family` was the second
     most common reason of all across a 12-genome clinical set.
 
 ## Everything else stage 08 writes
 
 | File | What it is for |
 |---|---|
-| `{sample}_is_summary.tsv` | **the honesty metric.** How many IS calls sit within `mobilome.contig_boundary_bp` of a contig end, and what fraction that is. Read it first |
+| `{sample}_is_summary.tsv` | how many IS calls sit within `mobilome.contig_boundary_bp` of a contig end, and what fraction that is. Read it first |
 | `{sample}_is_elements.tsv`, `_is_discarded.tsv` | one tidy row per insertion sequence, and the dropped rows with a reason |
 | `{sample}_ice_candidates.tsv`, `_ice_discarded.tsv` | ICE/IME candidates with anchors, boundaries, class and confidence — and the discard trail. The first row of the discard file records this assembly's own contig count and N50, with a sentence saying which contiguity band it falls in |
 | `{sample}_amrfinderplus.tsv`, `_amrfinderplus_mutations.tsv` | the raw AMR calls, and the point mutations separately |
@@ -226,8 +234,8 @@ treat an AICE call as a hypothesis ([Optional layers](optional-layers.md)).
     A `conjugative_region` row once appeared on the module's own positive control
     because Bakta labelled the integrase *DNA integration/recombination/inversion
     protein* and the product regex did not match that wording. The gene was 5.7 kb away
-    and comfortably inside the clustering window. The element was being under-called on
-    the very genome used to validate the module. Worth remembering before concluding
+    and comfortably inside the clustering window. The element was under-called on the
+    genome used to validate the module. Worth remembering before concluding
     that a region has no integrase.
 
 ## Next

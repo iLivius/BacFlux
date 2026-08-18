@@ -16,11 +16,19 @@ MultiQC report in `09.report`.
 Everything here is in `workflow/rules/shared/20_qc.smk` and runs in all four modes,
 except Qualimap.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **QC** | quality control |
+    | **N50** | the contig length at which half the assembly sits in contigs that long or longer |
+    | **ONT** | Oxford Nanopore Technologies, the long-read sequencing platform |
+
 !!! note "Decontamination runs first, and has to"
 
     CheckM is where a leftover contaminant contig shows up, as contamination *of the
-    isolate*. Screening the assembly before QC is what makes the CheckM number mean
-    what you think it means.
+    isolate*. Screening the assembly before QC is what makes the CheckM number
+    meaningful.
 
 ## Staging: one genome, or two
 
@@ -43,7 +51,7 @@ from a single list rather than being typed out per tool. The staging directory i
 is temporary and Snakemake removes it once the last consumer is finished.
 
 Beside it sits a file that is kept: `02.assembly/{sample}/eval/{sample}_qc_genomes.tsv`,
-with columns `bin_id`, `role`, `technology`, `source_path`. It says in writing which of
+with columns `bin_id`, `role`, `technology`, `source_path`. It says which of
 the two hybrid rows is the delivered genome, so nobody has to infer it from a filename
 suffix. No rule reads it; it exists to be read by a person.
 
@@ -68,7 +76,7 @@ module in particular is built around that constraint; see
 [Draft assemblies](../mobilome/draft-assemblies.md).
 
 The shell globs `*.fasta` inside the staged directory, so a hybrid sample gets both
-assemblies **side by side in one report** — exactly the comparison a hybrid run is for.
+assemblies side by side in one report.
 `--no-icarus` skips the interactive contig browser, which nothing here consumes.
 
 Output: `02.assembly/{sample}/eval/quast/` (QUAST names the files inside it).
@@ -124,7 +132,7 @@ The third row is the one to watch for after a large-removal warning from the
 Qualimap summarises how a sample's reads sit on its own assembly: mean depth and how
 even it is, GC bias, mapping rate, and insert size for paired reads. Uneven or
 unexpectedly low coverage is an early warning of a mixed culture, a mis-assembly, or
-simply not enough data.
+not enough data.
 
 ```bash
 qualimap bamqc -bam {sample}_map.bam --java-mem-size={N}G -nt {threads} \
@@ -137,7 +145,7 @@ alive long enough to be used twice.
 
 Output: `02.assembly/{sample}/eval/qualimap/`, an HTML report directory.
 
-The rule is gated on the mode having reads at all, so **`contigs` mode has no Qualimap
+The rule is gated on the mode having reads, so **`contigs` mode has no Qualimap
 report**. That mode does have a BAM, but it is the contigs aligned against themselves
 purely to satisfy BlobTools; a mapping-quality report on a self-alignment would say
 nothing. It is a mode-specific absence, not a gap.

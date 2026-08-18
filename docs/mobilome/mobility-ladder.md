@@ -26,6 +26,9 @@ to look a number up.
 
     That last distinction is the whole difference between tier 5 and tier 6.
 
+    Two abbreviations used throughout: **AMR** is antimicrobial resistance, and
+    **EFSA** is the European Food Safety Authority.
+
 | Tier | `mobility_tier_label` | Context | What it means |
 |:--:|---|---|---|
 | **1** | `intrinsic_candidate` | chromosomal, nothing mobile nearby | nothing was found that could move it |
@@ -37,8 +40,8 @@ to look a number up.
 
 ## How one tier is chosen
 
-The rungs are tested **from the top down, and the first match wins**. Order matters
-more than it looks, so it is written out here exactly as the code applies it:
+The rungs are tested **from the top down, and the first match wins**. The order is
+written out here exactly as the code applies it:
 
 1. inside an ICE → **6**
 2. on a plasmid Platon typed conjugative → **6**
@@ -62,7 +65,7 @@ is still carried in `mge_name` even when a higher rung set the tier.
 
 ### The three windows that define the rungs
 
-None of them is a property of a cell. Every row therefore reports the **measured**
+None of them is a biological constant. Every row therefore reports the **measured**
 distance next to the tier, so a reader who disagrees with a threshold can re-judge the
 row without re-running anything.
 
@@ -78,11 +81,11 @@ The only one that is a config key is the composite span. See [Tuning](tuning.md)
 
 **A gene with no usable coordinates is `NA` / `not_assessable`, never tier 1.** "We
 could not assess this" and "we assessed it and found nothing" are different results, and
-collapsing them would quietly turn missing data into an intrinsic-resistance claim.
+collapsing them would turn missing data into an intrinsic-resistance claim.
 
 **An IS that has landed *inside* the coding sequence is reported separately.** That
 usually inactivates the gene, so it gets its own `is_inside_amr_cds` flag rather than
-being folded into a mobility call. An insertion is not a mobilisation.
+being folded into a mobility call.
 
 ## Intrinsic versus acquired — the framing this exists to serve
 
@@ -122,9 +125,9 @@ the automated analysis of gene distribution across a species.
     - *Chromosomal* does not mean *intrinsic*. An acquired gene may perfectly well sit
       on the chromosome.
 
-    So tier 1 is `intrinsic_candidate`, and the qualifier is doing real work: the module
-    observed a chromosomal gene with no mobile-element context, which is *consistent
-    with* intrinsic and does not establish it. The confirmatory work is a species-wide
+    So tier 1 is `intrinsic_candidate`: the module observed a chromosomal gene with no
+    mobile-element context, which is *consistent with* intrinsic and does not establish
+    it. The confirmatory work is a species-wide
     distribution analysis plus phenotypic testing.
 
 The module produces **supporting evidence** for the intrinsic-versus-acquired judgement.
@@ -161,8 +164,7 @@ no output of this module substitutes for one.
 ## How far to trust a tier
 
 Tiers 1, 2, 3 and 6 are the ones you will meet in practice, and they are the ones the
-benchmark exercises. Two rungs are rarer than their position in the table suggests, and
-it is worth knowing why before one turns up in a report.
+benchmark exercises. Two rungs are rarer than their position in the table suggests.
 
 **Tier 4 is structurally uncommon, not broken.** It needs three things at once: the
 opt-in [TnCentral naming layer](optional-layers.md) configured, a curated transposon or

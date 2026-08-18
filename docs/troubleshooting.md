@@ -7,6 +7,16 @@ is being *read*, so a dry run costs seconds and catches the config problems belo
 before a single job starts — see
 [Always dry-run first](reference/running.md#always-dry-run-first).
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **DAG** | directed acyclic graph — the job graph Snakemake builds from the rules, which decides what runs and in what order |
+    | **YAML** | the config file's plain-text format; indentation is significant and tabs are refused |
+    | **ONT** | Oxford Nanopore Technologies, the long-read sequencing platform |
+    | **GTDB** | Genome Taxonomy Database, the reference GTDB-Tk places each genome in |
+    | **HPC** | high-performance computing — a shared cluster, as opposed to your own machine |
+
 ## `KeyError: 'mode'`
 
 !!! warning "Symptom"
@@ -79,7 +89,7 @@ in whatever environment you launched Snakemake from, on whatever is on its `PATH
 Four of those rules download with `wget`, which is not part of coreutils and is
 genuinely absent from some minimal conda base environments and HPC login shells.
 
-The four sit at different depths, so this can bite at any point: `download_phix`
+The four sit at different depths, so this can surface at any point: `download_phix`
 runs in the first seconds of an `illumina` or `hybrid` run, `download_amr_db`
 (CARD) and `cazyme_db_download` (dbCAN) shortly before their own analysis stages,
 and `icescan_models` only when the mobilome module is on.
@@ -171,9 +181,9 @@ read. Three things go wrong with it, and all three have happened here.
 lookups into the 39 GB `eggnog.db`, once per seed ortholog. That phase is the slow
 tail of a run on any disk — it is why `functional_annotation` is routinely the last
 rule still finishing (`00_common.smk:1262-1266`) — and random access is the access
-pattern a network filesystem handles worst, so a shared copy is where it hurts
-most. Either set `parameters.eggnog.dbmem: true` and pay the RAM, or hold that one
-database on local disk. The trade-off is set out in
+pattern a network filesystem handles worst, so a shared copy is where it costs
+most. Either set `parameters.eggnog.dbmem: true` and accept the memory cost, or hold
+that one database on local disk. The trade-off is set out in
 [Annotation](analysis/annotation.md#-dbmem-the-ram-trade-off).
 
 **CheckV's DIAMOND index belongs to whoever built it.** CheckV's official archive

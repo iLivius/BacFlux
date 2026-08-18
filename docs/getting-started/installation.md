@@ -14,6 +14,13 @@ Three things to put in place:
 3. the reference databases BacFlux does not fetch for you — those have their own
    page, [Reference databases](databases.md).
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **BAM** | the binary alignment file a read mapper writes |
+    | **HPC** | high-performance computing — a shared compute cluster |
+
 ## 1. Get the repository
 
 ```bash
@@ -72,9 +79,9 @@ in the launch directory.
 
 Two practical consequences:
 
-- **The first run spends a while before it does any science.** Solving and
-  downloading a dozen or more conda environments takes minutes. After that they
-  are on disk and the workflow starts straight away.
+- **The first run starts slowly.** Solving and downloading a dozen or more conda
+  environments takes minutes. After that they are on disk and the workflow starts
+  straight away.
 - **Tools never have to coexist.** GTDB-Tk, antiSMASH, VirSorter2 and MacSyFinder
   each get their own environment, so an upgrade to one cannot break another. The
   environments are pinned to different degrees: some to an exact version because a
@@ -115,14 +122,14 @@ They fall into four groups.
 | Filter, copy or stage a FASTA | `filter_contigs`, `finalize_contigs`, `stage_qc_genomes` | `awk`, `grep`, `head`, `cp`, `cat` |
 
 Apart from `wget`, the shell commands above are all standard Unix utilities,
-present on any Linux system that can run Snakemake at all. The helper scripts
-import nothing outside Python's standard library, so the Python that came with
-your Snakemake environment already runs them — there is no `pip install` step.
+present on any Linux system that can run Snakemake. The helper scripts import
+nothing outside Python's standard library, so the Python that came with your
+Snakemake environment already runs them — there is no `pip install` step.
 
-!!! warning "`wget` is the one that actually bites"
+!!! warning "`wget` is the one to check for"
 
-    It is genuinely absent from some minimal conda base environments and from some
-    HPC login shells, and all four rules that need it are database downloads.
+    It is absent from some minimal conda base environments and from some HPC login
+    shells, and all four rules that need it are database downloads.
 
     Check before you launch, and fix it in the launcher environment if it is
     missing:

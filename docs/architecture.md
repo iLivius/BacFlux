@@ -4,13 +4,19 @@ BacFlux is one workflow with four ways in. Whichever way you enter, you leave th
 the same nine numbered stages, and the `mode` key in the config decides nothing except
 how a set of contigs gets produced in the first place.
 
-That is the whole design in one sentence, and the diagram below is that sentence drawn.
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **ONT** | Oxford Nanopore Technologies — the long-read sequencing platform |
+    | **AMR** | antimicrobial resistance |
+    | **EFSA** | European Food Safety Authority, whose thresholds the ABRicate leg applies |
 
 ## The shape of a run
 
-The diagram is in two labelled halves. **Everything in the first box changes with
-the mode you chose. Everything in the second box is the same whichever mode ran** —
-that is the whole design, and it is why there is one workflow instead of four.
+The diagram is in two labelled halves. Everything in the first box changes with the
+mode you chose; everything in the second box is the same whichever mode ran. That is
+why there is one workflow instead of four.
 
 ```mermaid
 flowchart TD
@@ -82,10 +88,9 @@ Only `08.mobilome` is optional. Everything else runs on every sample, in every m
     everything else. The four v1 workflows shared roughly two-thirds of their code and
     had to be kept in step by hand; here that two-thirds exists once.
 
-    The one thing that does stay mode-aware is honesty about quality: a short-read
-    assembly is more fragmented, so every mobilome call carries contig-edge flags and
-    anything spanning contigs is capped at low confidence — see
-    [the mobilome overview](mobilome/index.md).
+    One thing does stay mode-aware: a short-read assembly is more fragmented, so every
+    mobilome call carries contig-edge flags and anything spanning contigs is capped at
+    low confidence — see [the mobilome overview](mobilome/index.md).
 
 ## What runs where
 
@@ -127,8 +132,6 @@ flowchart LR
     B --> CR([CARD report, grouped by<br/>CARD's own resistance mechanism])
     P --> M([mobility ladder, tier 1 to 6])
 ```
-
-No single leg is enough on its own. That is the reason there are three.
 
 Read the detail on [the AMR page](analysis/amr.md).
 

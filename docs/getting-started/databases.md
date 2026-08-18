@@ -11,6 +11,13 @@ BacFlux installs its own software but not its own reference data. Three groups:
 Nothing is written back into a database you supply. BacFlux reads your copy through a
 local symlink view and never modifies, moves or deletes it.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **GTDB** | Genome Taxonomy Database, the reference used for taxonomic placement |
+    | **HPC** | high-performance computing — a shared compute cluster |
+
 ## The five you download
 
 | Config key | Database | Version | Size on disk |
@@ -21,7 +28,7 @@ local symlink view and never modifies, moves or deletes it.
 | `directories.gtdbtk_db` | GTDB | **R232** | 94 GB extracted |
 | `directories.platon_db` | Platon | — | 2.8 GB |
 
-Two of those versions are not advice. Bakta 1.12.1 refuses a v5.x database, and
+Two of those versions are requirements. Bakta 1.12.1 refuses a v5.x database, and
 GTDB-Tk 2.7.2 pins itself to one GTDB release and rejects R226 or older. There is no
 in-place upgrade for either.
 
@@ -122,11 +129,11 @@ same output directory across runs of a project and they are downloaded once.
 `phix_link` and `card_link` ship empty and are required in the two modes that have
 short reads. An unset one stops the run at parse time, naming the key.
 
-Two defaults point at Zenodo mirrors rather than the publisher's own host, for one
-reason: CheckV's official database lives on `portal.nersc.gov`, and so does geNomad's
-downloader, and [NERSC](https://www.nersc.gov/) is unavailable often enough to cost
-real time. Both mirrors are unmodified copies. Change `links.genomad_md5` whenever you
-change `links.genomad_link` — a mismatch stops the run.
+Two defaults point at Zenodo mirrors rather than the publisher's own host: CheckV's
+official database lives on `portal.nersc.gov`, as does geNomad's downloader, and
+[NERSC](https://www.nersc.gov/) is unavailable often enough to cost real time. Both
+mirrors are unmodified copies. Change `links.genomad_md5` whenever you change
+`links.genomad_link` — a mismatch stops the run.
 
 !!! note "The dbCAN pin"
 
@@ -169,9 +176,8 @@ and each writes a `PROVENANCE.txt` recording what actually arrived. See
 
 **Downloads use the launcher environment.** The rules that fetch and unpack a database
 declare no conda environment of their own and use `wget`, `tar` and `sha256sum` from
-whatever you launched Snakemake in. `wget` is genuinely missing from some minimal conda
-bases and HPC login shells — check before a long run
-([Installation](installation.md)).
+whatever you launched Snakemake in. `wget` is missing from some minimal conda bases
+and HPC login shells — check before a long run ([Installation](installation.md)).
 
 **A wrong required path is not always caught at parse time.** The five
 `directories.*_db` values are read but not opened while the plan is built. Some are

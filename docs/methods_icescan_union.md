@@ -21,6 +21,8 @@ being repeated.
     | **T4SS** | type IV secretion system, the mating apparatus |
     | ***att* site** | the short repeat marking an integrated element's ends |
     | **MGE** | mobile genetic element, the general term |
+    | **IS** | insertion sequence, the smallest kind of mobile element |
+    | **HMM** | hidden Markov model, a statistical profile used to recognise a protein family |
 
 Established 2026-07-30, on the 28-genome Phase 7 benchmark
 (`<validation-root>/phase7_benchmark`),
@@ -51,8 +53,8 @@ comparing two arms that differ **only** by whether the ICE caller was given
 >
 > **§8.3, §9 and the table in §10 HAVE been recomputed**, at commit `1651e6f`
 > (after the att-search rework, the confidence-cap fix, the loner fix that
-> stopped one MacSyFinder system inventing a second machinery cluster out of
-> thin air, and the dead-code removal). The same two-arm method: both arms
+> stopped one MacSyFinder system inventing a second machinery cluster, and the
+> dead-code removal). The same two-arm method: both arms
 > re-run over the same 28 genomes, the only variable being `--icescan-tsv`.
 > Three things changed enough to be worth flagging before you read them:
 >
@@ -243,8 +245,7 @@ gene_name = Recombinase        hit_gene_ref = Phage_integrase
 ```
 
 Every excluded profile is an exchangeable of `Phage_integrase`, so **filtering
-on `hit_gene_ref` would let all four back in through the front door.** The
-caller gates on `gene_name`.
+on `hit_gene_ref` would let all four back in.** The caller gates on `gene_name`.
 
 ### 4.2 What was actually discarded, and how we know
 
@@ -278,7 +279,7 @@ element exists anywhere in the set.
 
 ## 5. What ICEscan does *not* solve
 
-This is the part most likely to be misunderstood, so it is stated plainly.
+This is the part most likely to be misunderstood.
 
 **It emits no coordinates.** MacSyFinder reports gene *ordinals*, never base
 pairs. A real row from the Tn*4451* detection:
@@ -466,8 +467,9 @@ Exactly one scored element changes, and it changes **for the worse** — see §9
 | SGI1 | 42,451 | — | — | — | — | missed |
 | IMEMlNZP2037-1 | 110,480 | 8,164 | 0.07 | 8,164 | 0.07 | medium |
 
-Both new detections are **honest**, not swallows: Tn*4451* at ratio 0.94
-(start offset +75 bp) and `IME_CdiR20291_ND` at 0.69 (start offset +37 bp).
+Both new detections are **honest** rather than oversized intervals that merely
+contain the curated element: Tn*4451* at ratio 0.94 (start offset +75 bp) and
+`IME_CdiR20291_ND` at 0.69 (start offset +37 bp).
 These are the two best-bounded IME recoveries the caller has produced.
 
 ### 8.3 Whole-set census (all 63 calls, not just scored ones)
@@ -515,7 +517,7 @@ With ICEscan on, an ICEscan `Recombinase` sits **0 bp** from the cluster and
 wins the "then the closest" tie-break over a Bakta product-text `Site-specific
 recombinase` **11,032 bp** away — and the *more distant* one was nearer the
 curated left edge. This lands at 0.4009: roughly 1.1 kb from dropping out of
-the "honest" band altogether.
+the "honest" band.
 
 **2. One of two boundary losses still holds; the other has since resolved
 itself.**
@@ -676,7 +678,7 @@ questions. Second, the CONJScan-only arm has **not** been re-run since
 `4a93d89`, so the "identical in both arms" result above is established only for
 the older att search; it is likely but not measured that it still holds.
 
-Either way the shape of the problem is unchanged and worth stating plainly: half
+Either way the shape of the problem is unchanged: half
 of all elements are still reported unbounded, their start and end being the
 outermost machinery genes rather than the true edges, and the residual error on
 the ones that are bounded is still measured in kilobases. Read `boundary_method`

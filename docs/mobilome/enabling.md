@@ -11,6 +11,17 @@ Everything else in the `mobilome:` block is either a threshold with a sensible d
 or one of the four optional layers, each of which stays off until you give it a source
 of its own ([Optional layers](optional-layers.md)).
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
+    | **IS** | insertion sequence — the smallest mobile element, carrying only the genes it needs to move itself |
+    | **ICE** | integrative and conjugative element — sits in the chromosome and carries its own conjugation machinery |
+    | **IME** | integrative mobilisable element — sits in the chromosome but needs a helper element to move |
+    | ***att* site** | the short direct repeat left at each end of an element where it integrated |
+    | **HMM** | hidden Markov model — a statistical profile of a gene or protein family |
+
 ## What `run: true` adds
 
 Ten rules on the default configuration, of which three are per-sample tool runs at up to
@@ -53,7 +64,7 @@ reads and therefore needs them: `illumina` and `hybrid` only.
 
 AMRFinderPlus detects curated **point mutations** only when it is told which organism it
 is looking at. Those mutations are the intrinsic, chromosomal, non-transferable
-determinants that tier 1 rests on, and a homology screen structurally cannot see them
+determinants that tier 1 rests on, and a homology screen cannot see them
 ([The mobility ladder](mobility-ladder.md)).
 
 So the module maps the GTDB-Tk call onto an AMRFinderPlus organism name and passes
@@ -87,7 +98,7 @@ raw evidence.
 
 **A licence decision.** Turning the module on fetches the CONJscan models, which Institut
 Pasteur / CNRS license under CC BY-NC-SA 4.0. BacFlux never ships them — you download
-them, on your machine, under your own agreement with the licensor, exactly as with
+them, under your own agreement with the licensor, exactly as with
 `bakta_db`. Selecting the module prints the notice at parse time. Licence types for
 everything the module can fetch are on [Licensing](../about/licensing.md).
 
@@ -111,7 +122,7 @@ canonical source — the bundle EBI publishes for ICEfinder2 — so `run: true` 
 needs. For the other three you paste a URL in yourself, and the commented `# e.g.` line
 beside each key is the address that was used to validate this module.
 
-Two of these are worth knowing about before a first run.
+Two of them need explaining before a first run.
 
 - **`coverage_profile`** (default 0.5, MacSyFinder's own default) is the fraction of a
   profile HMM an alignment must cover before the hit is kept. It is not identity and not

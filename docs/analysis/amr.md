@@ -1,7 +1,7 @@
 # Antimicrobial resistance
 
 BacFlux looks for resistance genes three times, with three methods that fail in
-different ways. That is the point: each one sees things the others cannot.
+different ways. Each one sees things the others cannot.
 
 | Leg | Input | Database | Present when | Modes |
 |---|---|---|---|---|
@@ -25,6 +25,14 @@ mobile elements, and it is the only leg that can report resistance-conferring
 **point mutations**.
 
 None of the three replaces another, and their counts are not meant to agree.
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **CARD** | Comprehensive Antibiotic Resistance Database |
+    | **EFSA** | European Food Safety Authority |
+    | **GTDB** | Genome Taxonomy Database, the reference taxonomy GTDB-Tk classifies against |
 
 ## ABRicate on the contigs
 
@@ -68,7 +76,7 @@ blanket 80/70 across all three would fight that curation.
     "near-universal" or "essentially absent" depending on which side of the cutoff
     it lands.
 
-    Read a borderline call from the actual identity value in the table, not from
+    Read a borderline call from the identity value in the table, not from
     presence or absence. This is also why AMRFinderPlus's per-gene cutoffs are
     left alone rather than overridden with 80/70.
 
@@ -79,7 +87,7 @@ blanket 80/70 across all three would fight that curation.
 
 Short-read modes only — `illumina` and `hybrid`. The gate is a capability flag,
 "does this mode produce short reads", not a mode name, so `nanopore` and
-`contigs` get no CARD leg at all and never even build the BBMap environment.
+`contigs` get no CARD leg and never build the BBMap environment.
 
 The fastp-trimmed pairs are mapped straight onto CARD's
 `nucleotide_fasta_protein_homolog_model.fasta` — the CARD model that holds
@@ -88,8 +96,8 @@ acquired resistance genes, as opposed to its mutation-based models. BBMap's
 reads actually covered. A gene is called present when **at least 70% of its
 length** is covered.
 
-Length coverage, not read count: a short conserved domain pulling in a pile of
-reads is not a gene being present.
+Length coverage, not read count: a short conserved domain can attract many
+reads without the gene being present.
 
 Set `links.card_link` to CARD's `broadstreet-*.tar.bz2` archive, or point
 `directories.card_db` at an extracted copy you already hold to skip the download
@@ -119,11 +127,11 @@ Set `links.card_link` to CARD's `broadstreet-*.tar.bz2` archive, or point
     flag that enforces it.
 
 The identity floor was deliberately **not** raised to 0.99. At a real 0.99 the
-same reads keep 2 alignments instead of 1,240, which would gut the one AMR leg
-that is immune to assembly collapse.
+same reads keep 2 alignments instead of 1,240, which would leave almost nothing
+in the one AMR leg that is immune to assembly collapse.
 
-The leg is **a sensitive screen whose specificity comes from the ≥70%
-reference-length gate, not from per-read identity.** A methods section can say
+The leg is a sensitive screen whose specificity comes from the ≥70%
+reference-length gate, not from per-read identity. A methods section can say
 "reads were mapped with BBMap at its default minimum identity (0.76) and a CARD
 sequence was reported when reads covered ≥70% of its length". It cannot claim a
 99% identity screen.
@@ -158,7 +166,7 @@ the table, and nothing is then dropped for what kind of entry it turned out to b
 | `presence_indicates_susceptibility` | CARD's mechanism for the entry is "resistance by absence". Detecting it **by presence** indicates the opposite of resistance | mgrB, OmpK35, OmpK36, OprD, LamB, carO |
 
 The last category is a sign error, not a borderline call, which is why it gets
-its own label and a `note` column spelling out what the presence actually means.
+its own label and a `note` column spelling out what the presence means.
 
 The `regulator` label uses the long-standing convention that a name ending in R
 is the regulator of the operon named without it (MexR regulates *mexAB*). The
@@ -168,7 +176,7 @@ efflux-pump regulators. Without that guard the suffix rule misfires on genuine
 determinants that happen to end in R: measured on a *Bacillus* isolate from this
 project's own test set, *vmlR* — an ABC-F ribosomal protection protein, CARD
 mechanism "antibiotic target protection", a real resistance gene — was demoted to
-`regulator`, which is the wrong direction to be wrong in.
+`regulator`.
 
 Three rows from a real *Pseudomonas* isolate, in the order the report puts them:
 
@@ -194,8 +202,8 @@ Sample <name>: <total> CARD sequences at >= 70% covered length.
 
 Only the categories actually present are printed, and a
 `presence_indicates_susceptibility` count is followed by a line saying in words
-that those rows are not evidence of resistance. The per-category count is the
-point: a bare total is the number this report exists to stop people quoting.
+that those rows are not evidence of resistance. A bare total is the number this
+report exists to stop people quoting.
 
 `reference_organism` is the organism CARD's **reference sequence** came from,
 never a statement about your sample. In the rows above, CARD attributes its CpxR
@@ -212,7 +220,7 @@ including `amr_gene_family` and `drug_class` — is in
 | `{sample}_covstats.tsv` | BBMap's raw per-reference coverage table, re-sorted by descending covered percent. |
 | `{sample}_AMR_legend.tsv` | The `aro_index.tsv` rows for every feature covered ≥70%, kept as raw evidence. |
 
-An isolate carrying nothing above 70% is a perfectly normal result, and
+An isolate carrying nothing above 70% is a normal result, and
 `map_amr_db` runs without `set -e` on purpose so that it does not become a
 pipeline failure. The report script draws the opposite line: a `covstats` file
 with no `#ID` header means BBMap did not finish writing it, and the script stops
@@ -261,7 +269,7 @@ genomes a placeholder epithet (`sp024807945`). A naive match would turn
 that genome against *P. aeruginosa*'s curated mutation list — worse than making no
 call at all.
 
-**No match is the normal case for environmental isolates.** AMRFinderPlus curates
+No match is the normal case for environmental isolates. AMRFinderPlus curates
 around thirty organisms, nearly all of them clinical, so a soil or plant-associated
 *Bacillus*, *Paenibacillus* or *Arthrobacter* matches none of them and the audit file
 records the same reason each time: *no curated organism for this taxon*.
@@ -284,8 +292,8 @@ Two committed lookup tables bridge the gap, both generated per GTDB release by
   rests on.
 
 At run time `amrfinder_organism` looks this sample's classification up in those tables
-and writes either an organism name or nothing. **Nothing is the safe default and the
-usual outcome**: a wrong `--organism` would produce confidently wrong point-mutation
+and writes either an organism name or nothing. Nothing is the safe default and the
+usual outcome: a wrong `--organism` would produce confidently wrong point-mutation
 calls, so the rule refuses to guess — including when a hybrid sample's two assemblies
 disagree. Every decision, and its reason, lands in
 `{sample}_amrfinder_organism_audit.tsv`.
@@ -315,10 +323,10 @@ mobilome module does not either. EFSA's definitions are population-level:
 >
 > — EFSA Scientific Committee (2025), Glossary
 
-Two things follow. **You cannot establish "intrinsic" from one genome** — the
-claim is about the species, and settling it means comparing gene presence across
-many genomes of that taxon. BacFlux performs no population comparison of any
-kind; every analysis here is per-genome. And **chromosomal does not mean
+**You cannot establish "intrinsic" from one genome** — the claim is about the
+species, and settling it means comparing gene presence across many genomes of
+that taxon. BacFlux performs no population comparison of any kind; every
+analysis here is per-genome. And **chromosomal does not mean
 intrinsic**: an acquired gene may well sit on the chromosome. That is why the
 mobility ladder's tier 1 is labelled `intrinsic_candidate` and not `intrinsic`,
 and why the CARD report's mechanism category is a hint rather than a

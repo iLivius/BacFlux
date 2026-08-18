@@ -1,9 +1,8 @@
 # Method reference: intrinsic versus acquired AMR, and what BacFlux can actually say
 
-A regulator asking about a resistance gene almost always wants one thing: did this
-strain always have it, or did it pick it up from somewhere? This page explains why
-that question is harder than it sounds, what BacFlux can answer, and — more
-importantly — what it deliberately refuses to answer.
+A regulator asking about a resistance gene wants to know one thing: did this strain
+always have it, or did it acquire it? This page explains why that question is harder
+than it sounds, what BacFlux can answer, and what it deliberately refuses to answer.
 
 Written to be quotable in a methods section: every claim carries its source, and the
 final section separates peer-reviewed guidance from technical reports and from our own
@@ -22,6 +21,7 @@ inference. For the short reader-facing version, see
     | **QPS** | Qualified Presumption of Safety, EFSA's list of species accepted as safe |
     | **MIC** | minimum inhibitory concentration — the lab measurement of resistance |
     | **ANI** | average nucleotide identity, a genome-to-genome similarity measure |
+    | **IS** | insertion sequence, the smallest kind of mobile element |
 
 Written 2026-08-14, prompted by three questions that come up whenever someone
 reads an `08.mobilome` table next to a regulatory checklist:
@@ -98,8 +98,8 @@ organism for this taxon*. Every `{sample}_amrfinderplus_mutations.tsv` was
 therefore header-only.
 
 **Read those empty files as "not assessed", never as "no mutations found."**
-BacFlux writes the refusal and its reason to the audit file precisely so the
-distinction survives.
+BacFlux writes the refusal and its reason to the audit file so the distinction
+survives.
 
 ---
 
@@ -190,8 +190,8 @@ were screened; those with **≥30 complete genomes** were analysed. Five qualifi
 | *B. paralicheniformis* | 26 | 26 (100%) |
 
 *B. paralicheniformis* was included below the threshold because many dossiers
-concerned it. **_Priestia megaterium_ had 40 genomes and was excluded anyway —
-no dossier had ever been submitted for it.** The catalogue is shaped by the
+concerned it. *Priestia megaterium* had 40 genomes and was excluded anyway, because
+no dossier had ever been submitted for it. The catalogue is shaped by the
 regulatory caseload, not by the genus.
 
 **Pipeline.** fastANI v1.32 (one-to-many) against each species' reference/type
@@ -215,8 +215,8 @@ demonstrates its own validity in each result table.
 
 ### The finding most relevant to BacFlux
 
-The catalogue is an unintentionally excellent demonstration of **threshold
-brittleness at 80% identity**:
+The catalogue is a clear demonstration of **threshold brittleness at 80%
+identity**:
 
 - *rphB* in *B. subtilis*: found above threshold in **85.3%** of genomes when
   queried as nucleotide, but **1.3%** when queried as protein — because most

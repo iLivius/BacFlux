@@ -2,12 +2,11 @@
 
 Two problems that look unrelated and are not. **Where does a mobile element stop?**
 and **why did a small plasmid vanish from the assembly?** Both come down to short
-repeated sequences, and both were found the same way — by two concrete failures on
-real data.
+repeated sequences.
 
 Every claim carries its source. Two are NEGATIVE results — questions the published
-literature simply does not answer — and they are flagged as such, because those are
-the ones to be careful with in a paper.
+literature does not answer — and they are flagged as such, because those are the ones
+to be careful with in a paper.
 
 !!! abstract "Terms used on this page"
 
@@ -18,6 +17,10 @@ the ones to be careful with in a paper.
     | **ICE** | integrative and conjugative element — a mobile element that sits in the chromosome and can move itself to another cell |
     | **direct repeat** | two copies of a sequence in the same orientation |
     | **HMM** | hidden Markov model, a statistical profile used to recognise a protein family |
+    | **IS** | insertion sequence, the smallest kind of mobile element |
+    | **MEM** | maximal exact match — a shared stretch that cannot be extended further at either end |
+    | **ONT** | Oxford Nanopore Technologies, the long-read sequencing platform |
+    | **DAG** | the graph of rules Snakemake builds to decide what still has to run |
 
 Established 2026-07-28 by reading the primary sources and the tools' own source
 code, prompted by two concrete failures on clinical *Klebsiella pneumoniae*
@@ -76,7 +79,7 @@ The obvious repair — try 25, then 24, 23 … and take the longest that works �
 **no published precedent** in att-site or genomic-island detection. Nobody needs
 it: a maximal-repeat search (Vmatch) or a local alignment (BLAST) returns the
 longest repeat in a single pass. Exact k-mer stepping is also strictly *weaker*,
-because it cannot absorb the indels and mismatches an aligner handles for free,
+because it cannot absorb the indels and mismatches an aligner handles automatically,
 and it yields no bitscore to weight confidence with.
 
 ### ⚠ NEGATIVE RESULT: no published false-positive rate for boundary calling
@@ -238,7 +241,7 @@ found**, and the licence blocker costs no sensitivity.
 > which is exactly the failure mode that prompted retaining this one. Quote the
 > numbers above, which are reproducible by running the script.
 
-One tempting follow-up idea is disposed of by the same measurement: shipping both
+One related idea is disposed of by the same measurement: shipping both
 searches and treating their agreement as a confidence signal would be worthless.
 Two implementations of identical semantics are *expected* to agree exactly, so
 their agreement carries no information about whether a boundary is real. It tests
@@ -389,7 +392,7 @@ read-length distribution. Reads per band, same sample — the raw ONT set holds
 
 `length_weight 10` empties the 1–3 kb band at **both** `keep_percent` values.
 Raising `keep_percent` rescues the 3–6 kb band, which is why it rescued this
-5.6 kb plasmid, but only lowering `length_weight` rescues 1–3 kb. Put plainly:
+5.6 kb plasmid, but only lowering `length_weight` rescues 1–3 kb. So
 **`keep_percent` protects plasmids of a few kb; `length_weight` protects plasmids
 under ~3 kb**, and this one happened to sit in `keep_percent`'s range.
 
@@ -451,8 +454,8 @@ ONT reads for unselected sequence score as low quality and are discarded
 Flye never sees the plasmid
 ```
 
-This bites when a plasmid's best BLAST hit is a **different genus from the
-host** — which is not exotic, since plasmids cross genus boundaries constantly.
+This happens when a plasmid's best BLAST hit is a **different genus from the
+host** — which is not unusual, since plasmids cross genus boundaries constantly.
 On *K. pneumoniae* **ATCC BAA-2146**, `auto` mode dropped a genuine plasmid —
 pMYS, `NZ_CP006660.1`, 2,014 bp — because *E. coli* database entries outnumbered
 *Klebsiella* ones 58,709 to 16,253: BLAST bestsum follows database composition,

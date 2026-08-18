@@ -62,12 +62,17 @@ flowchart TD
 Read it as three stages. The short reads are assembled **first**, not because that
 assembly is the product, but because a clean short-read assembly is the best available
 filter for the long reads: only the pairs mapping to it survive, and Filtlong then
-scores every ONT read by how much of it those pairs support. The genome you keep is
-built from the long reads and corrected by the short ones.
+scores every ONT read by how much of it those pairs support.
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **ONT** | Oxford Nanopore Technologies, the long-read sequencing platform |
 
 ## The Illumina leg is the ONT leg's contamination filter
 
-This is the design that makes the mode hybrid, and it is worth following.
+This is the design that makes the mode hybrid.
 
 There is no BLAST/BlobTools screen on the long-read assembly. Instead the screen runs
 on the **Illumina draft**, and the Illumina reads that map as proper pairs back to the
@@ -105,7 +110,7 @@ The Filtlong flags differ from `nanopore` mode on purpose:
 ## Two genomes, and which one is delivered
 
 The ONT assembly is the deliverable. The Illumina assembly is not a by-product: it is
-what the screen screens, it is the source of the clean read set, and it is kept as the
+what the screen runs on, it is the source of the clean read set, and it is kept as the
 comparator genome.
 
 | | Built from | Role |
@@ -137,8 +142,7 @@ Polypolish always runs, whether or not Medaka did, so this mode needs no
 `compare_hybrid_assemblies` aligns **four** stages of the ONT genome against the
 Illumina assembly and counts the variants: the raw Flye assembly, the reoriented one,
 the Medaka consensus, and the Polypolish-corrected genome. A well-behaved run shows
-the count falling towards zero as polishing proceeds — which is the point of having
-built the genome twice.
+the count falling towards zero as polishing proceeds.
 
 The digest is `02.assembly/{sample}/snps/SNPs_summary.txt`, with the four Snippy
 directories beside it. With Medaka off, stage `03` holds a `skipped.txt` instead.

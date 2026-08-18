@@ -5,7 +5,7 @@ QC and no assembler, so the whole front end is **one rule**, whose job is to han
 contamination screen a FASTA it can work with.
 
 Use it for a genome from a collaborator, from a database, or from an earlier assembly.
-Every analysis stage still runs; the mode simply cannot re-examine evidence that only
+Every analysis stage still runs; the mode cannot re-examine evidence that only
 exists in reads.
 
 ```mermaid
@@ -22,6 +22,15 @@ batch must share the extension. A dotted name such as `my.genome.fasta` is read 
 sample `my.genome`: the last dot splits off the extension, earlier dots stay in the
 name.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **QC** | quality control |
+    | **CARD** | Comprehensive Antibiotic Resistance Database |
+    | **IS** | insertion sequence, the smallest kind of transposable element |
+    | **AMR** | antimicrobial resistance |
+
 ## One rule, two branches
 
 `filter_contigs` looks at the **first header** and takes one of two paths. SPAdes
@@ -33,8 +42,7 @@ writes the same style for every record, so one line is enough to decide.
 | **B** | anything else | each header is trimmed to its first whitespace token. **No length filter and no coverage filter.** Nothing else changes |
 
 The rule logs which branch it took, in the first line of
-`logs/filter_contigs_{sample}.log`. Read it — it decides whether any filtering happened
-at all.
+`logs/filter_contigs_{sample}.log`. It decides whether any filtering happened at all.
 
 !!! note "Why branch B does not invent a filter"
 
@@ -44,18 +52,18 @@ at all.
     the only contigs that can leave the assembly are the ones the contamination screen
     drops.
 
-    The rule name is misleading in that branch, which is worth saying out loud: it
-    normalises headers rather than filtering. The normalisation is not cosmetic — Bakta,
-    Platon, geNomad and the BLAST screen all join on that first token.
+    The rule name is misleading in that branch: it normalises headers rather than
+    filtering. The normalisation matters — Bakta, Platon, geNomad and the BLAST screen
+    all join on that first token.
 
 ## Decontamination does most of the work, with one hand tied
 
-As in `illumina` mode, the screen's output *is* `contigs_final.fasta`. But BlobTools
+As in `illumina` mode, the screen's output is `contigs_final.fasta`. But BlobTools
 combines two signals — BLAST taxonomy and read coverage — and this mode has no reads.
 The contigs are mapped against themselves with minimap2 purely so BlobTools has a BAM
 to read, which gives a near-uniform depth that carries no information.
 
-**So only the BLAST taxonomy leg is doing real work here.** Every keep-or-drop decision
+So only the BLAST taxonomy leg is doing real work here. Every keep-or-drop decision
 still lands in `contaminants/contig_taxonomy_decisions.tsv` with its reason, and reading
 that file matters more in this mode than in any other. See
 [Decontamination](../analysis/decontamination.md).

@@ -3,9 +3,8 @@
 Getting a bacterial isolate from raw sequencing data to a statement you can defend —
 what species it is, how complete the genome is, what the organism can do, what
 resistance it carries and whether that resistance can move — takes a dozen tools.
-Each has its own input format, its own reference database and its own idea of a
-sensible default. Run by hand, the chain is slow, easy to get subtly wrong, and hard
-to repeat a year later when a reviewer asks.
+Each has its own input format, its own reference database and its own defaults. Run
+by hand, the chain is slow, easy to get subtly wrong, and hard to repeat a year later.
 
 BacFlux is that chain written down once, as a [Snakemake](https://snakemake.github.io/)
 workflow. Every step declares its inputs and its outputs, and every step that calls an
@@ -13,8 +12,14 @@ external tool declares its own conda environment, so a run can be resumed after 
 interruption, repeated on another machine, or handed to a colleague along with one
 config file and nothing else.
 
-That much is true of any workflow manager. The decision that shapes this repository is
-the other one: there is now a single workflow where there used to be four.
+That much is true of any workflow manager. What is specific to this repository is that
+there is now a single workflow where there used to be four.
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
 
 ## Four ways in, one analysis
 
@@ -23,8 +28,8 @@ because a project needed it — FastaFlux for genomes that arrived already assem
 BacFluxL when Oxford Nanopore Technologies (ONT) sequencing became routine here, and
 BacFluxL+ for isolates sequenced both ways. FastaFlux was a second Snakefile alongside
 the first; the two long-read ones had repositories of their own. All four were released,
-all four did their job, and work published with them stays citable — BacFluxL and
-BacFluxL+ are retired in favour of this repository and their DOIs stay valid. See
+and work published with them stays citable — BacFluxL and BacFluxL+ are retired in
+favour of this repository and their DOIs stay valid. See
 [Coming from v1](../getting-started/from-v1.md).
 
 They also had almost everything in common. Once an assembly exists, nothing downstream
@@ -67,16 +72,16 @@ produced both sides.
 ships without a DIAMOND index, so the index in any shared copy was built by whichever
 DIAMOND version that site happened to have, and the pinned one could not read it. The
 fix — build a local view of the read-only database from symlinks plus an index this
-workflow builds itself — was written in one rule, and all four modes had it. The other
-half of it matters more: two of the three bugs found that week were invisible in the
-`illumina` and `nanopore` runs, because those samples call zero viral contigs and take
-the empty-input shortcut before ever touching the database. Only the `hybrid` sample,
-which carries a prophage, went down that path — and fixing it there fixed it everywhere.
+workflow builds itself — was written in one rule, and all four modes had it. Two of the
+three bugs found that week were invisible in the `illumina` and `nanopore` runs, because
+those samples call zero viral contigs and take the empty-input shortcut before ever
+touching the database. Only the `hybrid` sample, which carries a prophage, went down
+that path — and fixing it there fixed it everywhere.
 
 **A new capability is built once.** The mobilome module is 22 rules and eleven Python
-helpers. Across the four it would have been copied four times and maintained in parallel
-for as long as it lived. That is what settled the order of work: merge first, then write
-the module. See [the mobilome module](../mobilome/index.md).
+helpers. Across the four it would have been copied four times and maintained in
+parallel. That is what settled the order of work: merge first, then write the module.
+See [the mobilome module](../mobilome/index.md).
 
 ## How the four modes actually share
 
@@ -85,7 +90,7 @@ the module. See [the mobilome module](../mobilome/index.md).
 reads that file and nothing else about the assembly. Exactly one shared rule feeding
 those stages looks further back — the one that reads Flye's own contig summary to tell
 Bakta which contigs are circular chromosomes — and it is gated so that it defines
-nothing at all in the two modes without long reads.
+nothing in the two modes without long reads.
 
 **Fixed stage numbers.** All technology-specific work lives under `01.reads` and
 `02.assembly`, so every shared stage lands on the same number in every mode: taxonomy is

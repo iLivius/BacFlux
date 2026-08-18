@@ -44,6 +44,13 @@ The two callers sit behind mutually exclusive guards, so only one set of rules i
 defined. The run prints which one it is at startup: `Phage caller: virsorter2 (default).
 Plasmid stage: Platon-only (geNomad off).`
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **HMM** | hidden Markov model — a statistical profile of a gene or protein family |
+    | **SOP** | standard operating procedure |
+
 ## Choosing the caller
 
 | | VirSorter2 2.2.4 | geNomad 1.12.0 |
@@ -55,11 +62,11 @@ Plasmid stage: Platon-only (geNomad off).`
 | Also changes | nothing else | switches on the Platon + geNomad plasmid concordance in [stage 06](plasmids.md) |
 
 VirSorter2 is the default because the whole default path — VirSorter2, Platon, CheckV — was
-chosen with their licences in view, and geNomad's is the one that did not fit.
+chosen with their licences in view, and geNomad's did not fit.
 [Licensing](../about/licensing.md) records what each licensor published and where it was
 read; read it before setting `genomad`.
 
-Choosing geNomad also changes the plasmid stage, and that is the point rather than a side
+Choosing geNomad also changes the plasmid stage, by design rather than as a side
 effect: one geNomad run produces both a virus FASTA and a plasmid summary, so opting in hands
 stage 06 a second, independent caller without a second run.
 
@@ -168,8 +175,7 @@ and the rule itself never knows which one it got.
 `quality_summary.tsv` is the file to read: one row per predicted viral sequence, with
 `checkv_quality`, `completeness`, `contamination`, viral and host gene counts, and CheckV's
 own warnings. Under VirSorter2, treat a low-completeness, high-host-gene row as what the loose
-0.5 cutoff was expected to produce — the caller is deliberately sensitive, and this is the step
-that says so.
+0.5 cutoff was expected to produce — the caller is deliberately sensitive.
 
 !!! note "A genome with no phage does not fail"
 
@@ -193,8 +199,8 @@ built by another site's DIAMOND makes CheckV fail deep into the completeness sta
 
 The prophage calls are a deliverable in their own right. A prophage is a mobile element, so
 [the mobilome module](../mobilome/index.md) counts this stage as part of its subject — but not
-as an input: no rule in stage 08 opens a file under `07.phages/`. What stage 08 does consume is
-the plasmid stage, and opting in to geNomad changes what *that* stage hands it, because the
+as an input: no rule in stage 08 opens a file under `07.phages/`. Stage 08 does consume the
+plasmid stage, and opting in to geNomad changes what that stage hands it, because the
 concordance table is built here.
 
 ## What to check afterwards

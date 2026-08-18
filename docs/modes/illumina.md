@@ -3,6 +3,12 @@
 `mode: illumina` — Illumina paired-end reads in, a decontaminated SPAdes assembly
 out. Six rules, in `workflow/rules/illumina/`.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
+
 ```mermaid
 flowchart TD
     subgraph FE["mode: illumina, rules in workflow/rules/illumina/"]
@@ -35,8 +41,9 @@ flowchart TD
 ## 1. PhiX removal
 
 An Illumina lane carries a PhiX spike-in — a small bacteriophage genome added as a
-sequencing control. Left in, it assembles into a ~5.4 kb contig of somebody else's
-virus and skews the coverage statistics BlobTools later uses to separate organisms.
+sequencing control. Left in, it assembles into a ~5.4 kb contig that is not part of
+the isolate and skews the coverage statistics BlobTools later uses to separate
+organisms.
 
 `download_phix` fetches the reference named by `links.phix_link`, `build_phix`
 indexes it, and `map_phix` runs `bowtie2 --local` per sample keeping the pairs that
@@ -75,15 +82,17 @@ itself** from the read length it measures:
 !!! warning "Passing `-k` switches that off"
 
     Supplying an explicit ladder disables SPAdes' selection entirely, so a fixed list is
-    then applied to whatever read length arrives. That matters because k-mer coverage is
-    only a fraction of read coverage — `read_cov × (L − k + 1) / L`. On 2×150 data
-    trimmed to ~145 bp, k = 127 retains **13%** of it, and the final contigs come from
-    the *largest* k — so an over-long ladder means the graph you deliver is the least
-    supported one in the run. SPAdes reports the coverage it saw at each k in its log.
+    then applied to whatever read length arrives. K-mer coverage is only a fraction of
+    read coverage — `read_cov × (L − k + 1) / L`. On 2×150 data trimmed to ~145 bp,
+    k = 127 retains **13%** of it, and the final contigs come from the *largest* k —
+    so an over-long ladder means the graph you deliver is the least supported one in
+    the run. SPAdes reports the coverage it saw at each k in its log.
 
     Set [`parameters.spades_kmers`](../reference/configuration.md) to a list only if you
     want to pin the ladder for reproducibility or override SPAdes on unusual data.
-    Whatever runs is echoed into the assembly log. `OMP_NUM_THREADS` is exported alongside `-t` so SPAdes' OpenMP sections obey the
+    Whatever runs is echoed into the assembly log.
+
+`OMP_NUM_THREADS` is exported alongside `-t` so SPAdes' OpenMP sections obey the
 same budget instead of taking every core on the machine, and `-m` is a hard RAM
 ceiling from `resources.ram_gb` that SPAdes aborts rather than exceed.
 
@@ -95,8 +104,8 @@ memory are left uncapped.
 `filter_contigs` keeps contigs of **at least 500 bp and at least 2× coverage**,
 reading both numbers straight off SPAdes' own header
 (`>NODE_1_length_12345_cov_67.8`). A pure-isolate assembly has a long tail of tiny,
-low-coverage contigs — sequencing noise, chimeras, fragments of whatever else was in
-the tube — which add nothing to the annotation but do inflate the contig count, the
+low-coverage contigs — sequencing noise, chimeras, fragments of other DNA in the
+sample — which add nothing to the annotation but do inflate the contig count, the
 CheckM contamination estimate and the BLAST screening time.
 
 The result is `02.assembly/{sample}/contigs_filt.fasta`, the draft the contamination

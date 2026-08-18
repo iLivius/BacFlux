@@ -9,6 +9,15 @@ the contig filter and the contamination screen. It ends by writing one file,
 reads that file and nothing else about the assembly, so the whole downstream half
 exists in one copy rather than four.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **ONT** | Oxford Nanopore Technologies — the long-read sequencing platform |
+    | **QC** | quality control |
+    | **AMR** | antimicrobial resistance |
+    | **IS** | insertion sequence — the smallest mobile element, carrying only the genes it needs to move |
+
 | | `illumina` | `nanopore` | `hybrid` | `contigs` |
 |---|---|---|---|---|
 | **Input** | paired-end reads | ONT long reads | both, same isolate | a FASTA |
@@ -27,14 +36,13 @@ step, and the rule is then not defined at all.
 Taxonomy, annotation, AMR and virulence screening, plasmid and prophage detection,
 the optional mobilome module and the MultiQC report are one set of rules, run over
 `contigs_final.fasta`. So are the contamination screen and assembly QC — those two
-sit *inside* the front end, at the point each mode needs them, but they are the same
+sit inside the front end, at the point each mode needs them, but they are the same
 code everywhere. Only the mapper that builds the coverage track differs: Bowtie2
 where there are short reads, minimap2 otherwise.
 
-That is what makes a cross-technology comparison mean something. When two answers
-come out of two sets of rules, every difference between them is confounded by the
-code. Out of one set, the difference is the data. See
-[Rationale](../about/rationale.md).
+That is what makes a cross-technology comparison meaningful: when two answers come
+out of two sets of rules, every difference between them is confounded by the code.
+Out of one set, the difference is the data. See [Rationale](../about/rationale.md).
 
 ## What the mode still decides downstream
 

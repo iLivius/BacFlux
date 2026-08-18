@@ -39,16 +39,19 @@ flowchart TD
 
 There is no PhiX step: PhiX is an Illumina spike-in and does not exist in an ONT
 library. The Medaka model is resolved *before* Flye runs, so a bad model name costs
-you seconds rather than an hour of assembly — see
+seconds rather than an hour of assembly — see
 [the model-choice note](../about/medaka-model.md).
 
-There is no PhiX step: PhiX is an Illumina spike-in and does not exist in an ONT
-library.
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **CARD** | Comprehensive Antibiotic Resistance Database |
 
 ## 1. Read filtering, and why it is the biggest lever in this mode
 
 An ONT run produces reads of wildly varying length and quality, and far more data
-than a bacterial isolate needs. Assembling everything is slower *and* worse: short,
+than a bacterial isolate needs. Assembling everything is slower and worse: short,
 poor reads add errors without adding contiguity. `filter_long_reads` runs Filtlong
 with three settings:
 
@@ -68,7 +71,7 @@ with three settings:
     from the assembly while sitting complete in the Illumina data: of the 603 raw ONT
     reads covering it, **93** survived the old `keep_percent: 90`, and **500** survive
     the 95 that now ships. Recovering the reads was necessary but not sufficient — no
-    setting tried, raw unfiltered reads included, actually assembled that plasmid.
+    setting tried, raw unfiltered reads included, assembled that plasmid.
 
     `parameters.long_read_qc.length_weight` has **no effect in this mode**: this rule
     passes no `--length_weight`, so Filtlong uses its own default of 1. That key
@@ -124,14 +127,14 @@ Two by-products are used later:
   `--replicons` table handed to Bakta, so the annotation knows which sequences are
   closed chromosomes and can call a gene that runs across the origin.
 
-Headers are trimmed to their first whitespace token here. That is not tidiness: Bakta,
-Platon, geNomad and the BLAST screen all join on that token.
+Headers are trimmed to their first whitespace token here, because Bakta, Platon,
+geNomad and the BLAST screen all join on that token.
 
 ## 4. Order: screen first, polish second
 
 The contamination screen runs on the **reoriented** assembly, and Medaka polishes the
 **decontaminated** one. Polishing a contaminant contig with this isolate's reads would
-be wasted effort at best, and would smear real differences at worst.
+waste effort and could smear real differences.
 
 `finalize_contigs` then copies whichever file ended the chain — the Medaka consensus,
 or the decontaminated assembly when Medaka is off — to `contigs_final.fasta`, and logs
@@ -151,8 +154,8 @@ which one it copied. That one line is the provenance of the delivered genome.
   still runs ([Antimicrobial resistance](../analysis/amr.md)).
 - **No length or coverage filter on the contigs.** The reoriented assembly reaches the
   screen as Flye left it.
-- **Residual base errors** are the thing Medaka exists to fix, and switching it off
-  leaves them in. Indels in homopolymers frameshift genes and ruin an annotation.
+- **Residual base errors** are what Medaka fixes; switching it off leaves them in.
+  Indels in homopolymers frameshift genes and ruin an annotation.
 
 ## What it writes
 

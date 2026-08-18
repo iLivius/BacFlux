@@ -2,12 +2,18 @@
 
 Why BacFlux polishes an ONT assembly with a bacterial methylation model when Dorado
 basecalled it with a canonical one. Written to be quotable in a methods section: every
-claim carries its source, and the last section states plainly which come from primary
+claim carries its source, and the last section states which come from primary
 documentation and which are inference.
 
 Established 2026-08-04 by reading Medaka's own source and ONT's documentation,
-prompted by a reasonable objection: **if Dorado basecalled without a methylation
+prompted by an objection: **if Dorado basecalled without a methylation
 model, why does BacFlux polish with a methylation-aware one?**
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **ONT** | Oxford Nanopore Technologies, the long-read sequencing platform |
 
 ---
 
@@ -39,7 +45,7 @@ does not — the two are different tools doing different jobs:
 |---|---|---|
 | Stage | basecalling | consensus polishing |
 | Job | **reports** methylation (`MM`/`ML` tags, per-base 5mC/6mA) | **corrects errors caused by** methylation |
-| Effect on the A/C/G/T sequence | none | changes it — that is the point |
+| Effect on the A/C/G/T sequence | none | changes it |
 | Output | an epigenetic annotation | a more accurate consensus |
 
 The Medaka bacterial model is not the polishing counterpart of a Dorado
@@ -62,7 +68,7 @@ silently polishing with the wrong model (`medaka/models.py`).
 
 ## The point that resolves the paradox
 
-The methylation errors exist **because** the basecaller was *not*
+The methylation errors exist because the basecaller was *not*
 methylation-aware. Bacteria methylate their own genomes (6mA, 5mC, 4mC, largely via
 restriction–modification systems). A modified base shifts the raw nanopore current
 away from the canonical signal, so a canonical basecaller — which can only emit
@@ -70,7 +76,7 @@ A/C/G/T — misreads those positions systematically, at the same sequence motifs
 every time. Because the errors are systematic rather than random, **more coverage
 does not remove them.**
 
-Those errors are already sitting in the basecalls. The bacterial polishing model is
+Those errors are already in the basecalls. The bacterial polishing model is
 trained to correct exactly that residue, which is why ONT scopes it to native
 material:
 
@@ -79,9 +85,8 @@ material:
 > that shows improved consensus accuracy."
 > — Medaka README (nanoporetech/medaka, v2.2.1)
 
-Note ONT's own words: a **research model**, and one whose compatibility is
-deliberately broad — *"compatible with several basecaller versions for the R10
-chemistries"*.
+ONT's own words: a **research model**, whose compatibility is deliberately broad —
+*"compatible with several basecaller versions for the R10 chemistries"*.
 
 **Corollary.** Had the run been basecalled *with* `--modified-bases`, the A/C/G/T
 sequence would be unchanged: modified-base calling adds an annotation layer on top
@@ -111,9 +116,9 @@ it to scale with how heavily methylated the organism is, not to be a fixed benef
 From the same source, and unrelated to model choice: **polish only structurally
 sound assemblies.** Where small plasmids were absent from the assembly, their reads
 misaligned elsewhere and Medaka introduced over 100 erroneous changes. A missing
-replicon is therefore not merely an omission — it actively corrupts the sequence
-that *is* present. BacFlux's plasmid-recovery and replicon-audit steps run before
-polishing partly for this reason.
+replicon is therefore not merely an omission: it corrupts the sequence that is
+present. BacFlux's plasmid-recovery and replicon-audit steps run before polishing
+partly for this reason.
 
 ## When this is the wrong choice, and how to override
 

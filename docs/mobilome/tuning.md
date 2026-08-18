@@ -21,6 +21,18 @@ This page is organised by what you saw, not by the parameter list.
 | tune against a fragmented assembly | [On a draft assembly](#on-a-draft-assembly) |
 | know whether a knob can fix this at all | [What no knob fixes](#what-no-knob-fixes) |
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
+    | **IS** | insertion sequence — the smallest mobile element, carrying only the genes it needs to move itself |
+    | **ICE** | integrative and conjugative element — carries its own conjugation machinery, so it can move itself into another cell |
+    | **IME** | integrative mobilisable element — carries a relaxase but no apparatus of its own, so it needs a helper element |
+    | **AICE** | actinomycete integrative and conjugative element |
+    | ***att* site** | the short direct repeat left at each end of an element where it integrated |
+    | **HMM** | hidden Markov model — a statistical profile of a gene or protein family |
+
 ## Start at the audit file
 
 Six files under `08.mobilome/{sample}/`, one per filtering step. Each carries a reason
@@ -84,7 +96,7 @@ awk -F'\t' '$8=="no_mge_context" || $8=="tier_not_raised"' \
     One catch with that idiom: if the column is **absent**, `col[...]` is 0 and `$0` —
     the whole line — gets tested instead. An `==` test then matches nothing and hands
     you an empty result; a `!=` test matches everything and the filter silently stops
-    filtering. Neither says a word. Check the header —
+    filtering. Check the header —
     `head -1 file | tr '\t' '\n' | nl` — whenever the row count looks wrong in either
     direction.
 
@@ -252,7 +264,7 @@ awk -F'\t' '$5=="kept_flagged"' 08.mobilome/S1/S1_ice_discarded.tsv | cut -f6 | 
     Lowering `MIN_ANCHOR_CLASSES_FOR_HIGH` to 2 does not lift the ceiling cleanly
     either: only 8 of the 26 IME rows would become eligible, because 17 of the rest are
     independently capped by `machinery_not_intact` and one by `at_contig_boundary`. The
-    change buys 8 relabelled rows and simultaneously makes every two-anchor ICE-ish
+    change buys 8 relabelled rows and simultaneously makes every two-anchor ICE-like
     cluster eligible for `high`. For an IME, medium is the ceiling, and `mobility` plus
     `machinery_intact` are the columns carrying the information.
 
@@ -263,7 +275,7 @@ Read the **class** before the count.
 | You see | Do |
 |---|---|
 | `evidence_level=profile_hits_only` | the module's weakest evidence: the profiles were seen, no system was assembled. Filter these out for reporting, or raise `coverage_profile` |
-| `mge_class=cime_or_island`, `mobility=passive` | no mobility claim and no tier. Not a false positive in the sense that matters |
+| `mge_class=cime_or_island`, `mobility=passive` | no mobility claim and no tier, so not a false positive |
 | a call at medium or better with a real mobility claim | investigate before dismissing |
 | calls in an archaeon or a very distant lineage | the CONJscan and ICEscan models are bacterial. Treat any call as suspect on those grounds alone |
 
@@ -298,7 +310,7 @@ Across 30 curated elements, lowering recovers exactly **one**: a 23 kb IME in
 coordinates) and correctly classed. It appears at 0.4 and gains nothing further at 0.3.
 
 The cost at 0.4 is two more calls, in *E. coli* K-12 MG1655 and *P. aeruginosa* PAO1.
-Read the class before panicking: every call added at 0.4 is `cime_or_island` /
+Read the class first: every call added at 0.4 is `cime_or_island` /
 `passive` / `low` / `profile_hits_only`, claiming no mobility and carrying no tier. At
 0.3 that stops holding — a 21.6 kb IME appears in *S. aureus* N315 at **medium**
 confidence with a real mobility claim, unverified either way.
@@ -329,7 +341,7 @@ what every measured result in this project was produced at. They are Layer B.
 |---|--:|---|---|
 | `--window-bp` | 15,000 | chains more machinery genes into one element; risks fusing two neighbouring systems | splits one operon into several candidates, each then too small to survive the size floor |
 | `--min-element-bp` | 8,000 | fewer, larger ICE candidates | admits short machinery spans; `cluster_shorter_than_min` stops firing |
-| `--min-ime-element-bp` | 2,000 | the sharpest knob in the module — see below | admits sub-2 kb clusters, which cannot physically hold both a relaxase and an integrase |
+| `--min-ime-element-bp` | 2,000 | the knob with the largest measured effect — see below | admits sub-2 kb clusters, which cannot physically hold both a relaxase and an integrase |
 | `--max-element-bp` | 500,000 | admits runaway anchor chains | drops genuinely large ICEs |
 | `--boundary-bp` | 1,000 | more candidates flagged as probably truncated and capped at low | fewer caps, and you stop being told that a call ran into the end of its contig |
 | `--integrase-window-bp` | 50,000 | an integrase further from the machinery may still anchor the element | more `integrase_without_conjugation_machinery` orphans, so fewer ICE/IME calls |
@@ -386,9 +398,9 @@ on both, the ICE*Kp* integrase sits 33,361 bp from the machinery cluster — and
 ICE label on a different element 1.1 Mb away.
 
 `--att-flank-window-bp` was 30,000 until SPI-7 showed why that was too narrow: its
-*attR* sits 5,800 bp outside a 30 kb window, so the element was reported 50 kb short for
-want of somewhere to look. 80 kb, 120 kb and 200 kb change no element's answer on the
-benchmark, so 50 kb is where the curve flattens rather than an arbitrary larger number.
+*attR* sits 5,800 bp outside a 30 kb window, so the element was reported 50 kb short.
+80 kb, 120 kb and 200 kb change no element's answer on the benchmark, so 50 kb is
+where the curve flattens rather than an arbitrary larger number.
 
 ### The composite span, and the co-localisation constants
 
@@ -415,8 +427,8 @@ Everything else in the co-localisation step is Layer C, in `colocalise.py`:
 
     IS*26* forms translocatable units with its copies in **direct** orientation, which
     breaks the same-orientation rule the composite pattern otherwise depends on. Without
-    the exemption, the single most clinically important AMR architecture is the one the
-    module misses.
+    the exemption, the module misses the single most clinically important AMR
+    architecture.
 
     `UNINFORMATIVE_FAMILY_VALUES` guards the opposite error: two IS both labelled "new"
     must not be called a composite on family grounds.
@@ -502,12 +514,11 @@ By default they are reported side by side and only the first sets confidence.
 Measured cost of turning it on: across the 85 element rows produced by the 52 complete
 records in the benchmark tree, 30 reach high confidence and only **7** of those have
 `boundary_method=tRNA`. The key demotes 23 of 30 high calls to medium **even on closed
-genomes**. Use it on closed long-read assemblies, where an unresolved boundary genuinely
-is a warning sign rather than the norm.
+genomes**. Use it on closed long-read assemblies, where an unresolved boundary is a
+warning sign rather than the norm.
 
 Either way, cargo is never assigned from an unresolved boundary: a de novo repeat is
-reported but never widens an element, so the interval stays the machinery span — a floor,
-never an invention.
+reported but never widens an element, so the interval stays the machinery span, a floor.
 
 !!! note "Two things about the att search that are easy to assume wrongly"
 
@@ -561,7 +572,7 @@ confidence cap reflect that.
 !!! warning "No knob tightens tier 6"
 
     The obvious framing — a false *predicted self-transmissible* is the expensive error,
-    so tighten the knobs — does not survive contact with the code. Tier 6 is set by
+    so tighten the knobs — is not how the code works. Tier 6 is set by
     exactly two things: an AMR gene inside an element classed `ice`, or a gene on a
     plasmid Platon typed `conjugative`. **Nothing in Layer A or Layer B touches either.**
 
@@ -569,8 +580,7 @@ confidence cap reflect that.
     the ICEscan layer on and off — 37 rows in both arms, the same 16 high / 19 medium /
     2 low, and not one row's confidence changes. `--min-ime-element-bp` acts only on
     IME/AICE-architecture clusters, and the naming thresholds change names, not tiers.
-    So every lever tightens the **tier-5** branch or the naming layer. That is a real
-    thing to want; it is just not what the heading promises.
+    So every lever tightens the **tier-5** branch or the naming layer.
 
     What actually guards tier 6 is not tunable: three of the five anchor classes for `high`,
     the absolute `spans_contigs` cap, the truncation check, and the
@@ -711,7 +721,7 @@ interval is honestly a floor.
 ## Traps
 
 **Lowering a threshold changes what "detected" means.** A recall score that counts any
-overlap flatters a looser setting, because one large call can swallow several curated
+overlap flatters a looser setting, because one large call can cover several curated
 elements and each counts as a hit. At `coverage_profile: 0.4` the internal scorer prints
 16/18 ICEs rather than 15/18 — the extra "detection" is a 3,187 bp call clipping the tail
 of a 161 kb element, 1.9% of it, and classed `ime` rather than `ice`. Honest ICE recall

@@ -10,6 +10,21 @@ the file's own order, and every section is tagged with the modes that read it �
 `[all modes]`, `[nanopore|hybrid]` and so on. Keys belonging to a mode that is
 not running are ignored entirely.
 
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **YAML** | the config file's plain-text format; indentation is significant and tabs are refused |
+    | **EFSA** | European Food Safety Authority, whose reporting thresholds the ABRicate leg applies |
+    | **GTDB** | Genome Taxonomy Database, the reference GTDB-Tk places each genome in |
+    | **AMR** | antimicrobial resistance |
+    | **IS** | insertion sequence, the smallest kind of mobile element |
+    | **ICE** | integrative and conjugative element — sits in the chromosome and can move itself to another cell |
+    | **IME** | integrative mobilisable element — the same, but needs a helper element to move |
+    | **AICE** | actinomycete integrative and conjugative element, a third class |
+    | ***att* site** | the short repeat marking an integrated element's ends |
+    | **HMM** | hidden Markov model, a statistical profile used to recognise a protein family |
+
 ## How the file is loaded
 
 The Snakefile declares **no** `configfile:` of its own, so a config must be named
@@ -89,8 +104,7 @@ v4.2.0, the version BacFlux pins.
 
 **Giving an explicit list disables that selection.** The list is then used whatever the
 reads look like, and the cost is easy to miss: k-mer coverage is not read coverage but
-`read_cov × (L − k + 1) / L`. With 145 bp reads, k = 127 keeps 13% of your coverage.
-The effect is easy to underestimate. With 145 bp reads, k = 127 keeps only about
+`read_cov × (L − k + 1) / L`. With 145 bp reads, k = 127 keeps only about
 **13%** of your coverage, and SPAdes prints the k-mer coverage it saw for each k in
 its own log — worth reading once on your own data:
 
@@ -508,7 +522,7 @@ range.
 There is no spelling for "off". The number goes straight to Filtlong's
 `--keep_percent`, so a blank value arrives as the literal `None` and Filtlong
 refuses to start; set `100` to keep everything above `min_length`, which is the
-safest setting for plasmids. Raising them further rarely buys anything — total
+safest setting for plasmids. Raising them further rarely gains anything — total
 bases barely moved in the test (208 → 227 Mb), so what changes is *which* reads
 survive, not how many. If you raise `length_weight` you are trading small
 replicons for chromosome contiguity; say so in your methods. Full treatment:
@@ -566,7 +580,7 @@ literally named `{}`.
     *precisely because* they are mobile and their nearest database relatives sit
     in another genus.
 
-    In `hybrid` mode this bites twice: only the Illumina reads mapping to the
+    In `hybrid` mode the loss compounds: only the Illumina reads mapping to the
     **selected** contigs become the short-read reference Filtlong scores ONT reads
     against, so sequence absent from that reference is discarded before Flye ever
     sees it — the plasmid disappears from the assembly, not merely from the
@@ -779,7 +793,7 @@ Tier 3 is an inference — two IS copies of one family, the right distance apart
 a gene between them. It has known blind spots: IS*26* forms translocatable units
 with its copies in *direct* orientation, breaking the same-orientation rule the
 pattern depends on. A curated hit is not an inference, so it gets IS*26* right
-for free.
+where the pattern does not.
 
 !!! warning "Tier 4 is strict, and rarer than it looks"
 
@@ -870,7 +884,7 @@ at medium however good the machinery evidence is, because the flanking sequence
 simply is not in the contig; that conflates two different questions. Either way,
 cargo is never assigned from an unresolved boundary: a de novo direct repeat is
 reported but never widens an element (about 16% of arbitrary spans on a real
-chromosome throw one up by chance), so the interval stays the machinery span — a
+chromosome produce one by chance), so the interval stays the machinery span — a
 floor, never an invention.
 
 !!! note "Three contig-end windows, one of them configurable"
@@ -912,7 +926,7 @@ the benchmark afterwards.
 | 15,000 bp | How far apart two machinery genes may sit and still be chained into one candidate element |
 | 8,000 bp | Floor on a candidate's length; below it the cluster is dropped with a reason |
 | 2,000 bp | The same floor for the IME/AICE architecture, which is genuinely smaller. The sharpest knob in the module |
-| 500,000 bp | Ceiling, so a runaway chain of anchors cannot swallow a whole replicon |
+| 500,000 bp | Ceiling, so a runaway chain of anchors cannot cover a whole replicon |
 | 50,000 bp | How far from the machinery an integrase may sit and still be taken as the element's own |
 | 50,000 bp | How much sequence either side of the machinery the att-site search reads |
 
@@ -952,8 +966,8 @@ the benchmark afterwards.
 
     The rule now passes `minid=0.76` — which changes no output, and stops the code
     claiming a stringency it never applied. It is deliberately not raised: at a
-    real 0.99 the same reads keep 2 alignments instead of 1240, which would gut
-    the one AMR leg immune to assembly collapse. Specificity comes from requiring
+    real 0.99 the same reads keep 2 alignments instead of 1240, which would
+    disable the one AMR leg immune to assembly collapse. Specificity comes from requiring
     ≥70% of the reference gene's **length** to be covered, which is why the loose
     identity floor is tolerable. There is no second pass and no divergent tier.
     See [antimicrobial resistance](../analysis/amr.md).
