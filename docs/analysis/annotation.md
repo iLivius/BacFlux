@@ -106,6 +106,18 @@ scratch directory is written alongside the results and deleted by Snakemake when
 rule ends; it is a sibling of the kept output, never inside it, so cleanup can never
 reach into a directory you keep.
 
+!!! warning "Do not cite the version in the output header"
+
+    Line 2 of every `.emapper.annotations` and `.emapper.seed_orthologs` file records
+    a version like `emapper-v1.3.0-90-g5b66bc3`, and the run log offers a matching
+    ready-made citation sentence. **That string is not an eggNOG-mapper version.**
+    eggNOG-mapper builds it by running `git describe`, and Snakemake runs rules from
+    the repository root, so it reports BacFlux's git description instead of its own.
+
+    The results are unaffected — this is the header only. The authoritative version is
+    the pin in `workflow/envs/eggnog-mapper.yaml`, **eggnog-mapper 2.1.15**, which is
+    what a methods section should cite.
+
 ### `--dbmem`: the RAM trade-off
 
 This is the slow tail of a BacFlux run, and usually the last rule still going. The
@@ -124,6 +136,26 @@ parameters:
 | Where `eggnog.db` is read from | disk, one random-access lookup per seed ortholog | memory |
 | RAM per **concurrent** eggNOG job | eggNOG-mapper's own working set | ~42 GB |
 | Worth it when | anything else | the machine has RAM to spare and this rule is what you are waiting for |
+
+!!! tip "Measured: 4.4x faster, and it depends where the database lives"
+
+    Three closed genomes (3,869-6,378 proteins), same input, only the flag changed:
+
+    | | `dbmem: false` | `dbmem: true` |
+    |---|--:|--:|
+    | three genomes, total | 7,223 s (120 min) | **1,628 s (27 min)** |
+    | per genome | 1,861-2,798 s | 530-552 s |
+
+    Annotations were **byte-identical** both ways, so this is a pure performance
+    switch. The DIAMOND search is only ~150 s of that; over 90% of the default
+    runtime is the seed-ortholog lookup phase, which is what the flag removes.
+
+    The size of the win depends on your storage. On the machine measured, `eggnog.db`
+    sits on **NFS**, so every cache miss is a network round-trip — the worst case for
+    random access, and the best case for this flag. On a local SSD expect less. Note
+    also that the three `dbmem` runtimes barely differ despite a 65% spread in protein
+    count: once the database is resident, the fixed ~39 GB load dominates, so the
+    saving grows with genome size and with the number of genomes in the batch.
 
 Two things happen when you switch it on, both at parse time, before any job starts:
 

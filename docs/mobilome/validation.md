@@ -34,11 +34,12 @@ yield 30 curated elements.
 | IME pilot | 12 | The same for IMEs, 10 genera, sizes deliberately straddling the module's size floor (522 bp to 110 kb) |
 | Negative control | 12 | Closed genomes with **no** curated ICEberg entry, 32,601,100 bp in total |
 
-The negative set is three reduced endosymbionts, two streamlined marine genomes, a
-deep-branching thermophile, five full-size reference strains (*E. coli* K-12 MG1655,
-*B. subtilis* 168, *P. aeruginosa* PAO1, *S. aureus* N315, *S.* Typhimurium LT2) and
-an archaeon, *Halobacterium* sp. NRC-1. The archaeon is a construction check: the
-machinery models are bacterial, so any call there would be spurious by definition.
+Every accession, with the reason it was chosen, is listed under
+[the benchmark genomes](#the-benchmark-genomes) below. The negative set spans reduced
+endosymbionts, streamlined marine genomes, a deep-branching thermophile, five
+full-size reference strains and one archaeon — the archaeon being a construction
+check, since the machinery models are bacterial and any call there would be spurious
+by definition.
 
 **How a call is scored.** ICEberg's curated interval is taken as truth. Among a
 caller's calls on that genome the scorer keeps the one with the largest overlap, and
@@ -56,6 +57,77 @@ alongside it.
     real, well-known element ICEberg has no entry for. The first penalises every
     caller; the second rewards a correct call as if it were an error. Both are
     described where they bite, below.
+
+## The benchmark genomes
+
+Every genome is a public GenBank deposit, used as downloaded. The reason each was
+picked is given because the sets were chosen deliberately rather than sampled — the
+IME set in particular is stacked with elements below the module's size floor, which is
+why its recall is the lowest number on this page.
+
+### ICE pilot — 18 genomes
+
+Six are the positive controls named in the design spec; the rest widen the set to 14 genera.
+
+| Accession | Organism | Curated element | Length | Why this one |
+|---|---|---|--:|---|
+| `AB450045` | *Vibrio cholerae* | SXT(HN1) | 19.1 kb | spec control: SXT |
+| `AY090559` | *Providencia rettgeri* | R391 | 88.5 kb | spec control: R391 |
+| `CP042858.1` | *Klebsiella pneumoniae* | ICEKpnQD23-1 | 190.9 kb | spec control: ICEKp |
+| `GU725392` | *Escherichia coli* | ICEEc2 | 93.9 kb | spec control: ICEEc2 |
+| `CP012430.1` | *Enterococcus faecium* | ICE_EfmISMMSVRE1_Tn916 | 16.9 kb | spec control: Tn916 |
+| `KP299160` | *Pseudomonas aeruginosa* | ICE(Tn4371)6061 | 43.8 kb | spec control: Tn4371 |
+| `KX077897` | *Streptococcus suis* | CMGE(TZ080501) | 125.8 kb | genus diversity: Streptococcus |
+| `CP027036.1` | *Klebsiella pneumoniae* | ICEKpn16_GR_13-1 | 151.9 kb | genus diversity: Klebsiella |
+| `CP034444.1` | *Mesorhizobium* sp. | ICEMsp.M1D | 199.4 kb | genus diversity: Mesorhizobium |
+| `CP024712.1` | *Pseudomonas syringae* | ICEPsy10 | 161.0 kb | genus diversity: Pseudomonas |
+| `MH160822.1` | *Proteus vulgaris* | ICEPvuChnBC22 | 148.8 kb | genus diversity: Proteus |
+| `GQ463144` | *Vibrio fluvialis* | ICEVflInd1 | 114.2 kb | genus diversity: Vibrio |
+| `AL513382` | *Salmonella enterica* | SPI-7 | 133.5 kb | genus diversity: Salmonella |
+| `CP048437.1` | *Faecalibacterium duncaniae* | ICE_FprA2-165_rpsI | 82.4 kb | genus diversity: Faecalibacterium |
+| `NC_004668.1` | *Enterococcus faecalis* | ICE_EfalV583_tRNALys | 138.3 kb | genus diversity: Enterococcus |
+| `CP002188` | *Mycoplasma bovis* | ICEB2 | 37.4 kb | genus diversity: Mycoplasma |
+| `NC_004461.1` | *Staphylococcus epidermidis* | ICE_Step12228_tRNAser | 38.4 kb | genus diversity: Staphylococcus |
+| `NC_013929` | *Streptomyces scabiei* | TR2 | 154.1 kb | genus diversity: Streptomyces |
+
+### IME pilot — 12 genomes
+
+Sizes deliberately straddle `min_element_bp` (8,000 bp): six of the twelve sit **below**
+the floor, so they are expected misses that measure where the floor actually bites.
+
+| Accession | Organism | Curated element | Length | Why this one |
+|---|---|---|--:|---|
+| `AE009948` | *Streptococcus agalactiae* | IME_Sag2603_rpmG | 522 bp | extreme sub-floor: 522 bp, 15x below min_element_bp; smallest IME in ICEberg |
+| `CP001103` | *Alteromonas mediterranea* | MGIAmaMed1 | 1,248 bp | deep sub-floor: 1.2 kb MGI, Gram-negative counterpart to the 522 bp case; genus diversity: Alteromonas |
+| `CP002888.1` | *Streptococcus salivarius* | IME_Ssal57I_tRNAlys | 5,123 bp | modal sub-floor architecture: S. salivarius tRNALys ~5.1 kb family, 11 near-identical copies in ICEberg |
+| `NC_013316.1` | *Clostridioides difficile* | IME_CdiR20291_ND | 5,551 bp | sub-floor, no named integration site (ND) so no tRNA hint for the att search; genus diversity: Clostridioides |
+| `U15027` | *Clostridium perfringens* | Tn4451 | 6,338 bp | named IME control: tnpX serine recombinase + oriT, no T4SS = the integrase+relaxase/no-T4SS row of the Phase 4 table; 1.7 kb below the floor |
+| `NC_017860` | *Prevotella intermedia* | MTnPi10 | 7,591 bp | floor edge case: 7591 bp, only 409 bp below min_element_bp; sits on a 580 kb second chromosome |
+| `NC_004668.1` | *Enterococcus faecalis* | IME_EfalV583_rpsI | 9,405 bp | just above the floor; same chromosome as ICE pilot entry ICE_EfalV583_tRNALys, so it tests ICE vs IME discrimination in one genome |
+| `CP011419.1` | *Streptococcus suis* | IME_SsuNSUI002_NS | 11.1 kb | above floor, no named integration site; genus diversity: Streptococcus suis |
+| `BA000037` | *Vibrio vulnificus* | MGIVvuTai1 | 19.0 kb | 15-30 kb MGI stratum; genus diversity: Vibrio |
+| `CP048437.1` | *Faecalibacterium duncaniae* | IME_FprA2-165_tRNAlys_2 | 23.2 kb | same chromosome as ICE pilot entry ICE_FprA2-165_rpsI, so it tests ICE vs IME discrimination; genus diversity: Faecalibacterium |
+| `AF261825` | *Salmonella enterica* | SGI1 | 42.5 kb | named IME control: canonical AMR-carrying SGI1 (ACSSuT / In104), mobilised by an IncA/C helper plasmid; borderline deposit, one-sided flank |
+| `CP016079.1` | *Mesorhizobium loti* | IMEMlNZP2037-1 | 110.5 kb | largest stratum: 110 kb element on a 7 Mb chromosome, tests 15 kb anchor clustering across a long element; genus diversity: Mesorhizobium |
+
+### Negative control — 12 genomes, 32.6 Mb
+
+Genomes with **no** curated ICEberg entry. Any call here is a candidate false positive.
+
+| Accession | Organism | Why this one |
+|---|---|---|
+| `NC_004061.1` | *Buchnera aphidicola* Sg | reduced endosymbiont genome (0.64 Mb): no conjugation machinery expected at all |
+| `NC_004344.2` | *Wigglesworthia glossinidia* brevipalpis | reduced endosymbiont (0.70 Mb): obligate intracellular, no MGE traffic |
+| `NC_002528.1` | *Buchnera aphidicola* APS | second Buchnera lineage, independent confirmation |
+| `NC_005042.1` | *Prochlorococcus marinus* SS120 | streamlined marine cyanobacterium, 1.75 Mb |
+| `NC_007516.1` | *Synechococcus* sp. CC9605 | marine picocyanobacterium, no curated ICE |
+| `NC_000918.1` | *Aquifex aeolicus* VF5 | deep-branching thermophile, 1.55 Mb |
+| `NC_002745.2` | *Staphylococcus aureus* N315 | well-characterised clinical isolate, no ICEberg entry |
+| `NC_000913.3` | *Escherichia coli* K-12 MG1655 | the reference lab strain; its mobilome is fully described and holds no ICE |
+| `NC_002516.2` | *Pseudomonas aeruginosa* PAO1 | reference strain, extensively studied |
+| `NC_000964.3` | *Bacillus subtilis* 168 | **Mis-assigned when the set was built.** ICE*Bs1* is present in 168 — it was discovered there (Auchtung 2005) — but ICEberg has no entry for it. The caller finds it, so this is a true positive scored as a false alarm. It is left in place rather than quietly removed |
+| `NC_003197.2` | *Salmonella Typhimurium* LT2 | reference strain, no curated ICEberg entry |
+| `NC_002607.1` | *Halobacterium* sp. NRC-1 | archaeon: CONJscan/ICEscan models are bacterial, so any call is suspect |
 
 ## ICE pilot — 15 of 18
 
