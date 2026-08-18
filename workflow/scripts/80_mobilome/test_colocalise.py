@@ -184,7 +184,7 @@ def run_colocalise(tmp_path, amr_rows, is_rows=None, replicon_rows=None,
 
 
 def audit_reasons(audit_rows, gene=None):
-    """Collect the reason slugs from the audit file, optionally for one gene."""
+    """Collect the reason keywords from the audit file, optionally for one gene."""
     return {row["reason"] for row in audit_rows
             if gene is None or row["amr_gene"] == gene}
 

@@ -89,7 +89,10 @@
 #    therefore carries a contig-boundary flag and a confidence tier, and the IS
 #    summary reports what FRACTION of calls sit at a contig end. Read those.
 #
-# 2. PUBLISHED IS-DETECTION FDR IS 8–24% EVEN ON CURATED DATA. The output is
+# 2. IS CALLING IS IMPERFECT EVEN ON CURATED GENOMES. Benchmarked against a
+#    curated E. coli annotation, ISEScan's "improbable or not an IS" rate was 8.0%
+#    (2.2% on the larger ISbrowser set); the four tools compared spanned 0-23.7%
+#    (Puterová & Martínek 2021, BMC Bioinformatics 22:258). The output is
 #    deliberately tiered evidence, never a bare count. And the language is
 #    "PREDICTED self-transmissible" — the confirmatory experiment is a filter or
 #    broth mating assay, not bioinformatics.

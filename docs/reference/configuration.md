@@ -259,7 +259,7 @@ stops the run rather than quietly resolving to something wrong.
 | `eggnog_db` | The eggNOG-mapper database directory. BacFlux pins eggnog-mapper 2.1.13, which annotates against **eggNOG 5.0**, database release **`emapperdb-5.0.2`**. The version is fixed by the tool rather than chosen by you: `download_eggnog_data.py` builds its URL from `__DB_VERSION__` in the installed release, so the database cannot drift away from the pin.
  |
 | `gtdbtk_db` | A GTDB-Tk release directory. |
-| `platon_db` | The Platon plasmid database. |
+| `platon_db` | The Platon plasmid database, release **v1.5.0** ([DOI 10.5281/zenodo.4066768](https://doi.org/10.5281/zenodo.4066768), 2020-10-05). It is versioned separately from Platon itself: v1.5.0 is the current database for every Platon from 1.5.0 onwards, including the 1.8 pinned here, so the database number trailing the tool number is expected rather than a sign of drift. |
 
 Versions and download recipes are on
 [reference databases](../getting-started/databases.md).
@@ -781,14 +781,16 @@ with its copies in *direct* orientation, breaking the same-orientation rule the
 pattern depends on. A curated hit is not an inference, so it gets IS*26* right
 for free.
 
-!!! warning "Tier 4 has never actually been produced"
+!!! warning "Tier 4 is strict, and rarer than it looks"
 
-    Reaching it needs a URL **and** at least `min_reference_coverage` of the
-    reference element present. On the clinical runs that did have this layer on,
-    every candidate was refused at 12% and 49% coverage of a 3,417 bp reference.
-    No run kept on disk contains a tier-4 row. Treat it as a working code path
-    that is currently unexercised, not as something this switch is known to
-    deliver.
+    Reaching it needs a URL **and** at least `min_reference_coverage` of the reference
+    element present **and** the gene to be somewhere no higher tier claims first. It has
+    been produced once, on a closed genome: `bla`CTX-M-15 inside Tn*Ecp1.1* at 87%
+    coverage ([Worked example](../mobilome/worked-example.md)). In that same genome six
+    other curated elements were named and none reached tier 4, because they sat on
+    plasmids. On fragmented clinical assemblies the same transposon was refused outright
+    at 12% and 49% coverage. Switching this on will name elements; it will not
+    necessarily produce a tier 4 row.
 
 #### `iceberg` — which ICE is it?
 

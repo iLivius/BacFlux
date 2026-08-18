@@ -210,14 +210,16 @@ its CDS with Pyrodigal.
 extracted directory are both derived from it, so the folder can never disagree with
 the link. The download rule fetches the archive and its `.sha256`, compares the two
 hashes, and **fails rather than extracting** if they differ. Only on a match does it
-extract and write the verified hash into a small sentinel file, `.verified.sha256`.
+extract and write the verified hash into a small marker file, `.verified.sha256`.
 
-The analysis rule depends on that sentinel rather than on the database directory, so
+The analysis rule waits for that marker file rather than for the database directory
+itself, and the difference matters: a directory can be left behind by an interrupted or
+never-verified run, whereas the marker is written only after the checksum has passed. So
 dbCAN cannot start against a database that failed its check. Setting
-`directories.dbcan_db` to a copy you already hold builds a symlink view instead, for
-the reason given under antiSMASH above, and writes a sentinel that says in words
-`local copy, not independently checksummed` — the analysis rule tests only that the
-sentinel exists, so the integrity claim holds for the download path alone.
+`directories.dbcan_db` to a copy you already hold builds a symlink view instead, for the
+reason given under antiSMASH above, and writes a marker that says in words `local copy,
+not independently checksummed` — the analysis rule tests only that the marker exists, so
+the integrity claim holds for the download path alone.
 
 !!! note "Why run_dbcan is pinned to 5.1.2"
 

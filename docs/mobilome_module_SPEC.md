@@ -174,6 +174,14 @@ Empirical anchor: in the ISOSDB paper, **97.5%** of ISOSDB transposases had prot
 
 Reality check: published benchmarks put IS-detection FDR at **8–24%** even on curated datasets. Report tiered confidence, never a bare count.
 
+> **Sourced 2026-08-17.** This figure was written without a citation. It is
+> traceable: Puterová & Martínek 2021 (BMC Bioinformatics 22:258, Table 3) report an
+> "improbable or not an IS element" discovery rate of 0–23.7% across four tools on a
+> curated *E. coli* annotation. But the range spans TOOLS, and ISEScan — the one
+> BacFlux uses — sits at 8.0% there and 2.2% on their larger ISbrowser set. Quoting
+> "8–24%" as if it described this workflow overstates it; the documentation now
+> gives ISEScan's own figures and cites the source.
+
 ### 2.3 Short-read fragmentation is the central constraint
 IS elements are the primary cause of contig breaks. On SPAdes assemblies:
 - Multi-copy IS collapse → located IS counts are a **floor, not a count**.
@@ -693,7 +701,18 @@ Steps 1–5 deliver a complete, defensible mobility ladder. Step 6 is the expens
 *All six were completed for v2.0.0. Two notes on how the finished ladder differs
 from the plan: step 4's "tiers 1–4" in practice reaches tier 3 without the
 optional TnCentral layer, because **tier 4 requires a curated name** and that
-layer is opt-in; and **tier 4 has never actually been assigned** in any retained
-run, because on the one occasion the naming layer did match a curated transposon
-the gene was on a conjugative plasmid and scored tier 6 instead. See "What the
-benchmark does not show" in `docs/mobilome/validation.md`.*
+layer is opt-in; and tier 4 had never been assigned in any retained run at the
+time of writing. See "What the benchmark does not show" in
+`docs/mobilome/validation.md`.*
+
+> **Updated 2026-08-17 — tier 4 has now been assigned.** The ATCC BAA-2146
+> positive control was re-run with the TnCentral layer on (`tncentral.dir`
+> pointed at the database fetched 2026-07-28). `bla`CTX-M-15 scores **tier 4**
+> inside Tn*Ecp1.1*, 99.9% identity over 87% of the 3,417 bp reference — the same
+> run without the layer scores it tier 2 / `is_adjacent`, so the documented
+> override works as specified in §7. Six further curated elements were named in
+> the same genome and none reached tier 4: they sit on plasmids, and the replicon
+> is tested first. 1,554 candidate hits were discarded, 1,044 of them for
+> reference coverage below the 80% floor — which is also why the same transposon
+> is refused on fragmented drafts (12% and 49%). Written up in
+> `docs/mobilome/worked-example.md`.

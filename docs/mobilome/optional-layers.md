@@ -146,14 +146,16 @@ also serve ISfinder content bring ISfinder's terms with them — written
 authorisation to download, no redistribution — so they are deliberately not wired
 in.
 
-!!! warning "Tier 4 is a working code path, not a measured one"
+!!! warning "This layer names elements; it does not guarantee a tier 4 row"
 
-    Reaching it needs a TnCentral source **and** at least `min_reference_coverage`
-    of a curated element present. On the clinical runs that had the layer on,
-    every Tn*Ecp1.1* candidate was refused at 12% and 49% coverage of a 3,417 bp
-    reference. **No run kept on disk contains a tier-4 row.** Treat the layer as
-    what it is — the naming cascade works, and this particular outcome has not
-    been observed. See [Validation](validation.md).
+    Reaching tier 4 needs a TnCentral source **and** at least
+    `min_reference_coverage` of a curated element present **and** no higher tier
+    claiming the gene first. On the ATCC BAA-2146 positive control the layer named
+    seven elements and exactly one produced a tier 4 row — `bla`CTX-M-15 in
+    Tn*Ecp1.1* at 87% coverage; the other six sat on plasmids and scored 5 or 6.
+    On fragmented clinical assemblies the same Tn*Ecp1.1* was refused outright at
+    12% and 49% coverage of its 3,417 bp reference. Expect names on any genome,
+    and tier 4 mainly on closed ones. See [Worked example](worked-example.md).
 
 **Outputs.** `08.mobilome/tncentral_db/` once per run;
 `{sample}_tncentral_blast.tsv`, `{sample}_named_elements.tsv` and

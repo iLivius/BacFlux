@@ -48,8 +48,8 @@ next to the number, so nobody reading the TSV has to look a tier up.
 
 The rungs are tested top down and the first match wins, so a curated transposon *on a
 plasmid* scores 5 or 6 rather than 4. That order, the three distance windows behind
-it, and which rungs are actually measured — tiers 4 and 5's IME route have never fired
-on any run kept on disk — are all on
+it, and how far to trust each rung — tier 4 rests on a single measured instance, and
+tier 5's IME route on none — are all on
 [The mobility ladder](mobility-ladder.md).
 
 ## What runs when you turn it on
@@ -161,9 +161,12 @@ those before reading the counts.
 **2. Never write "transmissible".** Tier 6 is `predicted_self_transmissible`, and the
 prediction rests on finding conjugation machinery, not on watching a transfer happen.
 
-**3. Confidence is tiered, never a bare call.** Published IS-detection
-false-discovery rates are 8–24% even on curated data, so every row carries
-`confidence` (high / medium / low) and anything resting on a contig boundary or on a
+**3. Confidence is tiered, never a bare call.** IS calling is imperfect even on
+manually curated genomes: benchmarking four tools against a curated *E. coli*
+annotation, Puterová & Martínek (2021) put the "improbable or not an IS element"
+discovery rate between 0% and 23.7% depending on the tool, with **ISEScan — the caller
+BacFlux uses — at 8.0%** (2.2% on their larger ISbrowser set). So every row carries
+`confidence` (high / medium / low), and anything resting on a contig boundary or on a
 partial hit is capped at `low`.
 
 The module was validated on closed genomes and then measured again on deliberately

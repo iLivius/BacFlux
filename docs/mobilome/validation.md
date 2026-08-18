@@ -444,18 +444,22 @@ double-stranded DNA through a translocase instead of a relaxase — is called tw
 one *Streptomyces* genome, neither call overlaps a curated element, and neither pilot
 set contains a curated AICE. Treat AICE calls as hypotheses.
 
-### Tiers 4 and 5, and tier 4 has never actually been assigned
+### Tiers 4 and 5, the thinnest-tested part of the ladder
 
 Tier 6 and tier 1 carry the benchmark work above. The middle of the ladder does not.
 
-- **Tier 4** — inside a *named* transposon or integron — depends entirely on the
-  opt-in TnCentral naming layer, and **no run retained on disk has ever assigned it**.
-  The naming layer has produced exactly one curated hit on real data, `bla`KPC-2 inside
-  Tn*7247* in a clinical *K. pneumoniae* isolate, and that gene scored **tier 6**,
-  because the transposon sat on a conjugative plasmid and plasmid evidence outranks a
-  transposon name. Tier 4 is reached only when a curated name is the *strongest*
-  evidence available, which in practice means a chromosomal element recovered at ≥80%
-  of its reference length, and no genome tested so far has produced that combination.
+- **Tier 4** — inside a *named* transposon or integron — depends entirely on the opt-in
+  TnCentral naming layer, and rests on **a single measured instance**: `bla`CTX-M-15
+  inside Tn*Ecp1.1* on the chromosome of the *K. pneumoniae* ATCC BAA-2146 positive
+  control, at 99.9% identity over 87% of the 3,417 bp reference. The same run without the
+  layer scores that gene tier 2, so the override behaves as designed
+  ([Worked example](worked-example.md)). One row on one closed genome is a demonstration
+  that the path works, **not** a measurement of how often it is right, and two things
+  keep it rare in practice. Tier 4 is reached only when a curated name is the *strongest*
+  evidence available — six other curated elements in that same genome sit on plasmids and
+  score 5 or 6 instead — and the ≥80% reference-coverage rule is strict: on fragmented
+  clinical assemblies the same Tn*Ecp1.1* was refused at 12% and 49% coverage. Expect
+  tier 4 on closed genomes far more than on drafts.
 - **Tier 5** is exercised, but only by one of its two routes. Every tier 5 row on disk
   is a gene on a mobilisable plasmid. **No AMR gene in any run has been assigned an
   IME context**, so the "inside an IME" half of tier 5 is untested end to end — which

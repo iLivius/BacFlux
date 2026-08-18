@@ -96,30 +96,76 @@ elsewhere on the plasmid, not wrapped around this gene. That is still the right 
 a mating apparatus makes the whole replicon transferable, and with it every gene on it —
 and the column says so rather than implying containment.
 
-## Tier 4 — what the naming layer is for, and why this run does not reach it
+## Tier 4 — the naming layer, switched on
 
-`mge_name` is `NA` on **all 66 rows**: this run did not have the TnCentral layer switched
-on. Nothing else produces a `unit_transposon`, so a gene a curated transposon would have
-explained falls back to tier 2 — "an IS is adjacent, so expression may change" — which is
-true and can sell the situation short.
+The run above was made without the TnCentral layer, so `mge_name` was `NA` on all 66
+rows. Re-running the same genome with the layer on — nothing else changed — is the
+clearest demonstration in these docs of what a curated name buys, because it changes one
+gene's answer completely.
 
 `blaCTX-M-15` is the standing example. IS*Ecp1* does not merely sit beside it supplying a
 promoter: IS*Ecp1* **mobilises** it, capturing the gene and moving it as a unit, and
-Tn*Ecp1.1* is that unit. Where a run can establish that, reporting "expression
-modulation, not mobilisation" is precisely backwards — which is why a curated hit
-**overrides** the pattern-based call rather than merely agreeing with it.
+Tn*Ecp1.1* is that unit. Reporting "expression modulation, not mobilisation" for that
+gene is precisely backwards, which is why a curated hit **overrides** the pattern-based
+call rather than merely agreeing with it. Here is the same gene, both ways:
 
-But note what happened on the clinical runs that *did* have the layer on: every
-Tn*Ecp1.1* candidate was **discarded**, with the reason recorded — *"only 12% / 49% of the
-3417 bp reference element is present (needs 80%). A fragment of a transposon is not that
-transposon."* The refusal is the correct behaviour, and it is also why tier 4 is so hard
-to reach on a fragmented assembly. Look in `{sample}_named_elements_discarded.tsv` before
-concluding a genome has no named transposon in it.
+| column | layer off | layer on |
+|---|---|---|
+| `mobility_tier` | **2** | **4** |
+| `mge_context` | `is_adjacent` | `unit_transposon` |
+| `mge_name` | `NA` | **Tn*Ecp1.1*** |
+| `distance_bp` | 48 | 0 — the gene is *inside* it |
+| `is_family` | IS1380 | `NA` |
+| `confidence` | medium | **high** |
 
-**No run kept on disk contains a tier 4 row.** The naming layer has matched a curated
-element on real data exactly once — `bla`KPC-2 inside Tn*7247* — and that gene scored
-tier 6, because the transposon sat on a conjugative plasmid and the replicon evidence is
-tested first ([The mobility ladder](mobility-ladder.md)).
+The match is 99.9% identity over 87% of the 3,417 bp reference element (`MF062700`). The
+pattern-based read was not wrong — IS*Ecp1* is an IS1380-family element and it is 48 bp
+away — but "an IS is adjacent, so expression may change" is a weaker and different claim
+than "the gene sits inside a named transposon that moves it".
+
+**Seven curated elements are named in this genome, and only one produces a tier 4 row.**
+That is the precedence rule doing its job rather than a shortfall:
+
+```text
+NZ_CP006659.2  chromosome        TnEcp1.1  87%   → tier 4   ← the only one
+NZ_CP006661.1  plasmid, conj.    Tn7241    81%   → tier 6, replicon evidence wins
+NZ_CP006661.1  plasmid, conj.    In781_p   82%   → tier 6
+NZ_CP006661.1  plasmid, conj.    Tn3000   100%   → tier 6
+NZ_CP006662.2  plasmid, mobil.   Tn3000    98%   → tier 5
+NZ_CP006662.2  plasmid, mobil.   Tn6320    88%   → tier 5
+NZ_CP006662.2  plasmid, mobil.   Tn1696.1 100%   → tier 5
+```
+
+Six of the seven sit on plasmids, and a plasmid is tested before a curated element, so
+those genes score 5 or 6 and keep the name in `named_element` as supporting detail. Only
+the chromosomal one is left for tier 4 to claim. A genome can be full of named
+transposons and still show a single tier 4 row.
+
+**The 80% rule is doing most of the filtering.** 1,554 candidate hits were discarded to
+produce those seven, and the reasons are recorded:
+
+```text
+1044  reference_coverage_below_threshold      ← the dominant one
+ 318  identity_below_naming_threshold
+ 103  interval_mostly_unaligned
+  84  tncentral_hit_is_a_plain_is
+   4  nested_or_overlapping_tncentral_hit
+```
+
+This is also why **tier 4 is much harder to reach on a draft**. On fragmented clinical
+assemblies every Tn*Ecp1.1* candidate was discarded, with the reason recorded — *"only
+12% / 49% of the 3417 bp reference element is present (needs 80%). A fragment of a
+transposon is not that transposon."* Here the same element clears the bar at 87% because
+this genome is closed. The refusal is correct behaviour in both cases; what differs is
+the assembly. Look in `{sample}_named_elements_discarded.tsv` before concluding a genome
+has no named transposon in it.
+
+!!! note "Reproducing this"
+
+    The naming layer was pointed at a TnCentral database fetched 2026-07-28 (533
+    sequences, `fasta_sha256` starting `6a264191`). The endpoint is unversioned, so that
+    digest — recorded in the database's own `PROVENANCE.txt` — is the only way to say
+    which release these names came from.
 
 ## The chromosomal ICE, scored against its curation
 
@@ -196,8 +242,10 @@ three: precise to four decimals, and carrying no discriminating power at all. Us
   CONJscan typed the mating apparatus rather than merely agreeing with a gene count.
 - The chromosomal ICE is recovered at 0.946 of its curated length with a tRNA-anchored
   boundary — and still ends 3.1 kb short, because a called interval is a floor.
-- **Tier 4 is not reached, and that is the honest result**, not an omission from the
-  walkthrough.
+- **Tier 4 is reached once, with the naming layer on** — `bla`CTX-M-15 inside Tn*Ecp1.1*,
+  which the same run scores tier 2 without it. Six other curated elements are named and
+  none of them produces a tier 4 row, because they sit on plasmids and the replicon is
+  tested first.
 - Every rejection carries its evidence in an audit file.
 
 ## What none of it establishes

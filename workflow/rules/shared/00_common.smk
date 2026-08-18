@@ -1545,8 +1545,10 @@ DBCAN_SHA_URL = DBCAN_LINK.replace(".tar.gz", ".sha256")
 # so the folder version always matches whatever dbcan_link points at. The same
 # approach is used for CheckV above. (v1 hard-coded "dbcan_db_v5.1.2", which
 # would silently mismatch a link pointing at any other dbCAN version.) The
-# sentinel is an empty marker file written after checksum verification so
-# Snakemake does not repeat the slow download/verify step.
+# sentinel (DBCAN_SENTINEL) is a small marker file holding the verified
+# checksum. It is written only after verification passes, so Snakemake does not
+# repeat the slow download/verify step, and no rule can start against a database
+# whose check failed.
 DBCAN_DB_ID    = os.path.splitext(os.path.splitext(os.path.basename(urlparse(DBCAN_LINK).path))[0])[0]
 DBCAN_DB_DIR   = DIR_ANNOTATION + "/dbcan/" + DBCAN_DB_ID
 DBCAN_SENTINEL = DBCAN_DB_DIR + "/.verified.sha256"

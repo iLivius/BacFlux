@@ -61,10 +61,10 @@ isolate was sequenced, and two isolates stay comparable when one was sequenced o
 and the other on ONT.
 
 ```
-  config: mode ──▶ ┌──────────┬──────────┬──────────┬──────────┐
+  config: mode ──> ┌──────────┬──────────┬──────────┬──────────┐
                    │ illumina │ nanopore │  hybrid  │ contigs  │
                    └────┬─────┴────┬─────┴────┬─────┴────┬─────┘
-  01.reads         bowtie2 PhiX  NanoPlot    both legs         —
+  01.reads         bowtie2 PhiX  NanoPlot    both legs   —
                    fastp         Filtlong
   02.assembly      SPAdes        Flye        Flye, Medaka*,   contig filter,
                                  dnaapler    Polypolish,      header-aware
@@ -148,9 +148,15 @@ one release, for the workflow to fetch:
 |---|---|---|
 | `directories.bakta_db` | [Bakta](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) | **v6.0** |
 | `directories.blast_db` | [NCBI core nt](https://ftp.ncbi.nlm.nih.gov/blast/db/), with the taxonomy files beside it | — |
-| `directories.eggnog_db` | [eggNOG](https://github.com/eggnogdb/eggnog-mapper/wiki) diamond database | — |
+| `directories.eggnog_db` | [eggNOG](https://github.com/eggnogdb/eggnog-mapper/wiki) diamond database | **emapperdb-5.0.2** |
 | `directories.gtdbtk_db` | [GTDB](https://ecogenomics.github.io/GTDBTk/installing/index.html) | **R232** |
-| `directories.platon_db` | [Platon](https://github.com/oschwengers/platon?tab=readme-ov-file#database) | — |
+| `directories.platon_db` | [Platon](https://github.com/oschwengers/platon?tab=readme-ov-file#database) | **v1.5.0** |
+
+Two of those versions are not yours to pick. The eggNOG release is fixed by the pinned
+eggnog-mapper 2.1.13, which builds its own download URL, so the database cannot drift away
+from the tool. And the Platon database is versioned separately from Platon itself — v1.5.0
+is the current database for every Platon from 1.5.0 onwards, including the 1.8 this
+workflow pins, so the two numbers are meant to differ.
 
 Everything else — PhiX, CARD, CheckV, dbCAN, VirSorter2, antiSMASH, and the optional
 mobilome databases — is downloaded into `output_dir` on the first run that needs it. Most

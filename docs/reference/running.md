@@ -147,7 +147,7 @@ correctly wins. Lowering `--cores` is how you run fewer heavy jobs side by side.
     ordering BacFlux relies on. It used to carry a `priority:` on 94 rules; all
     94 were removed in v2.0.0. Snakemake's default scheduler maximises the *sum*
     of the priorities of the jobs it starts, unweighted by how many cores each
-    takes, so a fan-out of small per-sample jobs outscored the one big job the
+    takes, so several small per-sample jobs together outscored the one big job the
     numbers were meant to start first — the scheme did the opposite of its intent
     whenever more than a couple of jobs were ready at once.
 

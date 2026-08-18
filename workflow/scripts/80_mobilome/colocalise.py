@@ -52,7 +52,8 @@ Consequences hard-wired here:
   * ABSENCE of a flanking IS may simply mean the contig ended, so every row
     carries `dist_to_contig_end` and `is_at_contig_boundary`, and anything
     resting on a contig boundary or on a partial hit is capped at LOW confidence;
-  * published IS-detection false-discovery rates are 8–24% even on curated data,
+  * IS calling is imperfect even on curated genomes (ISEScan: 8.0% "improbable or
+    not an IS" against a curated E. coli annotation, Puterová & Martínek 2021),
     so confidence is always TIERED (high/medium/low) and never a bare call.
 
 What runs where, because older comments in this module got it wrong: BacFlux v2
@@ -329,7 +330,7 @@ OUTPUT_COLUMNS = [
 #   confidence_capped      the call was downgraded — contig boundary, partial
 #                          hit, spans contigs, or a missing input table.
 #
-# `reason` is a short slug and `detail` carries the actual numbers. Every reason
+# `reason` is a fixed keyword and `detail` carries the actual numbers. Every reason
 # token in this file, grouped by the decision it belongs to, so a reader can grep
 # for one without reading the source:
 #   input_missing      is_table_absent_or_empty, replicon_table_absent_or_empty,
@@ -354,7 +355,7 @@ OUTPUT_COLUMNS = [
 #                      Do not underestimate these five: on an IS-rich clinical
 #                      genome they are among the commonest lines in the file
 #                      (flanking_is_different_family was the second most common
-#                      slug of all across the 12-genome clinical set), because
+#                      reason of all across the 12-genome clinical set), because
 #                      every AMR gene is tested against every nearby IS pair.
 #   evidence_rejected  unknown_element_type, is_inside_amr_cds_likely_inactivation,
 #                      is_abuts_partial_amr_hit_likely_inactivation,
@@ -386,7 +387,7 @@ AUDIT_COLUMNS = [
     "mobility_tier",
     "mge_context",
     "decision",   # one of the ten words above
-    "reason",     # short machine-readable slug
+    "reason",     # a fixed keyword, the same every time this rule fires
     "detail",     # the numbers behind the reason, in plain language
 ]
 
@@ -1496,7 +1497,7 @@ def find_composite_pair(gene, insertion_sequences, max_span_bp):
 
     Returns (best_pair_or_None, rejection_summary) where a pair is
     (left_element, right_element, span_bp) and rejection_summary is a dict of
-    {reason_slug: [detail strings]} for the audit trail — a candidate structure
+    {reason: [detail strings]} for the audit trail — a candidate structure
     we looked at and turned down is exactly what the audit file is for.
 
     Limitation, and it is the important one: on a short-read assembly the two IS

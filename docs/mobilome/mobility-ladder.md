@@ -5,6 +5,27 @@ answers a single question — *if this gene can move, what would move it?* — a
 label beside the number is written into the output table, so nobody reading the TSV has
 to look a number up.
 
+!!! note "The five terms the table uses"
+
+    An **IS** (insertion sequence) is the smallest mobile element: it encodes only what
+    it needs to move itself and carries no passenger genes, so an IS can never *be* the
+    resistance gene — only its neighbour.
+
+    A **composite transposon** is what you get when two copies of the same IS land
+    either side of something: the whole block, cargo included, can then move as a unit.
+
+    An **integron** is a capture system with a cassette array; a resistance gene sitting
+    in a cassette has an architecture somebody has characterised and named.
+
+    An **ICE** (integrative and conjugative element) sits in the chromosome and carries
+    its own conjugation machinery, so it can move itself into another cell.
+
+    An **IME** (integrative mobilisable element) also sits in the chromosome and carries
+    a **relaxase** — the enzyme that nicks the DNA to start a transfer — but no
+    apparatus of its own, so it needs a helper element to move.
+
+    That last distinction is the whole difference between tier 5 and tier 6.
+
 | Tier | `mobility_tier_label` | Context | What it means |
 |:--:|---|---|---|
 | **1** | `intrinsic_candidate` | chromosomal, nothing mobile nearby | nothing was found that could move it |
@@ -137,19 +158,40 @@ prediction rests on finding conjugation machinery that looks complete, not on wa
 transfer happen. **The confirmatory experiment is a filter or broth mating assay**, and
 no output of this module substitutes for one.
 
-## Which rungs are actually measured
+## How far to trust a tier
 
-| Tier | Status |
-|:--:|---|
-| 1 | benchmarked, and see the boundary caveat on [Validation](validation.md) |
-| 2, 3 | exercised on real genomes; both are *inferences* from IS position and orientation |
-| 4 | **a working code path that has never fired.** It needs the opt-in TnCentral layer *and* a curated element present at ≥80% of its reference length. No run kept on disk contains a tier 4 row |
-| 5 | exercised by its plasmid route only. **No AMR gene in any run has been given an IME context**, so half of this rung is untested end to end |
-| 6 | benchmarked, both routes |
+Tiers 1, 2, 3 and 6 are the ones you will meet in practice, and they are the ones the
+benchmark exercises. Two rungs are rarer than their position in the table suggests, and
+it is worth knowing why before one turns up in a report.
 
-Treat a tier 4 or tier 5 IME call as an unvalidated code path rather than a measured one,
-and say so if it reaches a dossier. The numbers behind this table are on
-[Validation](validation.md).
+**Tier 4 is structurally uncommon, not broken.** It needs three things at once: the
+opt-in [TnCentral naming layer](optional-layers.md) configured, a curated transposon or
+integron actually containing the gene, and the gene **not** on a plasmid and **not**
+inside an ICE or IME — because those are tested first and the first match wins. A
+resistance gene in a curated transposon on a plasmid scores tier 5, not tier 4.
+
+Nothing is lost when that happens: the curated name is still written to
+`named_element` and `named_element_type`, and the audit file records
+`inside_named_element_but_higher_tier_applies`. So you can always see that a gene sat
+in a named element even when its tier came from somewhere else.
+
+It is also strict about evidence: a curated element must be present at ≥80% of its
+reference length before it may name anything. That is why tier 4 turns up on closed
+genomes much more readily than on drafts, where the same element often survives only as a
+fragment. Worked through on a real genome, both halves of that — the override and the
+80% refusal — are on [Worked example](worked-example.md).
+
+**Tier 5 has two routes, and only one is well exercised.** The plasmid route — the gene
+is on a plasmid — is common and benchmarked. The IME route, where a chromosomal gene
+sits inside an integrative mobilisable element, is much rarer, and the benchmark has not
+put an AMR gene inside one.
+
+**What to do with that.** Tier 4 rests on a single measured instance, and the tier 5 IME
+route on none. If either reaches something you are signing, check the evidence columns
+yourself rather than the tier alone — `named_element`, `mge_id`, `boundary_method` and
+`confidence` are all there for exactly this. The measured performance of the tiers that
+*are* benchmarked is on [Validation](validation.md), including the boundary caveat that
+applies to tier 1.
 
 ## Next
 

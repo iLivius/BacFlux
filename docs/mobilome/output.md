@@ -159,7 +159,7 @@ cut -f8,9 {sample}_amr_mobility_audit.tsv | sort | uniq -c | sort -rn
 | `tools_disagree` | two tools disagreed. **Never resolved silently** |
 | `confidence_capped` | the call was downgraded, and the reason says which guard fired |
 
-`reason` is a short slug and `detail` carries the numbers. A real example, for
+`reason` is a fixed keyword you can filter on, and `detail` carries the numbers. A real example, for
 *bla*NDM-1:
 
 ```text
@@ -181,7 +181,7 @@ organism can raise the threshold and re-run.
     `flanking_is_pair_inverted_orientation`. Do not underestimate them: every AMR gene is
     tested against every nearby IS pair, so on an IS-rich clinical genome these are among
     the most common lines in the file — `flanking_is_different_family` was the second
-    most common slug of all across a 12-genome clinical set.
+    most common reason of all across a 12-genome clinical set.
 
 ## Everything else stage 08 writes
 

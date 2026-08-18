@@ -100,11 +100,16 @@ mobilome:
   coverage_profile: 0.5              # how much of an HMM profile a hit must cover
   contig_boundary_bp: 100            # how close to a contig end counts as "at the edge"
   require_trna_boundary_for_high: false
-  icescan:   { run: false, ... }     # ─┐
-  tncentral: { url: "", ... }        #  │ the four optional layers,
-  iceberg:   { urls: [], ... }       #  │ each off until it has a source
-  isosdb:    { fasta_url: "", ... }  # ─┘
+  icescan:   { run: false, ... }     # ─┐ the four optional layers, all off by
+  tncentral: { url: "", ... }        #  │ default: ICEscan by its own run flag,
+  iceberg:   { urls: [], ... }       #  │ the other three because they have
+  isosdb:    { fasta_url: "", ... }  # ─┘ nowhere yet to fetch from
 ```
+
+ICEscan is the only one of the four that ships a working URL, because it has a single
+canonical source — the bundle EBI publishes for ICEfinder2 — so `run: true` is all it
+needs. For the other three you paste a URL in yourself, and the commented `# e.g.` line
+beside each key is the address that was used to validate this module.
 
 Two of these are worth knowing about before a first run.
 

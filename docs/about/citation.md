@@ -201,6 +201,11 @@ distinction matters, and it is spelled out on [Licensing](licensing.md).
   fixed-length probe — is why BacFlux's att-site search works the way it does.
   Established by reading it, then implemented independently.
 
+- Puterová, J. & Martínek, T. (2021) digIS: towards detecting distant and putative
+  novel insertion sequence elements in prokaryotic genomes. *BMC Bioinformatics*
+  22:258. <https://doi.org/10.1186/s12859-021-04177-6> — benchmarked here for the
+  IS false-discovery figures quoted on the mobilome pages, not run by BacFlux.
+
 ## Licence
 
 BacFlux is released under the
