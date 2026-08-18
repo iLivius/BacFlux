@@ -441,7 +441,7 @@ a tier and a confidence — is exercised on *Klebsiella pneumoniae* ATCC BAA-214
 published literature. That run reaches tiers 1, 2, 3, 5 and 6; it recovers the
 chromosomal ICE at 0.946 of its curated length with a tRNA-anchored boundary and still
 ends 3,138 bp inside the curated element, because a called interval is a floor. It does
-not reach tier 4 — see [below](#tiers-4-and-5-and-tier-4-has-never-actually-been-assigned).
+not reach tier 4 — see [below](#tiers-4-and-5-the-thinnest-tested-part-of-the-ladder).
 The walkthrough is the [worked example](worked-example.md); the columns are on
 [Reading the output](output.md).
 

@@ -1,13 +1,28 @@
 # Comparing BacFlux's ICE/IME caller against the EBI Mobilome Annotation Pipeline
 
-**Status:** complete, numbers current as of BacFlux commit `4a93d89` (branch `release/v2.0.0`).
-**Purpose:** a methods-section-ready account of a head-to-head run of BacFlux's
-mobilome module against an independent, published mobilome pipeline, on identical
-input, scored by identical code.
-**Artefacts:** `<validation-root>/ebi_map`
-(runs, conversion, scoring) and `<validation-root>/phase7_benchmark`
-(BacFlux's own benchmark). Every figure below was recomputed from those files
-while writing this document, not copied from an earlier draft.
+The obvious question about any new caller is whether an established one does better.
+This page answers it directly: BacFlux's mobilome module and the EBI Mobilome
+Annotation Pipeline, run on the same genomes and scored by the same code.
+
+Read section 0 first. The two callers share ancestry, so this is **not** an
+independent check — treating it as one would overstate what agreement between them
+proves.
+
+Numbers current as of BacFlux commit `4a93d89` (branch `release/v2.0.0`), and every
+figure was recomputed from the run artefacts while writing, not carried over from a
+draft.
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **MAP** | the EBI **M**obilome **A**nnotation **P**ipeline, the caller compared against |
+    | **ICE** | integrative and conjugative element — integrates into the chromosome and carries its own conjugation machinery, so it can move itself |
+    | **IME** | integrative mobilisable element — integrates and can be moved, but has no machinery of its own and needs a helper |
+    | **AICE** | actinomycete integrative and conjugative element, a third class using a different transfer mechanism |
+    | **T4SS / T4CP** | type IV secretion system and its coupling protein — the apparatus that pushes DNA into the next cell |
+    | ***att* site** | the short repeat marking an integrated element's ends |
+    | **SO** | Sequence Ontology, the controlled vocabulary used for feature types in GFF output |
 
 ---
 

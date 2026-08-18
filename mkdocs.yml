@@ -136,6 +136,11 @@ nav:
       - Tuning: mobilome/tuning.md
       - Worked example: mobilome/worked-example.md
       - Validation: mobilome/validation.md
+  - Method references:
+      - Intrinsic vs acquired AMR: methods_amr_intrinsic_acquired.md
+      - att sites and small plasmids: methods_att_and_small_plasmids.md
+      - CONJScan + ICEscan together: methods_icescan_union.md
+      - Head-to-head vs the EBI pipeline: methods_ebi_comparison.md
   - Reference:
       - Configuration: reference/configuration.md
       - Output files: reference/output.md

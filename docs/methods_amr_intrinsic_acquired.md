@@ -1,9 +1,27 @@
 # Method reference: intrinsic versus acquired AMR, and what BacFlux can actually say
 
-*Written to be quotable in a methods section: every claim carries its source, and
-the last section states plainly which sources are peer-reviewed guidance, which are
-technical reports, and which claims are inference. The reader-facing summary is
-[`docs/mobilome/mobility-ladder.md`](mobilome/mobility-ladder.md).*
+A regulator asking about a resistance gene almost always wants one thing: did this
+strain always have it, or did it pick it up from somewhere? This page explains why
+that question is harder than it sounds, what BacFlux can answer, and — more
+importantly — what it deliberately refuses to answer.
+
+Written to be quotable in a methods section: every claim carries its source, and the
+final section separates peer-reviewed guidance from technical reports and from our own
+inference. For the short reader-facing version, see
+[The mobility ladder](mobilome/mobility-ladder.md).
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **AMR** | antimicrobial resistance |
+    | **intrinsic** | resistance shared by essentially all strains of a species — a property of the species, not of this isolate |
+    | **acquired** | resistance gained horizontally, from a plasmid or mobile element |
+    | **EFSA** | European Food Safety Authority, whose guidance drives the intrinsic/acquired question |
+    | **FEEDAP** | the EFSA panel that issues the guidance for feed additives |
+    | **QPS** | Qualified Presumption of Safety, EFSA's list of species accepted as safe |
+    | **MIC** | minimum inhibitory concentration — the lab measurement of resistance |
+    | **ANI** | average nucleotide identity, a genome-to-genome similarity measure |
 
 Written 2026-08-14, prompted by three questions that come up whenever someone
 reads an `08.mobilome` table next to a regulatory checklist:

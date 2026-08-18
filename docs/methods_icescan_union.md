@@ -1,9 +1,26 @@
 # Method reference: running CONJScan and ICEscan together
 
-*Destined for the MkDocs site, and intended to be quotable in a methods section.
-Every number here was re-measured from the artefacts on disk rather than carried
-over from notes. Where a claim could **not** be re-established, it is marked as
-such instead of being repeated.*
+BacFlux can search for conjugation machinery with two different model sets. This page
+explains why it runs **both and merges the results** rather than picking one, what the
+second set genuinely adds, and which parts of it are deliberately distrusted.
+
+Every number was re-measured from the artefacts on disk rather than carried over from
+notes. Where a claim could **not** be re-established, it is marked as such instead of
+being repeated.
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | **CONJScan** | the default model set, distributed with MacSyFinder. Conservative and well validated |
+    | **ICEscan** | the optional second set, a fork of CONJScan taken from ICEfinder2. Off by default; adds classes CONJScan cannot see |
+    | **MacSyFinder** | the engine both run on: it looks for a quorum of required genes, not single hits |
+    | **ICE** | integrative and conjugative element — moves itself between cells |
+    | **IME** | integrative mobilisable element — needs a helper element to move |
+    | **AICE** | actinomycete ICE, which replicates rather than conjugates in the usual way |
+    | **T4SS** | type IV secretion system, the mating apparatus |
+    | ***att* site** | the short repeat marking an integrated element's ends |
+    | **MGE** | mobile genetic element, the general term |
 
 Established 2026-07-30, on the 28-genome Phase 7 benchmark
 (`<validation-root>/phase7_benchmark`),

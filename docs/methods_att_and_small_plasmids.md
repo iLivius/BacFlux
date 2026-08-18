@@ -1,9 +1,23 @@
 # Method reference: att-site detection and small-plasmid recovery
 
-*Destined for the MkDocs site, and intended to be quotable in a methods section.
-Every claim here carries its source. Two of them are NEGATIVE results — places
-where the literature has no answer — and those are flagged explicitly, because
-they are the ones worth being careful about in a paper.*
+Two problems that look unrelated and are not. **Where does a mobile element stop?**
+and **why did a small plasmid vanish from the assembly?** Both come down to short
+repeated sequences, and both were found the same way — by two concrete failures on
+real data.
+
+Every claim carries its source. Two are NEGATIVE results — questions the published
+literature simply does not answer — and they are flagged as such, because those are
+the ones to be careful with in a paper.
+
+!!! abstract "Terms used on this page"
+
+    | | |
+    |---|---|
+    | ***att* site** | the short repeated sequence left at each end of an element when it integrates into a genome. Finding the pair is how an element's true edges are established |
+    | **attL / attR** | the left and right copies of that repeat |
+    | **ICE** | integrative and conjugative element — a mobile element that sits in the chromosome and can move itself to another cell |
+    | **direct repeat** | two copies of a sequence in the same orientation |
+    | **HMM** | hidden Markov model, a statistical profile used to recognise a protein family |
 
 Established 2026-07-28 by reading the primary sources and the tools' own source
 code, prompted by two concrete failures on clinical *Klebsiella pneumoniae*
