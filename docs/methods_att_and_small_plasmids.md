@@ -73,7 +73,7 @@ boundary calling.
   sites (which ICE*Kp* is) sit at **20–45 bp** cores, **serine**-integrase
   elements go as low as **3–12 bp** ([DEPhT](https://pmc.ncbi.nlm.nih.gov/articles/PMC9303363/)).
 
-### ⚠ NEGATIVE RESULT: no precedent for "step the probe down"
+### Stepping the probe down: no precedent, and weaker anyway
 
 The obvious repair — try 25, then 24, 23 … and take the longest that works — has
 **no published precedent** in att-site or genomic-island detection. Nobody needs
@@ -82,16 +82,15 @@ longest repeat in a single pass. Exact k-mer stepping is also strictly *weaker*,
 because it cannot absorb the indels and mismatches an aligner handles automatically,
 and it yields no bitscore to weight confidence with.
 
-### ⚠ NEGATIVE RESULT: no published false-positive rate for boundary calling
+### Nobody has published a false-positive rate for boundary calling
 
 There is **no published false-positive rate or statistical treatment specific to
 att-site detection**. Existing benchmarks measure genomic-island *calling*, not
 *boundary* calling. Islander's paper admits only "the few false positives", with
 no number.
 
-This matters for writing up: our own measured spurious de-novo boundary rate is
-better characterised than anything in the published literature, and can be stated
-as such. Measured on 300 randomly placed 15 kb non-ICE spans of a clinical
+That gap is why the rate below can be stated as the best-characterised figure
+available: it is measured rather than borrowed. Measured on 300 randomly placed 15 kb non-ICE spans of a clinical
 *K. pneumoniae* chromosome, with the real IS mask applied: **22%** of them
 returned a confident de novo "boundary", falling to **16%** once the
 repeat-family guard was added, and to **~1%** reaching the AMR table once de novo
@@ -369,11 +368,14 @@ duplication and expects to run inside the Autocycler pipeline.
 | **Trycycler** | manual curation per genome | Unusable unattended; superseded by Autocycler |
 | **Union of multiple long-read assemblers** | running several assemblers per sample | Would probably not have helped — the failure is shared across assemblers and driven by the read set |
 
-### ⚠ NEGATIVE RESULT: newest assemblers unbenchmarked here
+### Why newer assemblers are not in the table
 
-No 2025/2026 head-to-head benchmark scores small-plasmid recovery numerically
-for Myloasm, metaMDBG, LJA or hifiasm. Recent accuracy benchmarks exist; none
-report per-assembler small-plasmid recovery rates.
+Switching assembler is the obvious alternative to the options above, and it cannot
+be judged on evidence. The newer long-read assemblers — Myloasm, metaMDBG, LJA,
+hifiasm — have been benchmarked for accuracy through 2025 and 2026, but no
+head-to-head study reports **small-plasmid recovery** per assembler. That is the
+number this section turns on, so there is nothing to compare against and none of
+them can be recommended or ruled out here.
 
 ---
 
