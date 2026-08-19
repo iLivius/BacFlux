@@ -32,9 +32,25 @@ to the matching consensus model, and then substitutes the bacterial model — bu
 only if the detected basecaller is on its compatibility list. On a typical R10.4.1
 `sup` run this resolves to `r1041_e82_400bps_bacterial_methylation`.
 
+That command is character-for-character what `medaka_consensus` itself runs for its
+`--bacteria` flag, so `auto` really does get the bacterial model — this is verified
+against the installed Medaka source, not inferred. If resolution fails (no
+basecaller tag, or a tag Medaka's lookup does not know) the check exits 1 with a
+suggestion table; it never falls back to a non-bacterial model. Model choice is
+worth that strictness: across ten genomes it was the difference between 26 and 100
+residual errors ([Wick 2025](https://rrwick.github.io/2025/02/07/dorado-polish.html)).
+
 This happens in `check_medaka_model` (`workflow/rules/shared/12_medaka_check.smk`),
 which runs *before* assembly so a bad or incompatible model fails in seconds rather
 than after the assembler has spent an hour.
+
+!!! note "Naming drift: `dorado polish --bacteria`"
+
+    Wick's 2026 posts recommend `dorado polish --bacteria` in place of Medaka. As of
+    his 2025-02-07 measurement the two shipped identical model weights, though he
+    hedged that with "At the time of writing" and nobody has re-checked since. Noted
+    only so the tool names in those posts do not read as a contradiction of this
+    page; BacFlux stays on Medaka.
 
 ## Why this is not a mismatch
 
@@ -97,8 +113,26 @@ corollary is inference, not quoted documentation.)
 
 ## Does it actually help?
 
-Independently measured on two bacterial genomes, comparing Medaka v2 with the
-bacterial model against the previous release:
+The peer-reviewed measurement is Nagy *et al.* / NEKSUS Consortium (2026):
+92 clinical Enterobacterales, R10.4.1 chemistry, Dorado `sup` v5.0.0 basecalls,
+assembled with Flye, Hybracter and Autocycler and polished with Medaka v2.
+
+> "Medaka polishing with un-subsampled long-reads resulted in small improvements in
+> indels, but not SNVs for both Flye and Autocycler assemblies."
+>
+> "Seven-locus multi-locus sequence type, antimicrobial resistance, virulence and
+> stress gene annotation was equivalent across assembler/polisher combinations."
+>
+> — Nagy *et al.* / NEKSUS Consortium (2026), *Microbial Genomics* 12(2):001631.
+> https://www.microbiologyresearch.org/content/journal/mgen/10.1099/mgen.0.001631
+
+It is the only published benchmark run on the configuration BacFlux actually uses:
+Wick's polishing comparisons are all on Autocycler assemblies or on deliberately
+degraded Raven drafts, never on Flye. In practice, expect Medaka to take out indels,
+and expect typing, AMR and virulence calls to come out the same either way.
+
+A smaller and earlier observation, on two bacterial genomes, compared Medaka v2 with
+the bacterial model against the previous release:
 
 | Genome | Errors before | Errors after |
 |---|---|---|
@@ -108,17 +142,28 @@ bacterial model against the previous release:
 > Wick RR (2024) *Medaka v2: progress and potential pitfalls.*
 > https://rrwick.github.io/2024/10/17/medaka-v2.html
 
-The gain is real but variable — large on one genome, marginal on the other. Expect
-it to scale with how heavily methylated the organism is, not to be a fixed benefit.
+Two genomes is a small sample, and the gain is variable — large on one, marginal on
+the other. Expect it to scale with how heavily methylated the organism is, not to be
+a fixed benefit.
 
 ## A separate pitfall worth knowing
 
-From the same source, and unrelated to model choice: **polish only structurally
-sound assemblies.** Where small plasmids were absent from the assembly, their reads
+Unrelated to model choice: **polish only structurally sound assemblies.** In the 2024
+post above, where small plasmids were absent from the assembly, their reads
 misaligned elsewhere and Medaka introduced over 100 erroneous changes. A missing
 replicon is therefore not merely an omission: it corrupts the sequence that is
-present. BacFlux's plasmid-recovery and replicon-audit steps run before polishing
-partly for this reason.
+present.
+
+Wick broadened the warning in a 2025-02-25 revision of his assembly guide:
+
+> "Structural errors in your assembly (such as missing plasmids or start-end overlap
+> of circular contigs) can sometimes lead to Medaka increaing [sic] the number of
+> errors."
+> — https://rrwick.github.io/2020/10/30/guide-to-bacterial-genome-assembly.html
+
+So a missing plasmid is one case of a wider problem: an unresolved start–end overlap
+on a circular contig does the same. BacFlux's reorientation, plasmid-recovery and
+replicon-audit steps run before polishing partly for this reason.
 
 ## When this is the wrong choice, and how to override
 
@@ -134,6 +179,11 @@ parameters:
   nanopore:            # or: hybrid
     medaka_model: r1041_e82_400bps_sup_v4.2.0
 ```
+
+This has a cost worth stating: that is the standard, non-bacterial model, and on
+Wick's measurements it leaves roughly four times the residual errors the bacterial
+one does. It is still the right choice on amplified DNA, where the methylation the
+bacterial model corrects for is no longer in the template.
 
 `check_medaka_model` validates any explicit name against the installed Medaka's
 model list and fails early with a suggestion table if it is wrong.
@@ -156,8 +206,15 @@ Stated so the claims above can be defended or challenged individually.
 - "native data with bacterial modifications… improved consensus accuracy",
   "research model", "compatible with several basecaller versions", and the
   model-matching requirement — quoted from ONT's Medaka README (v2.2.1).
+- That `--auto_model consensus_bacteria` is the same call `medaka_consensus` makes
+  for its `--bacteria` flag, and the exit-1-on-failure behaviour — read from the
+  installed Medaka source and from `medaka_model_check.py`.
+- The 92-isolate Flye/Hybracter/Autocycler result and the annotation-equivalence
+  statement — quoted verbatim from Nagy *et al.* (2026), cited above.
 - The error counts for *C. lari* and *E. cloacae*, and the small-plasmid pitfall —
   Wick (2024), cited above.
+- The broadened structural-error warning, and the 26-versus-100 residual-error
+  figure for model choice — Wick (2025), cited above.
 
 **Inference, not quoted from documentation**
 
@@ -174,6 +231,10 @@ Stated so the claims above can be defended or challenged individually.
 - That methylation-induced errors are predominantly indels, and that frameshifted
   or pseudogene counts in the annotation are therefore a good readout for testing
   the model's benefit.
+
+**Not re-checked:** whether `dorado polish --bacteria` still ships the same model
+weights as Medaka's bacterial model. Wick reported that in February 2025 and hedged
+it with "At the time of writing"; nothing here verifies it since.
 
 **Not consulted:** Dorado's own documentation; any primary paper on modified-base
 effects on nanopore basecalling accuracy. A search also surfaced a BMC Genomics

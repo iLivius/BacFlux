@@ -6,7 +6,7 @@ the call itself does not depend on which front end produced the assembly. The
 supplementary BLAST line beside each call does — see below.
 
 [Platon](https://github.com/oschwengers/platon) v1.8 is the caller and always runs.
-[geNomad](https://github.com/apcamargo/genomad) is an optional second opinion: it is
+[geNomad](https://github.com/apcamargo/genomad) v1.12.0 is an optional second opinion: it is
 switched on from the *phage* stage, not from here, because one geNomad run calls viruses
 and plasmids together.
 

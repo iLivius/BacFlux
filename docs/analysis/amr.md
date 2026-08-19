@@ -291,6 +291,17 @@ Two committed lookup tables bridge the gap, both generated per GTDB release by
   the percentage of genomes on which GTDB and NCBI agree and how many genomes that
   rests on.
 
+!!! note "Rebuilding the tables is a manual step"
+
+    `generate_gtdb_organism_table.py` is not invoked by any rule. It is run by hand,
+    and both tables are committed to the repository; at run time
+    `gtdb_amrfinder_organism.py` only reads them from disk, and needs no network
+    access. They need rebuilding when GTDB or AMRFinderPlus changes, not per sample,
+    and nothing in the workflow warns that they have gone stale. A stale table maps
+    fewer species; an unmapped species silently loses its `--organism` flag, which
+    means no point-mutation screening for that isolate. `check_gtdb_organism_table.py`
+    validates a rebuild.
+
 At run time `amrfinder_organism` looks this sample's classification up in those tables
 and writes either an organism name or nothing. Nothing is the safe default and the
 usual outcome: a wrong `--organism` would produce confidently wrong point-mutation

@@ -95,6 +95,9 @@ instead of an hour later when Flye has already finished.
 | an explicit name | validated against the installed model list |
 | `false` | Medaka is skipped, and the rule is not defined at all |
 
+Which model `auto` resolves to, why it is the bacterial variant, and when to pin a
+different one, are in [The Medaka polishing model](../about/medaka-model.md).
+
 !!! note "Setting the model also changes the assembler"
 
     With `parameters.nanopore.flye_input_mode: auto` (the default), Flye's read mode
