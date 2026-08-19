@@ -53,12 +53,23 @@ tar -xJf db-light.tar.xz && rm db-light.tar.xz
 
 Note the archives are `.tar.xz` (hence `-xJf`), not `.tar.gz` as in earlier releases.
 
-If AMRFinderPlus complains about its database, refresh it in place from the Bakta
-conda environment:
+!!! tip "If AMRFinderPlus errors on its database, refresh it in place"
 
-```bash
-amrfinder_update --force_update --database db/amrfinderplus-db/
-```
+    The Bakta archive ships an AMRFinderPlus database alongside the annotation data,
+    and the two can fall out of step with the AMRFinderPlus binary in the Bakta conda
+    environment. The symptom is a database error from AMRFinderPlus, not a wrong
+    result — most often when the mobilome module runs, since that is what reads it.
+
+    Activate the Bakta conda environment and point the update at your Bakta database
+    directory:
+
+    ```bash
+    amrfinder_update --force_update --database db/amrfinderplus-db/
+    ```
+
+    **BacFlux never does this for you.** The workflow only ever reads
+    `{bakta_db}/amrfinderplus-db/latest`; it does not check the database's age and
+    does not refresh it, so a stale copy stays stale until you run the command above.
 
 !!! note "This is also why the mobilome module needs no database of its own"
 
