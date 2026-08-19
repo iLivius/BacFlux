@@ -98,9 +98,11 @@ annotation and AMR calling.
 built for community-level data; BacFlux goes narrower but ties every call back to
 a specific resistance gene in a specific isolate and reports a mobility tier with
 a confidence level. Neither is a reduced version of the other, and this document
-should not be read as ranking them. MAP's own documentation notes that its
-current release does not run gene-level AMR association, which is precisely the
-step BacFlux's module exists to perform.
+should not be read as ranking them. The difference is the unit of analysis, not
+the tool list: MAP runs AMRFinderPlus too, on by default. What differs is that it
+is built for metagenomes and MAGs, where a contig's host is itself uncertain,
+while BacFlux assumes one isolate and can therefore attach a mobility tier to a
+named gene on a named replicon.
 
 A practical consequence for users: for a full
 mobilome inventory of an isolate, or for anything metagenomic, MAP is the right
