@@ -82,8 +82,8 @@ one rule body exists in a given run.
 | Mode | Aligner | Command | Environment |
 |---|---|---|---|
 | `illumina`, `hybrid` | Bowtie2 2.5.4 | `bowtie2-build` then `bowtie2 -x … -1 … -2 …` | `bowtie.yaml` |
-| `nanopore` | minimap2 2.30 | `minimap2 -ax map-ont` | `minimap.yaml` |
-| `contigs` | minimap2 2.30 | `minimap2 -a contigs contigs` | `minimap.yaml` |
+| `nanopore` | minimap2 2.31 | `minimap2 -ax map-ont` | `minimap.yaml` |
+| `contigs` | minimap2 2.31 | `minimap2 -a contigs contigs` | `minimap.yaml` |
 
 Output in all three cases is `contaminants/{sample}_map.bam` plus its `.bai`, both
 temporary. Snakemake keeps them until every consumer is done: BlobTools here, and —

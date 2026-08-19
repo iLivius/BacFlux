@@ -59,7 +59,7 @@ list, with the licensing notes attached, is in
 | Functional annotation | eggNOG-mapper 2.1.15 against eggNOG 5.0.2 | 9, 28 |
 | Secondary metabolites | antiSMASH 8.0.4 | 4 |
 | CAZymes | run_dbCAN 5.1.2 (dbCAN3) | 54 |
-| AMR and virulence on contigs | ABRicate 1.2.0 — plus the databases below | 47 |
+| AMR and virulence on contigs | ABRicate 1.4.0 — plus the databases below | 47 |
 | Plasmids | Platon 1.8, with a supplementary BLAST+ line beside each call | 45, 7 |
 | Prophages | VirSorter2 2.2.4, with CheckV 1.0.3 grading what it found | 25, 38 |
 | Aggregated report | MultiQC 1.33 | 21 |
@@ -82,8 +82,8 @@ tables are kept side by side, so cite the ones you actually read.
 
 | `mode:` | Front end | Reference |
 |---|---|---|
-| `illumina` | Bowtie 2 (PhiX removal), fastp 1.0.1, SPAdes 4.2.0 | 34, 12, 3 |
-| `nanopore` | NanoPlot 1.46.2 (NanoPack), Filtlong 0.3.1, Flye 2.9.6, dnaapler 1.4.0, Medaka 2.2.2 *(optional — `parameters.{nanopore,hybrid}.medaka_model: false` skips it)* | 16, 50, 32, 5, 41 |
+| `illumina` | Bowtie 2 (PhiX removal), fastp 1.0.1, SPAdes 4.3.0 | 34, 12, 3 |
+| `nanopore` | NanoPlot 1.47.1 (NanoPack), Filtlong 0.3.1, Flye 2.9.6, dnaapler 1.4.0, Medaka 2.2.2 *(optional — `parameters.{nanopore,hybrid}.medaka_model: false` skips it)* | 16, 50, 32, 5, 41 |
 | `hybrid` | both front ends above — the short reads are assembled too, as the comparator genome — then BWA + Polypolish 0.7.1 to correct the ONT assembly with them, and Snippy 4.6.0 to compare the two | the two rows above, plus 36, 51, 48 |
 | `contigs` | no assembler — contig filtering only, with minimap2 self-mapping for the coverage track | 35 |
 

@@ -36,7 +36,7 @@ None of the three replaces another, and their counts are not meant to agree.
 
 ## ABRicate on the contigs
 
-*Rules `amr_contigs`, `AMR_summary`. ABRicate v1.2.0.*
+*Rules `amr_contigs`, `AMR_summary`. ABRicate v1.4.0.*
 
 ABRicate BLASTs the delivered genome (`contigs_final.fasta`) against one curated
 resistance or virulence database and reports every hit clearing the cutoffs. It

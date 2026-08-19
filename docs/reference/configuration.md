@@ -100,7 +100,7 @@ length it measures for itself:
 | shorter | 21, 33, 55 |
 
 Those three presets have been in SPAdes since at least v3.9 (2016) and are unchanged in
-v4.2.0, the version BacFlux pins.
+v4.3.0, the version BacFlux pins.
 
 **Giving an explicit list disables that selection.** The list is then used whatever the
 reads look like, and the cost is easy to miss: k-mer coverage is not read coverage but
