@@ -165,7 +165,7 @@ containers: MacSyFinder 2.1.4, ISEScan 1.7.3, IntegronFinder 2.0.6, geNomad
 1.11.1, HMMER 3.4, Aragorn 1.2.41.
 
 Two host-specific problems had to be solved first. Both are recorded in
-`ebi_map/nf_env.sh` and `ebi_map/run_map.sh`; anyone repeating this will hit them.
+`benchmark/ebi_comparison/nf_env.sh` and `benchmark/ebi_comparison/run_map.sh`; anyone repeating this will hit them.
 
 **(a) Apptainer instead of the host's Singularity.** This machine carries
 Singularity **2.6.1**, which predates the SIF container format that all current
@@ -203,7 +203,7 @@ arrives as the string `"true"`, failing the boolean type check.
 
 ### 2.4 Completeness of the MAP run
 
-**40/40 genomes reached `COMPLETED`** (`ebi_map/map_status_40.tsv`). Median
+**40/40 genomes reached `COMPLETED`** (`benchmark/ebi_comparison/map_status_40.tsv`). Median
 wall-clock 30.3 min per genome (range 23.4–39.9). Twelve genomes produced no
 `ices.tsv` because no ICE candidate survived MAP's prescan; that is a real
 result — no call — not a failure, and it is scored as zero calls.
