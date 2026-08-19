@@ -29,7 +29,6 @@ docs_dir: docs
 # nav will be built but left unreachable — check both lists when you add one.
 exclude_docs: |
   /README_notes.md
-  /methods_*.md
   /mobilome_*.md
   /unification_migration_plan.md
   /validation/
