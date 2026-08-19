@@ -1,0 +1,8 @@
+sample	caller	element_type	contig	start	end	length_bp	boundary_evidence	extra	matched_curated_element	curated_start	curated_end	curated_len	overlap_bp	pct_of_curated	start_offset	end_offset
+CP042858_1	EBI_MAP	T4SS-type ICE	CP042858.1	4515000	4657301	142302	-	relaxase=MOBH;mpf=typeF;near_rna=-	NONE				0			
+CP042858_1	EBI_MAP	T4SS-type ICE	CP042858.1	4959974	4988140	28167	-	relaxase=MOBH;mpf=typeF;near_rna=-	ICEKpnQD23-1	4831525	5022379	190855	28167	14.8	128449	-34239
+CP042858_1	BacFlux	ice	CP042858.1	4559721	4591823	32103	denovo/att825bp	conf=high;relaxase=MOBH;mpf=F	NONE				0			
+CP042858_1	BacFlux	ice	CP042858.1	4911034	4988140	77107	denovo/att23bp	conf=high;relaxase=MOBH;mpf=F	ICEKpnQD23-1	4831525	5022379	190855	77107	40.4	79509	-34239
+NC_000964_3	EBI_MAP	T4SS-type ICE	NC_000964.3	529362	549932	20571	attL:529362..529421(TAGGTTGAGGGCCTAGTGGGTGAATAACCCGTGGAGGTTCAAGTCCTCTCGGCCGCATC),attR:549873..549932(TAGGTTGAGGGCCTAGTGGGTGAATAACCCGTGGAGGTTCAAGTCCTCTCGGCCGCATC)	relaxase=MOBT;mpf=typeFA;near_rna=tRNA-Glu(528903..528974)[+]	NONE				0			
+NC_000964_3	BacFlux	ice	NC_000964.3	529362	549932	20571	tRNA/att60bp	conf=medium;relaxase=MOBT;mpf=FA	NONE				0			
+U15027	BacFlux	ime	U15027.1	352	6293	5942	none/att0bp	conf=low;relaxase=MOBV;mpf=NA	Tn4451	277	6614	6338	5942	93.8	75	-321

@@ -1,0 +1,41 @@
+accession	map_sample_id	set	run	status	elapsed_min	n_ice_calls	outcome	ices_tsv_path
+AB450045	AB450045	ICE	ice15	COMPLETED	39.6	0	no ICE candidate at prescan; no table written	
+AE009948	AE009948	IME	ime12	COMPLETED	29.9	6	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ime12/results/AE009948/prediction/icefinder2lite/AE009948_ices.tsv
+AF261825	AF261825	IME	ime12	COMPLETED	29.6	0	no ICE candidate at prescan; no table written	
+AL513382	AL513382	ICE	ice15	COMPLETED	39.6	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/AL513382/prediction/icefinder2lite/AL513382_ices.tsv
+AY090559	AY090559	ICE	ice15	COMPLETED	39.6	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/AY090559/prediction/icefinder2lite/AY090559_ices.tsv
+BA000037	BA000037	IME	ime12	COMPLETED	30.3	0	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ime12/results/BA000037/prediction/icefinder2lite/BA000037_ices.tsv
+CP001103	CP001103	IME	ime12	COMPLETED	30.4	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ime12/results/CP001103/prediction/icefinder2lite/CP001103_ices.tsv
+CP002188	CP002188	ICE	ice15	COMPLETED	39.7	0	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/CP002188/prediction/icefinder2lite/CP002188_ices.tsv
+CP002888.1	CP002888_1	IME	ime12	COMPLETED	29.7	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ime12/results/CP002888_1/prediction/icefinder2lite/CP002888_1_ices.tsv
+CP011419.1	CP011419_1	IME	ime12	COMPLETED	30.1	3	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ime12/results/CP011419_1/prediction/icefinder2lite/CP011419_1_ices.tsv
+CP012430.1	CP012430_1	ICE	ice15	COMPLETED	39.6	5	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/CP012430_1/prediction/icefinder2lite/CP012430_1_ices.tsv
+CP016079.1	CP016079_1	IME	ime12	COMPLETED	29.5	4	ices.tsv written [non-ICE stage GFF_MAPPING:ABORTED]	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ime12/results/CP016079_1/prediction/icefinder2lite/CP016079_1_ices.tsv
+CP024712.1	CP024712_1	ICE	ice15	COMPLETED	39.6	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/CP024712_1/prediction/icefinder2lite/CP024712_1_ices.tsv
+CP027036.1	CP027036_1	ICE	ice15	COMPLETED	39.6	2	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/CP027036_1/prediction/icefinder2lite/CP027036_1_ices.tsv
+CP034444.1	CP034444_1	ICE	ice15	COMPLETED	39.6	3	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/CP034444_1/prediction/icefinder2lite/CP034444_1_ices.tsv
+CP042858.1	CP042858_1	ICE	pilot3	COMPLETED	30.7	2	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/pilot3/results/CP042858_1/prediction/icefinder2lite/CP042858_1_ices.tsv
+CP048437.1	CP048437_1	ICE+IME	ime12	COMPLETED	30.4	12	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ime12/results/CP048437_1/prediction/icefinder2lite/CP048437_1_ices.tsv
+GQ463144	GQ463144	ICE	ice15	COMPLETED	39.6	0	no ICE candidate at prescan; no table written	
+GU725392	GU725392	ICE	ice15	COMPLETED	39.6	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/GU725392/prediction/icefinder2lite/GU725392_ices.tsv
+KP299160	KP299160	ICE	ice15	COMPLETED	39.6	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/KP299160/prediction/icefinder2lite/KP299160_ices.tsv
+KX077897	KX077897	ICE	ice15	COMPLETED	39.6	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/KX077897/prediction/icefinder2lite/KX077897_ices.tsv
+MH160822.1	MH160822_1	ICE	ice15	COMPLETED	39.6	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/MH160822_1/prediction/icefinder2lite/MH160822_1_ices.tsv
+NC_000913.3	NC_000913_3	NEG	negative	COMPLETED	24.4	0	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/negative/results/NC_000913_3/prediction/icefinder2lite/NC_000913_3_ices.tsv
+NC_000918.1	NC_000918_1	NEG	negative	COMPLETED	23.5	0	no ICE candidate at prescan; no table written	
+NC_000964.3	NC_000964_3	NEG	negative	COMPLETED	24.3	1	ices.tsv written [some stages reused from an earlier run]	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/negative/results/NC_000964_3/prediction/icefinder2lite/NC_000964_3_ices.tsv
+NC_002516.2	NC_002516_2	NEG	negative	COMPLETED	24.4	0	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/negative/results/NC_002516_2/prediction/icefinder2lite/NC_002516_2_ices.tsv
+NC_002528.1	NC_002528_1	NEG	negative	COMPLETED	23.4	0	no ICE candidate at prescan; no table written	
+NC_002607.1	NC_002607_1	NEG	negative	COMPLETED	23.6	0	no ICE candidate at prescan; no table written	
+NC_002745.2	NC_002745_2	NEG	negative	COMPLETED	23.9	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/negative/results/NC_002745_2/prediction/icefinder2lite/NC_002745_2_ices.tsv
+NC_003197.2	NC_003197_2	NEG	negative	COMPLETED	24.6	0	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/negative/results/NC_003197_2/prediction/icefinder2lite/NC_003197_2_ices.tsv
+NC_004061.1	NC_004061_1	NEG	negative	COMPLETED	23.4	0	no ICE candidate at prescan; no table written	
+NC_004344.2	NC_004344_2	NEG	negative	COMPLETED	23.4	0	no ICE candidate at prescan; no table written	
+NC_004461.1	NC_004461_1	ICE	ice15	COMPLETED	39.9	1	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/NC_004461_1/prediction/icefinder2lite/NC_004461_1_ices.tsv
+NC_004668.1	NC_004668_1	ICE+IME	ime12	COMPLETED	30.7	4	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ime12/results/NC_004668_1/prediction/icefinder2lite/NC_004668_1_ices.tsv
+NC_005042.1	NC_005042_1	NEG	negative	COMPLETED	23.5	0	no ICE candidate at prescan; no table written	
+NC_007516.1	NC_007516_1	NEG	negative	COMPLETED	23.5	0	no ICE candidate at prescan; no table written	
+NC_013316.1	NC_013316_1	IME	ime12	COMPLETED	30.3	3	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ime12/results/NC_013316_1/prediction/icefinder2lite/NC_013316_1_ices.tsv
+NC_013929	NC_013929	ICE	ice15	COMPLETED	39.6	8	ices.tsv written	/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map/runs/ice15/results/NC_013929/prediction/icefinder2lite/NC_013929_ices.tsv
+NC_017860	NC_017860	IME	ime12	COMPLETED	29.6	0	no ICE candidate at prescan; no table written	
+U15027	U15027	IME	ime12	COMPLETED	0.1	0	no ICE candidate at prescan; no table written [some stages reused from an earlier run]	

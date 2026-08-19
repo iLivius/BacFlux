@@ -1,0 +1,19 @@
+kind	element	accession	start	end	length_bp	organism	why	record_bp	flank_bp	element_covers_record	class
+ICE	SXT(HN1)	AB450045	1	19086	19086	Vibrio cholerae	spec control: SXT	19086	0	1.000	standalone
+ICE	R391	AY090559	1	88532	88532	Providencia rettgeri	spec control: R391	88532	0	1.000	standalone
+ICE	ICEKpnQD23-1	CP042858.1	4831525	5022379	190855	Klebsiella pneumoniae	spec control: ICEKp	5803733	5612878	0.033	chromosomal
+ICE	ICEEc2	GU725392	77	93971	93895	Escherichia coli	spec control: ICEEc2	93971	76	0.999	standalone
+ICE	ICE_EfmISMMSVRE1_Tn916	CP012430.1	2171009	2187902	16894	Enterococcus faecium	spec control: Tn916	3130373	3113479	0.005	chromosomal
+ICE	ICE(Tn4371)6061	KP299160	1	43841	43841	Pseudomonas aeruginosa	spec control: Tn4371	43841	0	1.000	standalone
+ICE	CMGE(TZ080501)	KX077897	1321	127099	125779	Streptococcus suis	genus diversity: Streptococcus	128795	3016	0.977	standalone
+ICE	ICEKpn16_GR_13-1	CP027036.1	332495	484436	151942	Klebsiella pneumoniae	genus diversity: Klebsiella	5426917	5274975	0.028	chromosomal
+ICE	ICEMsp.M1D	CP034444.1	1694617	1893992	199376	Mesorhizobium sp.	genus diversity: Mesorhizobium	7127907	6928531	0.028	chromosomal
+ICE	ICEPsy10	CP024712.1	5548512	5709520	161009	Pseudomonas syringae	genus diversity: Pseudomonas	6556999	6395990	0.025	chromosomal
+ICE	ICEPvuChnBC22	MH160822.1	1	148751	148751	Proteus vulgaris	genus diversity: Proteus	148751	0	1.000	standalone
+ICE	ICEVflInd1	GQ463144	1	114195	114195	Vibrio fluvialis	genus diversity: Vibrio	114195	0	1.000	standalone
+ICE	SPI-7	AL513382	4409574	4543073	133500	Salmonella enterica	genus diversity: Salmonella	4809037	4675537	0.028	chromosomal
+ICE	ICE_FprA2-165_rpsI	CP048437.1	372763	455173	82411	Faecalibacterium duncaniae	genus diversity: Faecalibacterium	3102523	3020112	0.027	chromosomal
+ICE	ICE_EfalV583_tRNALys	NC_004668.1	445116	583433	138318	Enterococcus faecalis	genus diversity: Enterococcus	3218031	3079713	0.043	chromosomal
+ICE	ICEB2	CP002188	210737	248144	37408	Mycoplasma bovis	genus diversity: Mycoplasma	1003404	965996	0.037	chromosomal
+ICE	ICE_Step12228_tRNAser	NC_004461.1	1519667	1558081	38415	Staphylococcus epidermidis	genus diversity: Staphylococcus	2499279	2460864	0.015	chromosomal
+ICE	TR2	NC_013929	3617692	3771788	154097	Streptomyces scabiei	genus diversity: Streptomyces	10148695	9994598	0.015	chromosomal

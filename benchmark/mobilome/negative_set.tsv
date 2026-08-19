@@ -1,0 +1,13 @@
+kind	element	accession	start	end	length_bp	organism	why
+NEGATIVE	none_expected	NC_004061.1	1	1	1	Buchnera aphidicola Sg	reduced endosymbiont genome (0.64 Mb): no conjugation machinery expected at all
+NEGATIVE	none_expected	NC_004344.2	1	1	1	Wigglesworthia glossinidia brevipalpis	reduced endosymbiont (0.70 Mb): obligate intracellular, no MGE traffic
+NEGATIVE	none_expected	NC_002528.1	1	1	1	Buchnera aphidicola APS	second Buchnera lineage, independent confirmation
+NEGATIVE	none_expected	NC_005042.1	1	1	1	Prochlorococcus marinus SS120	streamlined marine cyanobacterium, 1.75 Mb
+NEGATIVE	none_expected	NC_007516.1	1	1	1	Synechococcus sp. CC9605	marine picocyanobacterium, no curated ICE
+NEGATIVE	none_expected	NC_000918.1	1	1	1	Aquifex aeolicus VF5	deep-branching thermophile, 1.55 Mb
+NEGATIVE	none_expected	NC_002745.2	1	1	1	Staphylococcus aureus N315	well-characterised clinical isolate, no ICEberg entry
+NEGATIVE	none_expected	NC_000913.3	1	1	1	Escherichia coli K-12 MG1655	the reference lab strain; its mobilome is fully described and holds no ICE
+NEGATIVE	none_expected	NC_002516.2	1	1	1	Pseudomonas aeruginosa PAO1	reference strain, extensively studied
+NEGATIVE	none_expected	NC_000964.3	1	1	1	Bacillus subtilis 168	WRONG WHEN WRITTEN: ICEBs1 is PRESENT in 168 (it was discovered there, Auchtung 2005). The caller found it correctly, so this row is a TRUE POSITIVE that ICEberg has not curated, not a false alarm
+NEGATIVE	none_expected	NC_003197.2	1	1	1	Salmonella Typhimurium LT2	reference strain, no curated ICEberg entry
+NEGATIVE	none_expected	NC_002607.1	1	1	1	Halobacterium sp. NRC-1	archaeon: CONJscan/ICEscan models are bacterial, so any call is suspect

@@ -2874,8 +2874,8 @@ def test_two_calls_on_the_same_interval_collapse_to_the_better_evidenced_one():
     are widened to the element the repeats define, and two rows come out with the
     same start and end. Measured on ICEEc2 (GU725392) once the att search was
     fixed — an `ime` row and an `ice` row, both 27-92263. The benchmark's scorer
-    (phase7_benchmark/score.py, which lives with the benchmark rather than in
-    this repo) broke the tie towards the `ime`: tier 5 for an element correctly
+    (benchmark/mobilome/score.py, kept in this repo as a record) broke the tie
+    towards the `ime`: tier 5 for an element correctly
     identified as a tier-6 ICE.
 
     The same-class nesting rule cannot catch this: the classes differ, and the

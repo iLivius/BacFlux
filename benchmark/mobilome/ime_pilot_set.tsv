@@ -1,0 +1,13 @@
+kind	element	accession	start	end	length_bp	organism	why
+IME	IME_Sag2603_rpmG	AE009948	2091333	2091854	522	Streptococcus agalactiae	extreme sub-floor: 522 bp, 15x below min_element_bp; smallest IME in ICEberg
+IME	MGIAmaMed1	CP001103	2444009	2445256	1248	Alteromonas mediterranea	deep sub-floor: 1.2 kb MGI, Gram-negative counterpart to the 522 bp case; genus diversity: Alteromonas
+IME	IME_Ssal57I_tRNAlys	CP002888.1	70384	75506	5123	Streptococcus salivarius	modal sub-floor architecture: S. salivarius tRNALys ~5.1 kb family, 11 near-identical copies in ICEberg
+IME	IME_CdiR20291_ND	NC_013316.1	3516280	3521830	5551	Clostridioides difficile	sub-floor, no named integration site (ND) so no tRNA hint for the att search; genus diversity: Clostridioides
+IME	Tn4451	U15027	277	6614	6338	Clostridium perfringens	named IME control: tnpX serine recombinase + oriT, no T4SS = the integrase+relaxase/no-T4SS row of the Phase 4 table; 1.7 kb below the floor
+IME	MTnPi10	NC_017860	436516	444106	7591	Prevotella intermedia	floor edge case: 7591 bp, only 409 bp below min_element_bp; sits on a 580 kb second chromosome
+IME	IME_EfalV583_rpsI	NC_004668.1	3090770	3100174	9405	Enterococcus faecalis	just above the floor; same chromosome as ICE pilot entry ICE_EfalV583_tRNALys, so it tests ICE vs IME discrimination in one genome
+IME	IME_SsuNSUI002_NS	CP011419.1	246744	257855	11112	Streptococcus suis	above floor, no named integration site; genus diversity: Streptococcus suis
+IME	MGIVvuTai1	BA000037	270097	289135	19039	Vibrio vulnificus	15-30 kb MGI stratum; genus diversity: Vibrio
+IME	IME_FprA2-165_tRNAlys_2	CP048437.1	699930	723123	23194	Faecalibacterium duncaniae	same chromosome as ICE pilot entry ICE_FprA2-165_rpsI, so it tests ICE vs IME discrimination; genus diversity: Faecalibacterium
+IME	SGI1	AF261825	146	42596	42451	Salmonella enterica	named IME control: canonical AMR-carrying SGI1 (ACSSuT / In104), mobilised by an IncA/C helper plasmid; borderline deposit, one-sided flank
+IME	IMEMlNZP2037-1	CP016079.1	2162417	2272896	110480	Mesorhizobium loti	largest stratum: 110 kb element on a 7 Mb chromosome, tests 15 kb anchor clustering across a long element; genus diversity: Mesorhizobium

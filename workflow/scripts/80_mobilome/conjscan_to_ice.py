@@ -3467,8 +3467,8 @@ def resolve_nested_calls(sample, rows):
             # result is two rows with identical coordinates. Measured on ICEEc2
             # (GU725392) once the att search was fixed — an `ime` row and an `ice`
             # row, both 27-92263. Left alone, the tie-break in the Phase 7
-            # benchmark's scorer (`phase7_benchmark/score.py`, which lives with the
-            # benchmark and not in this repo — see docs/methods_ebi_comparison.md)
+            # benchmark's scorer (`benchmark/mobilome/score.py`, kept in this repo
+            # as a record — see benchmark/README.md)
             # reported the `ime`, i.e. tier 5 for an element we had correctly
             # identified as a tier-6 ICE.
             #
