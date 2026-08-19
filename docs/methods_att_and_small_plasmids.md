@@ -357,17 +357,17 @@ few duplicated bases at a circular junction, not a whole-plasmid concatemer.
 `autocycler trim` does handle it, but cannot distinguish artifact from genuine
 duplication and expects to run inside the Autocycler pipeline.
 
-### Options, ranked by effort-to-benefit
+### The options, and why only one of them ships
 
-| option | effort | verdict |
+| option | what it would require | verdict |
 |---|---|---|
-| **`keep_percent` 90 → 95** (and `length_weight` 10 → 1) | two lines | **done.** Recovers 502 of the plasmid's 603 reads — but *not* the assembled plasmid |
-| **SPAdes rescue** | ~½ day, no new deps | Published recommendation, not a hack: small plasmids "usually appear as circular contigs" in a short-read graph ([Wick/Judd/Holt](https://pmc.ncbi.nlm.nih.gov/articles/PMC9980784/)). We already write `assembly_graph_with_scaffolds.gfa` |
-| **Plassembler** | ~½ day + a database | **MIT, bioconda 1.8.3**, purpose-built. Pools reads that do *not* map to the Flye contigs and hybrid-assembles them with Unicycler — exactly where a Flye-absent plasmid lands. Can **reuse our existing Flye assembly** (`--flye_directory`), and writes empty outputs when it finds nothing, so the DAG never breaks. Cost: PLSDB is mandatory (`-d`, no skip flag) and states **no licence at all** — handle exactly as TnCentral/ICEberg per spec §5.5 |
-| **Hybracter** | large | MIT, bioconda, wraps Plassembler — but replaces the *entire* assembly stage and nests Snakemake inside Snakemake, with two schedulers competing for cores |
-| **Autocycler** | large | **Would probably not have helped.** Aimed at chromosome consensus accuracy; its own paper reports the smallest plasmid tested (2.5 kb) was occasionally missed and needed manual curation. Its clustering discards any cluster seen in too few input assemblies — precisely the small-plasmid case. Its own docs say: *if small plasmids matter, add Plassembler* |
-| **Trycycler** | n/a | Unusable unattended; superseded by Autocycler |
-| **Union of multiple long-read assemblers** | medium | Would probably not have helped — the failure is shared across assemblers and driven by the read set |
+| **`keep_percent` 90 → 95** (and `length_weight` 10 → 1) | nothing — a config change | **This is what BacFlux ships.** Recovers 502 of the plasmid's 603 reads — but *not* the assembled plasmid |
+| **SPAdes rescue** | no new tool or database | Published recommendation, not a hack: small plasmids "usually appear as circular contigs" in a short-read graph ([Wick/Judd/Holt](https://pmc.ncbi.nlm.nih.gov/articles/PMC9980784/)). We already write `assembly_graph_with_scaffolds.gfa` |
+| **Plassembler** | a new tool, and the PLSDB database | **MIT, bioconda 1.8.3**, purpose-built. Pools reads that do *not* map to the Flye contigs and hybrid-assembles them with Unicycler — exactly where a Flye-absent plasmid lands. Can **reuse our existing Flye assembly** (`--flye_directory`), and writes empty outputs when it finds nothing, so the DAG never breaks. Cost: PLSDB is mandatory (`-d`, no skip flag) and states **no licence at all** — handle exactly as TnCentral/ICEberg per spec §5.5 |
+| **Hybracter** | replacing the whole assembly stage | MIT, bioconda, wraps Plassembler — but replaces the *entire* assembly stage and nests Snakemake inside Snakemake, with two schedulers competing for cores |
+| **Autocycler** | replacing the whole assembly stage | **Would probably not have helped.** Aimed at chromosome consensus accuracy; its own paper reports the smallest plasmid tested (2.5 kb) was occasionally missed and needed manual curation. Its clustering discards any cluster seen in too few input assemblies — precisely the small-plasmid case. Its own docs say: *if small plasmids matter, add Plassembler* |
+| **Trycycler** | manual curation per genome | Unusable unattended; superseded by Autocycler |
+| **Union of multiple long-read assemblers** | running several assemblers per sample | Would probably not have helped — the failure is shared across assemblers and driven by the read set |
 
 ### ⚠ NEGATIVE RESULT: newest assemblers unbenchmarked here
 

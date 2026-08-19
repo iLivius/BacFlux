@@ -2,7 +2,7 @@
 #
 # Run the EBI mobilome-annotation-pipeline (MAP) on BacFlux benchmark genomes,
 # so its ICE/IME calls can be compared against BacFlux's own caller
-# (workflow/scripts/mobilome/conjscan_to_ice.py) on identical input.
+# (workflow/scripts/80_mobilome/conjscan_to_ice.py) on identical input.
 #
 # Usage:  ./run_map.sh <samplesheet.csv> <run_name>
 # Example: ./run_map.sh samplesheet_pilot3.csv pilot3
