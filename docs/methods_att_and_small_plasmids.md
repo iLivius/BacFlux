@@ -47,7 +47,7 @@ structural defect, not a tuning problem.
 > populations.* Microbial Genomics.
 > <https://pmc.ncbi.nlm.nih.gov/articles/PMC6202445/>
 
-### What the reference tools do — none uses a fixed length
+### What the reference tools do — every one searches a range of lengths
 
 | tool | att method | length rule | source |
 |---|---|---|---|
@@ -118,34 +118,12 @@ Python** — `vmatch -l N` semantics, which is what ICEfinder and ICEfinder2 use
 The search is in `workflow/scripts/80_mobilome/att_search.py`
 (`find_maximal_repeats` / `search_maximal_repeat`).
 
-> **Correction, 2026-07-31.** This section previously described a flank-vs-flank
-> `blastn -task blastn-short -dust no` call, following DEPhT and DBSCAN-SWA. That
-> was the design at the time of writing; it is **not** what shipped. Since commit
-> `9c05c3e` the search calls no external program at all. The reason is stated in
-> the code: `att_search.py` is stdlib-only and the Snakemake rule that calls it
-> has no conda environment of its own, so shelling out to `blastn` would make the
-> module depend on whatever happened to be on `PATH`. The BLAST recipe is
-> genuinely more sensitive — it absorbs mismatches and gaps, which an exact
-> repeat search cannot — so this is a deliberate trade of sensitivity for a
-> dependency-free rule, not an equivalence.
-
-> **Correction, 2026-07-31 (second pass).** Three further things in this section
-> had gone stale against commit `4a93d89`, and are fixed below rather than
-> quietly rewritten:
-> 1. the flank window is **50 kb**, not 30 kb — the bullets used 30 kb as their
->    worked example throughout;
-> 2. the ranking test was described as "**exactly** one copy in a tRNA". The code
->    tests *at least* one, which is not a detail: the paralogue guard that
->    removes the both-in-a-tRNA case now only fires when the two tRNAs carry the
->    **same amino acid**, so a genuine element sitting between two unlike tRNAs
->    reaches the ranking with both copies anchored;
-> 3. "two 30 kb flanks share a 15 bp repeat by luck roughly six times over" was
->    simply wrong arithmetic — the formula the code uses gives ~0.8 at 30 kb and
->    ~2.3 at 50 kb. The conclusion it supported (a flat 15 bp floor is not safe
->    on a large window) survives; the number did not.
->
-> The licensing note at the end of this part needed the same treatment, for a
-> reason that matters more — see the correction there.
+It calls no external program. `att_search.py` is standard-library only and the rule
+that runs it has no conda environment of its own, so shelling out to `blastn` would
+make the module depend on whatever happened to be on `PATH`. A BLAST search would be
+more sensitive — it absorbs mismatches and gaps, which an exact repeat search cannot —
+so this is a deliberate trade of sensitivity for a rule with no dependencies, not an
+equivalence.
 
 How it works, and where each choice comes from:
 
@@ -203,9 +181,8 @@ standard library.
 
 ### Why not Vmatch
 
-Spec §3.3 previously rejected Vmatch as "not on bioconda and licence-restricted".
-**The bioconda half is wrong** — `bioconda/vmatch 2.3.1` exists for linux-64 and
-osx-64. The rejection stands for the other reason: the recipe declares
+Vmatch is available — `bioconda/vmatch 2.3.1` exists for linux-64 and osx-64, so
+packaging is not the obstacle. It is rejected on licensing alone: the recipe declares
 `license: Unknown / OTHER` and vmatch.de was unreachable, so its terms cannot be
 verified — which under the project's §11 rule is still a blocker for an
 MIT-licensed workflow. The spec has been corrected to give the right reason.
@@ -230,17 +207,6 @@ every window**. No window hit either implementation's internal cap. So the
 conclusion holds: **a vmatch-based search would find nothing that is not already
 found**, and the licence blocker costs no sensitivity.
 
-> **Correction, 2026-07-31.** The figure previously quoted here — "**35 of 35
-> windows, 122 repeats**" — **does not reproduce**, and it should not be cited.
-> The equality result reproduces and is now measured over roughly five times as
-> many windows, but the counts do not match under any scoping that could be
-> reconstructed: not all searches (246), not distinct windows (180), not the
-> 18-genome ICE pilot alone (137 searches / 98 windows), and not the subset of
-> windows that returned at least one repeat (142 and 62 respectively). Since the
-> original script was never kept, what it was run over cannot now be recovered —
-> which is exactly the failure mode that prompted retaining this one. Quote the
-> numbers above, which are reproducible by running the script.
-
 One related idea is disposed of by the same measurement: shipping both
 searches and treating their agreement as a confidence signal would be worthless.
 Two implementations of identical semantics are *expected* to agree exactly, so
@@ -252,14 +218,6 @@ the code, once, and that is all it is for.
 ICEfinder2 is **CC BY-NC-SA 4.0**. Its source was read only to establish the
 algorithm and its parameters, which spec §11 explicitly permits. **No code was
 copied.**
-
-> **Correction, 2026-07-31.** This paragraph used to end "*none of the above
-> requires it — the flank-vs-flank BLAST recipe comes from DEPhT and
-> DBSCAN-SWA*". That sentence was the licence argument, and it stopped being
-> true when the implementation changed: BacFlux no longer uses the DEPhT recipe,
-> it computes the same maximal exact repeats ICEfinder2 gets from Vmatch. So the
-> separation has to be stated properly rather than by pointing at a different
-> tool.
 
 What was taken from ICEfinder2 is **which algorithm to use and with what
 parameters** — maximal exact repeats between the flanks, floor 15 bp — and spec
@@ -359,24 +317,6 @@ now ships, changing `length_weight` is worth two reads; at the old 90 it is wort
 320. The plasmid needed 90 and 10 acting together to disappear, and either change
 on its own brings most of it back.
 
-> **Correction, 2026-08-16.** This section previously showed two arms only and
-> concluded the plasmid was lost to `length_weight`. Filling in the missing arms
-> of the 2×2 — they were run for this correction; the original experiment had no
-> `keep_percent 95` arm at all — reverses that conclusion, and takes two figures
-> with it:
->
-> - The **602** quoted here and in three other places was measured with **no
->   `--keep_percent` at all** (arm `C_no_keeppct`), which is not a configuration
->   BacFlux can produce — both filtlong rules always pass the flag. The shipped
->   defaults give **502**. The **614** raw figure quoted alongside it does not
->   reproduce either; on the measure above the raw set holds 603.
-> - "93 — too few for Flye to assemble it" implied that some other setting did
->   assemble it. **None did.** Re-checked against the six Flye runs still on
->   disk: no arm, raw unfiltered reads included, produced a 5,596 bp contig, and
->   every arm misses that same replicon. (The arms are not otherwise identical —
->   `D_permissive` also fails to close the 87.9 kb replicon — but no arm trades
->   one of those for the Col2 plasmid.)
-
 ### So why is `length_weight` still 1?
 
 Because the two keys protect different size classes, which only shows in the
@@ -459,8 +399,8 @@ host** — which is not unusual, since plasmids cross genus boundaries constantl
 On *K. pneumoniae* **ATCC BAA-2146**, `auto` mode dropped a genuine plasmid —
 pMYS, `NZ_CP006660.1`, 2,014 bp — because *E. coli* database entries outnumbered
 *Klebsiella* ones 58,709 to 16,253: BLAST bestsum follows database composition,
-not biology. (This page previously attributed that run to KPNIH1; `NZ_CP006660.1`
-is a BAA-2146 replicon, and KPNIH1 is `CP008827.1`.)
+not biology. (`NZ_CP006660.1` is a BAA-2146 replicon; KPNIH1 is a different genome,
+`CP008827.1` — the two are easy to confuse.)
 
 **It did not cause the TUM24772 loss** — that plasmid survived decontamination
 (verified: present in `contigs_filt.fasta`), and was lost at the read-filtering
