@@ -65,9 +65,9 @@ fetch for you. You download them once and give BacFlux the path:
 |---|---|---|
 | `directories.bakta_db` | Bakta | **v6.0** (Bakta 1.12.1 refuses older ones) |
 | `directories.blast_db` | NCBI `core_nt` (or `nt_prok`, named in `parameters.nt_version`), plus the taxonomy files | — |
-| `directories.eggnog_db` | eggNOG diamond database | — |
+| `directories.eggnog_db` | eggNOG diamond database | **v5.0.2** (fixed by the eggnog-mapper pin) |
 | `directories.gtdbtk_db` | GTDB | **R232** (GTDB-Tk 2.7.2 pins itself to one release) |
-| `directories.platon_db` | Platon | — |
+| `directories.platon_db` | Platon | **v1.5.0** (versioned separately from Platon 1.8) |
 
 Everything else — PhiX, CARD, CheckV, dbCAN, VirSorter2, antiSMASH — is downloaded
 by the workflow into `output_dir` on the first run. All of those but PhiX also have

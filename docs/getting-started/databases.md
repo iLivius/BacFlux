@@ -24,13 +24,20 @@ local symlink view and never modifies, moves or deletes it.
 |---|---|---|---|
 | `directories.bakta_db` | Bakta | **v6.0** | 3.9 GB light, 84 GB full |
 | `directories.blast_db` | NCBI `core_nt` (or `nt_prok`) with the taxonomy files | — | ~300 GB |
-| `directories.eggnog_db` | eggNOG diamond database | — | ~50 GB | BacFlux pins eggnog-mapper 2.1.15, which annotates against **eggNOG 5.0**, database release **`emapperdb-5.0.2`**. The version is fixed by the tool rather than chosen by you: `download_eggnog_data.py` builds its URL from `__DB_VERSION__` in the installed release, so the database cannot drift away from the pin.
+| `directories.eggnog_db` | eggNOG diamond database | **v5.0.2** | ~50 GB |
 | `directories.gtdbtk_db` | GTDB | **R232** | 94 GB extracted |
-| `directories.platon_db` | Platon | — | 2.8 GB |
+| `directories.platon_db` | Platon | **v1.5.0** | 2.8 GB |
 
 Two of those versions are requirements. Bakta 1.12.1 refuses a v5.x database, and
 GTDB-Tk 2.7.2 pins itself to one GTDB release and rejects R226 or older. There is no
 in-place upgrade for either.
+
+Two more are chosen for you rather than by you. The eggNOG release is fixed by the
+pinned eggnog-mapper 2.1.15, which builds its own download URL from `__DB_VERSION__`
+in the installed release, so the database cannot drift away from the tool. And the
+Platon database is versioned separately from Platon itself: v1.5.0 is current for
+every Platon from 1.5.0 onwards, including the 1.8 pinned here, so the database
+number trailing the tool number is expected.
 
 ### Bakta
 
@@ -101,8 +108,23 @@ GTDB-Tk 2.7.x reads a pre-sketched skani database that GTDB now ships inside the
 release, so unlike 2.6.x it neither builds nor needs space for its own ~57 GB sketch
 cache.
 
-A split package is also published, as `gtdbtk_r232_data.tar.gz.part_aa` … `part_al`;
-`cat` the parts together before extracting.
+If the single 61 GB archive is awkward on your connection, GTDB also publishes it
+split into 12 parts, which can be pulled in parallel and joined:
+
+```bash
+# split package (alternative) — r232 has 12 parts, aa..al
+base_url="https://data.gtdb.ecogenomic.org/releases/release232/232.0/auxillary_files/gtdbtk_package/split_package/gtdbtk_r232_data.tar.gz.part_"
+suffixes=(aa ab ac ad ae af ag ah ai aj ak al)
+printf "%s\n" "${suffixes[@]}" | xargs -n 1 -P 12 -I {} wget -c "${base_url}{}"
+
+cat gtdbtk_r232_data.tar.gz.part_* > gtdbtk_r232_data.tar.gz
+tar xzf gtdbtk_r232_data.tar.gz
+rm gtdbtk_r232_data.tar.gz gtdbtk_r232_data.tar.gz.part_*
+```
+
+The part count is release-specific — R226 had 14 (`aa`..`an`). `cat` joins whatever
+matches the glob without complaint, so a part that failed to download produces a
+corrupt archive rather than an error: check you have all 12 before joining.
 
 ### Platon
 
