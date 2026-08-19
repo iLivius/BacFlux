@@ -4,9 +4,9 @@ A regulator asking about a resistance gene wants to know one thing: did this str
 always have it, or did it acquire it? This page explains why that question is harder
 than it sounds, what BacFlux can answer, and what it deliberately refuses to answer.
 
-Written to be quotable in a methods section: every claim carries its source, and the
-final section separates peer-reviewed guidance from technical reports and from our own
-inference. For the short reader-facing version, see
+Every claim carries its source, and the final section separates peer-reviewed
+guidance from technical reports and from inference, so the page can be quoted in a
+methods section. For the short version, see
 [The mobility ladder](mobilome/mobility-ladder.md).
 
 !!! abstract "Terms used on this page"
@@ -23,8 +23,8 @@ inference. For the short reader-facing version, see
     | **ANI** | average nucleotide identity, a genome-to-genome similarity measure |
     | **IS** | insertion sequence, the smallest kind of mobile element |
 
-Written 2026-08-14, prompted by three questions that come up whenever someone
-reads an `08.mobilome` table next to a regulatory checklist:
+Three questions this page answers, all of which arise when an `08.mobilome` table
+is read next to a regulatory checklist:
 
 1. AMRFinderPlus reports point mutations. How is that different from a BLAST
    search like ABRicate's, and why does it need `--organism`?

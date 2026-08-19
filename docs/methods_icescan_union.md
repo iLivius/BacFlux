@@ -24,7 +24,7 @@ being repeated.
     | **IS** | insertion sequence, the smallest kind of mobile element |
     | **HMM** | hidden Markov model, a statistical profile used to recognise a protein family |
 
-Established 2026-07-30, on the 28-genome Phase 7 benchmark
+Measured on the 28-genome Phase 7 benchmark
 (`<validation-root>/phase7_benchmark`),
 comparing two arms that differ **only** by whether the ICE caller was given
 `--icescan-tsv`.

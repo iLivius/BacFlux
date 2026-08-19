@@ -22,9 +22,9 @@ to be careful with in a paper.
     | **ONT** | Oxford Nanopore Technologies, the long-read sequencing platform |
     | **DAG** | the graph of rules Snakemake builds to decide what still has to run |
 
-Established 2026-07-28 by reading the primary sources and the tools' own source
-code, prompted by two concrete failures on clinical *Klebsiella pneumoniae*
-hybrid data (isolates TUM24772 / PRJNA1168299 and K3 / PRJNA1291976).
+The evidence comes from the primary sources, the tools' own source code, and two
+failures on clinical *Klebsiella pneumoniae* hybrid data — isolates TUM24772
+(PRJNA1168299) and K3 (PRJNA1291976).
 
 ---
 

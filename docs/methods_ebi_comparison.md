@@ -8,9 +8,8 @@ Read section 0 first. The two callers share ancestry, so this is **not** an
 independent check — treating it as one would overstate what agreement between them
 proves.
 
-Numbers current as of BacFlux commit `4a93d89` (branch `release/v2.0.0`), and every
-figure was recomputed from the run artefacts while writing, not carried over from a
-draft.
+Numbers current as of BacFlux commit `4a93d89` (branch `release/v2.0.0`). Every
+figure is computed from the run artefacts.
 
 !!! abstract "Terms used on this page"
 

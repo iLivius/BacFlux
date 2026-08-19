@@ -5,9 +5,9 @@ basecalled it with a canonical one. Written to be quotable in a methods section:
 claim carries its source, and the last section states which come from primary
 documentation and which are inference.
 
-Established 2026-08-04 by reading Medaka's own source and ONT's documentation,
-prompted by an objection: **if Dorado basecalled without a methylation
-model, why does BacFlux polish with a methylation-aware one?**
+The page exists to answer one apparent contradiction: **if Dorado basecalled
+without a methylation model, why does BacFlux polish with a methylation-aware
+one?** The answer is established from Medaka's own source and ONT's documentation.
 
 !!! abstract "Terms used on this page"
 
