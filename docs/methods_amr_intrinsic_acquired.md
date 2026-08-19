@@ -1,12 +1,8 @@
 # Method reference: intrinsic versus acquired AMR, and what BacFlux can actually say
 
 A regulator asking about a resistance gene wants to know one thing: did this strain
-always have it, or did it acquire it? This page explains why that question is harder
-than it sounds, what BacFlux can answer, and what it deliberately refuses to answer.
-
-Every claim carries its source, and the final section separates peer-reviewed
-guidance from technical reports and from inference, so the page can be quoted in a
-methods section. For the short version, see
+always have it, or did it acquire it? This page covers what BacFlux can answer, and
+what it deliberately refuses to answer. For the short version, see
 [The mobility ladder](mobilome/mobility-ladder.md).
 
 !!! abstract "Terms used on this page"
@@ -23,8 +19,8 @@ methods section. For the short version, see
     | **ANI** | average nucleotide identity, a genome-to-genome similarity measure |
     | **IS** | insertion sequence, the smallest kind of mobile element |
 
-Three questions this page answers, all of which arise when an `08.mobilome` table
-is read next to a regulatory checklist:
+Three questions arise when an `08.mobilome` table is read next to a regulatory
+checklist:
 
 1. AMRFinderPlus reports point mutations. How is that different from a BLAST
    search like ABRicate's, and why does it need `--organism`?
@@ -83,7 +79,7 @@ one place a single genome can speak to the intrinsic side. Everything else the
 module does — replicon, mobile-element context, mobility tier — addresses the
 acquired and mobile side.
 
-### The caveat, measured on real data
+### The caveat
 
 `--organism` only engages for organisms AMRFinderPlus curates mutations for:
 roughly three dozen, overwhelmingly clinical — *Escherichia*, *Salmonella*,
@@ -135,10 +131,10 @@ not `intrinsic`. The qualifier is doing real work and should not be dropped: the
 module observed that a gene is chromosomal with no mobile-element context, which
 is *consistent with* intrinsic and does not establish it.
 
-So the honest framing, which the documentation uses throughout: **BacFlux produces supporting
-evidence for the intrinsic/acquired judgement. It does not produce the
-judgement.** The confirmatory work is a species-wide distribution analysis, plus
-phenotypic testing (MIC against the relevant antimicrobial), per the decision tree
+So: **BacFlux produces supporting evidence for the intrinsic/acquired judgement.
+It does not produce the judgement.** The confirmatory work is a species-wide
+distribution analysis, plus phenotypic testing (MIC against the relevant
+antimicrobial), per the decision tree
 in EFSA (2025) §3.2.1.
 
 Where BacFlux does align well: EFSA (2024a) requires the AMR search to run against
@@ -147,7 +143,7 @@ coverage. BacFlux runs ten database queries across three independent legs —
 ABRicate over eight databases (`argannot`, `card`, `ecoh`, `ecoli_vf`, `megares`,
 `ncbi`, `resfinder`, `vfdb`), AMRFinderPlus, and a BBMap→CARD read-mapping leg
 that is immune to assembly collapse — with those thresholds applied on the
-ABRicate leg. That alignment was not designed against the citation; it predates it.
+ABRicate leg.
 
 ---
 
@@ -160,7 +156,7 @@ cannot.
 
 ### How it was built
 
-*(Read from the report itself, EFSA 2024b, §3.)*
+*(EFSA 2024b, §3.)*
 
 **Genomes.** NCBI **RefSeq**, restricted to assembly level *complete genome*,
 snapshot **30 November 2023**.
@@ -203,10 +199,10 @@ with **tblastn** (protein queries) and **blastn** (nucleotide queries), E-value
 **≥80% identity / ≥70% coverage**, compute the frequency of strains matching each
 query, and the median identity and coverage. Python 3 with R 4.3.3 for plots.
 
-**Controls, which are worth copying.** Every table carries internal positive
-controls — *rpoB*, *gyrA*, *gyrB* and 16S rRNA from the species' own reference
-genome, which should be near-universal — and a negative control, *fimA* from
-*Salmonella*, which should be absent. In the published tables the housekeeping
+**Controls.** Every table carries internal positive controls — *rpoB*, *gyrA*,
+*gyrB* and 16S rRNA from the species' own reference genome, which should be
+near-universal — and a negative control, *fimA* from *Salmonella*, which should
+be absent. In the published tables the housekeeping
 genes return ~100% of genomes and *fimA* returns 0% every time. The pipeline
 demonstrates its own validity in each result table.
 
@@ -241,11 +237,10 @@ is what a real acquired gene looks like.
 
 ### Why it is not built into BacFlux
 
-**Coverage.** It spans five species. On an environmental batch of the kind this
-document was written from, fewer than a fifth of the isolates fell inside those
-five; roughly another third were *Bacillus* or *Priestia* species outside them,
-and the rest were other genera entirely. For most of a typical environmental
-collection it would return nothing.
+**Coverage.** It spans five species. On one environmental batch, fewer than a
+fifth of the isolates fell inside those five; roughly another third were *Bacillus*
+or *Priestia* species outside them, and the rest were other genera entirely. For
+most of a typical environmental collection it would return nothing.
 
 **It is a snapshot.** RefSeq at 30 November 2023, dossiers to December 2023. It
 carries no update mechanism.

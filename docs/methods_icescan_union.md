@@ -4,10 +4,6 @@ BacFlux can search for conjugation machinery with two different model sets. This
 explains why it runs **both and merges the results** rather than picking one, what the
 second set genuinely adds, and which parts of it are deliberately distrusted.
 
-Every number was re-measured from the artefacts on disk rather than carried over from
-notes. Where a claim could **not** be re-established, it is marked as such instead of
-being repeated.
-
 !!! abstract "Terms used on this page"
 
     | | |
@@ -47,25 +43,19 @@ comparing two arms that differ **only** by whether the ICE caller was given
 > `ime_results_final.tsv` in the benchmark tree, and the current headline figures
 > are in `docs/mobilome/validation.md` and in `methods_ebi_comparison.md`.
 >
-> Those two tables are kept as they were measured rather than refreshed, because
-> refreshing one arm and not the other would destroy the comparison. Treat them
-> as a dated snapshot, not as the module's current output.
+> Treat them as a dated snapshot, not as the module's current output.
 >
-> **§8.3, §9 and the table in §10 HAVE been recomputed**, at commit `1651e6f`
+> **§8.3, §9 and the table in §10 were measured at commit `1651e6f`**
 > (after the att-search rework, the confidence-cap fix, the loner fix that
 > stopped one MacSyFinder system inventing a second machinery cluster, and the
-> dead-code removal). The same two-arm method: both arms
-> re-run over the same 28 genomes, the only variable being `--icescan-tsv`.
-> Three things changed enough to be worth flagging before you read them:
+> dead-code removal), by the same two-arm method: both arms
+> run over the same 28 genomes, the only variable being `--icescan-tsv`.
+> Three things differ from the July-30 figures:
 >
-> - The census counts moved (§8.3): `ime` is 21 in the union arm, not 22 — the
->   config comment beside `mobilome.icescan.run` already carried this
->   correction; the table here did not, and now does.
+> - The census counts moved (§8.3): `ime` is 21 in the union arm, not 22.
 > - **Cost 3 in §9 — the nested double-report on CP011419.1 — no longer
->   happens.** It was fixed by a later commit (the loner fix) that this snapshot
->   predates. Kept below with a note rather than deleted, because the failure
->   mode it describes is real history and the fix's own commit message
->   references this exact locus.
+>   happens.** It was fixed by a later commit (the loner fix) that the July-30
+>   snapshot predates.
 > - The fraction of calls resolved by a tRNA-anchored att pair is now much lower
 >   in ABSOLUTE terms than the July-30 figure (12–13% against the original
 >   34–35%). This is **not** a regression introduced by ICEscan — restricted to
@@ -74,8 +64,7 @@ comparing two arms that differ **only** by whether the ICE caller was given
 >   exists to make is unaffected. What changed is some combination of the
 >   att-search rework and the loner fix, applying equally to both arms. The
 >   original per-genome run artefacts from July 30 no longer exist on disk, so
->   the exact mechanism cannot be reconstructed further; this is stated rather
->   than guessed at.
+>   the exact mechanism cannot be reconstructed further.
 
 **Short version.** ICEscan is not a second opinion — it is a fork of the tool we
 already run. We add it *alongside* CONJScan rather than in place of it, take only
@@ -279,8 +268,6 @@ element exists anywhere in the set.
 
 ## 5. What ICEscan does *not* solve
 
-This is the part most likely to be misunderstood.
-
 **It emits no coordinates.** MacSyFinder reports gene *ordinals*, never base
 pairs. A real row from the Tn*4451* detection:
 
@@ -375,14 +362,9 @@ bacterial conjugation". Vogelmann *et al.* 2011 (PMID 21505418) states it
 without the hedge and measured the TraB pore at ~3.1 nm, wide enough for one.
 (The translocase is TraB generically; pSAM2's copy is TraSA.)
 
-> **Correction, 2026-08-15 — an AICE does make single-stranded DNA, but not the
-> kind that travels.** It copies itself by rolling-circle replication *inside*
-> one cell, and that intermediate is single-stranded (te Poele *et al.* 2008,
-> PMID 18523858). Until this date BacFlux confused that intermediate with the
-> transferred molecule and described an AICE as pushing single-stranded DNA
-> around a mycelium, in code comments, in the config and here. Both halves were
-> wrong: the DNA that crosses is double-stranded, and it crosses into another
-> cell.
+> **An AICE does make single-stranded DNA, but not the kind that travels.** It
+> copies itself by rolling-circle replication *inside* one cell, and that
+> intermediate is single-stranded (te Poele *et al.* 2008, PMID 18523858).
 
 The mobility ladder (spec §2.5) has no tier for this, and the reason is
 bookkeeping rather than biology. Tiers 5 and 6 are **defined by machinery**: tier
@@ -474,8 +456,7 @@ These are the two best-bounded IME recoveries the caller has produced.
 
 ### 8.3 Whole-set census (all 63 calls, not just scored ones)
 
-**Recomputed at `1651e6f`** — re-ran both arms over the same 28 genomes and
-counted the output fresh, rather than carrying the July-30 figures forward.
+**Measured at `1651e6f`** — both arms run over the same 28 genomes.
 
 | | control | union |
 |---|---:|---:|
@@ -491,8 +472,7 @@ counted the output fresh, rather than carrying the July-30 figures forward.
 | … of `ice`-class calls only | 5/36 (14%) | 5/36 (14%) — identical |
 
 **No element gained a self-transmissible claim.** The net-new calls in the
-union arm are all IME or AICE — tier 5 or no tier. This is the single most
-important safety property of the change, and it still holds exactly.
+union arm are all IME or AICE — tier 5 or no tier.
 
 "Bounded by an att pair" now means `boundary_method=tRNA` specifically, because
 that is the only method the caller ever acts on — a `denovo` pair is reported
@@ -507,8 +487,7 @@ figure.
 
 ## 9. Costs — what got worse, re-checked at `1651e6f`
 
-Reported in full, because they are real. Each of the four was re-run against
-current code before being repeated here — one no longer happens, the other
+All four were re-run against current code: one no longer happens, the other
 three still do, exactly as first measured.
 
 **1. `CMGE(TZ080501)` loses 12,324 bp. Still true.** On `KX077897`:
@@ -528,32 +507,28 @@ itself.**
 | `CP048437_1` | 150,670–187,352 · 36,683 bp · **denovo** · medium | 158,404–187,352 · 28,949 bp · **denovo** · medium |
 
 `AE009948` is unchanged from the original measurement: the union arm still
-loses this de novo boundary. `CP048437_1` is not — re-measured today, **both
+loses this de novo boundary. `CP048437_1` is not — re-measured, **both
 arms now report `denovo`**, so this element no longer loses anything. Nothing
 here was deliberately fixed for this locus; it moved as a side effect of the
-att-search rework and the loner fix, which is exactly the kind of drift this
-recomputation exists to catch rather than let stand unnoticed. `high` +
-`boundary_method=none` is still 10 in both arms.
+att-search rework and the loner fix. `high` + `boundary_method=none` is still
+10 in both arms.
 
 **3. The nested double-report on `CP011419.1` — RESOLVED, no longer happens.**
-At the time this was written, the union arm emitted *both*:
+In the July-30 run, the union arm emitted *both*:
 
 ```
 98,234–278,122   179,889 bp  ime   <- the blob, ratio 16.19
 246,807–251,765    4,959 bp  ime   <- the honest call, ratio 0.45, start +63 bp
 ```
 
-Re-run today, the union arm gives three clean, non-overlapping calls on this
+Re-run, the union arm gives three clean, non-overlapping calls on this
 genome — the honest 4,959 bp element, a separate compact 2,407 bp `ime`
 elsewhere on the same contig, and an unrelated `ice` — and **no 179,889 bp
 blob at all**. The cause, diagnosed at the time, was a MacSyFinder *loner* gene
 (one admitted without the normal co-localisation test) being treated as
 grounds to merge two distant clusters into one. That merge rule was corrected
 by a later commit specifically because of this locus; its own commit message
-names `CP011419.1` as the case that exposed the defect. Left here, with this
-note, rather than deleted, because it is real project history and because a
-reader comparing an old run against a new one should be able to find out why
-the numbers moved.
+names `CP011419.1` as the case that exposed the defect.
 
 **4. Unscored ICE intervals shrink by 10–20 kb. Still true.** Several loci not
 covered by either pilot move as ICEscan supplies a closer integrase — e.g.
@@ -592,14 +567,12 @@ This is a substantially better picture than the July-30 figures (64%/63%
 unvalidated, 23 unvalidated self-transmissible, 9 unvalidated high in both
 arms) — corroboration against the full curation roughly doubled. That
 improvement tracks the same code changes noted throughout this document (the
-att-search rework, the confidence-cap fix, the loner fix); it was not a
-separate effort aimed at this number, which is one reason to trust it rather
-than suspect it was tuned to look better. **In both arms**, about a third of
-calls still land on nothing curated, and 9 self-transmissible / 4 high-confidence
+att-search rework, the confidence-cap fix, the loner fix). **In both arms**,
+about a third of calls still land on nothing curated, and 9 self-transmissible / 4 high-confidence
 claims still rest on nothing measurable — the union does not worsen that ratio,
 it adds unvalidated IME and AICE calls at medium/low confidence on top of it.
 
-### The negative control (added 2026-07-30) — 2 calls in 32.6 Mb, neither invented
+### The negative control — 2 calls in 32.6 Mb, neither invented
 
 Spec §8 Phase 7 asks for "genomes with no reported ICE". Twelve closed genomes
 were screened, every one verified absent from all 1,677 ICEberg entries:
@@ -625,9 +598,8 @@ att at **tRNA-Leu(gag)** — ICE*Bs1* integrates at *trnS-leu2* — and Bakta
 annotated the integrase literally as "ICE*Bs1* integrase". ICEberg simply has no
 entry for NC_000964.3.
 
-⚠ **A warning about this benchmark's own design, recorded because it nearly
-inverted the result.** The set originally justified including strain 168 with
-"ICE*Bs1* is absent from 168 itself". That is false — ICE*Bs1* was *discovered*
+⚠ **A warning about this benchmark's own design.** The set originally justified
+including strain 168 with "ICE*Bs1* is absent from 168 itself". That is false — ICE*Bs1* was *discovered*
 in strain 168 (Auchtung *et al.* 2005). Had the call been counted rather than
 inspected, a textbook-correct detection would have been recorded as a false
 positive, and a working detector might then have been "fixed". Every call in a
@@ -651,9 +623,8 @@ errors**.
 
 ### Boundaries: measured before `4a93d89`, and again after
 
-> ⚠ **Superseded numbers, kept deliberately.** The two-arm comparison in this
-> document was run on 2026-07-30, *before* commit `4a93d89` reworked the *att*
-> search. The arm comparison itself is unaffected — it asks what ICEscan adds, and
+> ⚠ **Superseded numbers.** The two-arm comparison in this document was run on
+> 2026-07-30, *before* commit `4a93d89` reworked the *att* search. The arm comparison itself is unaffected — it asks what ICEscan adds, and
 > both arms were measured with the same att search — but the absolute boundary
 > numbers it produced are no longer current. Both are given below, labelled.
 
@@ -775,6 +746,6 @@ with two genuinely well-bounded new recoveries; all four integrase exclusions
 demonstrably fire; the `CP042858.1` regression check holds byte-identically in
 both arms.
 
-Carry forward: `run_icescan.sh` needs its threshold fixed; the `CP011419.1`
-nested double-report should be resolved; the FIX-4 tie-break's second key is
-worth revisiting; and this benchmark still cannot measure a false-positive rate.
+`run_icescan.sh` needs its threshold fixed; the FIX-4 tie-break's second key
+is worth revisiting; and this benchmark still cannot measure a false-positive
+rate.

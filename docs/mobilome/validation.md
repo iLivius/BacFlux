@@ -61,10 +61,10 @@ the negative control and the call-burden count below have to be read alongside i
 
 ## The benchmark genomes
 
-Every genome is a public GenBank deposit, used as downloaded. The reason each was
-picked is given because the sets were chosen deliberately rather than sampled — the
-IME set in particular is stacked with elements below the module's size floor, which is
-why its recall is the lowest number on this page.
+Every genome is a public GenBank deposit, used as downloaded. The sets were chosen
+deliberately rather than sampled — the IME set in particular is stacked with elements
+below the module's size floor, which is why its recall is the lowest number on this
+page.
 
 ### ICE pilot — 18 genomes
 
@@ -227,9 +227,8 @@ table.
 | Confidence `high` | 16 | **16 — unchanged** |
 
 **No element gained a self-transmissible claim.** Every net-new call in the ICEscan
-arm is an IME or an AICE — tier 5 or no tier at all. That is the single most important
-safety property of the layer: it can add elements at the mobilisable end of the ladder,
-it cannot promote anything to the top rung.
+arm is an IME or an AICE — tier 5 or no tier at all. The layer can add elements at the
+mobilisable end of the ladder; it cannot promote anything to the top rung.
 
 Both new IME detections fit the curated element closely rather than being oversized
 intervals that merely contain it: Tn*4451* at 0.94 of its curated length (start offset
@@ -293,10 +292,10 @@ difference cannot be explained by a better model — it is attributable to what 
 around the shared engine: candidate seeding, a class-aware size floor, and the
 decision to report low-quorum machinery at low confidence rather than discard it.
 
-One honesty note on that count. ICE*Vfl*Ind1 is detected but classified
-`cime_or_island` — integrase, coupling protein and apparatus, **no relaxase** — not
-`ice`. It counts as detected because its call overlaps the curated interval, which it
-does. It is not a correct class call and should not be presented as one.
+ICE*Vfl*Ind1 is detected but classified `cime_or_island` — integrase, coupling protein
+and apparatus, **no relaxase** — not `ice`. It counts as detected because its call
+overlaps the curated interval, which it does. It is not a correct class call and should
+not be presented as one.
 
 ### Class
 
@@ -408,8 +407,6 @@ assembly.
 | Confidence `low` | 7 (10%) | 22 (34%) | 42 (63%) | 39 (65%) |
 | `boundary_method = none` | 30 (44%) | 49 (77%) | 55 (82%) | 54 (90%) |
 | Calls on the 12 negative controls | 5 | 4 | 3 | 2 |
-
-Three results matter more than the rest.
 
 **Detection is flat down to 50 kb N50.** ICE recall is identical to the closed genomes
 at both 150 kb and 50 kb, and only breaks at 20 kb. For calibration, a survey of 28

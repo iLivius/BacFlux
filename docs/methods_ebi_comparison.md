@@ -4,12 +4,10 @@ The obvious question about any new caller is whether an established one does bet
 This page answers it directly: BacFlux's mobilome module and the EBI Mobilome
 Annotation Pipeline, run on the same genomes and scored by the same code.
 
-Read section 0 first. The two callers share ancestry, so this is **not** an
-independent check — treating it as one would overstate what agreement between them
-proves.
+The two callers share ancestry, so this is **not** an independent check —
+treating it as one would overstate what agreement between them proves.
 
-Numbers current as of BacFlux commit `4a93d89` (branch `release/v2.0.0`). Every
-figure is computed from the run artefacts.
+Numbers current as of BacFlux commit `4a93d89` (branch `release/v2.0.0`).
 
 !!! abstract "Terms used on this page"
 
@@ -31,9 +29,7 @@ figure is computed from the run artefacts.
 
 ---
 
-## 0. Read this first: the two callers are not independent
-
-**The most important caveat in this document, stated before any result.**
+## 0. The two callers are not independent
 
 BacFlux's ICE/IME caller and the EBI Mobilome Annotation Pipeline (MAP) both find
 conjugation machinery by running **MacSyFinder with the ICEscan model set**. MAP
@@ -207,7 +203,7 @@ wall-clock 30.3 min per genome (range 23.4–39.9). Twelve genomes produced no
 `ices.tsv` because no ICE candidate survived MAP's prescan; that is a real
 result — no call — not a failure, and it is scored as zero calls.
 
-Three run-level caveats, disclosed rather than buried:
+Three run-level caveats:
 
 - `CP016079.1` — a **non-ICE** stage aborted (`GFF_MAPPING:ABORTED`). The
   ICEfinder2-lite table was written and is what we scored, so the ICE/IME result
@@ -228,9 +224,6 @@ point where they take effect. The converter does **no** filtering, no
 re-thresholding and no coordinate arithmetic — only translation.
 
 ### 3.1 The SO-term `integron` trap
-
-**This is the single most important thing to know before repeating this
-comparison, and it fails silently.**
 
 MAP labels rows with Sequence Ontology terms. It writes the term **`integron`
 (SO:0000365) for two completely different things**: an ICEfinder2-lite **IME**,
@@ -589,11 +582,11 @@ than a known-restrictive licence, because there is nothing to comply with. With
 no measured benefit on one side and unverifiable terms on the other, vmatch is not
 adopted.
 
-> **Reproducibility gap, stated rather than hidden.** The 35/35 set-equality
-> measurement is recorded in the commit message of `4a93d89`, but the diagnostic
-> script that produced it is not retained in the repository or the benchmark tree.
-> Before this appears in a publication it should be re-run and the script and its
-> output archived alongside the other validation artefacts.
+> **Reproducibility gap.** The 35/35 set-equality measurement is recorded in the
+> commit message of `4a93d89`, but the diagnostic script that produced it is not
+> retained in the repository or the benchmark tree. Before this appears in a
+> publication it should be re-run and the script and its output archived
+> alongside the other validation artefacts.
 
 ---
 
