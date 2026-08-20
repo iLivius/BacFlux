@@ -79,20 +79,31 @@ Note the archives are `.tar.xz` (hence `-xJf`), not `.tar.gz` as in earlier rele
 ### NCBI core nt
 
 ```bash
-# list the core_nt volumes (or nt_prok for bacteria only)
-rsync --list-only rsync://ftp.ncbi.nlm.nih.gov/blast/db/core_nt.*.gz \
-  | grep '.tar.gz' | awk '{print "ftp.ncbi.nlm.nih.gov/blast/db/" $NF}' > nt_links.list
-
-# download in parallel, without overdoing it
-cat nt*.list | parallel -j4 'rsync -h --progress rsync://{} .'
-find . -name '*.gz' | parallel -j4 'echo {}; tar -zxf {}'
+# NCBI's own downloader. It ships with BLAST+, so it is already in the blast
+# environment; --decompress unpacks each volume as it arrives, and every transfer
+# is checked against the .md5 NCBI publishes beside it.
+update_blastdb.pl --decompress --num_threads 4 core_nt      # or nt_prok
 
 # taxonomy: BlobTools reads nodes.dmp and names.dmp from this same directory
-wget -c 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz' && tar -zxf taxdump.tar.gz
-wget    'ftp://ftp.ncbi.nlm.nih.gov/blast/db/taxdb.tar.gz'       && tar -zxf taxdb.tar.gz
-wget -c 'ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz'
+wget -c 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz' && tar -zxf taxdump.tar.gz
+wget -c 'https://ftp.ncbi.nlm.nih.gov/blast/db/taxdb.tar.gz'       && tar -zxf taxdb.tar.gz
+wget -c 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz'
 gunzip nucl_gb.accession2taxid.gz
 ```
+
+!!! warning "rsync no longer works, and ftp:// is a liability"
+
+    NCBI has switched its rsync service off — `rsync://ftp.ncbi.nlm.nih.gov` now
+    answers `Connection refused`, so any recipe built on it fails outright.
+
+    `ftp://` still resolves, but it is worth avoiding anyway: sustained FTP transfers
+    from an institutional network are a common trigger for rate limiting at NCBI's
+    end, and the protocol is blocked outright on many campus networks. Every NCBI URL
+    here is `https://`, which is served from the same host and the same paths.
+
+    `update_blastdb.pl` is the route NCBI supports. It resolves the volume list
+    itself, so nothing needs updating here when the number of `core_nt` volumes
+    changes, and it verifies each volume's md5.
 
 `nodes.dmp` and `names.dmp` **must** sit in the same directory as the BLAST volumes.
 `parameters.nt_version` chooses which subfolder is searched: `core_nt` (default) or

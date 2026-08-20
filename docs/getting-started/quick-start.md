@@ -95,7 +95,7 @@ directories:
   platon_db:  /data/db/platon/db
 
 links:
-  phix_link:  ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
+  phix_link:  https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
   card_link:  https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2
   dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
 
