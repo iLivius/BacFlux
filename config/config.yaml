@@ -327,6 +327,25 @@ parameters:
     medaka_model: auto         # auto/TRUE/empty = infer from FASTQ headers; FALSE = skip Medaka; else an explicit model name
     medaka_model_fallback_auto: false  # if an explicit model is INVALID: false = fail with suggestions (default); true = fall back to auto-inference
   hybrid:                      # read only when mode == hybrid
+    short_read_guidance: false # [hybrid] false (default): filter the ONT reads on
+                               #   length and quality only, exactly as nanopore mode.
+                               #   true: also score every long read against the
+                               #   decontaminated Illumina reads (-1/-2), trimming and
+                               #   splitting it where they disagree.
+                               #
+                               #   Short-read support is thinnest over repeats and IS
+                               #   elements, which is where the reads that hold an
+                               #   assembly together lie. Measured on five closed
+                               #   genomes: it turned a 6-contig Shigella flexneri
+                               #   assembly into 40 and cost Enterobacter hormaechei
+                               #   a whole replicon, while RAISING mean read length
+                               #   and N50 in both. It helped on one of the five, the
+                               #   least repetitive with the deepest short reads.
+                               #   docs/methods_reference_genome_run.md
+                               #
+                               #   With it ON the Illumina reads also screen the ONT
+                               #   leg for contaminants. With it OFF nothing does, so
+                               #   the long-read assembly is screened after Flye.
     flye_input_mode: auto      # Options: auto | nano-raw | nano-hq
     medaka_model: auto         # auto/TRUE/empty = infer; FALSE = skip; else an explicit model name
     medaka_model_fallback_auto: false  # if an explicit model is INVALID: false = fail with suggestions (default); true = fall back to auto-inference

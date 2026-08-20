@@ -183,13 +183,14 @@ rule map_sel_contigs:
 rule filter_long_reads:
     input:
         long = os.path.join(NANOPORE_DIR, ONT),
-        r1 = SEL_R1,
-        r2 = SEL_R2,
+        # Only a dependency when the guidance is on. Unpacking a dict keeps the input
+        # list valid either way, and with guidance off the ONT leg no longer waits on
+        # the Illumina selection at all.
+        **({"r1": SEL_R1, "r2": SEL_R2} if HYBRID_SHORT_READ_GUIDANCE else {}),
     output:
         filt_long = FILT_LONG,
     params:
         min_length = FILTLONG_MIN_LENGTH,
-        split = 1000,
         keep_percent = FILTLONG_KEEP_PERCENT,
         # keep_percent (the line above) and length_weight were both hard-coded
         # here once, at 90 and 10, and together they destroyed the 5,596 bp Col2
@@ -204,23 +205,34 @@ rule filter_long_reads:
         # what Ryan Wick's Feb 2026 benchmark does and does not say about this all
         # sit next to FILTLONG_LENGTH_WEIGHT in shared/00_common.smk.
         length_weight = FILTLONG_LENGTH_WEIGHT,
+        # Empty unless parameters.hybrid.short_read_guidance is true. --trim and
+        # --split are meaningless without a reference to compare against, so all
+        # three flags appear and disappear together.
+        guidance = lambda w, input: (
+            f"-1 {input.r1} -2 {input.r2} --trim --split 1000"
+            if HYBRID_SHORT_READ_GUIDANCE else ""
+        ),
+        # The coverage cap nanopore mode has always applied. With guidance off there
+        # is nothing else culling depth, and hybrid runs on 300x+ ONT data have been
+        # seen to leave Flye with no assembly at all.
+        target = ("" if HYBRID_SHORT_READ_GUIDANCE
+                  else f"--target_bases {FILTLONG_TARGET_BASES}"),
     conda:
         "../../envs/filtlong.yaml"
     log:
         LOGS + "/filter_long_reads_{sample}.log"
     shell:
         """
-        # The selected Illumina reads define the target genome, so this single
-        # step does the enrichment AND the decontamination for the ONT leg; there
-        # is deliberately no separate ONT screening block after Flye/dnaapler.
+        # With guidance ON the selected Illumina reads define the target genome, so
+        # this step does enrichment AND decontamination for the ONT leg. With it OFF
+        # -- the default -- nothing here screens for contaminants, which is why the
+        # long-read assembly is screened after Flye instead (shared/10_decontam.smk).
         filtlong \
-          -1 {input.r1} \
-          -2 {input.r2} \
+          {params.guidance} \
           --min_length {params.min_length} \
-          --trim \
-          --split {params.split} \
           --keep_percent {params.keep_percent} \
           --length_weight {params.length_weight} \
+          {params.target} \
           {input.long} > {output.filt_long} 2>{log}
         """
 

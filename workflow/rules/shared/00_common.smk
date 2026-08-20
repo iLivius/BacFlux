@@ -1157,6 +1157,27 @@ FILTLONG_KEEP_PERCENT  = _lrqc.get("keep_percent", 95)
 # Default 1 = filtlong's own default = do not let length dominate quality.
 FILTLONG_LENGTH_WEIGHT = float(_lrqc.get("length_weight", 1))
 
+# ── Short-read guidance for the hybrid ONT filter (default OFF) ──
+# With -1/-2, filtlong scores every long read against the Illumina reads and, with
+# --trim and --split, cuts it wherever short-read support fails. Short-read support
+# is thinnest across repeats and IS elements, which is exactly where the reads that
+# hold an assembly together lie: measured on five closed genomes, the guidance turned
+# a 6-contig Shigella flexneri assembly into 40 and cost Enterobacter hormaechei a
+# whole replicon, while raising mean read length and N50 in both cases. It helped on
+# one genome of the five, the least repetitive with the deepest short reads.
+# Full three-arm measurement: docs/methods_reference_genome_run.md
+#
+# --trim and --split do nothing without a reference, so they travel with the flag.
+# When it is off, the hybrid filter is byte-identical to the nanopore one.
+HYBRID_SHORT_READ_GUIDANCE = _config_bool(
+    ((config.get("parameters", {}) or {}).get("hybrid", {}) or {}).get("short_read_guidance"),
+    False,
+)
+# Nanopore mode caps coverage here; hybrid historically did not, because the short
+# reads were expected to do the culling. Without guidance there is nothing to cull
+# with, so the cap applies in both modes.
+FILTLONG_TARGET_BASES = 500000000
+
 
 # ── Mobilome settings, resumed ──
 MOBILOME_RUN = _config_bool(_mobilome_cfg.get("run"), False)
