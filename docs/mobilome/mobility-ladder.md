@@ -188,9 +188,12 @@ is on a plasmid — is common and benchmarked. The IME route, where a chromosoma
 sits inside an integrative mobilisable element, is much rarer, and the benchmark has not
 put an AMR gene inside one.
 
-**What to do with that.** Tier 4 rests on a single measured instance, and the tier 5 IME
-route on none. If either reaches something you are signing, check the evidence columns
-yourself rather than the tier alone — `named_element`, `mge_id`, `boundary_method` and
+**What to do with that.** Tier 4 has been measured on two genomes and the tier 5 IME
+route on none. One of those two produced 15 tier 4 rows from a single transposon, which
+is worth knowing before reading a count: a curated element carrying a resistance cluster
+yields as many rows as it has genes, so the row count reports elements as much as genes.
+If either reaches something you are signing, check the evidence columns yourself rather
+than the tier alone — `named_element`, `mge_id`, `boundary_method` and
 `confidence` are all there for exactly this. The measured performance of the tiers that
 *are* benchmarked is on [Validation](validation.md), including the boundary caveat that
 applies to tier 1.

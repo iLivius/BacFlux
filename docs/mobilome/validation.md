@@ -519,17 +519,26 @@ set contains a curated AICE. Treat AICE calls as hypotheses.
 Tier 6 and tier 1 carry the benchmark work above. The middle of the ladder does not.
 
 - **Tier 4** — inside a *named* transposon or integron — depends entirely on the opt-in
-  TnCentral naming layer, and rests on **a single measured instance**: `bla`CTX-M-15
-  inside Tn*Ecp1.1* on the chromosome of the *K. pneumoniae* ATCC BAA-2146 positive
-  control, at 99.9% identity over 87% of the 3,417 bp reference. The same run without the
-  layer scores that gene tier 2, so the override behaves as designed
-  ([Worked example](worked-example.md)). One row on one closed genome is a demonstration
-  that the path works, **not** a measurement of how often it is right, and two things
-  keep it rare in practice. Tier 4 is reached only when a curated name is the *strongest*
-  evidence available — six other curated elements in that same genome sit on plasmids and
-  score 5 or 6 instead — and the ≥80% reference-coverage rule is strict: on fragmented
-  clinical assemblies the same Tn*Ecp1.1* was refused at 12% and 49% coverage. Expect
-  tier 4 on closed genomes far more than on drafts.
+  TnCentral naming layer, and has now been measured on two genomes. On the
+  *K. pneumoniae* ATCC BAA-2146 positive control, `bla`CTX-M-15 scores tier 4 inside
+  Tn*Ecp1.1* at 99.9% identity over 87% of the 3,417 bp reference; the same run without
+  the layer scores that gene tier 2, so the override behaves as designed
+  ([Worked example](worked-example.md)). On *Enterobacter hormaechei* it produced **15
+  rows at once**, all fifteen genes inside a single curated chromosomal transposon,
+  Tn*SMR478* ([hybrid mode on five closed genomes](../methods_reference_genome_run.md)).
+
+  Those two results say different things. One gene in one element is the path working;
+  fifteen genes in one element is a reminder that a tier 4 count reports **elements as
+  much as genes** — a single transposon carrying a resistance cluster produces as many
+  rows as it has genes, and reading fifteen rows as fifteen independent findings would
+  overstate the evidence considerably.
+
+  Tier 4 stays uncommon for two structural reasons rather than one measurement. It is
+  reached only when a curated name is the *strongest* evidence available — six other
+  curated elements in the BAA-2146 genome sit on plasmids and score 5 or 6 instead — and
+  the ≥80% reference-coverage rule is strict: on fragmented clinical assemblies the same
+  Tn*Ecp1.1* was refused at 12% and 49% coverage. Expect tier 4 on closed genomes far
+  more than on drafts.
 - **Tier 5** is exercised, but only by one of its two routes. Every tier 5 row on disk
   is a gene on a mobilisable plasmid. **No AMR gene in any run has been assigned an
   IME context**, so the "inside an IME" half of tier 5 is untested end to end — which

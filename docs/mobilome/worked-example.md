@@ -152,6 +152,13 @@ those genes score 5 or 6 and keep the name in `named_element` as supporting deta
 the chromosomal one is left for tier 4 to claim. A genome can be full of named
 transposons and still show a single tier 4 row.
 
+The opposite case is just as possible, and one genome later produced it: on
+*Enterobacter hormaechei* a single chromosomal transposon, Tn*SMR478*, carried fifteen
+resistance and stress genes, so one element produced **fifteen** tier 4 rows
+([hybrid mode on five closed genomes](../methods_reference_genome_run.md)). The row
+count follows the genes, not the elements — worth remembering before reading one as a
+measure of the other.
+
 **The 80% rule is doing most of the filtering.** 1,554 candidate hits were discarded to
 produce those seven, and the reasons are recorded:
 

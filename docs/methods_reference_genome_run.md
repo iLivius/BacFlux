@@ -150,6 +150,13 @@ plasmid or ICE claiming it first ([the mobility ladder](mobilome/mobility-ladder
 which is why it is rare; a single chromosomal transposon carrying fifteen genes satisfies
 all three at once.
 
+Read that 15 as one element rather than fifteen findings. The other genome where tier 4
+has been measured, ATCC BAA-2146, produced exactly one row from seven named elements,
+because six of the seven sat on plasmids and were claimed by tier 5 or 6 first
+([Worked example](mobilome/worked-example.md)). The two results bracket the behaviour:
+the row count tracks genes, and how many rows an element yields is a property of the
+element.
+
 ## Acknowledgement
 
 The isolates, the sequencing, the reference genomes and the read subsets are the work of

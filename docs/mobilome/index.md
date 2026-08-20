@@ -53,8 +53,8 @@ next to the number, so nobody reading the TSV has to look a tier up.
 
 The rungs are tested top down and the first match wins, so a curated transposon *on a
 plasmid* scores 5 or 6 rather than 4. That order, the three distance windows behind
-it, and how far to trust each rung — tier 4 rests on a single measured instance, and
-tier 5's IME route on none — are all on
+it, and how far to trust each rung — tier 4 is measured on two genomes, tier 5's IME
+route on none — are all on
 [The mobility ladder](mobility-ladder.md).
 
 ## What runs when you turn it on
