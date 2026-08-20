@@ -51,19 +51,20 @@ number the workflow produces rather than one taken from the literature.
 
 ## Short-read correction of long reads: it can help, and it can lose a replicon
 
-In `hybrid` mode Filtlong is given the Illumina reads (`-1`/`-2`) and scores each long
-read by how well it agrees with them, trimming (`--trim`) and splitting (`--split`)
-where agreement fails. `nanopore` mode has no short reads to offer, so it filters on
-length and quality alone and caps coverage with `--target_bases`.
+`hybrid` mode can give Filtlong the Illumina reads (`-1`/`-2`), so that it scores each
+long read by how well it agrees with them and trims (`--trim`) or splits (`--split`) it
+where agreement fails. That is what `parameters.hybrid.short_read_guidance` controls.
+Without it, Filtlong sees only the long reads: it filters on length and quality and caps
+coverage with `--target_bases`, which is also what `nanopore` mode does.
 
 Three arms were assembled with Flye from the same 50× reads, differing only in the
 filtering before them:
 
 | arm | filtering |
 |---|---|
-| **guided** | Filtlong with `-1`/`-2`, `--trim`, `--split` — what `hybrid` ships |
+| **guided** | Filtlong with `-1`/`-2`, `--trim`, `--split` — `short_read_guidance: true` |
 | **unfiltered** | none |
-| **unguided** | Filtlong with `--min_length`, `--keep_percent`, `--target_bases` — the `nanopore` settings |
+| **unguided** | Filtlong with `--min_length`, `--keep_percent`, `--target_bases` — `short_read_guidance: false` |
 
 | genome | reference | guided | unfiltered | unguided |
 |---|--:|--:|--:|--:|
@@ -99,7 +100,9 @@ short reads — it was the only arm to recover both replicons.
 
 ## What the workflow delivered
 
-Assemblies, against the published references, using the shipped configuration:
+Assemblies, against the published references. These runs had short-read guidance
+**on**, so the numbers below are the `guided` column of the table above; the mobilome
+results that follow were produced from these same assemblies.
 
 | genome | contigs | assembled | difference |
 |---|--:|--:|--:|

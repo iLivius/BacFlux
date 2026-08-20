@@ -72,7 +72,7 @@ under their publishers' terms;
 
 ## Components you switch on yourself
 
-Each of these is off in the shipped configuration and stays off until you set
+Each of these stays off until you set
 the key in the middle column.
 
 | Component | Turned on by | Licence as published | Read from |

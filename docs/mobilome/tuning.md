@@ -639,7 +639,7 @@ mobilome:
 
 Turning the ICEscan layer on roughly doubles the IME rows and is the only way to get an
 AICE call at all; it needs its own source, which [Turning it on](enabling.md) covers.
-Measured against the shipped default rather than a half-changed configuration — the
+Measured against an otherwise unchanged configuration rather than a half-changed one — the
 "before" being CONJscan alone at 0.5 and the "after" the union at 0.4 — IMEs go 2/12 to
 6/12, ICEs stay at 15/18, and negative-set calls go 2 to 7.
 

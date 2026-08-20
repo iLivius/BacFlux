@@ -488,7 +488,7 @@ surviving each setting pair:
 | | `length_weight: 10` | `length_weight: 1` |
 |---|--:|--:|
 | `keep_percent: 90` (the old value) | 93 | 413 |
-| `keep_percent: 95` (what ships) | 500 | 502 |
+| `keep_percent: 95` | 500 | 502 |
 
 **`keep_percent` is the key to reach for.** At the 95 that now ships, changing
 `length_weight` is worth two reads; at the old 90 it was worth 320. The plasmid

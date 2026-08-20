@@ -636,7 +636,7 @@ median absolute offsets were **14,294 bp at the start and 34,239 bp at the end**
 **identical in both arms** — which was this section's actual finding: ICEscan
 moved boundaries not at all.
 
-**After `4a93d89`.** Re-measured on the union arm, which is what ships
+**After `4a93d89`.** Re-measured on the union arm (`mobilome.icescan.run: true`)
 (`results_final.tsv` / `ime_results_final.tsv`): **10 of the 20 detected curated
 elements (50%)** now carry an *att* pair, and across all calls the rate is
 **34 of 63 (54%)** on this 28-genome benchmark. The chromosomal median absolute

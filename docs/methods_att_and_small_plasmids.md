@@ -309,7 +309,7 @@ block of at least 1 kb; on that measure the **raw** read set holds **603**:
 | | `length_weight 10` | `length_weight 1` |
 |---|---|---|
 | **`keep_percent 90`** — the old value | **93** | 413 |
-| **`keep_percent 95`** — what ships | 500 | **502** |
+| **`keep_percent 95`** | 500 | **502** |
 
 **Both keys matter, and `keep_percent` is the one to reach for.** At the 95 that
 now ships, changing `length_weight` is worth two reads; at the old 90 it is worth
