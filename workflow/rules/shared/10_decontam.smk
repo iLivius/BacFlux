@@ -704,7 +704,7 @@ if LONGREAD_SCREEN:
         output:
             table = FINAL_BLOB_TABLE,
         params:
-            basename = FINAL_BLOB_PREFIX + ".blob",
+            basename = FINAL_BLOB_TABLE_PREFIX,
         conda:
             "../../envs/blobtools.yaml"
         log:
@@ -712,9 +712,11 @@ if LONGREAD_SCREEN:
         shell:
             """
             blobtools view \
-              -i {input.json} \
-              -o {params.basename} \
-              -r genus > {log} 2>&1
+              --input {input.json} \
+              --out {params.basename} \
+              --taxrule bestsum \
+              --rank all \
+              --hits > {log} 2>&1
             """
 
     # ── screen_final_contigs — verdict per delivered contig, discarding nothing ──

@@ -769,7 +769,12 @@ FINAL_BAM        = DECONTAM_DIR + "/{sample}_final_map.bam"
 FINAL_BLOB_PREFIX = DECONTAM_DIR + "/blob_final"
 FINAL_BLOB_JSON  = FINAL_BLOB_PREFIX + ".blobDB.json"
 FINAL_BLOB_COV   = FINAL_BLOB_PREFIX + "." + os.path.basename(FINAL_BAM) + ".cov"
-FINAL_BLOB_TABLE = FINAL_BLOB_PREFIX + ".blob.blobDB.table.txt"
+# blobtools view writes "<--out>.<json name minus .json>.table.txt", so the table
+# prefix is a plain name and the JSON's own stem is what gets appended. Mirrors
+# BLOB_TABLE_PREFIX / BLOB_TABLE above; passing a prefix that already ends in the
+# stem appends it twice.
+FINAL_BLOB_TABLE_PREFIX = DECONTAM_DIR + "/bestscore_final"
+FINAL_BLOB_TABLE = FINAL_BLOB_TABLE_PREFIX + ".blob_final.blobDB.table.txt"
 FINAL_TAXO_DECISIONS = DECONTAM_DIR + "/{sample}_final_contig_taxonomy_decisions.tsv"
 
 # ── Read hand-offs (Stage-4 contract) ──
