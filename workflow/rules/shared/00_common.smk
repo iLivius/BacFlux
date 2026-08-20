@@ -734,6 +734,44 @@ else:  # contigs
 NEEDS_FINAL_BLAST = HAS_LONG_READS
 PLASMID_BLASTOUT = (DECONTAM_DIR + "/{sample}_final_blastout") if NEEDS_FINAL_BLAST else BLASTOUT
 
+# ── Contaminant screen of the DELIVERED long-read genome (hybrid) ──
+# Hybrid screens the Illumina SPAdes draft; the genome it delivers comes from the
+# ONT side (Flye -> Medaka -> dnaapler -> Polypolish) and was never screened. That
+# was defensible while filtlong scored every long read against the decontaminated
+# short reads, which removed contaminant reads before Flye ever saw them. With
+# parameters.hybrid.short_read_guidance defaulting to false, nothing does that any
+# more, so the delivered assembly is screened here instead.
+#
+# The expensive half is already paid: blast_final_contigs megablasts FINAL_CONTIGS
+# against nt for plasmid_search, and PLASMID_BLASTOUT carries the same 15 columns
+# BlobTools reads. Only a coverage track and the BlobTools join are added.
+#
+# Default is "off": every contig is screened and gets an audited verdict, and none
+# is discarded. On a 2-5 contig long-read assembly a false positive removes a whole
+# replicon rather than trimming a fragment, and BlobTools finds outliers in a cloud
+# of contigs -- with three, there is no cloud. Opt in per run if you want removal.
+LONGREAD_SCREEN = MODE == "hybrid"
+_dec = (config.get("parameters", {}) or {}).get("decontamination", {}) or {}
+_lrm = _dec.get("long_read_mode", "off")
+# YAML 1.1 reads a bare off/no/false as a BOOLEAN, so `long_read_mode: off` arrives
+# here as False and would otherwise become the string "false" — which is not one of
+# the selector's modes, and would fail deep inside the rule rather than here.
+if isinstance(_lrm, bool):
+    _lrm = "off" if _lrm is False else "auto"
+LONGREAD_SCREEN_MODE = str(_lrm).strip().lower()
+if LONGREAD_SCREEN_MODE not in {"auto", "include", "exclude", "off"}:
+    raise WorkflowError(
+        f"[BacFlux] parameters.decontamination.long_read_mode is "
+        f"'{LONGREAD_SCREEN_MODE}', which is not one of: off, auto, include, exclude."
+    )
+
+FINAL_BAM        = DECONTAM_DIR + "/{sample}_final_map.bam"
+FINAL_BLOB_PREFIX = DECONTAM_DIR + "/blob_final"
+FINAL_BLOB_JSON  = FINAL_BLOB_PREFIX + ".blobDB.json"
+FINAL_BLOB_COV   = FINAL_BLOB_PREFIX + "." + os.path.basename(FINAL_BAM) + ".cov"
+FINAL_BLOB_TABLE = FINAL_BLOB_PREFIX + ".blob.blobDB.table.txt"
+FINAL_TAXO_DECISIONS = DECONTAM_DIR + "/{sample}_final_contig_taxonomy_decisions.tsv"
+
 # ── Read hand-offs (Stage-4 contract) ──
 # Gated exactly like the Flye/Medaka block in section 8, so referencing TRIM_R1 in
 # nanopore mode raises a clean NameError instead of silently building a path no
@@ -1984,6 +2022,12 @@ def _downstream_targets():
             targets += [*expand(NAMED_ELEMENTS_AUDIT, sample=SAMPLES)]
         if MOBILOME_NAME_ICE:
             targets += [*expand(ICE_NAMING_AUDIT, sample=SAMPLES)]
+
+    # The delivered long-read genome's contaminant audit (hybrid only). Requested
+    # even when the screen is in "off" mode: off means nothing is discarded, not
+    # that nothing is checked, and the audit is the point of running it.
+    if LONGREAD_SCREEN:
+        targets += [*expand(FINAL_TAXO_DECISIONS, sample=SAMPLES)]
     return targets
 
 

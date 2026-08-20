@@ -297,6 +297,30 @@ parameters:
     # plasmid's ONT reads, for different reasons, and both must be ruled out.
     mode: auto                 # Options: auto | include | exclude | off
     discard_no_hit: true       # discard contigs with no taxonomic hit
+    long_read_mode: "off"      # [hybrid] Options: off (default) | auto | include | exclude
+                               #   A SECOND screen, of the genome hybrid actually
+                               #   delivers. `mode:` above screens the Illumina SPAdes
+                               #   draft; the delivered genome comes from the ONT side
+                               #   (Flye, Medaka, dnaapler, Polypolish) and is not
+                               #   covered by it.
+                               #
+                               #   It used to be covered indirectly: filtlong scored
+                               #   long reads against the decontaminated short reads,
+                               #   removing contaminant reads before Flye. With
+                               #   parameters.hybrid.short_read_guidance now false by
+                               #   default, nothing does that, so this screen exists.
+                               #
+                               #   `off` still runs the screen and writes
+                               #   {sample}_final_contig_taxonomy_decisions.tsv with a
+                               #   verdict per contig — it just discards nothing. That
+                               #   is the default because BlobTools finds outliers in a
+                               #   cloud of contigs and a long-read assembly has two to
+                               #   five: a false positive deletes a whole replicon,
+                               #   usually the plasmid, not a fragment. Read the audit
+                               #   before setting this to anything else.
+                               #
+                               #   The genus lists below are shared with `mode:` — the
+                               #   organism does not change because the assembler did.
     include_genera:            # null | "GenusA;GenusB" | [GenusA, GenusB]   (inline genus list to KEEP)
     include_genera_by_sample:  # null | PATH to a 2-column TSV (sample, genus)  ← a FILE PATH, not a mapping
     exclude_genera:            # null | inline genus list to DISCARD

@@ -615,3 +615,159 @@ rule select_contigs:
           --composition {output.abund:q} \
           --decisions {output.decisions:q} > {log} 2>&1
         """
+
+
+# ══════════════ Contaminant screen of the DELIVERED long-read genome ══════════════
+#
+# Hybrid screens the Illumina SPAdes draft (the HAS_SHORT_READS branch above). The
+# genome it delivers comes from the other side of the mode — Flye, Medaka, dnaapler,
+# Polypolish — and passes through none of that.
+#
+# That was defensible for as long as filtlong scored every long read against the
+# decontaminated short reads: a contaminant read was removed before Flye ever saw it,
+# and the rule that did it said so. With parameters.hybrid.short_read_guidance now
+# defaulting to false, nothing removes contaminant long reads, so the assembly they
+# build is screened here instead.
+#
+# The costly half is already paid for. blast_final_contigs megablasts FINAL_CONTIGS
+# against nt so that plasmid_search can read it, and PLASMID_BLASTOUT carries the same
+# 15 columns BlobTools wants. Only a coverage track and the BlobTools join are new.
+if LONGREAD_SCREEN:
+
+    # ── map_final_contigs — ONT reads onto the delivered genome ──
+    # Takes in: FILT_LONG (the filtered ONT reads) and FINAL_CONTIGS.
+    # Does:     minimap2 -ax map-ont, exactly as the nanopore screen maps its draft.
+    #           The ONT reads are used rather than the Illumina ones on purpose: the
+    #           whole reason this screen exists is that the short reads may no longer
+    #           be involved in the ONT leg, and a coverage track derived from them
+    #           would put the short-read bias back into the decision.
+    # Produces: FINAL_BAM (+ .bai), both temp — only BlobTools reads them.
+    rule map_final_contigs:
+        input:
+            reads = FILT_LONG,
+            contigs = FINAL_CONTIGS,
+        output:
+            bam = temp(FINAL_BAM),
+            bai = temp(FINAL_BAM + ".bai"),
+        conda:
+            "../../envs/minimap.yaml"
+        threads: CPUS
+        log:
+            LOGS + "/map_final_contigs_{sample}.log"
+        shell:
+            """
+            minimap2 \
+              -ax map-ont {input.contigs} \
+              {input.reads} 2> {log} | \
+            samtools view -S -b -u -@ {threads} | \
+            samtools sort -o {output.bam} -@ {threads} 2>> {log}
+
+            samtools index {output.bam} -@ {threads} 2>> {log}
+            """
+
+    # ── blob_json_final / blob_table_final — the same join, on the delivered genome ──
+    # Takes in: FINAL_CONTIGS, the coverage track above, and PLASMID_BLASTOUT, which
+    #           blast_final_contigs already produced for plasmid_search.
+    # Produces: FINAL_BLOB_TABLE, one row per delivered contig with its coverage and
+    #           the genus BlobTools settled on.
+    rule blob_json_final:
+        input:
+            contigs = FINAL_CONTIGS,
+            bam = FINAL_BAM,
+            bai = FINAL_BAM + ".bai",
+            blast = PLASMID_BLASTOUT,
+            nodes = os.path.join(BLASTDB, "nodes.dmp"),
+            names = os.path.join(BLASTDB, "names.dmp"),
+        output:
+            json = temp(FINAL_BLOB_JSON),
+            cov = temp(FINAL_BLOB_COV),
+        params:
+            basename = FINAL_BLOB_PREFIX,
+        conda:
+            "../../envs/blobtools.yaml"
+        log:
+            LOGS + "/blob_json_final_{sample}.log"
+        shell:
+            """
+            blobtools create \
+              -i {input.contigs} \
+              -b {input.bam} \
+              -t {input.blast} \
+              --nodes {input.nodes} \
+              --names {input.names} \
+              -o {params.basename} > {log} 2>&1
+            """
+
+    rule blob_table_final:
+        input:
+            json = FINAL_BLOB_JSON,
+        output:
+            table = FINAL_BLOB_TABLE,
+        params:
+            basename = FINAL_BLOB_PREFIX + ".blob",
+        conda:
+            "../../envs/blobtools.yaml"
+        log:
+            LOGS + "/blob_table_final_{sample}.log"
+        shell:
+            """
+            blobtools view \
+              -i {input.json} \
+              -o {params.basename} \
+              -r genus > {log} 2>&1
+            """
+
+    # ── screen_final_contigs — verdict per delivered contig, discarding nothing ──
+    # Takes in: FINAL_BLOB_TABLE and FINAL_CONTIGS.
+    # Does:     the same selector the Illumina screen uses, with the same genus
+    #           configuration — the organism does not change because the assembler
+    #           did — but its own mode, from parameters.decontamination.long_read_mode,
+    #           defaulting to "off".
+    #
+    #           "off" makes the selector return keep/mode_off for every contig, so the
+    #           audit is written and nothing is removed. That default is deliberate:
+    #           BlobTools identifies outliers within a cloud of contigs, and a
+    #           long-read assembly has two to five. A false positive there deletes a
+    #           whole replicon — usually the plasmid — rather than trimming a
+    #           fragment, and this project has twice seen BLAST bestsum follow
+    #           database composition instead of biology on exactly that call.
+    # Produces: FINAL_TAXO_DECISIONS, one audited row per contig. The FASTA it writes
+    #           is a byproduct; FINAL_CONTIGS remains what every later stage reads.
+    rule screen_final_contigs:
+        input:
+            bestscore = FINAL_BLOB_TABLE,
+            contigs = FINAL_CONTIGS,
+        output:
+            decisions = FINAL_TAXO_DECISIONS,
+            abund = DECONTAM_DIR + "/{sample}_final_composition.tsv",
+            list = temp(DECONTAM_DIR + "/{sample}_final_keep.list"),
+            contigs = temp(DECONTAM_DIR + "/{sample}_final_screened.fasta"),
+        params:
+            selector = SELECT_TAXONOMY_SCRIPT,
+            mode = LONGREAD_SCREEN_MODE,
+            include_genera = DECONTAMINATION["include_genera"],
+            include_genera_by_sample = DECONTAMINATION["include_genera_by_sample"],
+            exclude_genera = DECONTAMINATION["exclude_genera"],
+            exclude_genera_file = DECONTAMINATION["exclude_genera_file"],
+            sample_overrides = DECONTAMINATION["sample_overrides"],
+            discard_no_hit = DECONTAMINATION["discard_no_hit"],
+        log:
+            LOGS + "/screen_final_contigs_{sample}.log"
+        shell:
+            """
+            python {params.selector:q} \
+              --bestscore {input.bestscore:q} \
+              --contigs {input.contigs:q} \
+              --sample {wildcards.sample:q} \
+              --mode {params.mode:q} \
+              --include-genera {params.include_genera:q} \
+              --include-genera-by-sample {params.include_genera_by_sample:q} \
+              --exclude-genera {params.exclude_genera:q} \
+              --exclude-genera-file {params.exclude_genera_file:q} \
+              --sample-overrides {params.sample_overrides:q} \
+              --discard-no-hit {params.discard_no_hit:q} \
+              --output-list {output.list:q} \
+              --output-fasta {output.contigs:q} \
+              --composition {output.abund:q} \
+              --decisions {output.decisions:q} > {log} 2>&1
+            """
