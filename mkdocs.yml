@@ -140,6 +140,7 @@ nav:
       - att sites and small plasmids: methods_att_and_small_plasmids.md
       - CONJScan + ICEscan together: methods_icescan_union.md
       - Head-to-head vs the EBI pipeline: methods_ebi_comparison.md
+      - Hybrid mode on five closed genomes: methods_reference_genome_run.md
   - Reference:
       - Configuration: reference/configuration.md
       - Output files: reference/output.md
