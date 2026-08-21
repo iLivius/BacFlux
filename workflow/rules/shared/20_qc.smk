@@ -283,6 +283,14 @@ if HAS_READS:
             LOGS + "/map_evaluation_{sample}.log"
         shell:
             """
+            # Qualimap renders its charts with JFreeChart, which reaches into Swing
+            # for theme colours. With DISPLAY set -- an SSH session with X11
+            # forwarding, say -- it tries to open that display and dies with
+            # "AWTError: Can't connect to X11 window server" AFTER the analysis has
+            # finished, at the report-writing step. Nothing here needs a display.
+            unset DISPLAY
+            export JAVA_OPTS="-Djava.awt.headless=true ${{JAVA_OPTS:-}}"
+
             qualimap bamqc \
               -bam {input.bam} \
               --java-mem-size={resources.java_mem}G \
