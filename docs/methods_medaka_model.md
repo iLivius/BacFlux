@@ -251,10 +251,6 @@ Stated so the claims above can be defended or challenged individually.
 - The biological mechanism (6mA/5mC/4mC, restriction–modification systems, signal
   deviation at modified bases, motif-systematic errors that coverage cannot
   average out). Standard domain knowledge, but not taken from the sources above.
-- That Dorado modified-base calling leaves the canonical A/C/G/T sequence
-  unchanged, and therefore that modbase basecalling would not remove the need for
-  this model. Consistent with how Dorado is architected, but not verified here
-  against Dorado's own documentation.
 - **That amplified DNA is a contraindication.** ONT scopes the model to "native
   data" but does not explicitly warn against amplified input. The caution above is
   read off that scoping, not quoted from a warning.
@@ -266,9 +262,34 @@ Stated so the claims above can be defended or challenged individually.
 weights as Medaka's bacterial model. Wick reported that in February 2025 and hedged
 it with "At the time of writing"; nothing here verifies it since.
 
-**From Dorado's documentation** (<https://software-docs.nanoporetech.com/dorado/latest/basecaller/mods/>):
-modified basecalling is "an extension to the normal `simplex` and `duplex` basecalling
-subcommands", and modifications are "annotated in the SAM/BAM/CRAM output". ONT does
-not state anywhere whether canonical accuracy changes when a modified-base model is
-used; the annotation-layer description is what supports the corollary above, and no
-stronger claim is made from it.
+**Verified against Dorado 2.1.1, 2026-08-21.** Modified-base calling does not feed back
+into which base is called, so it cannot repair a methylation-induced miscall and does
+not remove the need for this consensus model. Three independent lines establish it:
+
+- Dorado's basecall decoder emits only four symbols — `alphabet = {'A','C','G','T'}`
+  in `basecall/decode/beam_search.cpp`. There is no symbol for a modified base. The
+  modbase node reads the called sequence and writes only modification probabilities
+  beside it; it never assigns to the sequence.
+- ONT's maintainers state the invariant outright, and treat it as a design constraint:
+  *"modification calling has no effect on the canonical basecall — you should get
+  exactly the same sequence whether you do modbase or not. This is intentional"*
+  ([dorado#1494](https://github.com/nanoporetech/dorado/issues/1494#issuecomment-3302392321),
+  given as the reason for refusing a feature that would have let a modification
+  probability alter the emitted base).
+- The SAM specification makes it structural rather than a matter of implementation:
+  base modifications are *"a series of edits from the primary unmodified sequence as
+  originally reported by the sequencing instrument"*
+  ([SAMtags](https://raw.githubusercontent.com/samtools/hts-specs/master/SAMtags.tex)),
+  counted against a `SEQ` field whose 4-bit alphabet has no code point for 5mC or 6mA.
+
+ONT's own documentation does not say this in words — it describes modified basecalling
+only as "an extension to the normal `simplex` and `duplex` basecalling subcommands"
+(<https://software-docs.nanoporetech.com/dorado/latest/basecaller/mods/>).
+
+Two limits on the claim. It says no information flows back into base determination, not
+that output is byte-identical: enabling modification models changes GPU memory use and
+can shift the auto-selected batch size, and Dorado is not bit-reproducible across batch
+sizes — a difference that is non-determinism rather than feedback, and cannot
+systematically correct motif-specific errors. And it is specific to Dorado's split
+architecture; it does not hold for older basecallers where basecalling and modification
+calling happened inside one model.
