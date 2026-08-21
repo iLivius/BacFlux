@@ -104,12 +104,13 @@ material:
 ONT's own words: a **research model**, whose compatibility is deliberately broad —
 *"compatible with several basecaller versions for the R10 chemistries"*.
 
-**Corollary.** Had the run been basecalled *with* `--modified-bases`, the A/C/G/T
-sequence would be unchanged: modified-base calling adds an annotation layer on top
-of the canonical calls, it does not re-derive them. You would gain methylation
-calls and keep exactly the same methylation-induced errors — so the same Medaka
-model would still be the right choice. (See the sourcing note below: this
-corollary is inference, not quoted documentation.)
+**Corollary.** Had the run been basecalled *with* modified-base models, the A/C/G/T
+sequence would be unchanged. Dorado documents modified basecalling as "an extension
+to the normal `simplex` and `duplex` basecalling subcommands" whose output is
+"annotated in the SAM/BAM/CRAM output" through `MM`/`ML` tags — an annotation layer
+over the canonical calls rather than a re-derivation of them. You would gain
+methylation calls and keep exactly the same methylation-induced errors, so the same
+Medaka model would still be the right choice.
 
 ## Does it actually help?
 
@@ -165,14 +166,12 @@ So a missing plasmid is one case of a wider problem: an unresolved start–end o
 on a circular contig does the same. BacFlux's reorientation, plasmid-recovery and
 replicon-audit steps run before polishing partly for this reason.
 
-## When this is the wrong choice, and how to override
+## Overriding the model
 
-The model assumes **native, unamplified DNA**. PCR or whole-genome amplification
-erases methylation, so on amplified libraries the model is asked to correct signal
-distortions that are not there.
-
-If any library was amplified, pin the matched standard model explicitly instead of
-using `auto` — for R10.4.1 `sup` v4.2.0 basecalls that is:
+The bacterial model assumes **native, unamplified DNA**. Amplification — ONT's PCR
+barcoding kit (SQK-RPB114.24) or a whole-genome amplification protocol — copies the
+template with unmodified bases, so the methylation the model corrects for is no longer
+there. If a library was amplified, pin the matched standard model instead of `auto`:
 
 ```yaml
 parameters:
@@ -180,17 +179,13 @@ parameters:
     medaka_model: r1041_e82_400bps_sup_v4.2.0
 ```
 
-This has a cost worth stating: that is the standard, non-bacterial model, and on
-Wick's measurements it leaves roughly four times the residual errors the bacterial
-one does. It is still the right choice on amplified DNA, where the methylation the
-bacterial model corrects for is no longer in the template.
+That is the standard, non-bacterial model, and on Wick's measurements it leaves roughly
+four times the residual errors the bacterial one does — still the right choice on
+amplified DNA, but a real cost.
 
-`check_medaka_model` validates any explicit name against the installed Medaka's
-model list and fails early with a suggestion table if it is wrong.
-
-Library chemistry cannot be read reliably from FASTQ headers — the `sample_id`
-field is free text typed by the operator, not authoritative protocol metadata. If
-amplification status matters for a dataset, it has to come from the lab record.
+`check_medaka_model` validates any explicit name against the installed Medaka's model
+list and fails early with a suggestion table if it is wrong. Amplification status cannot
+be read from the reads; it has to come from the lab record.
 
 ## Sourcing: what is documented, what is inference
 
@@ -236,7 +231,9 @@ Stated so the claims above can be defended or challenged individually.
 weights as Medaka's bacterial model. Wick reported that in February 2025 and hedged
 it with "At the time of writing"; nothing here verifies it since.
 
-**Not consulted:** Dorado's own documentation; any primary paper on modified-base
-effects on nanopore basecalling accuracy. A search also surfaced a BMC Genomics
-study reporting that the bacterial methylation-aware model performed best among
-those tested, but the full text was not read and it is not relied on above.
+**From Dorado's documentation** (<https://software-docs.nanoporetech.com/dorado/latest/basecaller/mods/>):
+modified basecalling is "an extension to the normal `simplex` and `duplex` basecalling
+subcommands", and modifications are "annotated in the SAM/BAM/CRAM output". ONT does
+not state anywhere whether canonical accuracy changes when a modified-base model is
+used; the annotation-layer description is what supports the corollary above, and no
+stronger claim is made from it.
