@@ -265,6 +265,9 @@ rule filtered_long_read_qc:
         LOGS + "/filtered_long_read_qc_{sample}.log"
     shell:
         """
+        # NanoPlot can write its stats file before --outdir exists under load.
+        mkdir -p {output.nanoplot_filt_dir}
+
         NanoPlot \
           --fastq {input.fastq} \
           --threads {threads} \
