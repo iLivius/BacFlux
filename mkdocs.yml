@@ -104,6 +104,7 @@ plugins:
 # explaining before its output can be read safely.
 nav:
   - Home: index.md
+  - Rationale: about/rationale.md
   - Architecture: architecture.md
   - Getting started:
       - Installation: getting-started/installation.md
@@ -136,6 +137,7 @@ nav:
       - Worked example: mobilome/worked-example.md
       - Validation: mobilome/validation.md
   - Method references:
+      - The Medaka polishing model: methods_medaka_model.md
       - Intrinsic vs acquired AMR: methods_amr_intrinsic_acquired.md
       - att sites and small plasmids: methods_att_and_small_plasmids.md
       - CONJScan + ICEscan together: methods_icescan_union.md
@@ -147,7 +149,5 @@ nav:
       - Running BacFlux: reference/running.md
   - Troubleshooting: troubleshooting.md
   - About:
-      - Rationale: about/rationale.md
-      - The Medaka polishing model: about/medaka-model.md
       - Licensing: about/licensing.md
       - Citation and references: about/citation.md

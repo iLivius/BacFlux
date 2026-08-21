@@ -1,13 +1,28 @@
 # The Medaka polishing model
 
 Why BacFlux polishes an ONT assembly with a bacterial methylation model when Dorado
-basecalled it with a canonical one. Written to be quotable in a methods section: every
-claim carries its source, and the last section states which come from primary
-documentation and which are inference.
+basecalled it with a canonical one.
 
-The page exists to answer one apparent contradiction: **if Dorado basecalled
-without a methylation model, why does BacFlux polish with a methylation-aware
-one?** The answer is established from Medaka's own source and ONT's documentation.
+!!! tip "If you read nothing else"
+
+    - **You do not have to do anything.** `medaka_model: auto` is the default and
+      resolves to the bacterial methylation model. Confirmed on real R10.4.1 `sup`
+      reads: it selects `r1041_e82_400bps_bacterial_methylation_model`.
+    - **It is worth about 4x.** Against the standard model on the same ten genomes,
+      26 residual errors versus 100.
+    - **It is not a mismatch.** Methylation distorts the signal, so the canonical
+      basecaller makes the errors; the polisher corrects them. You polish with a
+      methylation-aware model *because* basecalling was not one.
+    - **Polish only structurally sound assemblies.** A missing plasmid makes its reads
+      misalign elsewhere, and Medaka then introduces errors rather than removing them.
+    - **Override in one case: amplified DNA.** PCR or whole-genome amplification erases
+      methylation, so pin the standard model instead — at roughly four times the
+      residual errors, which is the right trade there and nowhere else.
+    - **If you find advice to skip Medaka on `sup` reads**, it predates the bacterial
+      model and does not apply. See below.
+
+Everything after this is the evidence for those six points, with sources, and a final
+section separating what is documented from what is inference.
 
 !!! abstract "Terms used on this page"
 

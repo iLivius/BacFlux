@@ -40,7 +40,7 @@ flowchart TD
 There is no PhiX step: PhiX is an Illumina spike-in and does not exist in an ONT
 library. The Medaka model is resolved *before* Flye runs, so a bad model name costs
 seconds rather than an hour of assembly — see
-[the model-choice note](../about/medaka-model.md).
+[the model-choice note](../methods_medaka_model.md).
 
 !!! abstract "Terms used on this page"
 
@@ -96,7 +96,7 @@ instead of an hour later when Flye has already finished.
 | `false` | Medaka is skipped, and the rule is not defined at all |
 
 Which model `auto` resolves to, why it is the bacterial variant, and when to pin a
-different one, are in [The Medaka polishing model](../about/medaka-model.md).
+different one, are in [The Medaka polishing model](../methods_medaka_model.md).
 
 !!! note "Setting the model also changes the assembler"
 
