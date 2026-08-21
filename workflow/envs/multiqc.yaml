@@ -1,3 +1,10 @@
+# HELD at 1.33 deliberately. MultiQC 1.34 fixed CheckM sample-name cleaning in a way
+# that collides with our staging path: reports are assembled under
+# 09.report/multiqc_inputs/, and the fix truncates every sample name at the first dot,
+# so all samples collapse into a single row named "09". It fails silently -- exit 0, a
+# report that looks fine and is wrong. Moving the pin needs the staging directory moved
+# out from under 09.report first (e.g. OUT/multiqc_inputs); the strip regex follows
+# automatically because it is derived by os.path.relpath.
 name: multiqc
 channels:
   - conda-forge

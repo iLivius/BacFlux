@@ -61,7 +61,7 @@ list, with the licensing notes attached, is in
 | CAZymes | run_dbCAN 5.1.2 (dbCAN3) | 54 |
 | AMR and virulence on contigs | ABRicate 1.4.0 — plus the databases below | 47 |
 | Plasmids | Platon 1.8, with a supplementary BLAST+ line beside each call | 45, 7 |
-| Prophages | VirSorter2 2.2.4, with CheckV 1.0.3 grading what it found | 25, 38 |
+| Prophages | VirSorter2 2.2.4, with CheckV 1.1.1 grading what it found | 25, 38 |
 | Aggregated report | MultiQC 1.33 | 21 |
 
 **ABRicate's eight databases.** The screen runs once per database and the eight
