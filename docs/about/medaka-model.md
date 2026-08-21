@@ -147,6 +147,26 @@ Two genomes is a small sample, and the gain is variable — large on one, margin
 the other. Expect it to scale with how heavily methylated the organism is, not to be
 a fixed benefit.
 
+The largest tally is 147 assemblies, where the bacterial model improved 129 and made
+6 worse ([Wick 2026](https://rrwick.github.io/2026/06/19/dorado-v2-polishing.html)).
+A strong default, not a guarantee: the cases that get worse are the ones covered by
+the structural warning below.
+
+!!! warning "An older recommendation said the opposite, and is still findable"
+
+    In October 2023, Wick tested Medaka on `sup` basecalls and concluded: *"it
+    performed erratically with the sup/res assemblies, making things worse more often
+    than better"*, recommending *"Use Medaka if you are assembling hac reads but skip
+    it for sup/res reads"*
+    ([post](https://rrwick.github.io/2023/10/24/ont-only-accuracy-update.html)).
+
+    That test used `r1041_e82_400bps_sup_v4.2.0` — the **standard** model. The
+    bacterial model did not exist yet. Measured against each other on the same ten
+    genomes, the standard model left 100 residual errors and the bacterial model 26,
+    which is the gap that reverses the advice. Polishing `sup` reads with the standard
+    model is still a bad idea; polishing them with the bacterial model is the current
+    recommendation.
+
 ## A separate pitfall worth knowing
 
 Unrelated to model choice: **polish only structurally sound assemblies.** In the 2024
