@@ -7,7 +7,6 @@ Annotation Pipeline, run on the same genomes and scored by the same code.
 The two callers share ancestry, so this is **not** an independent check —
 treating it as one would overstate what agreement between them proves.
 
-Numbers current as of BacFlux commit `4a93d89` (branch `release/v2.0.0`).
 
 !!! abstract "Terms used on this page"
 
@@ -398,7 +397,7 @@ higher recall in §4 does not come from making many more calls.
 
 > **Provenance of these two rows.** `ebi_map/scoring/call_burden.tsv` was written
 > at 09:29 on 2026-07-31 from a snapshot of our calls taken at 09:26 — *before*
-> `4a93d89` regenerated them at ~11:12. Its BacFlux row therefore reads 66 calls /
+> the att-search fix regenerated them at ~11:12. Its BacFlux row therefore reads 66 calls /
 > 2,472,667 bp, which is stale. The figures above are recomputed from the live
 > `phase7_benchmark/work/*/ice_elements.tsv` over the same 40 samples. Three
 > samples changed: `AL513382` 95,548 → 145,727 bp; `GU725392` 2 calls / 57,721 bp
@@ -454,13 +453,13 @@ bona fide IME is a domain question this benchmark cannot settle.
 
 ### 6.3 Boundaries — where MAP was better, and by how much
 
-**Before BacFlux commit `4a93d89`, MAP's boundaries were better than ours. That
-is what prompted the fixes.**
+**Before the att-search fix, MAP's boundaries were better than ours. That is what
+prompted it.**
 
 Measured on the elements both callers found
 (`ebi_map/scoring/boundary_agreement.tsv`; chromosomal n=9, standalone n=5):
 
-| Metric | BacFlux **before** `4a93d89` | BacFlux **at** `4a93d89` | MAP |
+| Metric | BacFlux **before** the fix | BacFlux **after** | MAP |
 |---|---|---|---|
 | Chromosomal ICEs, median \|start offset\| | 14,294 bp | **5,141 bp** | 7,427 bp |
 | Chromosomal ICEs, median \|end offset\| | 34,239 bp | **14,912 bp** | 23,745 bp |
@@ -478,7 +477,7 @@ defects; two were candidate-extent differences with no repeats on either side. T
 two defects — a ranking that put raw repeat length above tRNA anchoring (on SPI-7
 a 51 bp repeat in ordinary sequence was beating the real 24 bp pair at tRNA-Phe),
 and a flank window of 30 kb when SPI-7's true attR sits 5.8 kb outside it — are
-documented in the commit message of `4a93d89`.
+documented with the fix itself.
 
 The conservative policy was **not** loosened to achieve this: a de novo
 repeat pair is still *reported and not applied*. Both recovered boundaries are
@@ -556,7 +555,7 @@ reason. It was tested rather than assumed, and the hypothesis was wrong twice
 over.
 
 **First, the two searches are the same search.** BacFlux's att search has not used
-`blastn` since commit `9c05c3e`; it computes **exact maximal repeats in standard-
+`blastn`; it computes **exact maximal repeats in standard-
 library Python** (`workflow/scripts/80_mobilome/att_search.py`), which is vmatch's
 own semantics. To test that properly rather than argue it, a second search was
 built on vmatch's actual data structure — prefix-doubling suffix array, Kasai LCP
@@ -585,7 +584,7 @@ no measured benefit on one side and unverifiable terms on the other, vmatch is n
 adopted.
 
 > **Reproducibility gap.** The 35/35 set-equality measurement is recorded in the
-> commit message of `4a93d89`, but the diagnostic script that produced it is not
+> commit message that introduced it, but the diagnostic script that produced it is not
 > retained in the repository or the benchmark tree. Before this appears in a
 > publication it should be re-run and the script and its output archived
 > alongside the other validation artefacts.
@@ -601,15 +600,15 @@ adopted.
 | Class, 17 shared elements | Agree on 14; all 3 differences are ICEberg ICEs that MAP called IMEs |
 | Call burden, 40 genomes | BacFlux 65 calls / 2.63 Mb; MAP 64 calls / 2.88 Mb |
 | Negative controls, 32.6 Mb | 2 candidate calls each; identical coordinates on the one shared call |
-| Boundaries before `4a93d89` | **MAP better** — chromosomal median \|start offset\| 7,427 bp vs our 14,294 |
-| Boundaries at `4a93d89` | Comparable — 5,141 bp vs MAP 7,427; standalone recovery 0.94 vs 0.94 |
+| Boundaries before the fix | **MAP better** — chromosomal median \|start offset\| 7,427 bp vs our 14,294 |
+| Boundaries after the fix | Comparable — 5,141 bp vs MAP 7,427; standalone recovery 0.94 vs 0.94 |
 | Is vmatch needed? | No — exact set equality with our search on 35/35 flank windows |
 
 Nothing here supports a claim that either pipeline is better than the other. It
 supports three narrower claims: BacFlux's caller recovers the curated elements MAP
 recovers plus three more; it assigns the ICE/IME class in line with ICEberg's
 curation in the three cases where the two callers differ; and its boundary
-refinement, after `4a93d89`, is comparable to a vmatch-based refiner without
+refinement, after that fix, is comparable to a vmatch-based refiner without
 requiring vmatch.
 
 Every mobility statement derived from these calls remains a **prediction**. An

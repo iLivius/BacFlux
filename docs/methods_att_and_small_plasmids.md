@@ -200,7 +200,7 @@ replays the actual caller (`conjscan_to_ice.py`) over the benchmark genomes with
 pipeline genuinely searched — after IS masking, at the real element coordinates,
 at the real computed floor.
 
-**Result, re-run 2026-07-31 at commit `4a93d89`:** 52 benchmark genomes, 246 att
+**Result:** 52 benchmark genomes, 246 att
 searches, **180 distinct flank windows, 1,033 repeats, exact set equality on
 every window**. No window hit either implementation's internal cap. So the
 conclusion holds: **a vmatch-based search would find nothing that is not already

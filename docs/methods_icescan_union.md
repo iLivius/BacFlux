@@ -405,7 +405,7 @@ the caller has produced.
 
 ### 8.3 Whole-set census (all 63 calls, not just scored ones)
 
-**Measured at `1651e6f`** — both arms run over the same 28 genomes, the only difference being `mobilome.icescan.run`. Rates quoted in §5 predate the
+**Measured** — both arms run over the same 28 genomes, the only difference being `mobilome.icescan.run`. Rates quoted in §5 predate the
 *att*-search rework and are higher in absolute terms; the comparison this page makes is
 unaffected, because restricted to `ice`-class calls the rate is identical in both arms
 (5 of 36, 14%).
@@ -434,7 +434,7 @@ real element and a fragment are not conflated, the rate is identical between the
 
 ---
 
-## 9. Costs — what got worse, re-checked at `1651e6f`
+## 9. Costs — what got worse
 
 Three of the four costs still hold; the fourth no longer occurs.
 
@@ -487,7 +487,7 @@ nothing curated may be a genuine second element rather than an error. Nothing he
 tell the difference.
 
 Counting them anyway, as an upper bound on the error rate and not an error rate.
-**Measured at `1651e6f`** against all 1,677 of ICEberg's curated entries on these 28
+**Measured** against all 1,677 of ICEberg's curated entries on these 28
 accessions, not just the pilots' 30 — the correct denominator for "does this call
 correspond to something curated":
 
@@ -556,14 +556,14 @@ absolute offsets are **5,141 bp at the start and 14,912 bp at the end**. Mind th
 denominator: 50% is over *detected curated elements*, 54% over *all calls*, and the two
 are different questions.
 
-The arm comparison was made with the earlier *att* search, which commit `4a93d89`
+The arm comparison was made with the earlier *att* search, which
 reworked. Under it, 6 of 18 detected elements carried a direct repeat in the
 CONJScan-only arm and 6 of 20 in the union arm, and on the nine ICE pilot elements that
 are both detected and *chromosomal* (the only ones where boundary error is a meaningful
 question — see the standalone-deposit note below) the median absolute offsets were
 **14,294 bp at the start and 34,239 bp at the end**, **identical in both arms**:
 ICEscan moved boundaries not at all. The CONJScan-only arm has **not** been re-run
-since `4a93d89`, so that holds only for the older search; likely, but not measured, for
+since it was replaced, so that holds only for the older search; likely, but not measured, for
 the current one.
 
 Either way the shape of the problem is unchanged: half of all elements are reported
