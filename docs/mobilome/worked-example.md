@@ -7,8 +7,8 @@ external.
 **_Klebsiella pneumoniae_ ATCC BAA-2146** (`GCF_000364385.3`) — a complete assembly, one
 chromosome and four plasmids, carrying `blaNDM-1`, `blaCTX-M-15`, `blaOXA-1`, `blaTEM-1`,
 `blaCMY-6`, `rmtC` and a long list of aminoglycoside, sulfonamide, quinolone, macrolide
-and metal-resistance genes. Run as `mode: contigs` with `mobilome.run: true` and
-`phage.caller: genomad`.
+and metal-resistance genes. Run as `mode: contigs` with `mobilome.run: true`, all four
+optional layers configured, and `phage.caller: genomad`.
 
 The isolates in BacFlux's own validation set are environmental and carry no acquired
 resistance, so they only ever exercise the bottom of the ladder. This genome exercises
@@ -45,16 +45,15 @@ AMRFinderPlus's curated organisms, so the run passed
 `--organism Klebsiella_pneumoniae`. Without that flag these rows would be **silently
 absent** ([Turning it on](enabling.md)).
 
-## Tier 2 — expression modulation, not mobilisation
+## Tier 2 — not reached in this genome
 
-```text
-blaCTX-M-15 (chromosomal copy)  tier=2  expression_modulation_not_mobilisation  conf=medium
-```
+No row scores tier 2 here. The rung is for a gene with an IS upstream on its own strand,
+where the IS can supply an outward-reading hybrid promoter and raise expression without
+making the gene mobile — a real situation, and the one this genome would have produced,
+since IS*Ecp1* sits 48 bp upstream of the chromosomal `blaCTX-M-15`.
 
-An IS sits upstream, on the gene's own strand. That can supply an outward-reading hybrid
-promoter and raise expression — it does not make the gene mobile. The tier stops here,
-and the confidence is capped at medium because the mechanism is inferred from coordinates
-and strand alone: no transcript was measured, and the audit line says so.
+It does not, because that gene is claimed by tier 4: the IS and the gene together are a
+curated transposon, which is a stronger statement than proximity. See the next section.
 
 ## Tier 3 — composite transposon
 
@@ -66,6 +65,59 @@ sul1        tier=3  composite_mobilisable_within_cell  conf=high
 
 Three genes flanked by two copies of the same IS family. `aadA2` + `qacEdelta1` + `sul1`
 is the classic **class 1 integron 3′ conserved segment**.
+
+## Tier 4 — inside a named transposon
+
+```text
+blaCTX-M-15 (chromosomal copy)  tier=4  named_element_mobilisable  conf=high
+    mge_name=TnEcp1.1  mge_context=unit_transposon  distance_bp=0
+```
+
+IS*Ecp1* does not merely sit beside this gene supplying a promoter: it **mobilises**
+it, capturing the gene and moving it as a unit, and Tn*Ecp1.1* is that unit. The match
+is 99.9% identity over 87% of the 3,417 bp reference element (`MF062700`).
+
+This is the one place a curated name changes an answer rather than decorating it.
+Without the TnCentral layer the same gene scores **tier 2**, `is_adjacent`, at medium
+confidence — an IS1380-family element 48 bp away, which is true and a weaker claim than
+"the gene sits inside a named transposon that moves it". That is why a curated hit
+**overrides** the pattern-based call instead of merely agreeing with it.
+
+**Seven curated elements are named in this genome, and only one produces a tier 4 row.**
+That is the precedence rule working, not a shortfall:
+
+```text
+NZ_CP006659.2  chromosome        TnEcp1.1  87%   → tier 4   ← the only one
+NZ_CP006661.1  plasmid, conj.    Tn7241    81%   → tier 6, replicon evidence wins
+NZ_CP006661.1  plasmid, conj.    In781_p   82%   → tier 6
+NZ_CP006661.1  plasmid, conj.    Tn3000   100%   → tier 6
+NZ_CP006662.2  plasmid, mobil.   Tn3000    98%   → tier 5
+NZ_CP006662.2  plasmid, mobil.   Tn6320    88%   → tier 5
+NZ_CP006662.2  plasmid, mobil.   Tn1696.1 100%   → tier 5
+```
+
+Six of the seven sit on plasmids, and a plasmid is tested before a curated element, so
+those genes score 5 or 6 and keep the name in `named_element` as supporting detail. Only
+the chromosomal one is left for tier 4 to claim. A genome can be full of named
+transposons and still show a single tier 4 row.
+
+**The 80% coverage rule does most of the filtering.** 1,554 candidate hits were discarded
+to produce those seven:
+
+```text
+1044  reference_coverage_below_threshold      ← the dominant one
+ 318  identity_below_naming_threshold
+ 103  interval_mostly_unaligned
+  84  tncentral_hit_is_a_plain_is
+   4  nested_or_overlapping_tncentral_hit
+```
+
+That floor is also why tier 4 is much harder to reach on a draft. On fragmented clinical
+assemblies the same Tn*Ecp1.1* is refused outright — *"only 12% / 49% of the 3417 bp
+reference element is present (needs 80%). A fragment of a transposon is not that
+transposon."* Here it clears the bar at 87% because the genome is closed. Look in
+`{sample}_named_elements_discarded.tsv` before concluding a genome has no named
+transposon in it.
 
 ## Tier 5 — on a plasmid, two flavours
 
@@ -107,83 +159,6 @@ machinery) are untouched and still `NA` in the machinery columns.
 elsewhere on the plasmid, not wrapped around this gene. That is still the right evidence —
 a mating apparatus makes the whole replicon transferable, and with it every gene on it —
 and the column says so rather than implying containment.
-
-## Tier 4 — the naming layer, switched on
-
-The run above was made without the TnCentral layer, so `mge_name` was `NA` on all 66
-rows. Re-running the same genome with the layer on — nothing else changed — changes one
-gene's answer completely.
-
-`blaCTX-M-15` shows why. IS*Ecp1* does not merely sit beside it supplying a promoter:
-IS*Ecp1* **mobilises** it, capturing the gene and moving it as a unit, and Tn*Ecp1.1* is
-that unit. Reporting "expression modulation, not mobilisation" for that gene is wrong,
-which is why a curated hit **overrides** the pattern-based call rather than merely
-agreeing with it. The same gene, both ways:
-
-| column | layer off | layer on |
-|---|---|---|
-| `mobility_tier` | **2** | **4** |
-| `mge_context` | `is_adjacent` | `unit_transposon` |
-| `mge_name` | `NA` | **Tn*Ecp1.1*** |
-| `distance_bp` | 48 | 0 — the gene is *inside* it |
-| `is_family` | IS1380 | `NA` |
-| `confidence` | medium | **high** |
-
-The match is 99.9% identity over 87% of the 3,417 bp reference element (`MF062700`). The
-pattern-based read was not wrong — IS*Ecp1* is an IS1380-family element and it is 48 bp
-away — but "an IS is adjacent, so expression may change" is a weaker and different claim
-than "the gene sits inside a named transposon that moves it".
-
-**Seven curated elements are named in this genome, and only one produces a tier 4 row.**
-That is the precedence rule, not a shortfall:
-
-```text
-NZ_CP006659.2  chromosome        TnEcp1.1  87%   → tier 4   ← the only one
-NZ_CP006661.1  plasmid, conj.    Tn7241    81%   → tier 6, replicon evidence wins
-NZ_CP006661.1  plasmid, conj.    In781_p   82%   → tier 6
-NZ_CP006661.1  plasmid, conj.    Tn3000   100%   → tier 6
-NZ_CP006662.2  plasmid, mobil.   Tn3000    98%   → tier 5
-NZ_CP006662.2  plasmid, mobil.   Tn6320    88%   → tier 5
-NZ_CP006662.2  plasmid, mobil.   Tn1696.1 100%   → tier 5
-```
-
-Six of the seven sit on plasmids, and a plasmid is tested before a curated element, so
-those genes score 5 or 6 and keep the name in `named_element` as supporting detail. Only
-the chromosomal one is left for tier 4 to claim. A genome can be full of named
-transposons and still show a single tier 4 row.
-
-The opposite case is just as possible, and one genome later produced it: on
-*Enterobacter hormaechei* a single chromosomal transposon, Tn*SMR478*, carried fifteen
-resistance and stress genes, so one element produced **fifteen** tier 4 rows
-([hybrid mode on five closed genomes](../methods_reference_genome_run.md)). The row
-count follows the genes, not the elements — worth remembering before reading one as a
-measure of the other.
-
-**The 80% rule is doing most of the filtering.** 1,554 candidate hits were discarded to
-produce those seven, and the reasons are recorded:
-
-```text
-1044  reference_coverage_below_threshold      ← the dominant one
- 318  identity_below_naming_threshold
- 103  interval_mostly_unaligned
-  84  tncentral_hit_is_a_plain_is
-   4  nested_or_overlapping_tncentral_hit
-```
-
-This is also why **tier 4 is much harder to reach on a draft**. On fragmented clinical
-assemblies every Tn*Ecp1.1* candidate was discarded, with the reason recorded — *"only
-12% / 49% of the 3417 bp reference element is present (needs 80%). A fragment of a
-transposon is not that transposon."* Here the same element clears the bar at 87% because
-this genome is closed. The refusal is correct behaviour in both cases; what differs is
-the assembly. Look in `{sample}_named_elements_discarded.tsv` before concluding a genome
-has no named transposon in it.
-
-!!! note "Reproducing this"
-
-    The naming layer was pointed at a TnCentral database fetched 2026-07-28 (533
-    sequences, `fasta_sha256` starting `6a264191`). The endpoint is unversioned, so that
-    digest — recorded in the database's own `PROVENANCE.txt` — is the only way to say
-    which release these names came from.
 
 ## The chromosomal ICE, scored against its curation
 
@@ -260,10 +235,9 @@ three, carrying no discriminating power. Use
   CONJscan typed the mating apparatus rather than merely agreeing with a gene count.
 - The chromosomal ICE is recovered at 0.946 of its curated length with a tRNA-anchored
   boundary — and still ends 3.1 kb short, because a called interval is a floor.
-- **Tier 4 is reached once, with the naming layer on** — `bla`CTX-M-15 inside Tn*Ecp1.1*,
-  which the same run scores tier 2 without it. Six other curated elements are named and
-  none of them produces a tier 4 row, because they sit on plasmids and the replicon is
-  tested first.
+- **Tier 4 is reached once** — `bla`CTX-M-15 inside Tn*Ecp1.1*. Six other curated
+  elements are named in the same genome and none produces a tier 4 row, because they sit
+  on plasmids and the replicon is tested first.
 - Every rejection carries its evidence in an audit file.
 
 ## What none of it establishes
