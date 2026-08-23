@@ -326,6 +326,10 @@ Per sample, `08.mobilome/{sample}/` holds:
 | `{sample}_amrfinder_organism.txt`, `_amrfinder_organism_audit.tsv` | Which AMRFinderPlus `--organism` the GTDB-Tk placement mapped to, or none, and why. |
 | `{sample}_replicon_calls.tsv` | Chromosome or plasmid, per contig, with the evidence for the call. |
 | `{sample}_contig_lengths.tsv` | The yardstick every contig-edge flag is measured against. |
+| `isescan/`, `conjscan/` | The tools' own output trees, kept as raw evidence. `icescan/` joins them when that optional second model set is switched on. |
+| `{sample}_named_elements.tsv`, `{sample}_named_elements_discarded.tsv`, `{sample}_tncentral_blast.tsv` | *Optional.* Curated transposons and integrons — the layer that makes tier 4 reachable. |
+| `{sample}_ice_candidates_named.tsv`, `{sample}_ice_naming.tsv`, `{sample}_iceberg_blast.tsv` | *Optional.* Curated names put on the ICE/IME candidates. Labels only: this layer cannot change any gene's tier. |
+| `{sample}_is_copy_number.tsv`, `{sample}_is_copy_number_audit.tsv`, `{sample}_isosdb_covstats.tsv`, `{sample}_assembly_covstats.tsv` | *Optional, `[illumina, hybrid]`.* How many insertion-sequence copies the assembler collapsed, from read depth rather than from the assembly. |
 
 !!! warning "`conjscan_output_missing` means the search did not run"
 
@@ -339,10 +343,6 @@ Per sample, `08.mobilome/{sample}/` holds:
     IME calls as **unknown**, not as absence. This is the same distinction the mobility
     ladder makes between `not_assessable` and tier 1.
 
-| `isescan/`, `conjscan/` | The tools' own output trees, kept as raw evidence. `icescan/` joins them when that optional second model set is switched on. |
-| `{sample}_named_elements.tsv`, `{sample}_named_elements_discarded.tsv`, `{sample}_tncentral_blast.tsv` | *Optional.* Curated transposons and integrons — the layer that makes tier 4 reachable. |
-| `{sample}_ice_candidates_named.tsv`, `{sample}_ice_naming.tsv`, `{sample}_iceberg_blast.tsv` | *Optional.* Curated names put on the ICE/IME candidates. Labels only: this layer cannot change any gene's tier. |
-| `{sample}_is_copy_number.tsv`, `{sample}_is_copy_number_audit.tsv`, `{sample}_isosdb_covstats.tsv`, `{sample}_assembly_covstats.tsv` | *Optional, `[illumina, hybrid]`.* How many insertion-sequence copies the assembler collapsed, from read depth rather than from the assembly. |
 
 Every column of the mobility table, with real rows, is on
 [Reading the output](../mobilome/output.md). What fragmentation does to a call, and

@@ -202,6 +202,7 @@ organism can raise the threshold and re-run.
 | `{sample}_amrfinder_organism.txt`, `_amrfinder_organism_audit.tsv` | which `--organism` the GTDB-Tk call mapped to, or none, and why |
 | `{sample}_replicon_calls.tsv` | chromosome or plasmid per contig, with the evidence |
 | `{sample}_contig_lengths.tsv` | the yardstick behind every contig-edge flag |
+| `isescan/`, `conjscan/` (and `icescan/`) | the tools' own output trees, kept as raw evidence |
 
 !!! warning "`conjscan_output_missing` means the search did not run"
 
@@ -215,7 +216,6 @@ organism can raise the threshold and re-run.
     IME calls as **unknown**, not as absence. This is the same distinction the mobility
     ladder makes between `not_assessable` and tier 1.
 
-| `isescan/`, `conjscan/` (and `icescan/`) | the tools' own output trees, kept as raw evidence |
 
 The optional layers add their own tables — curated names, ICE names, IS copy number — and
 each is listed on [Optional layers](optional-layers.md).
