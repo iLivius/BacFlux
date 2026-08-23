@@ -184,8 +184,8 @@ That DOI is the concept DOI and always resolves to the newest release; each tagg
 also gets its own version DOI, which is the one to cite when the exact code matters.
 Machine-readable metadata is in [`CITATION.cff`](CITATION.cff).
 
-BacFlux is glue: almost all of the science it reports comes from other people's tools and
-databases, so **cite those too**. The full list is in [`CITATIONS.md`](CITATIONS.md) and on
+Most of the science BacFlux reports is produced by other people's tools and databases, so
+**cite those too**. The full list is in [`CITATIONS.md`](CITATIONS.md) and on
 the [citation page](https://iLivius.github.io/BacFlux/about/citation/).
 
 ## Acknowledgements

@@ -1,7 +1,7 @@
 # Citations
 
-BacFlux is glue. Almost all of the science it reports comes from other people's
-tools and databases, and this file is where they are credited.
+Most of the science BacFlux reports is produced by other people's tools and
+databases, and this file is where they are credited.
 
 **If you publish results from BacFlux, cite the tools whose output you actually
 used** — not just BacFlux. The mobilome module in particular is an integrator:

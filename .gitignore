@@ -9,3 +9,16 @@ __pycache__/
 # site/ is the generated HTML, rebuilt on demand and published to the gh-pages
 # branch rather than committed here.
 site/
+
+# ISEScan scratch files, which land in the working directory rather than in the
+# output directory. ISEScan needs a "file of filenames" to feed its own predictor,
+# so it writes a one-line file holding the path to the assembly, uses it, and
+# deletes it again. Two details make it land here: it opens that file with a
+# relative path, so it goes to wherever Snakemake was launched from (this
+# directory), and it builds the name from the assembly's parent folder — which in
+# BacFlux is the sample — giving {sample}_contigs_final.fasta.list.
+#
+# It cleans up after itself, so you normally never see one. You will see them while
+# a run with the mobilome module is in progress, and they survive if ISEScan is
+# interrupted. Ignoring them keeps sample names out of the repository.
+*_contigs_final.fasta.list
