@@ -202,6 +202,19 @@ organism can raise the threshold and re-run.
 | `{sample}_amrfinder_organism.txt`, `_amrfinder_organism_audit.tsv` | which `--organism` the GTDB-Tk call mapped to, or none, and why |
 | `{sample}_replicon_calls.tsv` | chromosome or plasmid per contig, with the evidence |
 | `{sample}_contig_lengths.tsv` | the yardstick behind every contig-edge flag |
+
+!!! warning "`conjscan_output_missing` means the search did not run"
+
+    A genome with no ICE or IME calls has usually been searched and found to carry no
+    conjugation machinery, which is the normal result for an environmental isolate. But
+    if the machinery search itself fails, the module records that and reports no
+    calls — so the two look identical in the results table.
+
+    They are distinguished in `{sample}_ice_discarded.tsv`. If it carries the reason
+    `conjscan_output_missing`, nothing searched that genome: read the absence of ICE and
+    IME calls as **unknown**, not as absence. This is the same distinction the mobility
+    ladder makes between `not_assessable` and tier 1.
+
 | `isescan/`, `conjscan/` (and `icescan/`) | the tools' own output trees, kept as raw evidence |
 
 The optional layers add their own tables — curated names, ICE names, IS copy number — and
