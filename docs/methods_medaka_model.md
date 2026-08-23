@@ -193,7 +193,7 @@ present.
 Wick broadened the warning in a 2025-02-25 revision of his assembly guide:
 
 > "Structural errors in your assembly (such as missing plasmids or start-end overlap
-> of circular contigs) can sometimes lead to Medaka increaing [sic] the number of
+> of circular contigs) can sometimes lead to Medaka increa[s]ing the number of
 > errors."
 > — https://rrwick.github.io/2020/10/30/guide-to-bacterial-genome-assembly.html
 
