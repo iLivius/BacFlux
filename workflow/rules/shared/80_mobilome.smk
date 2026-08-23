@@ -685,6 +685,7 @@ if MOBILOME_RUN:
               --models-dir {input.models} \
               --coverage-profile {params.coverage} \
               --out-dir {output.conjscan_dir} \
+              --index-dir {output.conjscan_dir} \
               --worker {threads} \
               --force > {log} 2>&1 || {{
                 echo "" >> {log}
@@ -927,6 +928,7 @@ if MOBILOME_RUN:
                   --models-dir {input.models} \
                   --coverage-profile {params.coverage} \
                   --out-dir {output.icescan_dir} \
+                  --index-dir {output.icescan_dir} \
                   --worker {threads} \
                   --force > {log} 2>&1 || {{
                     echo "" >> {log}
