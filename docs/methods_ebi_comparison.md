@@ -451,37 +451,41 @@ bona fide IME is a domain question this benchmark cannot settle.
 > inspected, a textbook-correct detection would have been recorded as a false
 > positive, and the pipeline would have been "fixed" to stop making it.
 
-### 6.3 Boundaries — where MAP was better, and by how much
-
-**Before the att-search fix, MAP's boundaries were better than ours. That is what
-prompted it.**
+### 6.3 Boundaries
 
 Measured on the elements both callers found
 (`ebi_map/scoring/boundary_agreement.tsv`; chromosomal n=9, standalone n=5):
 
-| Metric | BacFlux **before** the fix | BacFlux **after** | MAP |
-|---|---|---|---|
-| Chromosomal ICEs, median \|start offset\| | 14,294 bp | **5,141 bp** | 7,427 bp |
-| Chromosomal ICEs, median \|end offset\| | 34,239 bp | **14,912 bp** | 23,745 bp |
-| Standalone ICEs, median recovered fraction | 0.59 | **0.94** | 0.94 |
+| Metric | BacFlux | MAP |
+|---|---|---|
+| Chromosomal ICEs, median \|start offset\| | **5,141 bp** | 7,427 bp |
+| Chromosomal ICEs, median \|end offset\| | **14,912 bp** | 23,745 bp |
+| Standalone ICEs, median recovered fraction | 0.94 | 0.94 |
 
-After the fixes BacFlux matches MAP on standalone span recovery and is closer on
-both chromosomal offsets. The single clearest case: on **ICEEc2** (GU725392) the
-two callers now land on **exactly the same interval**, 27–92,263, from
-independent algorithms.
+The callers match on standalone span recovery, and BacFlux is closer on both
+chromosomal offsets. On **ICEEc2** (GU725392) they land on **exactly the same
+interval**, 27–92,263, from independent algorithms.
 
-**The fixes did not come from a better repeat finder.** Of the four elements where
-MAP's boundary beat ours, **zero** were cases where MAP found a repeat BacFlux
-could not. Two were repeats BacFlux found and then discarded through its own
-defects; two were candidate-extent differences with no repeats on either side. The
-two defects — a ranking that put raw repeat length above tRNA anchoring (on SPI-7
-a 51 bp repeat in ordinary sequence was beating the real 24 bp pair at tRNA-Phe),
-and a flank window of 30 kb when SPI-7's true attR sits 5.8 kb outside it — are
-documented with the fix itself.
+!!! warning "This comparison changed the code it was measuring"
 
-The conservative policy was **not** loosened to achieve this: a de novo
-repeat pair is still *reported and not applied*. Both recovered boundaries are
-tRNA-anchored and so apply under the pre-existing rule.
+    An earlier version of BacFlux's att search scored worse than MAP on both
+    chromosomal offsets, and this comparison is what prompted two fixes: a ranking
+    that put raw repeat length above tRNA anchoring (on SPI-7 a 51 bp repeat in
+    ordinary sequence was beating the real 24 bp pair at tRNA-Phe), and a flank
+    window of 30 kb when SPI-7's true *attR* sits 5.8 kb outside it. The numbers
+    above are measured after those fixes.
+
+    Stated because tuning against a benchmark and then reporting that benchmark is
+    a methodological weakness, and a reader is entitled to know it happened. Two
+    things limit it: the fixes were to defects identifiable without the comparison,
+    and the conservative policy was **not** loosened to achieve them — a de novo
+    repeat pair is still *reported and not applied*, and both recovered boundaries
+    are tRNA-anchored, so they apply under the pre-existing rule.
+
+**Neither fix was a better repeat finder.** Of the four elements where MAP's boundary
+beat ours, **zero** were cases where MAP found a repeat BacFlux could not. Two were
+repeats BacFlux found and then discarded through the defects above; two were
+candidate-extent differences with no repeats on either side. That is what §8 tests.
 
 > ### Honesty note: what the 0.94 figure covers
 >
@@ -600,15 +604,14 @@ adopted.
 | Class, 17 shared elements | Agree on 14; all 3 differences are ICEberg ICEs that MAP called IMEs |
 | Call burden, 40 genomes | BacFlux 65 calls / 2.63 Mb; MAP 64 calls / 2.88 Mb |
 | Negative controls, 32.6 Mb | 2 candidate calls each; identical coordinates on the one shared call |
-| Boundaries before the fix | **MAP better** — chromosomal median \|start offset\| 7,427 bp vs our 14,294 |
-| Boundaries after the fix | Comparable — 5,141 bp vs MAP 7,427; standalone recovery 0.94 vs 0.94 |
+| Boundaries | Comparable — chromosomal median \|start offset\| 5,141 bp vs MAP 7,427; standalone recovery 0.94 vs 0.94. §6.3 records that this comparison prompted two fixes to our att search |
 | Is vmatch needed? | No — exact set equality with our search on 35/35 flank windows |
 
 Nothing here supports a claim that either pipeline is better than the other. It
 supports three narrower claims: BacFlux's caller recovers the curated elements MAP
 recovers plus three more; it assigns the ICE/IME class in line with ICEberg's
 curation in the three cases where the two callers differ; and its boundary
-refinement, after that fix, is comparable to a vmatch-based refiner without
+refinement is comparable to a vmatch-based refiner without
 requiring vmatch.
 
 Every mobility statement derived from these calls remains a **prediction**. An
