@@ -293,11 +293,11 @@ sample may appear on more than one row *or* carry several genera in one cell.
 
 ```text
 sample     genus
-AIT1183    Priestia
-AIT4245    Peribacillus;Paenibacillus
+isolate1   Priestia
+isolate2   Peribacillus;Paenibacillus
 ```
 
-AIT1183 keeps **Bacillus and Priestia**. AIT4245 keeps **Bacillus, Peribacillus and
+isolate1 keeps **Bacillus and Priestia**. isolate2 keeps **Bacillus, Peribacillus and
 Paenibacillus**. Every other sample keeps Bacillus alone.
 
 **Change the policy itself for one awkward sample.** Columns `sample` and `mode` are
@@ -311,14 +311,14 @@ cell you leave blank falls through to the run-wide value.
 
 ```text
 sample     mode      include_genera          exclude_genera    discard_no_hit
-AIT4261    off
-AIT2969    include   Bacillus;Priestia
-AIT1420    auto                                                false
+isolate3   off
+isolate4   include   Bacillus;Priestia
+isolate5   auto                                                false
 ```
 
-`AIT4261` is filtered not at all — every contig kept, audit files still written.
-`AIT2969` switches to `include` and keeps exactly those two genera, **replacing** any
-run-wide `include_genera`. `AIT1420` stays on `auto` but keeps its unplaced contigs.
+`isolate3` is filtered not at all — every contig kept, audit files still written.
+`isolate4` switches to `include` and keeps exactly those two genera, **replacing** any
+run-wide `include_genera`. `isolate5` stays on `auto` but keeps its unplaced contigs.
 
 !!! tip "Which of the two per-sample files do I want?"
 

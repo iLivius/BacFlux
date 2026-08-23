@@ -52,6 +52,11 @@ python benchmark/mobilome/score.py benchmark/mobilome/pilot_set_classified.tsv r
 
 Both scripts take paths as arguments and hold no BacFlux-specific state.
 
+The `ebi_comparison/` scripts are not portable in the same way. They carry the
+absolute paths of the machine the comparison was run on, near the top of each file,
+because they are the record of that particular run rather than a general tool.
+Repeating that half means pointing those paths at your own copies first.
+
 !!! note
     `ground_truth.tsv` came from ICEberg 3.0, which is unversioned and carries no reuse
     statement. A future download could differ from this copy with no way to tell, which
