@@ -1,0 +1,30 @@
+{
+  "upload_type": "software",
+  "title": "BacFlux: a unified Snakemake workflow for bacterial whole-genome sequencing",
+  "version": "2.0.0",
+  "language": "eng",
+  "access_right": "open",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Antonielli, Livio",
+      "affiliation": "AIT Austrian Institute of Technology"
+    }
+  ],
+  "description": "<p>BacFlux is an automated Snakemake workflow for bacterial whole-genome sequencing data.</p><p>Version 2.0.0 unifies four previously separate workflows into one with four entry points &mdash; Illumina paired-end reads, Oxford Nanopore reads, hybrid Illumina + Nanopore, and pre-assembled contigs &mdash; converging on a single shared analysis spine: decontamination, assembly QC, completeness and contamination, taxonomic placement, functional annotation, secondary metabolites, CAZymes, antimicrobial resistance and virulence screening, plasmid and prophage detection, and an aggregated report.</p><p>An optional mobilome module (off by default) reports, for each antimicrobial resistance gene, whether it sits in a mobile genetic element and how transferable that element is predicted to be. Every tool runs in its own conda environment.</p><p>Documentation: <a href=\"https://iLivius.github.io/BacFlux/\">https://iLivius.github.io/BacFlux/</a></p>",
+  "keywords": [
+    "bacterial genomics",
+    "whole-genome sequencing",
+    "Snakemake",
+    "genome assembly",
+    "genome annotation",
+    "antimicrobial resistance",
+    "mobile genetic elements",
+    "insertion sequences",
+    "integrative and conjugative elements",
+    "plasmids",
+    "Illumina",
+    "Oxford Nanopore"
+  ],
+  "notes": "If you use BacFlux, please also cite the tools whose output you actually used; the full list is in CITATIONS.md in the repository."
+}
