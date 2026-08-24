@@ -178,25 +178,34 @@ Nothing is lost when that happens: the curated name is still written to
 in a named element even when its tier came from somewhere else.
 
 It is also strict about evidence: a curated element must be present at ≥80% of its
-reference length before it may name anything. That is why tier 4 turns up on closed
-genomes much more readily than on drafts, where the same element often survives only as a
-fragment. Worked through on a real genome, both halves of that — the override and the
-80% refusal — are on [Worked example](worked-example.md).
+reference length before it may name anything. What decides tier 4 is therefore whether
+the element survived assembly intact, not whether the genome is closed. On a draft where
+the transposon sits on a single contig it is reached readily; where assembly broke the
+element up, the same transposon survives only as a fragment and is refused. Worked
+through on a real genome, both halves of that — the override and the 80% refusal — are on
+[Worked example](worked-example.md).
 
 **Tier 5 has two routes, and only one is well exercised.** The plasmid route — the gene
 is on a plasmid — is common and benchmarked. The IME route, where a chromosomal gene
 sits inside an integrative mobilisable element, is much rarer, and the benchmark has not
 put an AMR gene inside one.
 
-**What to do with that.** Tier 4 has been measured on two genomes and the tier 5 IME
-route on none. One of those two produced 15 tier 4 rows from a single transposon, which
-is worth knowing before reading a count: a curated element carrying a resistance cluster
-yields as many rows as it has genes, so the row count reports elements as much as genes.
+**What to do with that.** Tier 4 has been measured on closed positive controls and has
+since been seen on draft assemblies too; the tier 5 IME route has not been exercised at
+all. Tier 4 counts need care either way: a curated element carrying a resistance cluster
+yields as many rows as it has genes, so a single run can report ten or fifteen tier 4
+rows that are all one transposon. Read the count as elements as much as genes.
 If either reaches something you are signing, check the evidence columns yourself rather
 than the tier alone — `named_element`, `mge_id`, `boundary_method` and
 `confidence` are all there for exactly this. The measured performance of the tiers that
 *are* benchmarked is on [Validation](validation.md), including the boundary caveat that
 applies to tier 1.
+
+One more thing to expect before reading a tier 4 count: the curated transposon catalogues
+are rich in mercury- and arsenic-resistance elements — the Tn*21* and Tn*5053* families —
+and AMRFinderPlus with `--plus` reports those as `STRESS` rather than `AMR`. A tier 4 row
+is quite often a metal-resistance operon and not an antibiotic one, so read
+`amr_element_type` next to the tier before concluding anything about antibiotics.
 
 ## Next
 
