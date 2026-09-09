@@ -29,9 +29,10 @@
 #
 # The pins are VirSorter2's, not ours, and they matter: the classifier ships as a
 # pickled scikit-learn 0.22.1 model, so a newer scikit-learn can fail to load it
-# or silently change calls. `python` is intentionally NOT pinned here — the pins
-# below already force Python 3.8, and stating it twice only creates a second
-# thing to keep in sync.
+# or silently change calls. `python=3.8` is what those pins already force; it is
+# stated explicitly because every BacFlux env now pins its Python, and a reader
+# should not have to work the version out from pandas and scikit-learn. If the
+# VirSorter2 pins ever move, the Python pin moves with them.
 # ─────────────────────────────────────────────────────────────────────────────
 name: virsorter
 channels:
