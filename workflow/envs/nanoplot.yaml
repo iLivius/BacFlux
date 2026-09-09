@@ -5,3 +5,8 @@ channels:
 dependencies:
   - python=3.13
   - nanoplot=1.47.1
+  # plotly 7.0 removed figure_factory.create_2d_density, which NanoPlot calls for
+  # its length-vs-quality density plot. Unpinned, a fresh install pulls plotly 7 and
+  # NanoPlot exits 1 after writing NanoStats.txt, failing the rule. The last plotly
+  # NanoPlot was validated with is 6.9.0.
+  - plotly<7
