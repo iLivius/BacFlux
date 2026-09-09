@@ -38,6 +38,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
+  - python=3.8
   - virsorter=2.2.4
 
   # VirSorter2's own internal dependencies (from its packaged envs/vs2.yaml).

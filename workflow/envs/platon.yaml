@@ -3,5 +3,6 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
+  - python=3.13
   - blast=2.17.0
   - platon=1.8

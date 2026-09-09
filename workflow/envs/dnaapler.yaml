@@ -3,4 +3,5 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
+  - python=3.13
   - dnaapler=1.4.0

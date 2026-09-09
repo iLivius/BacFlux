@@ -8,4 +8,5 @@ dependencies:
   # r220/r226; the move to the GTDB R232 database (config.directories.gtdbtk_db)
   # requires 2.7.0+, which is also the first version able to read R232's
   # pre-sketched skani database directly (see the taxonomic_assignment rule).
+  - python=3.13
   - gtdbtk=2.7.2

@@ -17,4 +17,5 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
+  - python=3.14
   - macsyfinder=2.1.6

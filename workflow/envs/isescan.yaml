@@ -13,4 +13,5 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
+  - python=3.14
   - isescan=1.7.3

@@ -3,4 +3,5 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
+  - python=3.12
   - medaka=2.2.2
