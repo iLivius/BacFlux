@@ -19,6 +19,20 @@
 import glob
 import os
 
+# Keep a user's personal pip packages out of every conda environment.
+#
+# Python adds ~/.local/lib/python3.X/site-packages to its import path by default,
+# for whichever X it is. A tool running in a conda env with Python 3.13 therefore
+# also sees anything the user once `pip install --user`-ed for 3.13 on the host,
+# and a stray or older package there can shadow the env's own copy. That is a
+# classic "works on my machine" failure: the environment files are identical, the
+# extra package is invisible in them, and only one person hits it.
+#
+# PYTHONNOUSERSITE=1 tells Python to skip that directory. Setting it here, in the
+# process that launches every job, means every rule inherits it without touching
+# the rules themselves. Conda activation does not unset it.
+os.environ["PYTHONNOUSERSITE"] = "1"
+
 print(r'''
 ________             _______________
 ___  __ )_____ _________  ____/__  /___  _____  __
