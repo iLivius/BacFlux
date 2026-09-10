@@ -1,3 +1,0 @@
-sample	contig	start	end	action	reason	detail
-SYN	c1	1000	7599	kept_flagged	nested_or_overlapping_tncentral_hit	TnBig overlaps the better-scoring TnSmall on the same contig and is not listed separately. TnCentral entries are deliberately nested (a large transposon contains smaller ones), so one real element matches several references; only the best-scoring one is reported.
-SYN	NA	NA	NA	summary	tncentral_naming_complete	1 named element(s) kept from 2 reference match(es) at >=90% identity and >=80% reference coverage.

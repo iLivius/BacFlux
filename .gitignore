@@ -22,3 +22,11 @@ site/
 # a run with the mobilome module is in progress, and they survive if ISEScan is
 # interrupted. Ignoring them keeps sample names out of the repository.
 *_contigs_final.fasta.list
+
+# Scratch output from running a mobilome script by hand. The naming and
+# colocalisation scripts take --out-* paths, so testing one from the repository
+# root leaves its tables there; three of them were committed by accident once.
+# The real fixtures live in workflow/scripts/80_mobilome/testdata/ and are named
+# *_synthetic.tsv, which these patterns deliberately do not match.
+/synth.tsv
+/synth_*.tsv
