@@ -1,0 +1,4561 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../../methods_reference_genome_run/">
+      
+      
+        <link rel="next" href="../output/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Configuration - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Turning it on
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-file-is-loaded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the file is loaded
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spades-k-mer-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPAdes k-mer sizes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-checked-before-anything-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is checked before anything starts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-keys-that-define-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The keys that define a run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mode-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mode [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#input-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#directories-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Directories [all modes]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Directories [all modes]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-five-databases-you-provide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five databases you provide
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-local-copies-of-the-downloaded-databases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional local copies of the downloaded databases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#links-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Links [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resources [all modes]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Resources [all modes]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-threads-reaches-a-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How threads reaches a rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-ram_gb-reaches-a-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How ram_gb reaches a rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nt_version-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nt_version [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eggnog-dbmem-all-modes-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eggNOG --dbmem [all modes] — optional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#long-read-qc-nanoporehybrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-read QC [nanopore|hybrid]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decontamination-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decontamination [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#long-read-assembly-and-polishing-nanoporehybrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-read assembly and polishing [nanopore|hybrid]
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phage-caller-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phage caller [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mobilome-module-all-modes-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mobilome module [all modes] — optional
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mobilome module [all modes] — optional">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-switch-and-what-it-costs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The switch, and what it costs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-four-optional-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The four optional layers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The four optional layers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#icescan-a-second-machinery-model-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        icescan — a second machinery model set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tncentral-curated-transposon-and-integron-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tncentral — curated transposon and integron names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iceberg-which-ice-is-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iceberg — which ICE is it?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#isosdb-how-many-is-copies-did-the-assembly-lose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        isosdb — how many IS copies did the assembly lose?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#confidence-and-boundary-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Confidence and boundary flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#numbers-that-are-not-config-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numbers that are not config keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Numbers that are not config keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-iceime-geometry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ICE/IME geometry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elsewhere-in-the-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Elsewhere in the workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-file-is-loaded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the file is loaded
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spades-k-mer-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPAdes k-mer sizes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-checked-before-anything-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is checked before anything starts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-keys-that-define-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The keys that define a run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mode-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mode [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#input-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#directories-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Directories [all modes]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Directories [all modes]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-five-databases-you-provide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five databases you provide
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-local-copies-of-the-downloaded-databases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional local copies of the downloaded databases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#links-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Links [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resources [all modes]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Resources [all modes]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-threads-reaches-a-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How threads reaches a rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-ram_gb-reaches-a-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How ram_gb reaches a rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nt_version-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nt_version [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eggnog-dbmem-all-modes-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eggNOG --dbmem [all modes] — optional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#long-read-qc-nanoporehybrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-read QC [nanopore|hybrid]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decontamination-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decontamination [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#long-read-assembly-and-polishing-nanoporehybrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-read assembly and polishing [nanopore|hybrid]
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phage-caller-all-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phage caller [all modes]
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mobilome-module-all-modes-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mobilome module [all modes] — optional
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mobilome module [all modes] — optional">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-switch-and-what-it-costs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The switch, and what it costs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-four-optional-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The four optional layers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The four optional layers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#icescan-a-second-machinery-model-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        icescan — a second machinery model set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tncentral-curated-transposon-and-integron-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tncentral — curated transposon and integron names
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iceberg-which-ice-is-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iceberg — which ICE is it?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#isosdb-how-many-is-copies-did-the-assembly-lose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        isosdb — how many IS copies did the assembly lose?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#confidence-and-boundary-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Confidence and boundary flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#numbers-that-are-not-config-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numbers that are not config keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Numbers that are not config keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-iceime-geometry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ICE/IME geometry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elsewhere-in-the-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Elsewhere in the workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/reference/configuration.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h1>
+<p>One YAML file describes a whole BacFlux run. There are no command-line switches
+for analysis parameters, so the config is a complete record of what was done —
+worth archiving next to the results.</p>
+<p>The shipped template is <code>config/config.yaml</code>. It is a template: the empty strings
+are placeholders that must be filled in before anything runs. This page follows
+the file's own order, and every section is tagged with the modes that read it —
+<code>[all modes]</code>, <code>[nanopore|hybrid]</code> and so on. Keys belonging to a mode that is
+not running are ignored entirely.</p>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>YAML</strong></td>
+<td>the config file's plain-text format; indentation is significant and tabs are refused</td>
+</tr>
+<tr>
+<td><strong>EFSA</strong></td>
+<td>European Food Safety Authority, whose reporting thresholds the ABRicate leg applies</td>
+</tr>
+<tr>
+<td><strong>GTDB</strong></td>
+<td>Genome Taxonomy Database, the reference GTDB-Tk places each genome in</td>
+</tr>
+<tr>
+<td><strong>AMR</strong></td>
+<td>antimicrobial resistance</td>
+</tr>
+<tr>
+<td><strong>IS</strong></td>
+<td>insertion sequence, the smallest kind of mobile element</td>
+</tr>
+<tr>
+<td><strong>ICE</strong></td>
+<td>integrative and conjugative element — sits in the chromosome and can move itself to another cell</td>
+</tr>
+<tr>
+<td><strong>IME</strong></td>
+<td>integrative mobilisable element — the same, but needs a helper element to move</td>
+</tr>
+<tr>
+<td><strong>AICE</strong></td>
+<td>actinomycete integrative and conjugative element, a third class</td>
+</tr>
+<tr>
+<td><strong><em>att</em> site</strong></td>
+<td>the short repeat marking an integrated element's ends</td>
+</tr>
+<tr>
+<td><strong>HMM</strong></td>
+<td>hidden Markov model, a statistical profile used to recognise a protein family</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="how-the-file-is-loaded">How the file is loaded<a class="headerlink" href="#how-the-file-is-loaded" title="Permanent link">&para;</a></h2>
+<p>The Snakefile declares <strong>no</strong> <code>configfile:</code> of its own, so a config must be named
+on the command line:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>snakemake<span class="w"> </span>--sdm<span class="w"> </span>conda<span class="w"> </span>--cores<span class="w"> </span><span class="m">16</span><span class="w"> </span>--configfile<span class="w"> </span>config/config_custom.yaml
+</code></pre></div>
+<p>Start it as a copy of the template, which <code>.gitignore</code> already covers so your
+edits survive a <code>git pull</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cp<span class="w"> </span>config/config.yaml<span class="w"> </span>config/config_custom.yaml
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Your file is the whole config — nothing fills in a missing key</p>
+<p>Snakemake <em>merges</em> a hard-coded <code>configfile:</code> with whatever <code>--configfile</code>
+supplies rather than replacing it. Had the Snakefile named the shipped
+template as a default, every key you deleted from your own copy would be
+quietly refilled from the template — with its empty-string placeholders and
+its default download links — and the run would carry on against a path that
+does not exist.</p>
+<p>So there is no base layer. Delete a required key and the run stops naming it,
+which is the intended behaviour. Copy the whole template and edit it; do not
+write a short config from scratch.</p>
+</div>
+<p>Launched with no config at all, the run stops in seconds:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>[BacFlux] No configuration supplied. Pass one explicitly, e.g.:
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  snakemake --sdm conda --cores N --configfile config/config.yaml
+</code></pre></div>
+<p>A single top-level key can still be overridden per run without editing the file
+— <code>--config mode=contigs</code> — but anything nested belongs in the file.</p>
+<p><strong>Paths.</strong> Every path in the config, <code>directories.output_dir</code> included,
+resolves against <strong>the directory you launched Snakemake from</strong> — not against the
+config file. Since you are told to run from the repository root, a relative
+<code>output_dir</code> puts your results inside your clone:</p>
+<table>
+<thead>
+<tr>
+<th><code>output_dir</code></th>
+<th>where the results go</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/data/results/run1</code></td>
+<td>exactly there</td>
+</tr>
+<tr>
+<td><code>results/run1</code></td>
+<td>inside the clone, at <code>BacFlux/results/run1</code></td>
+</tr>
+</tbody>
+</table>
+<p>Neither is wrong, but only one of them is usually what you meant. <code>output_dir</code> is
+the one path BacFlux expands to an absolute form for you, so it behaves
+predictably once set; the rest (<code>input.*_dir</code>, <code>directories.*_db</code>, the
+decontamination file paths) are used exactly as written. Give all of them as
+absolute paths unless you are certain.</p>
+<h2 id="spades-k-mer-sizes">SPAdes k-mer sizes<a class="headerlink" href="#spades-k-mer-sizes" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">spades_kmers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span><span class="w">           </span><span class="c1"># auto | a comma-separated list, e.g. "21,33,55,77"</span>
+</code></pre></div>
+<p>Applies to <code>illumina</code> and <code>hybrid</code>, the two modes that run SPAdes. Leave it on <code>auto</code>
+unless you have a reason not to.</p>
+<p><strong><code>auto</code> passes no <code>-k</code> at all</strong>, which is what lets SPAdes size the ladder from the read
+length it measures for itself:</p>
+<table>
+<thead>
+<tr>
+<th>read length</th>
+<th>ladder</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>≥ 250 bp</td>
+<td>21, 33, 55, 77, 99, 127</td>
+</tr>
+<tr>
+<td>≥ 150 bp</td>
+<td>21, 33, 55, 77</td>
+</tr>
+<tr>
+<td>shorter</td>
+<td>21, 33, 55</td>
+</tr>
+</tbody>
+</table>
+<p>Those three presets have been in SPAdes since at least v3.9 (2016) and are unchanged in
+v4.3.0, the version BacFlux pins.</p>
+<p><strong>Giving an explicit list disables that selection.</strong> The list is then used whatever the
+reads look like, and the cost is easy to miss: k-mer coverage is not read coverage but
+<code>read_cov × (L − k + 1) / L</code>. With 145 bp reads, k = 127 keeps only about
+<strong>13%</strong> of your coverage, and SPAdes prints the k-mer coverage it saw for each k in
+its own log — worth reading once on your own data:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Assembling dataset ... with K=77
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  Average coverage = ...
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Assembling dataset ... with K=127
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  Average coverage = ...        &lt;- typically a small fraction of the K=21 figure
+</code></pre></div>
+<p>SPAdes assembles iteratively and the final contigs come from the <strong>largest</strong> k, so an
+over-long ladder means the graph you deliver is the least supported one in the run.</p>
+<div class="admonition note">
+<p class="admonition-title">When to set it explicitly</p>
+<p>Two good reasons: pinning the ladder so an assembly is reproducible against a future
+SPAdes whose defaults have moved, or overriding SPAdes on data whose read length
+misrepresents its usable length. Values must be odd, ascending and below 128 —
+SPAdes' own limit — and are checked before any job starts.</p>
+<p>Whichever path is taken, the ladder that ran is recorded in the assembly log.</p>
+</div>
+<h2 id="what-is-checked-before-anything-starts">What is checked before anything starts<a class="headerlink" href="#what-is-checked-before-anything-starts" title="Permanent link">&para;</a></h2>
+<p>BacFlux validates the config while Snakemake is still reading the workflow —
+seconds in, before a single job is scheduled. A dry run (<code>snakemake -n</code>)
+therefore catches almost every config mistake. The checks, in the order the file
+lists the keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Check</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code></td>
+<td>present, and one of the four</td>
+<td>Missing: stops with a <code>KeyError</code>. Present but unrecognised: stops, listing the four</td>
+</tr>
+<tr>
+<td><code>input.&lt;mode&gt;_dir</code></td>
+<td>set, and an existing directory</td>
+<td>Stops naming the key</td>
+</tr>
+<tr>
+<td>input files</td>
+<td>at least one, all sharing one extension, extension recognised</td>
+<td>Stops listing the extensions it found</td>
+</tr>
+<tr>
+<td>sample names</td>
+<td>none of the refused characters listed under <a href="#input-all-modes">Input</a></td>
+<td>Stops naming the offending sample</td>
+</tr>
+<tr>
+<td>Illumina samples</td>
+<td>every R1 has its R2</td>
+<td>Stops naming the missing mate</td>
+</tr>
+<tr>
+<td>hybrid samples</td>
+<td>present in both input directories</td>
+<td>Stops listing samples missing from either side</td>
+</tr>
+<tr>
+<td><code>directories.output_dir</code> and the five required databases</td>
+<td>present</td>
+<td>Stops with a <code>KeyError</code> naming the key</td>
+</tr>
+<tr>
+<td><code>directories.checkv_db</code></td>
+<td>holds exactly one <code>*/genome_db/checkv_reps.faa</code></td>
+<td>Stops, and says to give the parent directory</td>
+</tr>
+<tr>
+<td><code>directories.vs2_db</code>, <code>antismash_db</code>, <code>dbcan_db</code>, <code>card_db</code>, <code>genomad_db</code></td>
+<td>a directory, holding a file only that database has</td>
+<td>Stops naming the missing probe file</td>
+</tr>
+<tr>
+<td><code>directories.genomad_db</code></td>
+<td>every file readable by you; metadata table has the current column set</td>
+<td>Stops listing unreadable files, or explaining the schema mismatch</td>
+</tr>
+<tr>
+<td><code>links.dbcan_link</code></td>
+<td>set, and a <code>.tar.gz</code></td>
+<td>Stops</td>
+</tr>
+<tr>
+<td><code>links.card_link</code>, <code>links.phix_link</code></td>
+<td>set whenever the mode has short reads</td>
+<td>Stops naming the key and the mode</td>
+</tr>
+<tr>
+<td><code>links.checkv_link</code>, <code>links.genomad_link</code></td>
+<td>a <code>.tar.gz</code> if set</td>
+<td>Stops</td>
+</tr>
+<tr>
+<td><code>parameters.eggnog.dbmem</code></td>
+<td><code>resources.ram_gb</code> can hold one job</td>
+<td>Stops, and names the number to raise</td>
+</tr>
+<tr>
+<td><code>parameters.spades_kmers</code></td>
+<td><code>auto</code>, or odd ascending integers below 128</td>
+<td>Stops, naming the offending value</td>
+</tr>
+<tr>
+<td><code>parameters.decontamination.mode</code></td>
+<td>one of <code>auto</code>, <code>include</code>, <code>exclude</code>, <code>off</code></td>
+<td>Stops</td>
+</tr>
+<tr>
+<td><code>parameters.&lt;mode&gt;.flye_input_mode</code></td>
+<td>one of <code>auto</code>, <code>nano-raw</code>, <code>nano-hq</code></td>
+<td>Stops</td>
+</tr>
+<tr>
+<td><code>phage.caller</code></td>
+<td><code>virsorter2</code> or <code>genomad</code></td>
+<td>Stops</td>
+</tr>
+<tr>
+<td><code>mobilome.coverage_profile</code></td>
+<td>a fraction in <code>(0, 1]</code></td>
+<td>Stops, and says it is a fraction, not a percentage</td>
+</tr>
+<tr>
+<td><code>mobilome.icescan.run</code></td>
+<td>has a <code>url</code> or a <code>dir</code> to use</td>
+<td>Stops</td>
+</tr>
+<tr>
+<td><code>mobilome.isosdb.fasta_url</code></td>
+<td><code>family_map_url</code> set alongside it</td>
+<td>Stops</td>
+</tr>
+<tr>
+<td>any boolean key</td>
+<td>recognisable as true/false</td>
+<td>Stops naming the value</td>
+</tr>
+</tbody>
+</table>
+<p>Database <em>contents</em> are not opened at parse time, so a placeholder path in
+<code>bakta_db</code> or <code>blast_db</code> passes a dry run and fails later. The optional
+<code>directories.*_db</code> overrides are the exception — each is validated the moment it
+is set, which is why <code>config/config_v2_test_examples.yaml</code> leaves them out of its
+four minimal per-mode dry-run configs.</p>
+<p>What the run prints back while parsing is worth reading: the active mode, the
+phage caller, the decontamination policy, one line per discovered sample, and —
+where they apply — the eggNOG memory flag to add and the mobilome module's
+banner.</p>
+<h2 id="the-keys-that-define-a-run">The keys that define a run<a class="headerlink" href="#the-keys-that-define-a-run" title="Permanent link">&para;</a></h2>
+<p>Most of the file can stay at its defaults. These are the ones that describe what
+the analysis actually is:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Choices</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code></td>
+<td><code>illumina</code>, <code>nanopore</code>, <code>hybrid</code>, <code>contigs</code></td>
+</tr>
+<tr>
+<td><code>input.illumina_dir</code> / <code>nanopore_dir</code> / <code>contigs_dir</code></td>
+<td>where the raw inputs are, per technology</td>
+</tr>
+<tr>
+<td><code>directories.output_dir</code></td>
+<td>where results go</td>
+</tr>
+<tr>
+<td><code>directories.bakta_db</code>, <code>blast_db</code>, <code>eggnog_db</code>, <code>gtdbtk_db</code>, <code>platon_db</code></td>
+<td>the five databases you download yourself</td>
+</tr>
+<tr>
+<td><code>links.dbcan_link</code>, and <code>phix_link</code> + <code>card_link</code> in the short-read modes</td>
+<td>the downloads the workflow performs</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="mode-all-modes">Mode <code>[all modes]</code><a class="headerlink" href="#mode-all-modes" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">illumina</span><span class="w">                 </span><span class="c1"># illumina | nanopore | hybrid | contigs</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code></td>
+<td>Selects the front-end rules (<code>workflow/rules/&lt;mode&gt;/*.smk</code>) and the sample-discovery logic</td>
+<td><code>illumina</code></td>
+<td>Matched case-insensitively. Anything other than the four names stops the run at parse time.</td>
+</tr>
+</tbody>
+</table>
+<p>The mode is never inferred from the data. Everything from taxonomy onwards is
+one shared set of rules, so the mode changes only how the genome is produced —
+see <a href="../../getting-started/choosing-a-mode/">choosing a mode</a>.</p>
+<hr />
+<h2 id="input-all-modes">Input <code>[all modes]</code><a class="headerlink" href="#input-all-modes" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">input</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">illumina_dir</span><span class="p">:</span><span class="w"> </span><span class="s">""</span><span class="w">             </span><span class="c1"># {sample}_R1.&lt;ext&gt; + {sample}_R2.&lt;ext&gt;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">nanopore_dir</span><span class="p">:</span><span class="w"> </span><span class="s">""</span><span class="w">             </span><span class="c1"># {sample}_ont.&lt;ext&gt;</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">contigs_dir</span><span class="p">:</span><span class="w">  </span><span class="s">""</span><span class="w">             </span><span class="c1"># {sample}.&lt;fasta|fa|fna&gt;</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Read by</th>
+<th>What it holds</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>illumina_dir</code></td>
+<td><code>illumina</code>, <code>hybrid</code></td>
+<td>Paired-end reads named <code>{sample}_R1.&lt;ext&gt;</code> and <code>{sample}_R2.&lt;ext&gt;</code></td>
+<td>Discovery keys off R1; the missing mate of any sample stops the run.</td>
+</tr>
+<tr>
+<td><code>nanopore_dir</code></td>
+<td><code>nanopore</code>, <code>hybrid</code></td>
+<td>Oxford Nanopore Technologies (ONT) reads named <code>{sample}_ont.&lt;ext&gt;</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>contigs_dir</code></td>
+<td><code>contigs</code></td>
+<td>Finished assemblies named <code>{sample}.&lt;ext&gt;</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>A mode reads only the directories it needs; the others can stay empty.</p>
+<p><strong>Extensions.</strong> Reads may be <code>fastq</code>, <code>fq</code>, <code>fastq.gz</code> or <code>fq.gz</code>; assemblies may
+be <code>fasta</code>, <code>fa</code> or <code>fna</code>. Every file of one kind in one batch must share a
+single extension, because <code>{sample}.{extension}</code> would otherwise be ambiguous —
+a mixture stops the run and prints the extensions it found.</p>
+<p><strong>Sample names.</strong> The name becomes a filename, a Snakemake wildcard, a Bakta
+locus tag and a label in the report, so a handful of characters are refused
+outright, anywhere in the name:</p>
+<p><code>*</code> <code>#</code> <code>@</code> <code>%</code> <code>^</code> <code>/</code> <code>!</code> (space) <code>?</code> <code>&amp;</code> <code>:</code> <code>;</code> <code>|</code> <code>&lt;</code> <code>&gt;</code></p>
+<p>Everything else is accepted, underscores included. In <code>contigs</code> mode the <em>last</em>
+dot splits off the extension, so <code>my.genome.fasta</code> is read as sample
+<code>my.genome</code>; earlier dots stay part of the name and flow safely through paths and
+locus tags.</p>
+<hr />
+<h2 id="directories-all-modes">Directories <code>[all modes]</code><a class="headerlink" href="#directories-all-modes" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">directories</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">output_dir</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">bakta_db</span><span class="p">:</span><span class="w">   </span><span class="s">""</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">blast_db</span><span class="p">:</span><span class="w">   </span><span class="s">""</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">eggnog_db</span><span class="p">:</span><span class="w">  </span><span class="s">""</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">gtdbtk_db</span><span class="p">:</span><span class="w">  </span><span class="s">""</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">platon_db</span><span class="p">:</span><span class="w">  </span><span class="s">""</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="c1"># optional local copies, below</span>
+</code></pre></div>
+<h3 id="output">Output<a class="headerlink" href="#output" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>output_dir</code></td>
+<td>Root for every result and log, plus every database the workflow downloads for itself</td>
+<td>Created if absent. May be relative — it is the one path resolved to an absolute one automatically.</td>
+</tr>
+</tbody>
+</table>
+<p>Reusing one output directory across runs is what stops the self-downloaded
+databases being fetched again. Conda environments do <strong>not</strong> live here: Snakemake
+puts them under <code>.snakemake/conda</code> in the directory you launch from, so launching
+from the same place each time is what avoids rebuilding them. See
+<a href="../running/">running BacFlux</a>.</p>
+<h3 id="the-five-databases-you-provide">The five databases you provide<a class="headerlink" href="#the-five-databases-you-provide" title="Permanent link">&para;</a></h3>
+<p>Required in every mode. None of them has a fallback behind it, so a missing key
+stops the run rather than quietly resolving to something wrong.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it points at</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bakta_db</code></td>
+<td>A Bakta database, light or full. Also supplies the AMRFinderPlus database at <code>amrfinderplus-db/latest/</code>, which the mobilome module uses.</td>
+</tr>
+<tr>
+<td><code>blast_db</code></td>
+<td>The directory holding the NCBI nucleotide database; the subfolder named by <code>parameters.nt_version</code> is what the contamination screen blasts against.</td>
+</tr>
+<tr>
+<td><code>eggnog_db</code></td>
+<td>The eggNOG-mapper database directory. BacFlux pins eggnog-mapper 2.1.15, which annotates against <strong>eggNOG 5.0</strong>, database release <strong><code>emapperdb-5.0.2</code></strong>. The version is fixed by the tool rather than chosen by you: <code>download_eggnog_data.py</code> builds its URL from <code>__DB_VERSION__</code> in the installed release, so the database cannot drift away from the pin.</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>gtdbtk_db</code></td>
+<td>A GTDB-Tk release directory.</td>
+</tr>
+<tr>
+<td><code>platon_db</code></td>
+<td>The Platon plasmid database, release <strong>v1.5.0</strong> (<a href="https://doi.org/10.5281/zenodo.4066768">DOI 10.5281/zenodo.4066768</a>, 2020-10-05). It is versioned separately from Platon itself: v1.5.0 is the current database for every Platon from 1.5.0 onwards, including the 1.8 pinned here, so the database number trailing the tool number is expected rather than a sign of drift.</td>
+</tr>
+</tbody>
+</table>
+<p>Versions and download recipes are on
+<a href="../../getting-started/databases/">reference databases</a>.</p>
+<h3 id="optional-local-copies-of-the-downloaded-databases">Optional local copies of the downloaded databases<a class="headerlink" href="#optional-local-copies-of-the-downloaded-databases" title="Permanent link">&para;</a></h3>
+<p>Six databases the workflow can fetch itself. Point the matching key at a copy you
+already hold and <strong>nothing is downloaded</strong> — the key overrides both the <code>links.*</code>
+entry and, where the tool has one, its own downloader. These paths are only ever
+read: BacFlux builds a local symlink view rather than touching your directory.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Point it at</th>
+<th>Read when</th>
+<th>Probe file checked at parse time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>checkv_db</code></td>
+<td>The <strong>parent</strong> directory holding the versioned folder, e.g. <code>/path/to/checkv/</code> containing <code>checkv-db-v1.5/</code></td>
+<td>all modes</td>
+<td>exactly one <code>*/genome_db/checkv_reps.faa</code></td>
+</tr>
+<tr>
+<td><code>vs2_db</code></td>
+<td>What <code>virsorter setup</code> produced</td>
+<td><code>phage.caller: virsorter2</code></td>
+<td><code>Done_all_setup</code></td>
+</tr>
+<tr>
+<td><code>antismash_db</code></td>
+<td>What <code>download-antismash-databases</code> produced</td>
+<td>all modes</td>
+<td><code>clusterblast/</code></td>
+</tr>
+<tr>
+<td><code>dbcan_db</code></td>
+<td>An extracted dbCAN database matching <code>links.dbcan_link</code></td>
+<td>all modes</td>
+<td><code>dbCAN.hmm</code></td>
+</tr>
+<tr>
+<td><code>card_db</code></td>
+<td>An extracted CARD database</td>
+<td><code>illumina</code>, <code>hybrid</code></td>
+<td><code>aro_index.tsv</code></td>
+</tr>
+<tr>
+<td><code>genomad_db</code></td>
+<td>The <code>genomad_db/</code> directory <code>genomad download-database</code> produced</td>
+<td><code>phage.caller: genomad</code></td>
+<td><code>version.txt</code></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Why CheckV gets a local view rather than being used in place</p>
+<p>CheckV needs a DIAMOND index (<code>genome_db/checkv_reps.dmnd</code>) that the official
+archive does not ship — it is built locally after unpacking. Whatever index
+sits in a shared database was built by whichever DIAMOND that site happened
+to have, and DIAMOND refuses to run a format it does not recognise: CheckV
+then dies at <em>"Running DIAMOND blastp search… DIAMOND task failed"</em>, after
+the contamination stage has already succeeded, which reads like a CheckV bug.
+A shared database is also usually not writable, so rebuilding in place is not
+an option. BacFlux therefore symlinks the big read-only files and builds the
+index with its own DIAMOND — about 950 MB and a couple of minutes, once per
+output directory.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">geNomad's database gets two extra checks</p>
+<p>A shared copy can be <em>partly</em> readable: on this machine 11 of 27 files were
+mode 0640 — <code>version.txt</code>, both hallmark tables and the whole
+<code>genomad_integrase_db</code> set — while the big files beside them were
+world-readable. A file can be listed and still refuse to open, so checking
+that it exists is not enough: the run would start and die minutes later on a
+permission error. Every file is therefore checked for read access, and the
+offenders are named.</p>
+<p>The second check is on the database <em>schema</em>. A geNomad database is coupled
+to the geNomad release, and geNomad does not verify this: it parses
+<code>genomad_marker_metadata.tsv</code> positionally from the last columns, so an older
+database shifts every field by one and geNomad dies on
+<code>ValueError: invalid literal for int() with base 10: '1398618at2'</code> — a marker
+accession being read as a hallmark count. Verified here on 2026-07-24 with
+database v1.7 against geNomad 1.12.0. BacFlux tests for the trailing
+<code>PREVIOUS_MARKER_ACCESSION</code> column instead of guessing at version numbers.</p>
+</div>
+<hr />
+<h2 id="links-all-modes">Links <code>[all modes]</code><a class="headerlink" href="#links-all-modes" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">links</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">phix_link</span><span class="p">:</span><span class="w">   </span><span class="s">""</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">dbcan_link</span><span class="p">:</span><span class="w">  </span><span class="s">"https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz"</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">card_link</span><span class="p">:</span><span class="w">   </span><span class="s">""</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">checkv_link</span><span class="p">:</span><span class="w"> </span><span class="s">"https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz"</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">genomad_link</span><span class="p">:</span><span class="w"> </span><span class="s">"https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz"</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nt">genomad_md5</span><span class="p">:</span><span class="w">  </span><span class="s">"67244b528bb8bed464d1ca147136d33e"</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Required in</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>phix_link</code></td>
+<td><code>illumina</code>, <code>hybrid</code></td>
+<td>unset</td>
+<td>The PhiX genome Illumina spikes into nearly every lane. Those reads are real sequence from another organism and are mapped out before assembly.</td>
+</tr>
+<tr>
+<td><code>dbcan_link</code></td>
+<td>all modes</td>
+<td>dbCAN 5.1.2 on Zenodo</td>
+<td>Must be a <code>.tar.gz</code>: the checksum URL and the extracted folder name are both derived from it, so the folder always matches the release you pointed at.</td>
+</tr>
+<tr>
+<td><code>card_link</code></td>
+<td><code>illumina</code>, <code>hybrid</code></td>
+<td>unset</td>
+<td>CARD, for the read-mapping AMR leg. Reads are immune to assembly collapse, so this leg sees determinants the contig-based leg can miss.</td>
+</tr>
+<tr>
+<td><code>checkv_link</code></td>
+<td><em>optional</em>, all modes</td>
+<td>a Zenodo mirror of CheckV's own database</td>
+<td>Empty means CheckV downloads its own. Ignored when <code>directories.checkv_db</code> is set — and BacFlux says so rather than ignoring the key silently.</td>
+</tr>
+<tr>
+<td><code>genomad_link</code></td>
+<td><em>optional</em>, <code>phage.caller: genomad</code></td>
+<td>the geNomad authors' own Zenodo copy</td>
+<td>Must be the database archive (<code>genomad_db_v*.tar.gz</code>), not the HMM or MSA archive beside it on the same record. Empty falls back to geNomad's own downloader.</td>
+</tr>
+<tr>
+<td><code>genomad_md5</code></td>
+<td>with <code>genomad_link</code></td>
+<td>the MD5 of the default archive</td>
+<td>Zenodo publishes an MD5 rather than the <code>.sha256</code> sidecar the other mirrors carry, so it is configured rather than derived. <strong>Change it whenever you change the link</strong> — a mismatch stops the run, and a stale hash is worse than none.</td>
+</tr>
+</tbody>
+</table>
+<p>The CheckV and geNomad mirrors exist for one reason: both databases are served
+from <code>portal.nersc.gov</code> (<a href="https://www.nersc.gov/">NERSC</a>), which is unreachable
+often enough to cost real time (it
+was down for the whole of 2026-07-22, blocking three validation runs here), and
+geNomad's downloader has no option to point elsewhere. Several of these
+databases carry terms of their own; BacFlux ships none of the data, and the
+licence of each is tabulated on <a href="../../about/licensing/">licensing</a>.</p>
+<hr />
+<h2 id="resources-all-modes">Resources <code>[all modes]</code><a class="headerlink" href="#resources-all-modes" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">resources</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">16</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">ram_gb</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>threads</code></td>
+<td>How many cores the machine has to give. Every CPU-bound rule builds its own request against this number.</td>
+<td><code>16</code></td>
+<td>Nothing needs configuring per rule.</td>
+</tr>
+<tr>
+<td><code>ram_gb</code></td>
+<td>The memory budget handed to the rules that can be told a limit.</td>
+<td><code>64</code></td>
+<td>Not enforced by Snakemake — see below.</td>
+</tr>
+</tbody>
+</table>
+<p>These describe your machine. What actually enforces the CPU budget at run time is
+<code>--cores N</code> on the command line; set it to the same value as <code>threads</code>, and see
+<a href="../running/">running BacFlux</a> for why <code>--jobs</code> must not be added alongside it.</p>
+<h3 id="how-threads-reaches-a-rule">How <code>threads</code> reaches a rule<a class="headerlink" href="#how-threads-reaches-a-rule" title="Permanent link">&para;</a></h3>
+<p>Rules ask either for all of <code>threads</code>, or for <code>min(threads, N)</code> where their tool
+stops scaling at N. Both go into Snakemake's built-in <code>threads:</code>, which is what
+makes a plain <code>--cores N</code> a real ceiling.</p>
+<table>
+<thead>
+<tr>
+<th>Request</th>
+<th>Rules</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>all of <code>threads</code></td>
+<td><code>map_phix</code>, <code>illumina_assembly</code>, <code>ont_assembly</code>, <code>map_contigs</code>, <code>map_sel_contigs</code></td>
+</tr>
+<tr>
+<td><code>min(threads, 24)</code></td>
+<td><code>blast_contigs</code>, <code>blast_final_contigs</code>, <code>genome_assembly_evaluation</code>, <code>completeness_and_contamination</code>, <code>map_evaluation</code>, <code>taxonomic_assignment</code>, <code>annotation</code>, <code>functional_annotation</code>, <code>secondary_metabolites_analysis</code>, <code>cazyme_gene_cluster</code>, <code>map_amr_db</code>, <code>plasmid_search</code>, <code>viral_identification_virsorter2</code>, <code>viral_quality</code>, <code>genomad_end_to_end</code>, <code>fix_start</code>, <code>short_read_correction</code>, <code>compare_hybrid_assemblies</code>, <code>long_read_consensus</code> (nanopore)</td>
+</tr>
+<tr>
+<td><code>min(threads, 16)</code></td>
+<td><code>trim_adapters</code>, <code>assembly_depth</code>, <code>isosdb_map</code></td>
+</tr>
+<tr>
+<td><code>min(threads, 8)</code></td>
+<td>the NanoPlot rules, <code>long_read_consensus</code> (hybrid), <code>checkv_db</code>, <code>checkv_db_local</code>, and the mobilome rules <code>amrfinderplus</code>, <code>isescan</code>, <code>conjscan</code>, <code>icescan</code>, <code>tncentral_blast</code>, <code>iceberg_blast</code></td>
+</tr>
+<tr>
+<td><code>min(threads, 4)</code></td>
+<td><code>virsorter2_db</code></td>
+</tr>
+<tr>
+<td>none declared</td>
+<td>both ABRicate rules, and the small parsing rules that run plain Python</td>
+</tr>
+</tbody>
+</table>
+<h3 id="how-ram_gb-reaches-a-rule">How <code>ram_gb</code> reaches a rule<a class="headerlink" href="#how-ram_gb-reaches-a-rule" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>What it gets</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>illumina_assembly</code></td>
+<td>SPAdes <code>-m</code>, a hard ceiling, uncapped</td>
+</tr>
+<tr>
+<td><code>map_evaluation</code></td>
+<td>Qualimap's JVM heap, <code>min(ram_gb, 64)</code> GB</td>
+</tr>
+<tr>
+<td><code>map_amr_db</code>, <code>assembly_depth</code>, <code>isosdb_map</code></td>
+<td>BBMap's <code>-Xmx</code>, <code>min(ram_gb, 32)</code> GB</td>
+</tr>
+<tr>
+<td><code>functional_annotation</code></td>
+<td>42 GB, only when <code>parameters.eggnog.dbmem</code> is on</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title"><code>ram_gb</code> is a number handed to tools, not a budget Snakemake polices</p>
+<p>Snakemake enforces the CPU side on its own, because rules declare the
+built-in <code>threads:</code>. Memory figures are gigabytes rather than core counts, so
+they sit in <code>resources:</code> under three different names, and are scheduled
+against <strong>only</strong> if the launch line passes the matching one — <code>--resources
+mem_gb=N</code> for eggNOG, <code>java_mem=N</code> for Qualimap, <code>ram=N</code> for SPAdes. Without
+that, two large jobs running at once can each take their full share. eggNOG
+with <code>--dbmem</code> is the one case where this matters enough that BacFlux prints
+the exact flag to add.</p>
+<p>The three BBMap legs (<code>map_amr_db</code>, <code>assembly_depth</code>, <code>isosdb_map</code>) are not
+schedulable at all: their figure is a <code>params:</code> value handed straight to
+<code>-Xmx</code>, not a declared resource.</p>
+</div>
+<hr />
+<h2 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h2>
+<h3 id="nt_version-all-modes"><code>nt_version</code> <code>[all modes]</code><a class="headerlink" href="#nt_version-all-modes" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">nt_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">core_nt</span><span class="w">          </span><span class="c1"># core_nt | nt_prok</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nt_version</code></td>
+<td>Which subfolder of <code>directories.blast_db</code> the contamination screen blasts against</td>
+<td><code>core_nt</code></td>
+<td><code>nt_prok</code> is the prokaryote-only build: smaller and faster, and enough when contaminants are expected to be bacterial. A config omitting the key falls back to <code>core_nt</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="eggnog-dbmem-all-modes-optional">eggNOG <code>--dbmem</code> <code>[all modes]</code> <em>— optional</em><a class="headerlink" href="#eggnog-dbmem-all-modes-optional" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="w">  </span><span class="nt">eggnog</span><span class="p">:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span><span class="nt">dbmem</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dbmem</code></td>
+<td>Loads the 39 GB <code>eggnog.db</code> wholly into RAM instead of reading it from disk</td>
+<td><code>false</code></td>
+<td>Costs about 42 GB <strong>per concurrent eggNOG job</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p>eggNOG-mapper's annotation phase does random-access lookups into that SQLite
+database once per seed ortholog, which is why <code>functional_annotation</code> is
+routinely the last rule still running. <code>--dbmem</code> makes those lookups in-memory.</p>
+<p>Two things happen when you switch it on. BacFlux refuses at parse time if
+<code>resources.ram_gb</code> cannot hold even one such job, naming the number to raise. And
+it prints the exact <code>--resources mem_gb=N</code> flag, with your own <code>ram_gb</code> filled
+in, so Snakemake will cap concurrent eggNOG jobs at what your memory actually
+holds. Without that flag the run still works; concurrency is then bounded by
+cores rather than by RAM. More on the annotation stage:
+<a href="../../analysis/annotation/">annotation</a>.</p>
+<h3 id="long-read-qc-nanoporehybrid">Long-read QC <code>[nanopore|hybrid]</code><a class="headerlink" href="#long-read-qc-nanoporehybrid" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="w">  </span><span class="nt">long_read_qc</span><span class="p">:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span><span class="nt">min_length</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="nt">keep_percent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">95</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="nt">length_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</code></pre></div>
+<p><strong>This is the biggest lever on small-plasmid recovery.</strong> Filtlong ranks reads by</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>(Length^length_weight × MeanQuality^mean_q_weight)^(1/(lw+mqw)) × WindowQuality
+</code></pre></div>
+<p>and <code>--keep_percent</code> deletes the bottom of that ranking. A small plasmid cannot
+produce reads longer than itself, so its reads sit near the bottom by
+construction and are discarded first.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Reaches Filtlong in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>min_length</code></td>
+<td>Reads shorter than this are discarded outright</td>
+<td><code>1000</code></td>
+<td>both long-read modes</td>
+</tr>
+<tr>
+<td><code>keep_percent</code></td>
+<td>Keep the best N% of <strong>bases</strong> by the score above</td>
+<td><code>95</code></td>
+<td>both long-read modes</td>
+</tr>
+<tr>
+<td><code>length_weight</code></td>
+<td>How much length dominates the ranking</td>
+<td><code>1</code> (Filtlong's own default)</td>
+<td><code>hybrid</code> only</td>
+</tr>
+</tbody>
+</table>
+<p>Measured here on <em>Klebsiella pneumoniae</em> TUM24772 (BioProject PRJNA1168299,
+closed genome GCA_043950115.1) — a clinical test isolate, not one of the mobilome
+positive controls. Its 5,596 bp Col2 plasmid (CP171790.1) was missing from the
+assembly while sitting complete in the Illumina data. Of the 603 raw ONT reads
+mapping to it (minimap2 <code>-x map-ont</code>, alignment block ≥ 1 kb), the number
+surviving each setting pair:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;"><code>length_weight: 10</code></th>
+<th style="text-align: right;"><code>length_weight: 1</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keep_percent: 90</code> (the old value)</td>
+<td style="text-align: right;">93</td>
+<td style="text-align: right;">413</td>
+</tr>
+<tr>
+<td><code>keep_percent: 95</code></td>
+<td style="text-align: right;">500</td>
+<td style="text-align: right;">502</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>keep_percent</code> is the key to reach for.</strong> At the 95 that now ships, changing
+<code>length_weight</code> is worth two reads; at the old 90 it was worth 320. The plasmid
+needed both old values together to disappear, and either change on its own brings
+most of it back.</p>
+<p><code>length_weight</code> still defaults to 1 because the two keys protect different size
+classes. Reads per length band, same sample (the raw set holds 2,954 reads of
+1–3 kb and 3,418 of 3–6 kb):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">1–3 kb</th>
+<th style="text-align: right;">3–6 kb</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keep_percent: 90</code>, <code>lw: 10</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">318</td>
+</tr>
+<tr>
+<td><code>keep_percent: 95</code>, <code>lw: 10</code></td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2,666</td>
+</tr>
+<tr>
+<td><code>keep_percent: 90</code>, <code>lw: 1</code></td>
+<td style="text-align: right;">123</td>
+<td style="text-align: right;">2,331</td>
+</tr>
+<tr>
+<td><code>keep_percent: 95</code>, <code>lw: 1</code></td>
+<td style="text-align: right;">605</td>
+<td style="text-align: right;">2,935</td>
+</tr>
+</tbody>
+</table>
+<p><code>length_weight: 10</code> empties the 1–3 kb band whatever <code>keep_percent</code> says. So
+<code>keep_percent</code> protects plasmids of a few kb and <code>length_weight</code> protects
+plasmids under about 3 kb; this 5.6 kb one happened to sit in <code>keep_percent</code>'s
+range.</p>
+<div class="admonition warning">
+<p class="admonition-title">Recovering the reads is necessary, not sufficient</p>
+<p>No setting tried here assembled that plasmid — raw unfiltered reads included.
+ONT ligation prep under-represents small circular plasmids roughly four-fold,
+and no filter setting undoes that half of the problem. Read this table as
+"these settings stop the reads being thrown away", not as "and then it
+assembled".</p>
+</div>
+<p>There is no spelling for "off". The number goes straight to Filtlong's
+<code>--keep_percent</code>, so a blank value arrives as the literal <code>None</code> and Filtlong
+refuses to start; set <code>100</code> to keep everything above <code>min_length</code>, which is the
+safest setting for plasmids. Raising them further rarely gains anything — total
+bases barely moved in the test (208 → 227 Mb), so what changes is <em>which</em> reads
+survive, not how many. If you raise <code>length_weight</code> you are trading small
+replicons for chromosome contiguity; say so in your methods. Full treatment:
+<a href="../../modes/nanopore/">nanopore mode</a>.</p>
+<h3 id="decontamination-all-modes">Decontamination <code>[all modes]</code><a class="headerlink" href="#decontamination-all-modes" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="w">  </span><span class="nt">decontamination</span><span class="p">:</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span><span class="w">                 </span><span class="c1"># auto | include | exclude | off</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="nt">discard_no_hit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="nt">include_genera</span><span class="p">:</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">    </span><span class="nt">include_genera_by_sample</span><span class="p">:</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">    </span><span class="nt">exclude_genera</span><span class="p">:</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">    </span><span class="nt">exclude_genera_file</span><span class="p">:</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">    </span><span class="nt">sample_overrides</span><span class="p">:</span>
+</code></pre></div>
+<p>After BlobTools assigns every contig a genus, the selector keeps or discards
+contigs by this policy and writes an audit row for every decision. One policy
+covers all four modes, and it runs on the draft assembly, before annotation, so a
+contaminant never reaches CheckM or Bakta.</p>
+<div class="admonition note">
+<p class="admonition-title"><code>mode</code> here is the filtering policy, not the pipeline mode</p>
+<p><code>parameters.decontamination.mode</code> and the top-level <code>mode</code> share a name and
+nothing else.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code></td>
+<td><code>auto</code> keeps the most abundant genus BlobTools inferred; <code>include</code> keeps only the genera you list; <code>exclude</code> removes the ones you list; <code>off</code> keeps everything</td>
+<td><code>auto</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>discard_no_hit</code></td>
+<td>Removes contigs BLAST could not place</td>
+<td><code>true</code> in the shipped template</td>
+<td>Omitting the key entirely resolves to <code>false</code>, so keep the line. Applied <em>before</em> the mode logic. In <code>auto</code> it also drops "no-hit" from the vote that picks the dominant genus.</td>
+</tr>
+<tr>
+<td><code>include_genera</code></td>
+<td>Genera to keep, for every sample</td>
+<td>unset</td>
+<td>An inline list: <code>"GenusA;GenusB"</code> or <code>[GenusA, GenusB]</code>. Commas and semicolons both separate.</td>
+</tr>
+<tr>
+<td><code>include_genera_by_sample</code></td>
+<td><strong>A file path</strong> to a two-column TSV (<code>sample</code>, <code>genus</code>)</td>
+<td>unset</td>
+<td>The compact form when many samples each need their own include list. A sample may appear on several rows.</td>
+</tr>
+<tr>
+<td><code>exclude_genera</code></td>
+<td>Genera to discard, for every sample</td>
+<td>unset</td>
+<td>Same shapes as <code>include_genera</code>.</td>
+</tr>
+<tr>
+<td><code>exclude_genera_file</code></td>
+<td><strong>A file path</strong> to a genus list, one per line</td>
+<td>unset</td>
+<td>Blank lines and <code>#</code> comments are skipped.</td>
+</tr>
+<tr>
+<td><code>sample_overrides</code></td>
+<td><strong>A file path</strong> to a per-sample override TSV</td>
+<td>unset</td>
+<td>Columns <code>sample</code> and <code>mode</code> are required; <code>include_genera</code>, <code>exclude_genera</code> and <code>discard_no_hit</code> may follow. A row replaces the run-wide setting for that one sample.</td>
+</tr>
+</tbody>
+</table>
+<p>The last three are <strong>paths to files</strong>, not mappings written inline. A YAML block
+written there would be stringified and the selector would try to open a file
+literally named <code>{}</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">An empty cell in the override TSV means <em>keep the global value</em></p>
+<p>Not "match nothing". A row must still carry the full set of tabs where fields
+are blank, or the columns shift and the wrong value is read.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title"><code>auto</code> can delete a genuine plasmid, and in hybrid mode it takes the reads with it</p>
+<p><code>auto</code> follows BlobTools' <code>bestsum</code>, which sums bitscores per taxon across
+every hit — and that follows database composition rather than biology. On
+<em>K. pneumoniae</em> ATCC BAA-2146 it discarded a real 2,014 bp plasmid
+(pMYS, NZ_CP006660.1) as <em>Escherichia</em>, because <em>E. coli</em> entries outnumbered
+<em>Klebsiella</em> ones 58,709 to 16,253. Broad-host-range plasmids are dropped
+<em>precisely because</em> they are mobile and their nearest database relatives sit
+in another genus.</p>
+<p>In <code>hybrid</code> mode the loss compounds: only the Illumina reads mapping to the
+<strong>selected</strong> contigs become the short-read reference Filtlong scores ONT reads
+against, so sequence absent from that reference is discarded before Flye ever
+sees it — the plasmid disappears from the assembly, not merely from the
+taxonomy table.</p>
+<p>Check <code>02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv</code> for
+any discarded contig of plausible plasmid size whose assigned genus differs
+from the sample's. The fixes are <code>mode: include</code> naming both genera,
+<code>mode: off</code>, <code>discard_no_hit: false</code>, or a <code>sample_overrides</code> row for the one
+awkward isolate. This is independent of <code>long_read_qc</code> above; both can delete
+a plasmid, for different reasons, and both should be ruled out.</p>
+</div>
+<p>The selector's alias handling, the audit file's reason codes and the two routes
+by which a real plasmid is lost are on
+<a href="../../analysis/decontamination/">decontamination</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">A config written before 2.0.0</p>
+<p>A single top-level <code>parameters.genus</code> is still translated into
+<code>mode: include</code> with that genus, so older configs keep working. It is not
+part of the current schema and is not documented beyond this note.</p>
+</div>
+<h3 id="long-read-assembly-and-polishing-nanoporehybrid">Long-read assembly and polishing <code>[nanopore|hybrid]</code><a class="headerlink" href="#long-read-assembly-and-polishing-nanoporehybrid" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="w">  </span><span class="nt">nanopore</span><span class="p">:</span><span class="w">                    </span><span class="c1"># read only when mode == nanopore</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">    </span><span class="nt">flye_input_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span><span class="w">      </span><span class="c1"># auto | nano-raw | nano-hq</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span><span class="nt">medaka_model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="nt">medaka_model_fallback_auto</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span><span class="nt">hybrid</span><span class="p">:</span><span class="w">                      </span><span class="c1"># read only when mode == hybrid</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">    </span><span class="nt">flye_input_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">    </span><span class="nt">medaka_model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="nt">medaka_model_fallback_auto</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<p>The block is namespaced per mode: a run reads only the block named after itself.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>flye_input_mode</code></td>
+<td>Which read model Flye assembles under</td>
+<td><code>auto</code></td>
+<td><code>auto</code> gives <code>--nano-hq</code> unless an explicit <em>fast</em> Medaka model is named.</td>
+</tr>
+<tr>
+<td><code>medaka_model</code></td>
+<td>Which Medaka consensus model polishes the assembly</td>
+<td><code>auto</code></td>
+<td><code>auto</code>/<code>true</code>/empty infer it from the FASTQ headers; <code>false</code> skips Medaka entirely <em>(optional step, switched off here)</em>; anything else is taken as a model name.</td>
+</tr>
+<tr>
+<td><code>medaka_model_fallback_auto</code></td>
+<td>What to do when an <strong>explicit</strong> model turns out to be invalid</td>
+<td><code>false</code></td>
+<td><code>false</code> stops with a table of flowcell/device/accuracy suggestions. <code>true</code> falls back to inference — an opt-in, because an explicit choice should be honoured or reported, never silently swapped for a guess.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">The two keys are coupled, and it changes the assembly</p>
+<p>With <code>flye_input_mode: auto</code>, an explicit <code>medaka_model</code> whose name contains
+<strong>"fast"</strong> also switches the <em>assembler</em> to <code>--nano-raw</code> — fast basecalling
+means noisier reads. So naming a fast model changes how the genome is
+assembled, not only how it is polished. To pin the polisher and leave the
+assembler alone, set <code>flye_input_mode</code> explicitly instead of leaving it on
+<code>auto</code>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title"><code>auto</code> needs a basecaller tag in the reads</p>
+<p>Inference reads the basecaller name out of the FASTQ headers, so it fails
+outright on reads that carry none — common in public or re-headered data.
+Name the model explicitly for such a dataset.</p>
+</div>
+<p>The model is validated right after read filtering, before the assembler runs, so
+a typo fails in seconds rather than an hour in. Details and the model table:
+<a href="../../modes/nanopore/">nanopore mode</a>.</p>
+<hr />
+<h2 id="phage-caller-all-modes">Phage caller <code>[all modes]</code><a class="headerlink" href="#phage-caller-all-modes" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nt">phage</span><span class="p">:</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="nt">caller</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">virsorter2</span><span class="w">           </span><span class="c1"># virsorter2 | genomad</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>caller</code></td>
+<td>Which tool finds viruses and prophages in stage <code>07.phages</code></td>
+<td><code>virsorter2</code></td>
+<td>CheckV then scores whatever that caller found, so this changes CheckV's input, not the QC itself.</td>
+</tr>
+</tbody>
+</table>
+<p>Choosing <code>genomad</code> changes the plasmid stage too. One geNomad run calls viruses
+and plasmids together, so opting in also switches on the Platon + geNomad
+concordance in <code>06.plasmids</code>; on the default, that stage is Platon alone and
+geNomad never runs. Read <a href="../../about/licensing/">licensing</a> before choosing, and
+<a href="../../analysis/phages/">prophages</a> for what the choice does to the output.</p>
+<hr />
+<h2 id="mobilome-module-all-modes-optional">Mobilome module <code>[all modes]</code> <em>— optional</em><a class="headerlink" href="#mobilome-module-all-modes-optional" title="Permanent link">&para;</a></h2>
+<p>Everything in this block is inert while <code>run</code> is <code>false</code>, which is the shipped
+default. Switching it on adds stage <code>08.mobilome</code>: for every AMR gene the
+pipeline found, the mobile-element context around it and a mobility tier, from
+1 (chromosomal, intrinsic candidate) to 6 (inside an ICE or on a conjugative
+plasmid — predicted self-transmissible).</p>
+<h3 id="the-switch-and-what-it-costs">The switch, and what it costs<a class="headerlink" href="#the-switch-and-what-it-costs" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nt">mobilome</span><span class="p">:</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="nt">max_composite_span_bp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="nt">coverage_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run</code></td>
+<td>Master switch for the whole module</td>
+<td><code>false</code></td>
+<td>Adds 22 rules, two tools (ISEScan and CONJscan/MacSyFinder, both from bioconda), and a model download that needs network access on first use. Those models are non-commercial — see <a href="../../about/licensing/">licensing</a>.</td>
+</tr>
+<tr>
+<td><code>max_composite_span_bp</code></td>
+<td>Two IS copies further apart than this are not called one composite transposon</td>
+<td><code>20000</code></td>
+<td>A convention, not biology. The measured distance is always reported next to the call, so a reader can disagree without re-running anything.</td>
+</tr>
+<tr>
+<td><code>coverage_profile</code></td>
+<td>The fraction of an HMM profile a protein's alignment must cover before the hit is kept</td>
+<td><code>0.5</code></td>
+<td>MacSyFinder's own default, and the value every published result here was measured at. See below.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Nothing else has to be set.</strong> The module runs on the databases BacFlux already
+has, plus the CONJscan models it fetches itself. See <a href="../../mobilome/enabling/">turning it
+on</a>.</p>
+<div class="admonition note">
+<p class="admonition-title"><code>coverage_profile</code> is not identity and not an E-value</p>
+<p>A protein can score beyond statistical doubt against a profile and still be
+dropped by this rule alone, because it aligned to only part of the profile.
+That happens for two opposite reasons: it really is a fragment or a decayed
+remnant, or it is a full-length member of a divergent family sharing only the
+catalytic core.</p>
+</div>
+<p>Lowering it was measured end to end at 0.5 / 0.4 / 0.3 over three benchmark sets
+— 18 curated ICEs, 12 curated IMEs, and 12 genomes with no curated element at all
+(32.6 Mb), with the ICEscan layer on:</p>
+<table>
+<thead>
+<tr>
+<th><code>coverage_profile</code></th>
+<th style="text-align: right;">curated ICEs</th>
+<th style="text-align: right;">curated IMEs</th>
+<th style="text-align: right;">calls on the negative set</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.5</td>
+<td style="text-align: right;">15 of 18</td>
+<td style="text-align: right;">5 of 12</td>
+<td style="text-align: right;">5 (2 without ICEscan)</td>
+</tr>
+<tr>
+<td>0.4</td>
+<td style="text-align: right;">15 of 18</td>
+<td style="text-align: right;">6 of 12</td>
+<td style="text-align: right;">7 (4 without ICEscan)</td>
+</tr>
+<tr>
+<td>0.3</td>
+<td style="text-align: right;">15 of 18</td>
+<td style="text-align: right;">6 of 12</td>
+<td style="text-align: right;">9 (5 without ICEscan)</td>
+</tr>
+</tbody>
+</table>
+<p>Across 30 curated elements, lowering it recovers exactly one more: a 23 kb IME in
+<em>Faecalibacterium duncaniae</em>, found in full and correctly classed. Everything
+added on the negative controls at 0.4 is a <code>cime_or_island</code> at <code>passive</code>
+mobility, <code>low</code> confidence, claiming nothing and carrying no tier — the tiering
+absorbs it, which is what it is for. At 0.3 that stops being true: a 21.6 kb IME
+is called in <em>Staphylococcus aureus</em> N315 at medium confidence with a real
+mobility claim. Nothing measured here supports 0.3 for single isolates. If your
+isolates sit in the space where it might help — of 395 curated IMEs, 73 carry a
+relaxase hit that is clean on E-value and fails only this rule, 60 of them
+<code>T4SS_MOBT</code> at about 0.32 coverage — 0.4 is worth trying, and the audit TSV
+records a reason for every dropped candidate so you can see what changed.</p>
+<p>Both machinery searches use this one value, and must: their hit tables are
+merged, so different stringencies would make an element's class depend on which
+model set was more permissive.</p>
+<h3 id="the-four-optional-layers">The four optional layers<a class="headerlink" href="#the-four-optional-layers" title="Permanent link">&para;</a></h3>
+<p>Each needs a source of its own before it does anything, and none of them switches
+on merely because <code>run</code> is true.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Switched on by</th>
+<th>What it adds</th>
+<th>Modes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>icescan</code></td>
+<td><code>icescan.run: true</code> <strong>and</strong> a <code>url</code> or <code>dir</code> (the shipped <code>url</code> counts)</td>
+<td>A second machinery model set, merged with CONJscan's hits</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>tncentral</code></td>
+<td>a <code>url</code> or <code>dir</code></td>
+<td>Curated transposon and integron names — the only thing that makes ladder tier 4 reachable</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>iceberg</code></td>
+<td>a <code>urls</code> entry or <code>dir</code></td>
+<td>Names the ICE/IME candidates CONJscan already found</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>isosdb</code></td>
+<td><code>fasta_url</code> + <code>family_map_url</code>, or <code>dir</code></td>
+<td>Read-derived IS copy number: how many copies the assembly lost</td>
+<td><code>illumina</code>, <code>hybrid</code></td>
+</tr>
+</tbody>
+</table>
+<p>Every layer writes a <code>PROVENANCE.txt</code> beside what it fetched, recording the
+source, the fetch date, the observed checksum and how much arrived — sequences
+for the three databases, HMM profiles for the ICEscan models. None of these URLs
+pins a release, so without that file there is no way to say later which one a
+result came from.</p>
+<h4 id="icescan-a-second-machinery-model-set"><code>icescan</code> — a second machinery model set<a class="headerlink" href="#icescan-a-second-machinery-model-set" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="w">  </span><span class="nt">icescan</span><span class="p">:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">"https://ftp.ebi.ac.uk/pub/databases/metagenomics/pipelines/tool-dbs/icefinder2lite/icf2_dbs.tar.gz"</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">    </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">    </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run</code></td>
+<td>Runs MacSyFinder a second time with the ICEscan models and merges the two hit tables</td>
+<td><code>false</code></td>
+<td>Switched on with no <code>url</code> and no <code>dir</code> stops the run — silently producing today's results would hide the fact that the layer never existed.</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>Where to fetch the model package from</td>
+<td>ICEfinder2's database bundle (~61 MB)</td>
+<td>Only the MacSyFinder models are extracted; the rest is discarded. Use the <code>https://</code> form — the <code>ftp://</code> spelling of the same path times out from behind many firewalls.</td>
+</tr>
+<tr>
+<td><code>sha256</code></td>
+<td>Pins which release you analysed with</td>
+<td>unset</td>
+<td>Optional but recommended: the URL carries no version. Empty skips the check; the observed checksum is recorded either way.</td>
+</tr>
+<tr>
+<td><code>dir</code></td>
+<td>A MacSyFinder models directory you already hold, containing an <code>ICEscan/</code> folder</td>
+<td>unset</td>
+<td>Takes precedence over <code>url</code>; nothing is downloaded.</td>
+</tr>
+</tbody>
+</table>
+<p>It is a fork of CONJscan by the same authors, one minor version behind the
+release BacFlux installs, which is why it runs <em>alongside</em> rather than instead:
+swapping would lose the MOB relaxase models, the decayed-machinery models and the
+whole plasmid set. What it adds is the AICE class, extra integrase profiles, and
+many more IME rows — 10 without it against 21 with it, over the 28 benchmark
+genomes run both ways. What it does not add is boundaries: MacSyFinder reports
+gene ordinals, never base pairs, so every coordinate still comes from BacFlux's
+own annotation join, clustering and att-site search. The measurements are on
+<a href="../../mobilome/validation/">validation</a>.</p>
+<h4 id="tncentral-curated-transposon-and-integron-names"><code>tncentral</code> — curated transposon and integron names<a class="headerlink" href="#tncentral-curated-transposon-and-integron-names" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="w">  </span><span class="nt">tncentral</span><span class="p">:</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">    </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">    </span><span class="nt">min_identity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">90.0</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">    </span><span class="nt">min_reference_coverage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.8</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>url</code></td>
+<td>A ZIP holding <code>tncentral.fa</code> — about 512 curated transposons, integrons and IS</td>
+<td>unset (layer off)</td>
+<td>The server rejects curl's default user-agent, so the download sends a browser one; if that ever stops working the rule fails loudly rather than building an empty database.</td>
+</tr>
+<tr>
+<td><code>sha256</code></td>
+<td>Pins the release</td>
+<td>unset</td>
+<td>The endpoint is unversioned. Recorded either way in <code>tncentral_db/PROVENANCE.txt</code>.</td>
+</tr>
+<tr>
+<td><code>dir</code></td>
+<td>A directory already holding <code>tncentral.fa</code></td>
+<td>unset</td>
+<td>Beats <code>url</code>; nothing is fetched.</td>
+</tr>
+<tr>
+<td><code>min_identity</code></td>
+<td>Percent identity a BLAST hit needs before it may confer a curated <strong>name</strong></td>
+<td><code>90.0</code></td>
+<td>Below this the sequence may well be a relative of the element, but the name would claim more than the data shows.</td>
+</tr>
+<tr>
+<td><code>min_reference_coverage</code></td>
+<td>Fraction of the <strong>reference element</strong> that must be present</td>
+<td><code>0.8</code></td>
+<td>Measured against the reference, not your contig: a 7 kb element inside a 300 kb contig covers 2% of the contig and 100% of itself. A fragment of a transposon is not that transposon.</td>
+</tr>
+</tbody>
+</table>
+<p>Tier 3 is an inference — two IS copies of one family, the right distance apart,
+a gene between them. It has known blind spots: IS<em>26</em> forms translocatable units
+with its copies in <em>direct</em> orientation, breaking the same-orientation rule the
+pattern depends on. A curated hit is not an inference, so it gets IS<em>26</em> right
+where the pattern does not.</p>
+<div class="admonition warning">
+<p class="admonition-title">Tier 4 is strict, and rarer than it looks</p>
+<p>Reaching it needs a URL <strong>and</strong> at least <code>min_reference_coverage</code> of the reference
+element present <strong>and</strong> the gene to be somewhere no higher tier claims first. It has
+been produced once, on a closed genome: <code>bla</code>CTX-M-15 inside Tn<em>Ecp1.1</em> at 87%
+coverage (<a href="../../mobilome/worked-example/">Worked example</a>). In that same genome six
+other curated elements were named and none reached tier 4, because they sat on
+plasmids. On fragmented clinical assemblies the same transposon was refused outright
+at 12% and 49% coverage. Switching this on will name elements; it will not
+necessarily produce a tier 4 row.</p>
+</div>
+<h4 id="iceberg-which-ice-is-it"><code>iceberg</code> — which ICE is it?<a class="headerlink" href="#iceberg-which-ice-is-it" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="w">  </span><span class="nt">iceberg</span><span class="p">:</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">    </span><span class="nt">urls</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">    </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">    </span><span class="nt">min_identity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80.0</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">    </span><span class="nt">min_overlap_fraction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>urls</code></td>
+<td>One or more FASTA URLs, concatenated into one BLAST database</td>
+<td><code>[]</code> (layer off)</td>
+<td>A single URL written without a leading dash is accepted too. Note the host: the older <code>bioinfo-mml.sjtu.edu.cn</code> path serves the previous ICEberg release, not the current one. The larger file is ~100 MB and the server is slow.</td>
+</tr>
+<tr>
+<td><code>dir</code></td>
+<td>A directory of <code>.fas</code> files you already hold</td>
+<td>unset</td>
+<td>Beats <code>urls</code>.</td>
+</tr>
+<tr>
+<td><code>min_identity</code></td>
+<td>Identity floor for a name</td>
+<td><code>80.0</code></td>
+<td>Below this the elements are related but not the same, and the name would mislead.</td>
+</tr>
+<tr>
+<td><code>min_overlap_fraction</code></td>
+<td>How much of <strong>our</strong> candidate the curated element must cover before the two are treated as the same thing</td>
+<td><code>0.5</code></td>
+<td>Deliberately lenient next to the transposon cascade: ICEs are mosaic and their cargo varies between strains, so demanding near-completeness would refuse to name exactly the divergent elements a name helps with most.</td>
+</tr>
+</tbody>
+</table>
+<p>There is no <code>sha256</code> key here, unlike the other two layers: this is two files
+rather than one archive, and the big one has to be resumable over a slow link, so
+a single pinned digest is the wrong instrument. The observed checksum of the
+concatenated FASTA and the fetch date land in <code>iceberg_db/PROVENANCE.txt</code>.</p>
+<p>This layer only labels; it cannot change any gene's tier. Its real value is
+showing how far our boundaries fall short: on <em>K. pneumoniae</em> ATCC BAA-2146 the
+ICE call spans 54,943 bp against ICEberg's 58,048 bp for the same element — 0.946
+of it, stopping 3,138 bp inside its far end. Any AMR gene in that last 3 kb is
+scored as though it were outside the ICE. That is the <em>good</em> case, a closed
+genome where the att search found a tRNA-anchored repeat.</p>
+<h4 id="isosdb-how-many-is-copies-did-the-assembly-lose"><code>isosdb</code> — how many IS copies did the assembly lose?<a class="headerlink" href="#isosdb-how-many-is-copies-did-the-assembly-lose" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="w">  </span><span class="nt">isosdb</span><span class="p">:</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">    </span><span class="nt">fasta_url</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">    </span><span class="nt">family_map_url</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">    </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">    </span><span class="nt">min_covered_percent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">90.0</span>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">    </span><span class="nt">min_copy_number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+</code></pre></div>
+<p><code>[illumina|hybrid]</code> only — it needs reads.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fasta_url</code></td>
+<td>22,713 IS nucleotide sequences, already dereplicated at 95% identity</td>
+<td>unset (layer off)</td>
+<td>About 9.9 MB zipped.</td>
+</tr>
+<tr>
+<td><code>family_map_url</code></td>
+<td>Entry → IS family (IS3, IS5, IS110 …)</td>
+<td>unset</td>
+<td><strong>Required whenever <code>fasta_url</code> is set.</strong> Set one without the other and the run stops at parse time, rather than the download failing an hour in.</td>
+</tr>
+<tr>
+<td><code>dir</code></td>
+<td>A directory already holding both files</td>
+<td>unset</td>
+<td>Beats the URLs.</td>
+</tr>
+<tr>
+<td><code>min_covered_percent</code></td>
+<td>A database entry must be covered this far end to end before its depth is believed</td>
+<td><code>90.0</code></td>
+<td>A partially covered entry is usually a conserved domain shared with another family; averaging it in would inflate every estimate.</td>
+</tr>
+<tr>
+<td><code>min_copy_number</code></td>
+<td>Below this multiple of the genome baseline the element is treated as absent</td>
+<td><code>0.5</code></td>
+<td>Deliberately under 1.0: a real single-copy IS sits near 1×, and sampling noise plus mapping loss routinely push it to 0.6–0.8×.</td>
+</tr>
+</tbody>
+</table>
+<p>Elsewhere the module says the located IS count is a floor, not a count. True, but
+unquantified — you cannot tell whether the floor is 2 short or 40. Reads are
+immune to assembly collapse, so depth over an IS divided by depth over the genome
+gives the copy number. It changes no AMR gene's tier, and must not: it says
+nothing about <em>where</em> the extra copies are, only that they exist. Results are
+reported per family as well as per entry, because the family total is robust to
+which near-identical entry an ambiguous read happened to land on.</p>
+<h3 id="confidence-and-boundary-flags">Confidence and boundary flags<a class="headerlink" href="#confidence-and-boundary-flags" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="w">  </span><span class="nt">require_trna_boundary_for_high</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span><span class="nt">contig_boundary_bp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>require_trna_boundary_for_high</code></td>
+<td>Also demands a tRNA-anchored att pair before an ICE/IME candidate may be labelled <code>high</code> confidence</td>
+<td><code>false</code></td>
+<td>Sensible on closed long-read assemblies, where an unresolved boundary really is a warning sign.</td>
+</tr>
+<tr>
+<td><code>contig_boundary_bp</code></td>
+<td>How close to a contig end counts as "at the boundary" when flagging an <strong>IS</strong> call</td>
+<td><code>100</code></td>
+<td>Feeds the <code>at_contig_boundary</code> and <code>fraction_at_contig_boundary</code> columns of the IS summary. A high fraction means the assembly broke exactly where the IS elements are.</td>
+</tr>
+</tbody>
+</table>
+<p>Left <code>false</code>, confidence answers "how sure are we this <strong>is</strong> an ICE?" — from the
+number of anchor classes, whether the machinery is intact, and whether it all
+sits on one contig. Where the element <em>ends</em> is reported separately, in
+<code>boundary_method</code>. Set <code>true</code> on a fragmented assembly and nearly every call caps
+at medium however good the machinery evidence is, because the flanking sequence
+simply is not in the contig; that conflates two different questions. Either way,
+cargo is never assigned from an unresolved boundary: a de novo direct repeat is
+reported but never widens an element (about 16% of arbitrary spans on a real
+chromosome produce one by chance), so the interval stays the machinery span — a
+floor, never an invention.</p>
+<div class="admonition note">
+<p class="admonition-title">Three contig-end windows, one of them configurable</p>
+<p>They answer different questions about different objects, which is why they
+are separate:</p>
+<table>
+<thead>
+<tr>
+<th>Window</th>
+<th>Question</th>
+<th>Set by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>100 bp</td>
+<td>Is an <strong>IS call</strong> sitting on the edge of its contig?</td>
+<td><code>contig_boundary_bp</code></td>
+</tr>
+<tr>
+<td>1000 bp</td>
+<td>Was there enough flanking sequence to have <strong>seen</strong> a neighbouring element at all? Caps confidence in the mobility table.</td>
+<td>fixed in <code>colocalise.py</code></td>
+</tr>
+<tr>
+<td>1000 bp</td>
+<td>The same question for an ICE or IME candidate rather than an AMR gene.</td>
+<td>fixed in <code>conjscan_to_ice.py</code></td>
+</tr>
+</tbody>
+</table>
+<p>An IS 500 bp from a contig end is not "at the edge", but you still could not
+have seen its partner 2 kb away — absence of evidence is not evidence of
+absence. The first and third confusingly share the flag name <code>--boundary-bp</code>
+while meaning different things; only the first is wired to a config key.</p>
+</div>
+<p>What each column of the output means is on
+<a href="../../mobilome/output/">reading the output</a>; what to conclude on a fragmented
+assembly is on <a href="../../mobilome/draft-assemblies/">draft assemblies</a>.</p>
+<hr />
+<h2 id="numbers-that-are-not-config-keys">Numbers that are not config keys<a class="headerlink" href="#numbers-that-are-not-config-keys" title="Permanent link">&para;</a></h2>
+<p>Some thresholds you might reasonably expect to find in the config are set in the
+code instead. This is where each one lives.</p>
+<h3 id="the-iceime-geometry">The ICE/IME geometry<a class="headerlink" href="#the-iceime-geometry" title="Permanent link">&para;</a></h3>
+<p><code>conjscan_ice</code> passes none of these, so the script's own defaults are what every
+measured result quoted on this site was produced at. Changing one means editing
+the rule's shell block in <code>workflow/rules/shared/80_mobilome.smk</code> — and re-running
+the benchmark afterwards.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Default</th>
+<th>What it controls</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">15,000 bp</td>
+<td>How far apart two machinery genes may sit and still be chained into one candidate element</td>
+</tr>
+<tr>
+<td style="text-align: right;">8,000 bp</td>
+<td>Floor on a candidate's length; below it the cluster is dropped with a reason</td>
+</tr>
+<tr>
+<td style="text-align: right;">2,000 bp</td>
+<td>The same floor for the IME/AICE architecture, which is genuinely smaller. The sharpest knob in the module</td>
+</tr>
+<tr>
+<td style="text-align: right;">500,000 bp</td>
+<td>Ceiling, so a runaway chain of anchors cannot cover a whole replicon</td>
+</tr>
+<tr>
+<td style="text-align: right;">50,000 bp</td>
+<td>How far from the machinery an integrase may sit and still be taken as the element's own</td>
+</tr>
+<tr>
+<td style="text-align: right;">50,000 bp</td>
+<td>How much sequence either side of the machinery the att-site search reads</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">One asymmetry, which is deliberate</p>
+<p>The att search is always given the 8,000 bp floor, never the 2,000 bp IME
+one, and it refuses any repeat pair implying an element outside its range. So
+an IME admitted at 3 kb can never have its boundaries resolved, however clean
+the repeat pair — it keeps <code>boundary_method: none</code> and reports the machinery
+span. Four of the five curated IMEs this module detects have machinery spans
+under that floor (3,840 / 4,959 / 5,942 / 6,252 bp). The deliberate reading is
+that an att pair implying a 3 kb element is mostly noise; the honest reading
+is that IME boundaries are therefore largely unresolved. Making the floors
+agree per class would change results, so it has not been done quietly.</p>
+</div>
+<h3 id="elsewhere-in-the-workflow">Elsewhere in the workflow<a class="headerlink" href="#elsewhere-in-the-workflow" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Where</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>minid=0.76</code>, ≥70% of reference length covered</td>
+<td><code>CARD_MIN_IDENTITY</code> / <code>CARD_MIN_COVERED</code>, <code>00_common.smk</code></td>
+<td>The CARD read-mapping AMR leg. Read identity is BBMap's default; the specificity comes from the length-coverage gate. See below.</td>
+</tr>
+<tr>
+<td>80% identity, 70% coverage</td>
+<td><code>rule amr_contigs</code>, <code>50_amr.smk</code></td>
+<td>ABRicate's EFSA reporting thresholds. Kept on that leg only — a blanket cutoff would fight AMRFinderPlus's curated per-gene ones.</td>
+</tr>
+<tr>
+<td>eight databases</td>
+<td><code>DATABASES</code>, <code>00_common.smk</code></td>
+<td>Which ABRicate databases run: argannot, card, ecoh, ecoli_vf, megares, ncbi, resfinder, vfdb.</td>
+</tr>
+<tr>
+<td><code>--target_bases 500000000</code></td>
+<td><code>rule filter_long_reads</code>, <code>nanopore/10_reads.smk</code></td>
+<td>The nanopore mode's total-output cap. The hybrid rule has no equivalent — the selected Illumina reads decide what is worth keeping there, and it passes <code>--trim</code>, <code>--split 1000</code> and <code>--length_weight</code> instead.</td>
+</tr>
+<tr>
+<td>coverage ≥ 2×, length ≥ 500 bp</td>
+<td><code>FASTA_SEL_CMD</code>, <code>00_common.smk</code></td>
+<td>The contig filter, read out of the SPAdes header. Always applied in <code>illumina</code> and <code>hybrid</code>; in <code>contigs</code> mode only when the first header looks like SPAdes' own (it carries <code>length_…</code> or <code>cov_…</code>), since inventing a filter for an assembly from anywhere else would silently delete real sequence.</td>
+</tr>
+<tr>
+<td>80% of the reference</td>
+<td><code>EXACT_NAME_REFERENCE_COVERAGE</code>, <code>name_ice_elements.py</code></td>
+<td>Below it, an ICEberg name is suffixed <code>-like</code>. Distinct from <code>iceberg.min_overlap_fraction</code>, which is measured against our candidate.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">The CARD leg is a sensitive screen, not a high-identity one</p>
+<p>Until 2026-08-15 this rule passed BBMap <code>idfilter=0.99</code>, and both the code and
+the documentation claimed results were screened at 99% identity. They were
+not. <code>idfilter</code> does not filter the primary alignment of a properly-paired
+read (BBMap 39.33, <code>align2/AbstractMapThread.java</code>: the guard reads
+<code>if(!r.paired() &amp;&amp; …)</code>), so every result the leg ever produced was screened at
+BBMap's default of 0.76. Measured on the same reads: paired, <code>idfilter=0.99</code>
+kept 1240 alignments, 1238 of them below 99% identity; the same reads treated
+as single-end kept 1.</p>
+<p>The rule now passes <code>minid=0.76</code> — which changes no output, and stops the code
+claiming a stringency it never applied. It is deliberately not raised: at a
+real 0.99 the same reads keep 2 alignments instead of 1240, which would
+disable the one AMR leg immune to assembly collapse. Specificity comes from requiring
+≥70% of the reference gene's <strong>length</strong> to be covered, which is why the loose
+identity floor is tolerable. There is no second pass and no divergent tier.
+See <a href="../../analysis/amr/">antimicrobial resistance</a>.</p>
+</div>
+<hr />
+<h2 id="where-to-go-next">Where to go next<a class="headerlink" href="#where-to-go-next" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Read it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../../getting-started/databases/">Reference databases</a></td>
+<td>the databases these keys point at, and how to get them</td>
+</tr>
+<tr>
+<td><a href="../../getting-started/quick-start/">Quick start</a></td>
+<td>a fresh clone to a running job</td>
+</tr>
+<tr>
+<td><a href="../running/">Running BacFlux</a></td>
+<td>what <code>--cores</code> does, and how to restart a run</td>
+</tr>
+<tr>
+<td><a href="../output/">Output files</a></td>
+<td>what each numbered stage writes</td>
+</tr>
+<tr>
+<td><a href="../../mobilome/enabling/">Turning it on</a> · <a href="../../mobilome/optional-layers/">Optional layers</a> · <a href="../../mobilome/tuning/">Tuning</a></td>
+<td>the mobilome block in full, layer by layer</td>
+</tr>
+<tr>
+<td><a href="../../getting-started/from-v1/">Coming from v1</a></td>
+<td>which keys changed name or moved</td>
+</tr>
+<tr>
+<td><a href="../../troubleshooting/">Troubleshooting</a></td>
+<td>what to do when a run stops</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,3242 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../configuration/">
+      
+      
+        <link rel="next" href="../running/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Output files - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#output-files" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Output files
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Turning it on
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-files-to-read-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The files to read first
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#01reads-read-qc-and-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        01.reads — read QC and filtering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#02assembly-the-genome-and-everything-used-to-judge-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        02.assembly — the genome and everything used to judge it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="02.assembly — the genome and everything used to judge it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-delivered-genome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The delivered genome
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contaminants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        contaminants/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eval/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#front-end-working-directories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Front-end working directories
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#03taxonomy-gtdb-tk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        03.taxonomy — GTDB-Tk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#04annotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        04.annotation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#05amr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05.amr
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="05.amr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#abricatesample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        abricate/{sample}/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mappingsample-illumina-hybrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mapping/{sample}/ — [illumina, hybrid]
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#06plasmids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        06.plasmids
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#07phages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        07.phages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#08mobilome-opt-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        08.mobilome — opt-in
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#09report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        09.report
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        logs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#temporary-files-and-directories-a-re-run-wipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temporary files, and directories a re-run wipes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-files-to-read-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The files to read first
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#01reads-read-qc-and-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        01.reads — read QC and filtering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#02assembly-the-genome-and-everything-used-to-judge-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        02.assembly — the genome and everything used to judge it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="02.assembly — the genome and everything used to judge it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-delivered-genome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The delivered genome
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contaminants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        contaminants/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eval/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#front-end-working-directories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Front-end working directories
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#03taxonomy-gtdb-tk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        03.taxonomy — GTDB-Tk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#04annotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        04.annotation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#05amr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05.amr
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="05.amr">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#abricatesample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        abricate/{sample}/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mappingsample-illumina-hybrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mapping/{sample}/ — [illumina, hybrid]
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#06plasmids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        06.plasmids
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#07phages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        07.phages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#08mobilome-opt-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        08.mobilome — opt-in
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#09report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        09.report
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        logs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#temporary-files-and-directories-a-re-run-wipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temporary files, and directories a re-run wipes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/reference/output.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="output-files">Output files<a class="headerlink" href="#output-files" title="Permanent link">&para;</a></h1>
+<p>Everything a run writes goes under <code>directories.output_dir</code>. BacFlux resolves that
+to an absolute path before any job starts, so a relative value in the config still
+lands where you expect, and the workflow never changes its working directory.</p>
+<p>Inside it the directories are numbered in the order the stages run, so a plain <code>ls</code>
+reads like the workflow itself. <strong>The numbering is identical in all four modes.</strong>
+Everything technology-specific is grouped under <code>01.reads</code> and <code>02.assembly</code>, and
+every shared stage below that gets the same number whichever front end produced the
+genome. A stage a mode cannot produce is simply absent — it is never renumbered.</p>
+<div class="admonition note">
+<p class="admonition-title">The stage numbers changed in 2.0.0</p>
+<p>They differed per workflow before the four front ends were merged. The old-to-new
+map is on <a href="../../getting-started/from-v1/">Coming from v1</a>; this page describes only
+what a 2.0.0 run writes.</p>
+</div>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>QC</strong></td>
+<td>quality control — the read, assembly and completeness checks</td>
+</tr>
+<tr>
+<td><strong>AMR</strong></td>
+<td>antimicrobial resistance</td>
+</tr>
+<tr>
+<td><strong>GTDB</strong></td>
+<td>Genome Taxonomy Database, the reference GTDB-Tk places each genome in</td>
+</tr>
+<tr>
+<td><strong>ANI</strong></td>
+<td>average nucleotide identity, a genome-to-genome similarity measure</td>
+</tr>
+<tr>
+<td><strong>EFSA</strong></td>
+<td>European Food Safety Authority, whose reporting thresholds the ABRicate leg applies</td>
+</tr>
+<tr>
+<td><strong>ICE</strong></td>
+<td>integrative and conjugative element — sits in the chromosome and can move itself to another cell</td>
+</tr>
+<tr>
+<td><strong>IME</strong></td>
+<td>integrative mobilisable element — the same, but needs a helper element to move</td>
+</tr>
+<tr>
+<td><strong>COG, GO, KEGG, EC</strong></td>
+<td>the ortholog, gene-ontology, pathway and enzyme classifications eggNOG assigns to a protein</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr />
+<h2 id="the-files-to-read-first">The files to read first<a class="headerlink" href="#the-files-to-read-first" title="Permanent link">&para;</a></h2>
+<p>A full run leaves several thousand files. These are the ones that carry the result.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Answers</th>
+<th>Modes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>02.assembly/{sample}/contigs_final.fasta</code></td>
+<td>The delivered genome. Every later stage works from this one file.</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv</code></td>
+<td>Which contigs were kept, which were dropped, and the reason for each.</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>02.assembly/{sample}/eval/checkm/{sample}_checkm_stats.tsv</code></td>
+<td>Completeness and contamination of that genome.</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>03.taxonomy/{sample}/classify/gtdbtk.*.summary.tsv</code></td>
+<td>What the isolate is.</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>04.annotation/bakta/{sample}/{sample}.tsv</code></td>
+<td>The gene calls, with products.</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>05.amr/abricate/{sample}/AMR_summary.txt</code></td>
+<td>AMR and virulence hits on the assembly, across eight databases.</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>05.amr/mapping/{sample}/{sample}_CARD_report.tsv</code></td>
+<td>AMR determinants found in the <em>reads</em>, classified by what kind of CARD entry each is.</td>
+<td><code>[illumina, hybrid]</code></td>
+</tr>
+<tr>
+<td><code>06.plasmids/{sample}/platon/verified_plasmids.txt</code></td>
+<td>Which contigs are plasmids.</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>07.phages/checkv/{sample}/quality_summary.tsv</code></td>
+<td>Predicted prophages and how complete each one is.</td>
+<td>all</td>
+</tr>
+<tr>
+<td><code>08.mobilome/{sample}/{sample}_amr_mobility.tsv</code></td>
+<td>For each AMR gene: the mobile-element context and a mobility tier.</td>
+<td>all, opt-in</td>
+</tr>
+<tr>
+<td><code>09.report/multiqc_report.html</code></td>
+<td>Read QC, assembly QC, completeness and taxonomy for the whole batch on one page.</td>
+<td>all</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">One output directory, one batch</p>
+<p>A sample name is the only thing separating two runs that share an <code>output_dir</code>:
+reuse a name and the second run overwrites the first sample's results throughout.
+<code>09.report/multiqc_report.html</code> is overwritten unconditionally — the rule passes
+MultiQC <code>--force</code>, because without it MultiQC writes <code>multiqc_report_1.html</code>
+instead and the rule then fails on a missing output.</p>
+<p>The downloaded databases under <code>04</code>, <code>07</code> and <code>08</code> are <em>not</em> per sample and are
+reused, so one output directory per project is cheaper than one per run.</p>
+</div>
+<hr />
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">&para;</a></h2>
+<p>Bracketed tags follow <code>config/config.yaml</code>: <code>[illumina, hybrid]</code> means only those
+modes write the line. Untagged lines are written in all four.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>output_dir/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|-- 01.reads/                                    [illumina, nanopore, hybrid]
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>|   `-- {sample}/
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>|       |-- illumina/                            [illumina, hybrid]
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>|       `-- ont/                                 [nanopore, hybrid]
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>|-- 02.assembly/
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>|   `-- {sample}/
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>|       |-- contigs_final.fasta                  &lt;- the delivered genome
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>|       |-- contigs_filt.fasta                   [illumina, hybrid, contigs]
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>|       |-- spades/                              [illumina, hybrid]
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>|       |-- flye/  fix_start/  medaka/           [nanopore, hybrid]
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>|       |-- polypolish/  snps/                   [hybrid]
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>|       |-- {sample}_replicons.tsv  + _audit     [nanopore, hybrid]
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>|       |-- {sample}_medaka_model.txt            [nanopore, hybrid]
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>|       |-- contaminants/                        BLAST + BlobTools + the audit
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>|       `-- eval/                                QUAST, CheckM, Qualimap
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>|-- 03.taxonomy/{sample}/                        GTDB-Tk
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>|-- 04.annotation/
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>|   |-- bakta/{sample}/   eggnog/{sample}/
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>|   |-- antismash/{sample}/   + antismash/databases/
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>|   `-- dbcan/{sample}/       + dbcan/&lt;db version&gt;/
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>|-- 05.amr/
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>|   |-- abricate/{sample}/                       eight databases + a summary
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>|   `-- mapping/{sample}/                        [illumina, hybrid]
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>|-- 06.plasmids/{sample}/platon/
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>|-- 07.phages/
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>|   |-- virsorter/{sample}/  + vs2_db/           unless phage.caller: genomad
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>|   |-- genomad/{sample}/    + genomad_db/       only when phage.caller: genomad
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>|   `-- checkv/{sample}/     + checkv_db/
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>|-- 08.mobilome/                                 only when mobilome.run: true
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>|-- 09.report/                                   multiqc_report.html
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>`-- logs/                                        one file per rule per sample
+</code></pre></div>
+<hr />
+<h2 id="01reads-read-qc-and-filtering"><code>01.reads</code> — read QC and filtering<a class="headerlink" href="#01reads-read-qc-and-filtering" title="Permanent link">&para;</a></h2>
+<p>Absent entirely in <code>contigs</code> mode, which has no reads to QC.</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Written by</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{sample}/illumina/{sample}_fastp.html</code></td>
+<td><code>trim_adapters</code></td>
+<td>fastp's adapter- and quality-trimming report, for a human.</td>
+</tr>
+<tr>
+<td><code>{sample}/illumina/{sample}_fastp.json</code></td>
+<td><code>trim_adapters</code></td>
+<td>The same numbers for MultiQC.</td>
+</tr>
+<tr>
+<td><code>{sample}/illumina/{sample}_sel_R{1,2}.fastq</code></td>
+<td><code>map_sel_contigs</code></td>
+<td><code>[hybrid]</code> The Illumina pairs that mapped as proper pairs to the decontaminated Illumina assembly. Two rules read them: Filtlong scores the Oxford Nanopore reads against these pairs, so a contig dropped by the contamination screen takes its long reads with it; Polypolish then uses them to correct the final genome. Kept, not temporary — deleting them would force the whole short-read half to re-run.</td>
+</tr>
+<tr>
+<td><code>{sample}/ont/{sample}_filt.fastq</code></td>
+<td><code>filter_long_reads</code></td>
+<td>The Oxford Nanopore reads Filtlong kept — what Flye assembled and what Medaka polished with.</td>
+</tr>
+<tr>
+<td><code>{sample}/ont/raw_qc/</code>, <code>{sample}/ont/filt_qc/</code></td>
+<td><code>raw_long_read_qc</code>, <code>filtered_long_read_qc</code></td>
+<td>NanoPlot read-length and quality profiles, before and after filtering. Read side by side: the difference is what the filter did.</td>
+</tr>
+</tbody>
+</table>
+<p>The trimmed Illumina pairs (<code>{sample}_trim_R{1,2}.fastq</code>) and the PhiX reference and
+its index under <code>01.reads/phix/</code> are all temporary and are gone when the run finishes.
+See <a href="../../modes/illumina/">Illumina mode</a> and <a href="../../modes/nanopore/">Nanopore mode</a>.</p>
+<hr />
+<h2 id="02assembly-the-genome-and-everything-used-to-judge-it"><code>02.assembly</code> — the genome and everything used to judge it<a class="headerlink" href="#02assembly-the-genome-and-everything-used-to-judge-it" title="Permanent link">&para;</a></h2>
+<h3 id="the-delivered-genome">The delivered genome<a class="headerlink" href="#the-delivered-genome" title="Permanent link">&para;</a></h3>
+<p><code>02.assembly/{sample}/contigs_final.fasta</code> is the one hand-off between the front end
+and everything after it. Every rule in stages <code>03</code> to <code>08</code> works from this file or
+from something built out of it, so nothing downstream has to know which assembler
+ran. The one deliberate exception is <code>hybrid</code>, where QUAST, CheckM and GTDB-Tk are
+also handed the Illumina assembly as a comparator — see <code>eval/</code> below.</p>
+<p>What it is differs by mode:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th><code>contigs_final.fasta</code> is</th>
+<th>Also kept</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>illumina</code></td>
+<td>the decontaminated SPAdes assembly — decontamination <em>is</em> the last assembly step</td>
+<td><code>contigs_filt.fasta</code>, the pre-decontamination draft</td>
+</tr>
+<tr>
+<td><code>contigs</code></td>
+<td>the decontaminated input assembly</td>
+<td><code>contigs_filt.fasta</code></td>
+</tr>
+<tr>
+<td><code>nanopore</code></td>
+<td>the Medaka consensus of the decontaminated, reoriented Flye assembly</td>
+<td><code>contaminants/assembly_decontam.fasta</code></td>
+</tr>
+<tr>
+<td><code>hybrid</code></td>
+<td>the Oxford Nanopore assembly after Medaka and Polypolish</td>
+<td><code>contaminants/contigs_sel.fasta</code>, the decontaminated Illumina assembly, kept as the QC comparator and as Snippy's reference</td>
+</tr>
+</tbody>
+</table>
+<p>Set <code>parameters.{nanopore,hybrid}.medaka_model: false</code> and the consensus step drops
+out of the last two rows: <code>nanopore</code> then delivers the decontaminated reoriented
+assembly as it stands, <code>hybrid</code> delivers that assembly after Polypolish alone.</p>
+<p>In <code>contigs</code> mode, what <code>contigs_filt.fasta</code> holds depends on the headers you fed in.
+The length and coverage filter reads both numbers out of the header itself, so it can
+only run on SPAdes-style headers: those keep their names and lose any contig under
+500 bp or 2× coverage. Any other header style has no numbers to read, so nothing is
+filtered and the headers are trimmed to their first token instead. Which branch ran
+is the first line of <code>logs/filter_contigs_{sample}.log</code>.</p>
+<p>In <code>hybrid</code> the contamination screen runs on the Illumina draft while the delivered
+genome comes from the Oxford Nanopore leg, so those two FASTAs have entirely different
+contig names. That is not a bug and it is why the plasmid step gets its own BLAST
+table (below).</p>
+<h3 id="contaminants"><code>contaminants/</code><a class="headerlink" href="#contaminants" title="Permanent link">&para;</a></h3>
+<p>The contamination screen and its audit trail, all under
+<code>02.assembly/{sample}/contaminants/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{sample}_blastout</code></td>
+<td>The megablast table over the draft assembly: 15 tab-separated columns with the subject title last.</td>
+</tr>
+<tr>
+<td><code>{sample}_final_blastout</code></td>
+<td><code>[nanopore, hybrid]</code> A second megablast, over <code>contigs_final.fasta</code>. It exists because the plasmid step looks contigs up <strong>by ID</strong>, and in the long-read modes the screened contigs and the delivered contigs do not share names.</td>
+</tr>
+<tr>
+<td><code>bestscore.blob.blobDB.table.txt</code></td>
+<td>The BlobTools per-contig table — taxonomy and coverage. The evidence behind every keep/drop decision, so it is kept.</td>
+</tr>
+<tr>
+<td><code>contig_taxonomy_decisions.tsv</code></td>
+<td><strong>The audit file.</strong> Every contig, its assigned genus, and the reason it was kept or dropped.</td>
+</tr>
+<tr>
+<td><code>contigs.list</code></td>
+<td>The kept contig IDs, one per line.</td>
+</tr>
+<tr>
+<td><code>{sample}_composition.txt</code></td>
+<td>One line per genus with its share of the DNA and of the contig count, over <em>every</em> contig in the BlobTools table — kept or dropped. Also read by the annotation step as Bakta's genus hint.</td>
+</tr>
+</tbody>
+</table>
+<p><code>blob.blobDB.json</code>, the coverage file beside it, and the alignment BAM are all
+temporary. Full reasoning, and the two routes by which this step can delete a real
+plasmid, on <a href="../../analysis/decontamination/">Decontamination</a>.</p>
+<h3 id="eval"><code>eval/</code><a class="headerlink" href="#eval" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{sample}_qc_genomes.tsv</code></td>
+<td>Which genome is which: bin id, role (<code>primary</code> or <code>comparator</code>), technology, source path. In <code>hybrid</code> this is the file that says which of the two rows is the delivered genome.</td>
+</tr>
+<tr>
+<td><code>quast/</code></td>
+<td>QUAST assembly metrics — contig count, N50, largest contig, total length, GC.</td>
+</tr>
+<tr>
+<td><code>checkm/{sample}_checkm_stats.tsv</code></td>
+<td>CheckM completeness and contamination. <code>lineage.ms</code> beside it is CheckM's own marker-set file.</td>
+</tr>
+<tr>
+<td><code>qualimap/</code></td>
+<td>Coverage depth and evenness of the reads on the assembly. Absent in <code>contigs</code> mode, where the only alignment is the contigs against themselves and a report on it would say nothing.</td>
+</tr>
+</tbody>
+</table>
+<p>In <code>hybrid</code>, QUAST, CheckM and GTDB-Tk each run over <strong>two</strong> genomes per sample —
+<code>{sample}_illumina</code> and <code>{sample}_ont</code> — so one report holds both and the comparison
+is the point. The staging directory <code>eval/genomes/</code> that carries them there is
+temporary. See <a href="../../analysis/assembly-qc/">Assembly QC</a>.</p>
+<h3 id="front-end-working-directories">Front-end working directories<a class="headerlink" href="#front-end-working-directories" title="Permanent link">&para;</a></h3>
+<p>Kept as the assembler left them, for when you need to see what happened.</p>
+<table>
+<thead>
+<tr>
+<th>Directory</th>
+<th>Modes</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>spades/</code></td>
+<td><code>[illumina, hybrid]</code></td>
+<td>SPAdes' own output, including <code>contigs.fasta</code> before the length and coverage filter.</td>
+</tr>
+<tr>
+<td><code>flye/</code></td>
+<td><code>[nanopore, hybrid]</code></td>
+<td><code>assembly.fasta</code>, Flye's <code>assembly_info.txt</code> (which carries the circularity call), and <code>ignore_list.txt</code> — the contigs Flye did not close, which dnaapler must not rotate.</td>
+</tr>
+<tr>
+<td><code>fix_start/</code></td>
+<td><code>[nanopore, hybrid]</code></td>
+<td>dnaapler's reoriented assembly, the header-trimmed copy, and the reorientation summary.</td>
+</tr>
+<tr>
+<td><code>medaka/</code></td>
+<td><code>[nanopore, hybrid]</code></td>
+<td><code>consensus.fasta</code> and Medaka's working files. Absent when Medaka is switched off.</td>
+</tr>
+<tr>
+<td><code>polypolish/</code></td>
+<td><code>[hybrid]</code></td>
+<td>Empty at the end — every file in it is temporary.</td>
+</tr>
+<tr>
+<td><code>snps/</code></td>
+<td><code>[hybrid]</code></td>
+<td>One numbered sub-directory per Snippy run — <code>01.flye_snps_dir</code> through <code>04.polypolish_snps_dir</code> — each comparing one Oxford Nanopore stage against the Illumina assembly, plus <code>SNPs_summary.txt</code>. With Medaka off, <code>03</code> holds a <code>skipped.txt</code> instead of a comparison.</td>
+</tr>
+<tr>
+<td><code>{sample}_replicons.tsv</code></td>
+<td><code>[nanopore, hybrid]</code></td>
+<td>The five-column table handed to Bakta as <code>--replicons</code>: topology from Flye, replicon type from dnaapler. <code>{sample}_replicons_audit.tsv</code> beside it carries the raw numbers and a reason per contig.</td>
+</tr>
+<tr>
+<td><code>{sample}_medaka_model.txt</code></td>
+<td><code>[nanopore, hybrid]</code></td>
+<td>The Medaka model that was confirmed or inferred, written early so a bad model fails in seconds rather than after the assembler has run. Absent when Medaka is switched off, along with the rule that writes it.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="03taxonomy-gtdb-tk"><code>03.taxonomy</code> — GTDB-Tk<a class="headerlink" href="#03taxonomy-gtdb-tk" title="Permanent link">&para;</a></h2>
+<p>One directory per sample, named by GTDB-Tk itself. The file to read is
+<code>classify/gtdbtk.bac120.summary.tsv</code> (<code>gtdbtk.ar53.summary.tsv</code> for archaea): the
+placement, the closest reference and the ANI to it.</p>
+<p>MultiQC reads that summary, and — when the mobilome module is on — so does the step
+that maps the species to an AMRFinderPlus <code>--organism</code>, which is what unlocks
+point-mutation detection. See <a href="../../analysis/taxonomy/">Taxonomy</a>.</p>
+<hr />
+<h2 id="04annotation"><code>04.annotation</code><a class="headerlink" href="#04annotation" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bakta/{sample}/</code></td>
+<td>The full Bakta annotation set — <code>{sample}.gff3</code>, <code>.tsv</code>, <code>.faa</code>, <code>.fna</code>, <code>.gbff</code> and more. Three later stages reach into this directory: eggNOG takes the <code>.faa</code>, antiSMASH the <code>.gbff</code>, dbCAN both the <code>.faa</code> and the <code>.gff3</code>.</td>
+</tr>
+<tr>
+<td><code>eggnog/{sample}/</code></td>
+<td><code>{sample}.emapper.*</code> — orthologous group per protein, with COG category, GO, KEGG KO and pathway, EC. Terminal: nothing else reads it.</td>
+</tr>
+<tr>
+<td><code>antismash/{sample}/</code></td>
+<td>Secondary-metabolite clusters, with antiSMASH's own HTML report. Terminal.</td>
+</tr>
+<tr>
+<td><code>antismash/databases/</code></td>
+<td>The shared antiSMASH reference database: downloaded here, or a symlink view of a copy you already hold.</td>
+</tr>
+<tr>
+<td><code>dbcan/{sample}/</code></td>
+<td>CAZyme calls, gene clusters and substrate predictions. Terminal.</td>
+</tr>
+<tr>
+<td><code>dbcan/&lt;db version&gt;/</code></td>
+<td>The shared dbCAN database, likewise. The folder is named from the download URL, so the version is visible on disk. The empty <code>.verified.sha256</code> beside it is the marker written once the checksum matched, and its presence is what stops the download repeating.</td>
+</tr>
+</tbody>
+</table>
+<p>eggNOG is the slow tail of a BacFlux run. See <a href="../../analysis/annotation/">Annotation</a>.</p>
+<hr />
+<h2 id="05amr"><code>05.amr</code><a class="headerlink" href="#05amr" title="Permanent link">&para;</a></h2>
+<p>Two legs run independently, and they are meant to disagree at the edges: one sees the
+assembly, the other sees the reads.</p>
+<h3 id="abricatesample"><code>abricate/{sample}/</code><a class="headerlink" href="#abricatesample" title="Permanent link">&para;</a></h3>
+<p>One TSV per database — <code>argannot</code>, <code>card</code>, <code>ecoh</code>, <code>ecoli_vf</code>, <code>megares</code>, <code>ncbi</code>,
+<code>resfinder</code>, <code>vfdb</code> — plus <code>AMR_summary.txt</code>, which collates a sample's eight tables.
+This leg carries the EFSA thresholds: a hit needs ≥80% identity and ≥70% gene-length
+coverage.</p>
+<h3 id="mappingsample-illumina-hybrid"><code>mapping/{sample}/</code> — <code>[illumina, hybrid]</code><a class="headerlink" href="#mappingsample-illumina-hybrid" title="Permanent link">&para;</a></h3>
+<p>Trimmed reads mapped onto CARD's protein homolog model. Reads are immune to assembly
+collapse, so this leg can see determinants that sit on a contig the assembler
+destroyed.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{sample}_CARD_report.tsv</code></td>
+<td><strong>The one to read.</strong> One row per CARD sequence that cleared the coverage gate, with CARD's own classification joined on: <code>aro_accession</code>, <code>aro_name</code>, <code>covered_percent</code>, <code>category</code>, <code>resistance_mechanism</code>, <code>amr_gene_family</code>, <code>drug_class</code>, <code>reference_organism</code>, <code>note</code>. <code>category</code> is what stops an efflux-pump subunit being counted as an acquired resistance gene.</td>
+</tr>
+<tr>
+<td><code>{sample}_covstats.tsv</code></td>
+<td>BBMap's raw coverage table, sorted by descending covered percent. The evidence behind the report.</td>
+</tr>
+<tr>
+<td><code>{sample}_AMR_legend.tsv</code></td>
+<td>Every feature covered ≥70%, with its row from CARD's <code>aro_index.tsv</code>.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">What this leg is actually screened at</p>
+<p>BBMap is passed <code>minid=0.76</code> — its own default (<code>CARD_MIN_IDENTITY</code>,
+<code>workflow/rules/shared/00_common.smk:394</code>). The rule used to pass <code>idfilter=0.99</code>
+instead, which BBMap does not apply to the primary alignment of a properly-paired
+read, so 0.76 is what has been in force throughout. Read this as a <strong>sensitive
+screen</strong>: its specificity comes from requiring reads to cover at least <strong>70% of the
+reference gene's length</strong> (<code>CARD_MIN_COVERED</code>, same file, line 395), not from
+per-read identity. There is one mapping pass, and no "divergent" tier.</p>
+</div>
+<p><code>05.amr/card_db/</code> holds the CARD database this run used — downloaded there, or a
+symlink view of the copy at <code>directories.card_db</code>. Either way it is temporary, and
+goes once the mapping and the report have both read it. See
+<a href="../../analysis/amr/">Antimicrobial resistance</a>.</p>
+<hr />
+<h2 id="06plasmids"><code>06.plasmids</code><a class="headerlink" href="#06plasmids" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{sample}/platon/verified_plasmids.txt</code></td>
+<td>The terminal plasmid product on the default path: the contigs Platon called plasmid, each annotated with whether its best nucleotide hit also says "plasmid". That check is <strong>supplementary and never a filter</strong> — a mobile element on a genuinely chromosomal contig can push both signals the same wrong way.</td>
+</tr>
+<tr>
+<td><code>{sample}/platon/contigs_final.tsv</code></td>
+<td>Platon's per-contig table with its replicon-distribution score. Platon names every file after the input basename, hence <code>contigs_final.*</code>.</td>
+</tr>
+<tr>
+<td><code>{sample}/platon/contigs_final.chromosome.fasta</code></td>
+<td>The contigs Platon called chromosome.</td>
+</tr>
+<tr>
+<td><code>{sample}/{sample}_plasmid_concordance.tsv</code></td>
+<td><em>Optional.</em> Written only when <code>phage.caller: genomad</code>. One row per contig joining Platon's call and geNomad's, with a confidence column: both callers agree → high, one only → medium, a real clash → low. Nothing is dropped; a disagreement is flagged and kept.</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../../analysis/plasmids/">Plasmids</a>.</p>
+<hr />
+<h2 id="07phages"><code>07.phages</code><a class="headerlink" href="#07phages" title="Permanent link">&para;</a></h2>
+<p>Which caller runs is set by <code>phage.caller</code>, and the choice changes what stage <code>06</code>
+holds as well as this one.</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>virsorter/{sample}/</code></td>
+<td><em>Default.</em> VirSorter2's calls at a deliberately loose score cutoff of 0.5; the file CheckV grades is <code>final-viral-combined.fa</code>.</td>
+</tr>
+<tr>
+<td><code>genomad/{sample}/</code></td>
+<td><em>Only when opted in.</em> One geNomad run produces both the virus calls (<code>contigs_final_summary/contigs_final_virus.fna</code>) and the plasmid calls (<code>contigs_final_summary/contigs_final_plasmid_summary.tsv</code>) that stage <code>06</code>'s concordance table needs.</td>
+</tr>
+<tr>
+<td><code>checkv/{sample}/quality_summary.tsv</code></td>
+<td><strong>The phage deliverable.</strong> Completeness, contamination and a quality tier per predicted viral sequence. A genome with no viral calls gets a header-only file rather than a failed run.</td>
+</tr>
+<tr>
+<td><code>vs2_db/</code>, <code>genomad_db/</code>, <code>checkv_db/</code></td>
+<td>The caller's and CheckV's databases. Each is either downloaded here or built as a symlink view of a copy you already hold — BacFlux only ever reads your copy.</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../../analysis/phages/">Prophages</a>.</p>
+<hr />
+<h2 id="08mobilome-opt-in"><code>08.mobilome</code> — opt-in<a class="headerlink" href="#08mobilome-opt-in" title="Permanent link">&para;</a></h2>
+<p>Written only when <code>mobilome.run: true</code>. That adds ten rules on the default path; the
+module's other twelve belong to four optional layers, each of which stays off until
+you configure a source for it. See <a href="../../mobilome/enabling/">Turning it on</a>.</p>
+<p>Databases and model sets sit at the top of the stage, fetched once and shared by every
+sample: <code>conjscan_models/</code>, and — each only when its layer is configured —
+<code>icescan_models/</code>, <code>tncentral_db/</code>, <code>iceberg_db/</code>, <code>isosdb_db/</code>.</p>
+<p>Per sample, <code>08.mobilome/{sample}/</code> holds:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{sample}_amr_mobility.tsv</code></td>
+<td><strong>The deliverable.</strong> One row per AMR gene: its mobile-element context, the element's identity where one is known, the contig-edge flags, a mobility tier from 1 to 6 and a confidence.</td>
+</tr>
+<tr>
+<td><code>{sample}_amr_mobility_audit.tsv</code></td>
+<td>Why every gene that got no context got none.</td>
+</tr>
+<tr>
+<td><code>{sample}_is_summary.tsv</code></td>
+<td>The honesty metric: how many insertion-sequence calls sit within <code>mobilome.contig_boundary_bp</code> of a contig end, and what fraction of the total that is. <strong>Read this before the table above.</strong></td>
+</tr>
+<tr>
+<td><code>{sample}_is_elements.tsv</code>, <code>{sample}_is_discarded.tsv</code></td>
+<td>One tidy row per insertion sequence, and the dropped rows with a reason.</td>
+</tr>
+<tr>
+<td><code>{sample}_ice_candidates.tsv</code>, <code>{sample}_ice_discarded.tsv</code></td>
+<td>ICE/IME candidates with their anchors, boundaries and class; and the discard trail.</td>
+</tr>
+<tr>
+<td><code>{sample}_amrfinderplus.tsv</code>, <code>_amrfinderplus_mutations.tsv</code></td>
+<td>The AMR calls with coordinates and a method column; point mutations separately.</td>
+</tr>
+<tr>
+<td><code>{sample}_amrfinder_organism.txt</code>, <code>_amrfinder_organism_audit.tsv</code></td>
+<td>Which AMRFinderPlus <code>--organism</code> the GTDB-Tk placement mapped to, or none, and why.</td>
+</tr>
+<tr>
+<td><code>{sample}_replicon_calls.tsv</code></td>
+<td>Chromosome or plasmid, per contig, with the evidence for the call.</td>
+</tr>
+<tr>
+<td><code>{sample}_contig_lengths.tsv</code></td>
+<td>The yardstick every contig-edge flag is measured against.</td>
+</tr>
+<tr>
+<td><code>isescan/</code>, <code>conjscan/</code></td>
+<td>The tools' own output trees, kept as raw evidence. <code>icescan/</code> joins them when that optional second model set is switched on.</td>
+</tr>
+<tr>
+<td><code>{sample}_named_elements.tsv</code>, <code>{sample}_named_elements_discarded.tsv</code>, <code>{sample}_tncentral_blast.tsv</code></td>
+<td><em>Optional.</em> Curated transposons and integrons — the layer that makes tier 4 reachable.</td>
+</tr>
+<tr>
+<td><code>{sample}_ice_candidates_named.tsv</code>, <code>{sample}_ice_naming.tsv</code>, <code>{sample}_iceberg_blast.tsv</code></td>
+<td><em>Optional.</em> Curated names put on the ICE/IME candidates. Labels only: this layer cannot change any gene's tier.</td>
+</tr>
+<tr>
+<td><code>{sample}_is_copy_number.tsv</code>, <code>{sample}_is_copy_number_audit.tsv</code>, <code>{sample}_isosdb_covstats.tsv</code>, <code>{sample}_assembly_covstats.tsv</code></td>
+<td><em>Optional, <code>[illumina, hybrid]</code>.</em> How many insertion-sequence copies the assembler collapsed, from read depth rather than from the assembly.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title"><code>conjscan_output_missing</code> means the search did not run</p>
+<p>A genome with no ICE or IME calls has usually been searched and found to carry no
+conjugation machinery, which is the normal result for an environmental isolate. But
+if the machinery search itself fails, the module records that and reports no
+calls — so the two look identical in the results table.</p>
+<p>They are distinguished in <code>{sample}_ice_discarded.tsv</code>. If it carries the reason
+<code>conjscan_output_missing</code>, nothing searched that genome: read the absence of ICE and
+IME calls as <strong>unknown</strong>, not as absence. This is the same distinction the mobility
+ladder makes between <code>not_assessable</code> and tier 1.</p>
+</div>
+<p>Every column of the mobility table, with real rows, is on
+<a href="../../mobilome/output/">Reading the output</a>. What fragmentation does to a call, and
+what not to conclude from one, is on
+<a href="../../mobilome/draft-assemblies/">Draft assemblies</a>.</p>
+<hr />
+<h2 id="09report"><code>09.report</code><a class="headerlink" href="#09report" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>multiqc_report.html</code></td>
+<td>fastp or NanoPlot, Qualimap, QUAST, CheckM, GTDB-Tk and Bakta for the whole batch, with sample names rewritten into readable panel labels.</td>
+</tr>
+<tr>
+<td><code>multiqc_config.yaml</code></td>
+<td>The generated config, kept so the renaming rules are inspectable.</td>
+</tr>
+<tr>
+<td><code>multiqc_data/</code></td>
+<td>MultiQC's parsed numbers behind the report.</td>
+</tr>
+</tbody>
+</table>
+<p>Left alone, MultiQC names a sample after every directory component of the file it came
+from. The generated config rewrites those into <code>&lt;what it is&gt; | &lt;sample&gt;</code> — so a panel
+row reads <code>assembly QC | S1</code>, and a hybrid sample's two genomes appear separately as
+<code>completeness Illumina | S1</code> and <code>completeness ONT | S1</code>.</p>
+<p>The report directory is deliberately not a declared Snakemake output, so anything you
+drop in it survives a re-run.</p>
+<hr />
+<h2 id="logs"><code>logs</code><a class="headerlink" href="#logs" title="Permanent link">&para;</a></h2>
+<p>One file per rule invocation, flat, with the sample appended where the rule runs per
+sample — <code>logs/annotation_S1.log</code>, <code>logs/multiqc.log</code>. The stem is usually the rule's
+own name, but not always: every mobilome rule logs under a <code>mobilome_</code> prefix, so rule
+<code>isescan</code> writes <code>logs/mobilome_isescan_S1.log</code>, and a handful elsewhere are shortened
+— <code>map_amr_db</code> writes <code>logs/map_amr_S1.log</code>. The log is the first place to look when a
+rule fails, and the only place some warnings go: the decontamination selector's
+"N contigs from the BlobTools table were not found in the FASTA", for instance, is
+written there rather than to the console.</p>
+<p>There is no <code>benchmarks/</code> directory: no rule declares Snakemake's <code>benchmark:</code>
+directive, so no runtime or memory record is written anywhere.</p>
+<hr />
+<h2 id="temporary-files-and-directories-a-re-run-wipes">Temporary files, and directories a re-run wipes<a class="headerlink" href="#temporary-files-and-directories-a-re-run-wipes" title="Permanent link">&para;</a></h2>
+<p>Some outputs are declared temporary: Snakemake deletes them as soon as every rule that
+needed them has finished. They are absent from a completed run, which is normal and
+not a failure.</p>
+<table>
+<thead>
+<tr>
+<th>Gone by the end</th>
+<th>Why it existed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>01.reads/{sample}/illumina/{sample}.{1,2}.fastq</code> and <code>{sample}_trim_R{1,2}.fastq</code></td>
+<td>The PhiX-free pairs and then the fastp-trimmed pairs. The trimmed ones survive until the last rule that reads them is done: the assembler, the coverage alignment, the CARD leg, and in <code>hybrid</code> the mapping that picks the Illumina pairs to keep.</td>
+</tr>
+<tr>
+<td><code>01.reads/phix/</code></td>
+<td>The PhiX reference and its index, needed only while reads are being screened.</td>
+</tr>
+<tr>
+<td><code>02.assembly/{sample}/contaminants/{sample}_map.bam</code>, the BlobTools JSON and coverage file</td>
+<td>Intermediates of the screen; the BlobTools <em>table</em> is kept.</td>
+</tr>
+<tr>
+<td><code>02.assembly/{sample}/eval/genomes/</code></td>
+<td>Staging copies of the assemblies under their bin ids, for QUAST, CheckM and GTDB-Tk.</td>
+</tr>
+<tr>
+<td><code>02.assembly/{sample}/polypolish/</code> contents</td>
+<td>Alignments and the pre-correction draft.</td>
+</tr>
+<tr>
+<td><code>04.annotation/eggnog/{sample}_tmp/</code></td>
+<td>emapper's scratch space.</td>
+</tr>
+<tr>
+<td><code>05.amr/card_db/</code>, and <code>05.amr/card.tar.bz2</code> on the download path</td>
+<td>The CARD database, needed only until the mapping and the report have read it.</td>
+</tr>
+<tr>
+<td><code>08.mobilome/{sample}/assembly_depth_ref/</code>, <code>isosdb_ref/</code></td>
+<td>BBMap indexes for the copy-number leg.</td>
+</tr>
+<tr>
+<td><code>09.report/multiqc_inputs/</code></td>
+<td>Relabelled CheckM and GTDB-Tk copies staged for MultiQC.</td>
+</tr>
+</tbody>
+</table>
+<p>Nearly every tool directory on this page is a declared Snakemake <strong>directory</strong> output:
+the per-sample trees written by Bakta, eggNOG, antiSMASH, dbCAN, QUAST, CheckM,
+Qualimap, GTDB-Tk, Platon, the phage caller, CheckV, ISEScan and CONJscan, and every
+database directory the workflow fetches. Snakemake deletes a directory output before
+re-running the rule that makes it, so anything you put inside one will not survive
+that rule re-running. Keep your own files beside them, not in them. <code>09.report/</code> is
+the deliberate exception, which is why it is safe to drop things there.</p>
+<hr />
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../configuration/">Configuration</a> — every key referred to above, and its default.</li>
+<li><a href="../running/">Running BacFlux</a> — dry runs, <code>--cores</code>, and what a re-run rebuilds.</li>
+<li><a href="../../getting-started/databases/">Reference databases</a> — which databases you supply
+  and which the workflow fetches into the output directory.</li>
+<li><a href="../../troubleshooting/">Troubleshooting</a> — an empty or missing output, and what it
+  usually means.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

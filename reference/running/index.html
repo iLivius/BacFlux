@@ -1,0 +1,2841 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../output/">
+      
+      
+        <link rel="next" href="../../troubleshooting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Running BacFlux - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#running-bacflux" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Running BacFlux
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Turning it on
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#launch-from-the-repository-root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Launch from the repository root
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#always-dry-run-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Always dry-run first
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-sdm-conda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --sdm conda
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-files-the-exact-environments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin files: the exact environments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-cores-is-the-cpu-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --cores is the CPU budget
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#eggnog-dbmem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eggNOG --dbmem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resuming-an-interrupted-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resuming an interrupted run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-a-qc-tool-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a QC tool fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-survives-between-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What survives between runs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cleaning-up-a-finished-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleaning up a finished project
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#for-contributors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For contributors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="For contributors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-tagging-a-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before tagging a release
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#launch-from-the-repository-root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Launch from the repository root
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#always-dry-run-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Always dry-run first
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-sdm-conda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --sdm conda
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-files-the-exact-environments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin files: the exact environments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-cores-is-the-cpu-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --cores is the CPU budget
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#eggnog-dbmem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eggNOG --dbmem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resuming-an-interrupted-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resuming an interrupted run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-a-qc-tool-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a QC tool fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-survives-between-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What survives between runs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cleaning-up-a-finished-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleaning up a finished project
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#for-contributors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For contributors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="For contributors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-tagging-a-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before tagging a release
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/reference/running.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="running-bacflux">Running BacFlux<a class="headerlink" href="#running-bacflux" title="Permanent link">&para;</a></h1>
+<p>One command runs all four modes. Which pipeline you get is decided by <code>mode:</code>
+inside the config file, not on the command line, so the launch line looks the
+same for an Illumina batch and for a folder of finished assemblies.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>conda<span class="w"> </span>activate<span class="w"> </span>snakemake
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>/path/to/BacFlux
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># check what would run, without running it</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>snakemake<span class="w"> </span>--sdm<span class="w"> </span>conda<span class="w"> </span>--cores<span class="w"> </span><span class="m">24</span><span class="w"> </span>--configfile<span class="w"> </span>config/config_custom.yaml<span class="w"> </span>-n
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># launch</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>snakemake<span class="w"> </span>--sdm<span class="w"> </span>conda<span class="w"> </span>--cores<span class="w"> </span><span class="m">24</span><span class="w"> </span>--configfile<span class="w"> </span>config/config_custom.yaml
+</code></pre></div>
+<p><code>config/config_custom.yaml</code> is your own copy of the shipped example
+(<code>cp config/config.yaml config/config_custom.yaml</code>), git-ignored so your edits
+survive a <code>git pull</code>. See <a href="../../getting-started/quick-start/">Quick start</a>.</p>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DAG</strong></td>
+<td>directed acyclic graph — the job graph Snakemake builds from the rules, which decides what runs and in what order</td>
+</tr>
+<tr>
+<td><strong>RAM</strong></td>
+<td>the machine's memory, as opposed to disk</td>
+</tr>
+<tr>
+<td><strong>CPU</strong></td>
+<td>a processor core, the unit <code>--cores</code> counts</td>
+</tr>
+<tr>
+<td><strong>OOM</strong></td>
+<td>out of memory — a job killed by the system for using more than the machine had</td>
+</tr>
+<tr>
+<td><strong>QC</strong></td>
+<td>quality control — the read and assembly checks</td>
+</tr>
+<tr>
+<td><strong>YAML</strong></td>
+<td>the config file's plain-text format; indentation is significant and tabs are refused</td>
+</tr>
+<tr>
+<td><strong>GTDB</strong></td>
+<td>Genome Taxonomy Database, the reference GTDB-Tk places each genome in</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="launch-from-the-repository-root">Launch from the repository root<a class="headerlink" href="#launch-from-the-repository-root" title="Permanent link">&para;</a></h2>
+<p>Three things are anchored to the directory you launch from, so make it the
+repository root every time:</p>
+<ul>
+<li><strong><code>workflow/Snakefile</code></strong> is found automatically from there, which is why it
+  never has to be named on the command line.</li>
+<li><strong><code>.snakemake/</code></strong> is created in the launch directory. It holds the per-rule
+  conda environments, the working-directory lock, and the metadata that decides
+  what a re-run rebuilds. Launch from somewhere else and Snakemake builds a
+  second copy of all 31 environments from scratch.</li>
+<li><strong>Relative paths in the config</strong> resolve against the launch directory. BacFlux
+  deliberately does not use Snakemake's <code>workdir:</code> directive, so the process
+  never changes directory; <code>directories.output_dir</code> is resolved to an absolute
+  path once at parse time and every output path is built off it
+  (<code>workflow/rules/shared/00_common.smk:160</code>). Input directories are used as
+  given — absolute paths are safest.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">The config must be named on the command line</p>
+<p><code>workflow/Snakefile</code> declares no default <code>configfile:</code>. That is deliberate:
+Snakemake <strong>merges</strong> a hard-coded config with the one passed on the command
+line rather than replacing it, so a default would quietly fill in any key
+your copy omits — with the shipped example's empty placeholders
+(<code>bakta_db: ""</code> and friends) — and the run would carry on against a path
+that does not exist. Without <code>--configfile</code> the run stops at once:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>[BacFlux] No configuration supplied. Pass one explicitly, e.g.:
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  snakemake --sdm conda --cores N --configfile config/config.yaml
+</code></pre></div>
+</div>
+<h2 id="always-dry-run-first">Always dry-run first<a class="headerlink" href="#always-dry-run-first" title="Permanent link">&para;</a></h2>
+<p><code>-n</code> (or <code>--dry-run</code>) builds the job list and prints it without running anything
+or writing a file. It is worth the few seconds every time, because BacFlux does
+nearly all of its validation while the workflow is being <em>read</em> — before the
+first job starts. A dry run therefore catches, among others:</p>
+<table>
+<thead>
+<tr>
+<th>Checked at parse time</th>
+<th>Where the check lives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code> missing, or not one of the four</td>
+<td><code>00_common.smk:83</code></td>
+</tr>
+<tr>
+<td><code>phage.caller</code> that is neither <code>genomad</code> nor <code>virsorter2</code></td>
+<td><code>00_common.smk:121</code></td>
+</tr>
+<tr>
+<td>an optional <code>directories.*</code> database path that is not a directory, or holds something other than that database</td>
+<td><code>00_common.smk:242</code>, <code>244</code></td>
+</tr>
+<tr>
+<td>the input directory this mode needs, unset or not a directory</td>
+<td><code>00_common.smk:1665</code>, <code>1667</code></td>
+</tr>
+<tr>
+<td>a sample name containing one of <code>* # @ % ^ / ! ? &amp; : ; &#124; &lt; &gt;</code> or a space</td>
+<td><code>00_common.smk:1676</code></td>
+</tr>
+<tr>
+<td>an Illumina R1 with no R2 beside it</td>
+<td><code>00_common.smk:1690</code></td>
+</tr>
+<tr>
+<td>in hybrid mode, a sample that has reads of only one kind</td>
+<td><code>00_common.smk:1734</code></td>
+</tr>
+<tr>
+<td><code>links.card_link</code> or <code>links.phix_link</code> unset in a mode that needs them</td>
+<td><code>00_common.smk:1528</code>, <code>1542</code></td>
+</tr>
+<tr>
+<td><code>parameters.eggnog.dbmem: true</code> with <code>resources.ram_gb</code> below 42</td>
+<td><code>00_common.smk:1287</code></td>
+</tr>
+</tbody>
+</table>
+<p>The same parse step prints a header naming every choice the config made. Reading
+it costs nothing and catches a config you did not mean to run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Mode: contigs — Downstream analysis of bacterial whole-genome assemblies.
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Phage caller: virsorter2 (default). Plasmid stage: Platon-only (geNomad off).
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Decontamination mode: auto (discard_no_hit=true).
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>Using CheckV database from link: 'https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz' (db_id='checkv-db-v1.5').
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>Sample BAA-2146 will be processed.
+</code></pre></div>
+<p>Optional parts announce themselves too: the mobilome module adds a line, and
+eggNOG's <code>--dbmem</code> prints the exact flag to add (see <a href="#memory">Memory</a>).</p>
+<h2 id="-sdm-conda"><code>--sdm conda</code><a class="headerlink" href="#-sdm-conda" title="Permanent link">&para;</a></h2>
+<p><code>--sdm</code> is short for <code>--software-deployment-method</code>, and replaces the deprecated
+<code>--use-conda</code>. It tells Snakemake to build each rule's own environment from the
+31 YAML files in <code>workflow/envs/</code> and run that rule inside it. Only Snakemake
+itself is installed by hand; SPAdes, Flye, Bakta, GTDB-Tk and the rest are
+installed by the workflow on first use.</p>
+<p>The environments are built once and reused. By default they land in
+<code>.snakemake/conda/</code> under the launch directory. <code>--conda-prefix</code> moves them:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>snakemake<span class="w"> </span>--sdm<span class="w"> </span>conda<span class="w"> </span>--conda-prefix<span class="w"> </span>~/.bacflux-envs<span class="w"> </span>--cores<span class="w"> </span><span class="m">24</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">          </span>--configfile<span class="w"> </span>config/config_custom.yaml
+</code></pre></div>
+<p>That is worth doing when several checkouts or several projects should share one
+set rather than each building its own — together they are tens of gigabytes, and
+building them takes a while.</p>
+<div class="admonition tip">
+<p class="admonition-title">Build the environments ahead of time</p>
+<p><code>--conda-create-envs-only</code> builds every environment and stops. Useful before
+a long run, and on machines where only the login node reaches the network.</p>
+</div>
+<h2 id="pin-files-the-exact-environments">Pin files: the exact environments<a class="headerlink" href="#pin-files-the-exact-environments" title="Permanent link">&para;</a></h2>
+<p>Beside every environment file in <code>workflow/envs/</code> sits a <code>&lt;name&gt;.linux-64.pin.txt</code>.
+It lists every package in that environment, down to the exact build, as it was
+when the workflow was validated. On a linux-64 machine Snakemake finds it
+automatically and installs from it instead of solving the yaml, so two installs
+made months apart on different machines get identical environments. Nothing
+needs configuring; the run log shows <code>Using pinnings from ...</code> for each one.</p>
+<p>On any other platform the pin file is ignored and the yaml is solved fresh. The
+Python version and the tool version are pinned there too, so the environment is
+still close to the validated one, but the other packages may move.</p>
+<div class="admonition note">
+<p class="admonition-title">One environment has no pin file, on purpose</p>
+<p><code>dbcan</code> is installed through pip, and a pin file is a conda package list: it
+cannot record pip packages, and an install made from a pin file skips the
+yaml's pip section entirely. That environment therefore always builds from
+its yaml. The comment at the top of <code>dbcan.yaml</code> says the same, so nobody
+regenerates a pin file for it.</p>
+</div>
+<p>To regenerate a pin file after deliberately changing an environment, validate
+the rebuilt environment first, then:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>conda<span class="w"> </span>list<span class="w"> </span>--explicit<span class="w"> </span>-p<span class="w"> </span>&lt;path<span class="w"> </span>to<span class="w"> </span>the<span class="w"> </span>built<span class="w"> </span>environment&gt;<span class="w"> </span>&gt;<span class="w"> </span>workflow/envs/&lt;name&gt;.linux-64.pin.txt
+</code></pre></div>
+<h2 id="-cores-is-the-cpu-budget"><code>--cores</code> is the CPU budget<a class="headerlink" href="#-cores-is-the-cpu-budget" title="Permanent link">&para;</a></h2>
+<p><code>--cores N</code> is the one CPU knob, and it is enough on its own. Every rule that
+wants more than one core declares Snakemake's built-in <code>threads:</code>, which is the
+directive <code>--cores</code> enforces automatically; the two ABRicate rules declare none
+and count as one core each. Rules whose tool stops scaling ask for less, through
+<code>capped_cpus(n)</code>, which is <code>min(resources.threads, n)</code> against the config value
+(<code>00_common.smk:421-429</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Thread request</th>
+<th>Rules</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CPUS</code> (the full <code>resources.threads</code>)</td>
+<td><code>map_phix</code>, <code>illumina_assembly</code> (SPAdes), <code>ont_assembly</code> (Flye), <code>map_contigs</code>, <code>map_sel_contigs</code></td>
+</tr>
+<tr>
+<td><code>capped_cpus(24)</code></td>
+<td>BLAST screening, QUAST, CheckM, Qualimap, GTDB-Tk, Bakta, eggNOG, antiSMASH, dbCAN, BBMap→CARD, Platon, VirSorter2, geNomad, CheckV, Polypolish, Snippy, <code>fix_start</code>, Medaka <strong>in nanopore mode</strong></td>
+</tr>
+<tr>
+<td><code>capped_cpus(16)</code></td>
+<td><code>trim_adapters</code> (fastp); the mobilome depth and ISOSDB mapping legs</td>
+</tr>
+<tr>
+<td><code>capped_cpus(8)</code></td>
+<td>NanoPlot raw and filtered QC; Medaka <strong>in hybrid mode</strong> (the two long-read modes carry different values, kept as they were until timings say otherwise); the mobilome tool rules (AMRFinderPlus, ISEScan, CONJScan, ICEscan, the two BLAST naming legs); the two CheckV database rules</td>
+</tr>
+<tr>
+<td><code>capped_cpus(4)</code></td>
+<td><code>virsorter2_db</code></td>
+</tr>
+</tbody>
+</table>
+<p>So <code>--cores 24</code> gives each rule its declared cap, and <code>--cores 8</code> caps every
+request at 8 by itself — except <code>virsorter2_db</code>, whose own lower cap of 4
+correctly wins. Lowering <code>--cores</code> is how you run fewer heavy jobs side by side.</p>
+<div class="admonition warning">
+<p class="admonition-title">Never add <code>--jobs</code> alongside <code>--cores</code></p>
+<p>For a local run <code>--jobs</code>/<code>-j</code> is an <strong>alias</strong> for <code>--cores</code>, not a second,
+independent "N jobs of M cores each" setting — a natural but wrong
+assumption. Passing both switches the core budget off rather than adding a
+cap on top of it. Measured here: two rules each declaring <code>threads: 8</code>,
+launched with <code>--jobs 2 --cores 8</code>, both received their full 8 threads and
+ran together — 16 real threads against a declared 8-core budget. The same
+rules with <code>--cores 8</code> alone ran one at a time. <code>--jobs</code> belongs on cluster
+runs, where it caps how many jobs are queued with the scheduler at once.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">No priority scheme — the DAG orders the rules</p>
+<p>A rule runs when its inputs exist and never before, which is the only
+ordering BacFlux relies on. It used to carry a <code>priority:</code> on 94 rules; all
+94 were removed in v2.0.0. Snakemake's default scheduler maximises the <em>sum</em>
+of the priorities of the jobs it starts, unweighted by how many cores each
+takes, so several small per-sample jobs together outscored the one big job the
+numbers were meant to start first — the scheme did the opposite of its intent
+whenever more than a couple of jobs were ready at once.</p>
+</div>
+<h2 id="memory">Memory<a class="headerlink" href="#memory" title="Permanent link">&para;</a></h2>
+<p><code>resources.threads</code> and <code>resources.ram_gb</code> in the config describe your machine.
+Snakemake enforces only the CPU side. <code>ram_gb</code> is handed to the tools that accept
+a memory ceiling, so two large jobs running at once can each take it:</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>What <code>ram_gb</code> does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>illumina_assembly</code></td>
+<td>SPAdes <code>-m</code>, a hard ceiling it aborts rather than exceed (<code>illumina/20_assembly.smk:70</code>, <code>hybrid/20_assembly.smk:64</code>)</td>
+</tr>
+<tr>
+<td><code>map_evaluation</code></td>
+<td>Qualimap JVM heap, <code>min(ram_gb, 64)</code> GB (<code>shared/20_qc.smk:281</code>)</td>
+</tr>
+<tr>
+<td><code>map_amr_db</code>, and the mobilome depth and ISOSDB legs</td>
+<td>BBMap <code>-Xmx</code>, <code>min(ram_gb, 32)</code> GB (<code>shared/50_amr.smk:345</code>; <code>shared/80_mobilome.smk:1602</code>, <code>1643</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Three rules also declare a memory figure as a named Snakemake <code>resource</code> — <code>ram</code>
+on SPAdes, <code>java_mem</code> on Qualimap, <code>mem_gb</code> on eggNOG — and Snakemake schedules
+against a named resource <strong>only when the launch line passes it</strong>, as in
+<code>--resources mem_gb=64</code>. All three are gigabyte figures, not core counts.</p>
+<h3 id="eggnog-dbmem">eggNOG <code>--dbmem</code><a class="headerlink" href="#eggnog-dbmem" title="Permanent link">&para;</a></h3>
+<p>eggNOG-mapper's annotation phase does random-access lookups into the 39 GB
+<code>eggnog.db</code> once per seed ortholog, which is why <code>functional_annotation</code> is
+routinely the last rule still running. Setting <code>parameters.eggnog.dbmem: true</code>
+loads that database wholly into RAM instead, at roughly <strong>42 GB per concurrent
+eggNOG job</strong> (<code>00_common.smk:1281</code>). It is off by default.</p>
+<p>Turning it on prints the flag to add, with your own <code>ram_gb</code> filled in:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>eggNOG --dbmem is ON: each functional_annotation job loads the 39 GB eggnog.db into RAM
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>(~42 GB/job; 1 fit in ram_gb=64). To have Snakemake cap concurrent eggNOG jobs to that
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>many, add '--resources mem_gb=64' to your launch command.
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>snakemake<span class="w"> </span>--sdm<span class="w"> </span>conda<span class="w"> </span>--cores<span class="w"> </span><span class="m">24</span><span class="w"> </span>--resources<span class="w"> </span><span class="nv">mem_gb</span><span class="o">=</span><span class="m">64</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">          </span>--configfile<span class="w"> </span>config/config_custom.yaml
+</code></pre></div>
+<p>Without the flag the run still works; eggNOG concurrency then falls back to the
+<code>--cores</code> bound instead of the RAM one, which is how a machine with 64 GB ends up
+running two 42 GB jobs at once. Setting <code>dbmem: true</code> with <code>ram_gb</code> below 42 is
+refused at parse time rather than allowed to fail on the first job.</p>
+<h2 id="resuming-an-interrupted-run">Resuming an interrupted run<a class="headerlink" href="#resuming-an-interrupted-run" title="Permanent link">&para;</a></h2>
+<p>Snakemake rebuilds only what is missing or out of date, so an interrupted run is
+relaunched with the same command. Everything that finished cleanly is kept.</p>
+<p>An interruption leaves two kinds of debris.</p>
+<ul>
+<li><strong>Part-written outputs.</strong> A job killed mid-write leaves a file Snakemake marks
+  incomplete. <code>--rerun-incomplete</code> (<code>--ri</code>) rebuilds those instead of trusting
+  them.</li>
+<li><strong>A locked working directory.</strong> A run killed outright — <code>Ctrl-C</code> twice, a node
+  failure, an OOM kill — can leave <code>.snakemake/</code> locked. Snakemake says so on the
+  next launch; <code>snakemake --unlock</code> clears it.</li>
+</ul>
+<p>Changing the config can be enough to mark a step out of date on its own.
+Snakemake compares more than file timestamps: a changed rule parameter, script or
+conda environment counts too (<code>--rerun-triggers</code> defaults to
+<code>code input mtime params software-env</code>). A dry run answers "what would re-run?"
+directly, and faster than reasoning about it.</p>
+<div class="admonition warning">
+<p class="admonition-title"><code>--ignore-incomplete</code> and <code>--keep-incomplete</code> are not resume flags</p>
+<p>They are the opposite of <code>--rerun-incomplete</code>: <code>--keep-incomplete</code> leaves a
+failed job's part-written output on disk, and <code>--ignore-incomplete</code> stops
+Snakemake checking for it, so that file can be accepted as a finished result.
+They are useful when you want to <em>inspect</em> what a failing rule produced.
+After an interruption, use <code>--rerun-incomplete</code>.</p>
+<p><code>--keep-going</code> (<code>-k</code>) is different and safe: it lets independent jobs carry on
+when one fails, so a whole batch is not lost to one bad sample. It applies
+only to runtime failures, never to a parse or DAG error.</p>
+</div>
+<h2 id="when-a-qc-tool-fails">When a QC tool fails<a class="headerlink" href="#when-a-qc-tool-fails" title="Permanent link">&para;</a></h2>
+<p>Four tools produce reports that nothing else in the workflow reads: QUAST
+(assembly metrics), Qualimap (read-mapping quality), NanoPlot (long-read QC) and
+CheckV (prophage grading). MultiQC gathers what they wrote; no analysis step
+depends on them. So if one of them crashes on a sample, the rule finishes
+anyway: it creates its output directory first, lets the tool fail, and writes a
+note beginning <code>NOTE:</code> into that sample's log under <code>logs/</code>. The run carries on,
+and that sample simply has no section for that tool in the MultiQC report.</p>
+<p>The reverse is deliberate too. CheckM, the genome-staging step and the
+assembly-depth step look like QC but feed later rules — GTDB-Tk, QUAST itself,
+the IS copy-number layer — so a failure there stops the run rather than letting
+a bad input flow downstream.</p>
+<p>For everything else, <code>--keep-going</code> (<code>-k</code>) is the flag to reach for: when one
+sample's job fails, the other samples keep running to completion instead of the
+whole batch stopping. Fix the one sample, then resume with <code>--rerun-incomplete</code>.</p>
+<h2 id="what-survives-between-runs">What survives between runs<a class="headerlink" href="#what-survives-between-runs" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Kept where</th>
+<th>Contents</th>
+<th>Cost of deleting it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.snakemake/conda/</code> in the launch directory</td>
+<td>the 31 per-rule environments</td>
+<td>rebuilt from scratch, needs network</td>
+</tr>
+<tr>
+<td><code>.snakemake/</code> metadata</td>
+<td>what is up to date, and the lock</td>
+<td>the next run recomputes more than it needs to</td>
+</tr>
+<tr>
+<td>under <code>output_dir</code></td>
+<td>the databases the workflow fetches and keeps — antiSMASH, dbCAN, CheckV, the phage caller's own database, and the optional mobilome databases</td>
+<td>re-downloaded</td>
+</tr>
+<tr>
+<td><code>output_dir/logs/</code></td>
+<td>one log per rule and sample (<code>00_common.smk:539</code>)</td>
+<td>nothing recomputes; you lose the record</td>
+</tr>
+</tbody>
+</table>
+<p>PhiX and CARD are the two that do not persist: both are declared <code>temp()</code>
+(<code>illumina/10_reads.smk:67</code>, <code>shared/50_amr.smk:201</code>), so Snakemake deletes them
+as soon as the last rule reading them finishes, and every run fetches them again.</p>
+<p>Reusing the same launch directory and the same <code>output_dir</code> is what keeps the
+rest from being rebuilt. Databases you already hold elsewhere can be pointed at
+instead of downloaded — see
+<a href="../../getting-started/databases/">Reference databases</a>.</p>
+<h2 id="cleaning-up-a-finished-project">Cleaning up a finished project<a class="headerlink" href="#cleaning-up-a-finished-project" title="Permanent link">&para;</a></h2>
+<p><code>workflow/scripts/clean_workdir.sh</code> strips a finished output directory down to
+results, reports and audit trails, deleting bulky intermediates (trimmed and
+filtered reads, SPAdes and Flye working directories, Medaka scratch, CheckM
+scratch) and every database the workflow keeps in the output tree. Raw input
+reads are never touched — they are read in place, never copied into the output
+tree.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># preview — this is what --run would delete</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>workflow/scripts/clean_workdir.sh<span class="w"> </span>/path/to/output_dir
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># actually delete</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>workflow/scripts/clean_workdir.sh<span class="w"> </span>--run<span class="w"> </span>/path/to/output_dir
+</code></pre></div>
+<p>It is <strong>dry-run by default</strong>; only <code>--run</code> deletes, and the listing printed is
+identical in both modes, so the preview is exactly what you get. It recognises
+the current layout and the four older ones it replaced, so output directories
+made before v2.0.0 can still be cleaned — see
+<a href="../../getting-started/from-v1/">Coming from v1</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">This is an archive step, not a between-runs tidy</p>
+<p>It is deliberately aggressive. Re-running the workflow on a cleaned directory
+recomputes a great deal, assembly and polishing included. Run it once the
+results are known good and you are ready to archive or hand over.</p>
+</div>
+<p><code>--include-snakemake</code> additionally deletes a <code>.snakemake/</code> directory found
+<em>inside</em> the output directory — which only exists if you launched from in there
+rather than from the repository root. It is opt-in because it is categorically
+heavier than the rest: that directory holds the conda environments, routinely the
+largest single item in a finished project. When one is present but not opted
+into, the script prints its size rather than quietly leaving it.</p>
+<div class="admonition note">
+<p class="admonition-title"><code>miscellaneous/clean_workdir.sh</code> still works</p>
+<p>It is a wrapper that forwards every argument to the real script, kept because
+older notes and habits point at that path.</p>
+</div>
+<h2 id="for-contributors">For contributors<a class="headerlink" href="#for-contributors" title="Permanent link">&para;</a></h2>
+<p>Every script a rule runs lives in a directory named after the rule file that runs
+it — <code>workflow/scripts/50_amr/</code> is run by <code>workflow/rules/shared/50_amr.smk</code>, and
+so on — with each test beside its script. A script sitting loose in
+<code>workflow/scripts/</code> is <strong>not</strong> part of a run; it is a maintenance tool you run by
+hand, as <code>clean_workdir.sh</code> is. See <code>workflow/scripts/README.md</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># the test suite</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>pytest<span class="w"> </span>workflow/scripts<span class="w"> </span>-q
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># fail on any rule name, path, config key or constant that a comment</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1"># mentions but that no longer exists</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>python<span class="w"> </span>miscellaneous/check_comment_references.py
+</code></pre></div>
+<h3 id="before-tagging-a-release">Before tagging a release<a class="headerlink" href="#before-tagging-a-release" title="Permanent link">&para;</a></h3>
+<p>Run the whole workflow, not a dry run. A dry run resolves the graph and checks
+inputs; it never builds an environment and never executes a tool. Building the
+environments without running them is not enough either: a package can install
+cleanly and still break at runtime.</p>
+<p>The check that catches these: a fresh clone, a fresh <code>--conda-prefix</code>, one small
+public genome, every mode. It takes an hour or two, and it is the only test that
+exercises what a new user actually gets.</p>
+<p>The version number is declared in five places, and they have to move together:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What to change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>workflow/Snakefile</code></td>
+<td>the header comment and the banner it prints</td>
+</tr>
+<tr>
+<td><code>README.md</code></td>
+<td>the label under the ASCII banner</td>
+</tr>
+<tr>
+<td><code>docs/index.md</code></td>
+<td>"This site documents version ..."</td>
+</tr>
+<tr>
+<td><code>.zenodo.json</code></td>
+<td><code>version</code></td>
+</tr>
+<tr>
+<td><code>CITATION.cff</code></td>
+<td><code>version</code>, and <code>date-released</code> for the tag day</td>
+</tr>
+</tbody>
+</table>
+<p>Leave every other mention of an old version alone: most of them are statements
+about what that release changed, and they stay true.</p>
+<p>After Zenodo archives the release, add the version DOI it mints to the
+<code>identifiers</code> block in <code>CITATION.cff</code>, replacing the previous version entry.</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../configuration/">Configuration</a> — every key named here, in the file's own order.</li>
+<li><a href="../output/">Output files</a> — what a run writes, and where.</li>
+<li><a href="../../troubleshooting/">Troubleshooting</a> — what to do when a run stops.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

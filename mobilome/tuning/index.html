@@ -1,0 +1,3747 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../draft-assemblies/">
+      
+      
+        <link rel="next" href="../worked-example/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Tuning - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tuning" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Tuning
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Turning it on
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-at-the-audit-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start at the audit file
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-places-a-knob-can-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three places a knob can live
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#symptom-to-knob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symptom to knob
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Symptom to knob">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-element-you-know-is-there-was-not-reported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An element you know is there was not reported
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-interval-looks-far-too-big-or-far-too-small" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The interval looks far too big, or far too small
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#everything-comes-out-at-medium-confidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Everything comes out at medium confidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#calls-on-a-genome-that-should-have-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calls on a genome that should have none
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-knobs-one-by-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The knobs, one by one
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The knobs, one by one">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coverage_profile-the-one-layer-a-knob-that-changes-what-is-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        coverage_profile — the one Layer A knob that changes what is detected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#element-geometry-real-knobs-but-not-config-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Element geometry — real knobs, but not config keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-composite-span-and-the-co-localisation-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The composite span, and the co-localisation constants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-naming-thresholds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The naming thresholds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-three-contig-end-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three contig-end windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boundaries-the-att-search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundaries: the att search
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is-copy-number-and-replicon-calling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IS copy number and replicon calling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-two-directions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two directions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The two directions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tightening-for-a-dossier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tightening for a dossier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#widening-for-a-survey" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Widening for a survey
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-a-draft-assembly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On a draft assembly
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-no-knob-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What no knob fixes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#traps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Traps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-at-the-audit-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start at the audit file
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-places-a-knob-can-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three places a knob can live
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#symptom-to-knob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symptom to knob
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Symptom to knob">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-element-you-know-is-there-was-not-reported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An element you know is there was not reported
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-interval-looks-far-too-big-or-far-too-small" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The interval looks far too big, or far too small
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#everything-comes-out-at-medium-confidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Everything comes out at medium confidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#calls-on-a-genome-that-should-have-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calls on a genome that should have none
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-knobs-one-by-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The knobs, one by one
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The knobs, one by one">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coverage_profile-the-one-layer-a-knob-that-changes-what-is-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        coverage_profile — the one Layer A knob that changes what is detected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#element-geometry-real-knobs-but-not-config-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Element geometry — real knobs, but not config keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-composite-span-and-the-co-localisation-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The composite span, and the co-localisation constants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-naming-thresholds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The naming thresholds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-three-contig-end-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three contig-end windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boundaries-the-att-search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundaries: the att search
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is-copy-number-and-replicon-calling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IS copy number and replicon calling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-two-directions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two directions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The two directions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tightening-for-a-dossier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tightening for a dossier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#widening-for-a-survey" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Widening for a survey
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-a-draft-assembly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On a draft assembly
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-no-knob-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What no knob fixes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#traps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Traps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/mobilome/tuning.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="tuning">Tuning<a class="headerlink" href="#tuning" title="Permanent link">&para;</a></h1>
+<p>Every threshold in this module is a convention, not a biological constant, and the module
+says so in its own output: each filtering decision writes an audit row naming what
+happened, a short reason token, and the numbers behind it — usually the threshold that
+was applied next to the value that failed it.</p>
+<p>That audit trail is the tuning method. It tells you <em>why</em> something was dropped and
+therefore <em>which</em> knob to reach for, and often that no knob will help. Changing a value
+before reading it is guessing.</p>
+<p>This page is organised by what you saw, not by the parameter list.</p>
+<table>
+<thead>
+<tr>
+<th>You want to</th>
+<th>Go to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>find out why something was dropped</td>
+<td><a href="#start-at-the-audit-file">Start at the audit file</a></td>
+</tr>
+<tr>
+<td>know where a given knob physically lives</td>
+<td><a href="#three-places-a-knob-can-live">Three places a knob can live</a></td>
+</tr>
+<tr>
+<td>match a symptom to a knob</td>
+<td><a href="#symptom-to-knob">Symptom to knob</a></td>
+</tr>
+<tr>
+<td>look a threshold up</td>
+<td><a href="#the-knobs-one-by-one">The knobs, one by one</a></td>
+</tr>
+<tr>
+<td>tighten for a dossier, or widen for a survey</td>
+<td><a href="#the-two-directions">The two directions</a></td>
+</tr>
+<tr>
+<td>tune against a fragmented assembly</td>
+<td><a href="#on-a-draft-assembly">On a draft assembly</a></td>
+</tr>
+<tr>
+<td>know whether a knob can fix this at all</td>
+<td><a href="#what-no-knob-fixes">What no knob fixes</a></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>AMR</strong></td>
+<td>antimicrobial resistance</td>
+</tr>
+<tr>
+<td><strong>IS</strong></td>
+<td>insertion sequence — the smallest mobile element, carrying only the genes it needs to move itself</td>
+</tr>
+<tr>
+<td><strong>ICE</strong></td>
+<td>integrative and conjugative element — carries its own conjugation machinery, so it can move itself into another cell</td>
+</tr>
+<tr>
+<td><strong>IME</strong></td>
+<td>integrative mobilisable element — carries a relaxase but no apparatus of its own, so it needs a helper element</td>
+</tr>
+<tr>
+<td><strong>AICE</strong></td>
+<td>actinomycete integrative and conjugative element</td>
+</tr>
+<tr>
+<td><strong><em>att</em> site</strong></td>
+<td>the short direct repeat left at each end of an element where it integrated</td>
+</tr>
+<tr>
+<td><strong>HMM</strong></td>
+<td>hidden Markov model — a statistical profile of a gene or protein family</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="start-at-the-audit-file">Start at the audit file<a class="headerlink" href="#start-at-the-audit-file" title="Permanent link">&para;</a></h2>
+<p>Six files under <code>08.mobilome/{sample}/</code>, one per filtering step. Each carries a reason
+for every decision it made.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Written by</th>
+<th>What it explains</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{sample}_ice_discarded.tsv</code></td>
+<td><code>conjscan_to_ice.py</code></td>
+<td>every ICE/IME candidate dropped, downgraded or flagged</td>
+</tr>
+<tr>
+<td><code>{sample}_amr_mobility_audit.tsv</code></td>
+<td><code>colocalise.py</code></td>
+<td>every AMR gene that did not get the context or tier you expected</td>
+</tr>
+<tr>
+<td><code>{sample}_is_discarded.tsv</code></td>
+<td><code>isescan_to_table.py</code></td>
+<td>IS calls dropped or flagged</td>
+</tr>
+<tr>
+<td><code>{sample}_named_elements_discarded.tsv</code></td>
+<td><code>name_transposons.py</code></td>
+<td>TnCentral hits refused a curated name</td>
+</tr>
+<tr>
+<td><code>{sample}_ice_naming.tsv</code></td>
+<td><code>name_ice_elements.py</code></td>
+<td>why an ICE candidate did or did not get a curated ICEberg name</td>
+</tr>
+<tr>
+<td><code>{sample}_is_copy_number_audit.tsv</code></td>
+<td><code>isosdb_copy_number.py</code></td>
+<td>database entries excluded from the copy-number estimate</td>
+</tr>
+</tbody>
+</table>
+<p>Four of the six share one layout — <code>sample, contig, start, end, action, reason, detail</code>.
+Two do not: <code>{sample}_amr_mobility_audit.tsv</code> keys on the gene
+(<code>sample, contig, amr_gene, amr_start, amr_end, mobility_tier, mge_context, decision,
+reason, detail</code>), and <code>{sample}_is_copy_number_audit.tsv</code> keys on a database entry with
+no coordinates at all (<code>sample, element, action, reason, detail</code>).</p>
+<p>In all six the last three columns work the same way. <code>action</code> (or <code>decision</code>) says what
+happened, <code>reason</code> is the token you filter on, and <code>detail</code> carries the numbers in plain
+language. Only the column <em>positions</em> differ, which is why the recipes below say which
+column to cut.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># What happened to the ICE/IME candidates in this sample?</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cut<span class="w"> </span>-f5,6<span class="w"> </span><span class="m">08</span>.mobilome/S1/S1_ice_discarded.tsv<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span><span class="p">|</span><span class="w"> </span>uniq<span class="w"> </span>-c<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-rn
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Why did this AMR gene not get a mobile-element context?</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># This file has the wider key block: decision is column 8, reason 9, detail 10.</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>awk<span class="w"> </span>-F<span class="s1">'\t'</span><span class="w"> </span><span class="s1">'$8=="no_mge_context" || $8=="tier_not_raised"'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="m">08</span>.mobilome/S1/S1_amr_mobility_audit.tsv<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-f3,9,10
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">The action words are not the same in every file</p>
+<p>In <code>{sample}_ice_discarded.tsv</code> and <code>{sample}_is_discarded.tsv</code> a thing that is gone
+from the table says <strong><code>dropped</code></strong>. In <code>{sample}_named_elements_discarded.tsv</code> and
+<code>{sample}_is_copy_number_audit.tsv</code> the same event says <strong><code>discarded</code></strong>. A grep
+across all six for one of those words misses half the answer.</p>
+<p><code>kept_flagged</code> is neither: the thing is in the table, but something about it was
+hedged — usually a confidence cap. <code>evidence_recorded</code>, <code>boundaries_resolved</code>,
+<code>not_applicable</code> and <code>summary</code> are notes, written so that a decision is never
+invisible. <code>row_skipped</code> and <code>input_missing</code> are about the inputs rather than the
+biology: a hit that could not be joined to the annotation, or a file that was not
+there.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Look columns up by name in the result tables</p>
+<p>The audit layouts are stable. The two <strong>result</strong> tables —
+<code>{sample}_amr_mobility.tsv</code> and <code>{sample}_ice_candidates.tsv</code> — have gained columns
+as the module grew, so tables kept from different builds do not line up.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>awk<span class="w"> </span>-F<span class="s1">'\t'</span><span class="w"> </span><span class="s1">'NR==1 {for (i = 1; i &lt;= NF; i++) col[$i] = i; print; next}</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="s1">            $col["confidence"] == "high"'</span><span class="w"> </span>any_result_table.tsv
+</code></pre></div>
+<p>One catch with that idiom: if the column is <strong>absent</strong>, <code>col[...]</code> is 0 and <code>$0</code> —
+the whole line — gets tested instead. An <code>==</code> test then matches nothing and hands
+you an empty result; a <code>!=</code> test matches everything and the filter silently stops
+filtering. Check the header —
+<code>head -1 file | tr '\t' '\n' | nl</code> — whenever the row count looks wrong in either
+direction.</p>
+<p>The two tables also spell their booleans differently: <code>{sample}_amr_mobility.tsv</code>
+writes <code>yes</code> / <code>no</code> / <code>NA</code>, <code>{sample}_ice_candidates.tsv</code> writes <code>TRUE</code> / <code>FALSE</code> /
+<code>NA</code> so that R reads them straight into a logical column
+(<code>conjscan_to_ice.py:947</code>).</p>
+</div>
+<h2 id="three-places-a-knob-can-live">Three places a knob can live<a class="headerlink" href="#three-places-a-knob-can-live" title="Permanent link">&para;</a></h2>
+<p>They differ in how much you are signing up for.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Where</th>
+<th>What it costs you</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong></td>
+<td><code>config/config.yaml</code>, <code>mobilome:</code> block</td>
+<td>Nothing. Documented next to the key, survives a <code>git pull</code>.</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td>the <code>shell:</code> block of a rule in <code>workflow/rules/shared/80_mobilome.smk</code></td>
+<td>A repository edit. These are real, tested command-line flags that the scripts accept and the rules simply do not pass, so the script default stands.</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>a constant at the top of a script in <code>workflow/scripts/80_mobilome/</code></td>
+<td>A source edit, plus probably a test edit.</td>
+</tr>
+</tbody>
+</table>
+<p>The Layer B flags, all on <code>rule conjscan_ice</code> unless noted: <code>--window-bp</code>,
+<code>--min-element-bp</code>, <code>--min-ime-element-bp</code>, <code>--max-element-bp</code>, <code>--boundary-bp</code>,
+<code>--integrase-window-bp</code>, <code>--att-flank-window-bp</code>; plus <code>--min-length-bp</code> on
+<code>rule isescan_table</code> and <code>--min-chromosome-bp</code> on <code>rule mobilome_replicons</code>.</p>
+<p>To change one, add the flag to the rule's shell block:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>        <span class="n">shell</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">            </span><span class="sd">"""</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="sd">            python {params.script} \</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="sd">              --sample {wildcards.sample} \</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="sd">              --conjscan-tsv {input.conjscan_dir}/best_solution.tsv \</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="sd">              ...</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="sd">              --replicons {input.replicons} \</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="sd">              --min-ime-element-bp 3000 \</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="sd">              {params.strict_boundary} \</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="sd">              --out-table {output.table} \</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="sd">              --out-audit {output.audit} &gt; {log} 2&gt;&amp;1</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="sd">            """</span>
+</code></pre></div>
+<p>Every script the mobilome rules run lives in <code>workflow/scripts/80_mobilome/</code>, a
+directory named after the rule file that runs it, with each script's tests beside it.
+A script sitting loose in <code>workflow/scripts/</code> is not part of a run — it is a maintenance
+tool you invoke by hand. <code>workflow/scripts/README.md</code> has the full map. After a Layer C
+edit, <code>pytest workflow/scripts</code> (457 pass, 2 skip; 380 of them mobilome) is the check that you
+did not break something else on the way; the tests encode today's thresholds in places,
+so expect to update a test alongside a deliberate change.</p>
+<div class="admonition warning">
+<p class="admonition-title">Layer B values are not sanity-checked</p>
+<p>The scripts check only that the value is a whole number. <code>--min-ime-element-bp
+80000</code> is accepted, silently drops every IME-architecture call, and the result is
+indistinguishable from a genome that has none.</p>
+<p><code>mobilome.coverage_profile</code> is the exception, and its guard lives in the workflow
+rather than in the script (<code>80_mobilome.smk:196</code>): MacSyFinder accepts
+<code>--coverage-profile 30</code> and then finds nothing, which looks exactly like a genome
+with no conjugative system, so BacFlux exits at parse time instead — when Snakemake
+reads the config, before any rule runs. The general lesson for any knob you add:
+check it there too, because "found nothing" is a plausible-looking answer.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Most thresholds reach the audit file only when they fire</p>
+<p>The value appears inside the <code>detail</code> of the row it caused —
+<code>cluster_shorter_than_min</code> names the floor and the measured span,
+<code>integrase_without_conjugation_machinery</code> names the integrase window. The ICE and IS
+audits have no unconditional "settings used" row, so on a sample where nothing was
+dropped neither the audit nor the log says which floors were in force. The one
+exception is the naming layer: <code>{sample}_named_elements_discarded.tsv</code> always closes
+with a <code>summary</code> / <code>tncentral_naming_complete</code> row naming both thresholds it applied.
+The parse-time banner prints only <code>max_composite_span_bp</code> and <code>contig_boundary_bp</code>
+(<code>00_common.smk:1252-1257</code>). If you change a Layer B knob, write the value down
+yourself.</p>
+</div>
+<h2 id="symptom-to-knob">Symptom to knob<a class="headerlink" href="#symptom-to-knob" title="Permanent link">&para;</a></h2>
+<p>Every <code>reason</code> below is a literal string in the code — grep for it.</p>
+<h3 id="an-element-you-know-is-there-was-not-reported">An element you know is there was not reported<a class="headerlink" href="#an-element-you-know-is-there-was-not-reported" title="Permanent link">&para;</a></h3>
+<p>Grep <code>{sample}_ice_discarded.tsv</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Reason</th>
+<th>What it means</th>
+<th>Knob</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cluster_shorter_than_min</code></td>
+<td>the machinery span was below the size floor; <code>detail</code> gives the measured span and which floor applied</td>
+<td><code>--min-ime-element-bp</code> for IME/AICE architecture, <code>--min-element-bp</code> otherwise</td>
+</tr>
+<tr>
+<td><code>cluster_longer_than_max</code></td>
+<td>anchors chained across the contig into one implausible element</td>
+<td><code>--max-element-bp</code>, or <strong>lower</strong> <code>--window-bp</code> so the chain breaks</td>
+</tr>
+<tr>
+<td><code>no_conjugation_anchor</code></td>
+<td>integrases with no relaxase and no mating apparatus nearby — a genome's ordinary complement of recombinases</td>
+<td>not a threshold problem</td>
+</tr>
+<tr>
+<td><code>integrase_without_conjugation_machinery</code></td>
+<td>the integrase marking your element was attached to no machinery cluster</td>
+<td><code>--integrase-window-bp</code>, but read the next box first</td>
+</tr>
+<tr>
+<td><code>untrusted_integrase_profile</code></td>
+<td>an ICEscan integrase profile deliberately ignored (integron and housekeeping recombinases that would anchor elements onto the wrong gene)</td>
+<td>Layer C: <code>ICESCAN_TRUSTED_INTEGRASE_PROFILES</code>, <code>conjscan_to_ice.py:255</code></td>
+</tr>
+<tr>
+<td><code>integrase_match_is_a_transposase</code></td>
+<td>the Bakta product text matched the integrase pattern but the protein is a transposase</td>
+<td>Layer C: <code>TRANSPOSASE_PRODUCT_PATTERN</code>, <code>conjscan_to_ice.py:532</code></td>
+</tr>
+<tr>
+<td><code>conjscan_found_no_systems</code></td>
+<td>MacSyFinder assembled nothing at all</td>
+<td><code>mobilome.coverage_profile</code>, then the ICEscan layer</td>
+</tr>
+<tr>
+<td><code>hit_id_not_in_annotation</code></td>
+<td>a MacSyFinder hit could not be joined to the Bakta GFF3</td>
+<td>not a threshold — a mismatched input pair. Check that the Bakta run and the <code>.faa</code> MacSyFinder read are the same run</td>
+</tr>
+</tbody>
+</table>
+<p>In <code>{sample}_named_elements_discarded.tsv</code>: <code>reference_coverage_below_threshold</code> →
+<code>mobilome.tncentral.min_reference_coverage</code>, and <code>identity_below_naming_threshold</code> →
+<code>mobilome.tncentral.min_identity</code>. A third, <code>tncentral_hit_is_a_plain_is</code>, is not a
+threshold at all: an insertion sequence carries only what it needs to move, so it cannot
+hold a passenger AMR gene, and ISEScan has already inventoried it.</p>
+<p>If the element is there but no <strong>AMR gene</strong> picked it up, look in
+<code>{sample}_amr_mobility_audit.tsv</code> for <code>near_but_outside_element_machinery_span</code> (the
+element's reported interval is the machinery span and your gene is in the cargo beyond
+it — a boundary problem, not a threshold one) or <code>nearest_mobile_element_too_far</code>
+(<code>IS_ADJACENT_MAX_BP</code>, Layer C).</p>
+<div class="admonition warning">
+<p class="admonition-title">Read the audit before you turn the knob the literature points at</p>
+<p>A worked case measured here. <em>Streptococcus salivarius</em> CP002888.1 carries the
+curated IME_Ssal57I_tRNAlys at 70,384–75,506. This clade is exactly the <code>T4SS_MOBT</code>
+biology that profile coverage is supposed to hold back, so lowering
+<code>coverage_profile</code> ought to recover it. Measured at 0.5, 0.4 and 0.3 it is missed at
+every value, and the audit says why in two lines: the relaxase hits were being found
+at 0.5 all along, a machinery cluster took an integrase sitting 324 bp away, and the
+integrase that actually marks the curated element — 20 kb further on — was left with
+nothing to attach to. Each integrase joins at most one cluster.</p>
+<p>Not <code>coverage_profile</code>, and not <code>--integrase-window-bp</code> either: the element's
+integrase was well inside the 50 kb window. It lost to a nearer competitor. That is
+a co-localisation limit, not a threshold.</p>
+</div>
+<h3 id="the-interval-looks-far-too-big-or-far-too-small">The interval looks far too big, or far too small<a class="headerlink" href="#the-interval-looks-far-too-big-or-far-too-small" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>You see</th>
+<th>Read</th>
+<th>Then</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>interval much <strong>smaller</strong> than the published element</td>
+<td><code>boundary_method</code></td>
+<td>if <code>none</code>, the interval <strong>is</strong> the machinery span — a floor, by design. Compare <code>start</code>/<code>end</code> against <code>machinery_start</code>/<code>machinery_end</code>. <code>--att-flank-window-bp</code> is the knob, but see below</td>
+</tr>
+<tr>
+<td>interval much <strong>larger</strong></td>
+<td><code>n_anchors</code>, <code>anchor_classes</code>, and <code>evidence_recorded / system_merge_refused_too_long</code></td>
+<td>lower <code>--window-bp</code> (fuses less) or <code>--max-element-bp</code> (drops the chain)</td>
+</tr>
+<tr>
+<td>a de novo repeat found but the interval did not move</td>
+<td><code>kept_flagged / denovo_att_reported_not_applied</code></td>
+<td>working as intended — a de novo repeat is reported and never applied. No knob; this is a design decision, not a threshold</td>
+</tr>
+<tr>
+<td>ends resolved but at the wrong place</td>
+<td><code>att_length_bp</code>, <code>att_trna</code>, <code>attL</code>, <code>attR</code></td>
+<td>Layer C: <code>MIN_ATT_REPEAT_BP</code>, <code>MAX_ATT_COPIES_OUTSIDE_TRNA</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="everything-comes-out-at-medium-confidence">Everything comes out at medium confidence<a class="headerlink" href="#everything-comes-out-at-medium-confidence" title="Permanent link">&para;</a></h3>
+<p>Check which cap fired — the audit names one per rule:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>awk<span class="w"> </span>-F<span class="s1">'\t'</span><span class="w"> </span><span class="s1">'$5=="kept_flagged"'</span><span class="w"> </span><span class="m">08</span>.mobilome/S1/S1_ice_discarded.tsv<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-f6<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span><span class="p">|</span><span class="w"> </span>uniq<span class="w"> </span>-c
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Cap reason</th>
+<th>Meaning</th>
+<th>Knob</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>few_anchor_classes</code></td>
+<td>fewer than 3 of the five anchor classes were present</td>
+<td><code>MIN_ANCHOR_CLASSES_FOR_HIGH</code> (Layer C, <code>conjscan_to_ice.py:682</code>) — read the box first</td>
+</tr>
+<tr>
+<td><code>machinery_not_intact</code></td>
+<td>low system wholeness, a decayed model, or a truncated relaxase/VirB4</td>
+<td><code>WHOLENESS_INTACT_MIN</code> / <code>PROFILE_COVERAGE_INTACT_MIN</code> (Layer C, both 0.7, <code>conjscan_to_ice.py:666,672</code>)</td>
+</tr>
+<tr>
+<td><code>at_contig_boundary</code></td>
+<td>machinery runs into a contig end → capped <strong>low</strong></td>
+<td><code>--boundary-bp</code></td>
+</tr>
+<tr>
+<td><code>spans_contigs</code></td>
+<td>hits on more than one contig → capped <strong>low</strong>, absolutely</td>
+<td>none, deliberately</td>
+</tr>
+<tr>
+<td><code>no_assembled_system</code></td>
+<td>profile hits only, no assembled system → capped <strong>low</strong></td>
+<td><code>mobilome.coverage_profile</code>, or accept the tier</td>
+</tr>
+<tr>
+<td><code>boundary_not_resolved</code> / <code>boundary_denovo_only</code></td>
+<td>only fires when <code>require_trna_boundary_for_high</code> is on</td>
+<td>turn that key off</td>
+</tr>
+<tr>
+<td><code>contig_length_unknown</code></td>
+<td>no length for the contig, so it cannot be said whether the element runs off the end</td>
+<td>fix the <code>--contig-lengths</code> input</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">An IME can never reach high confidence. That is the design, not a knob</p>
+<p>High confidence needs at least <strong>3 distinct anchor classes</strong>
+(<code>MIN_ANCHOR_CLASSES_FOR_HIGH = 3</code>). There are five — integrase, relaxase, coupling
+protein, mating apparatus, and the AICE translocase that only the ICEscan layer
+finds — although the audit's own sentence says "of the four anchor classes", which
+is right for every conjugative call and understates an AICE one. An IME is <em>defined</em>
+by having an integrase and a relaxase and <strong>no mating apparatus of its own</strong> — that
+is what makes it mobilisable-with-a-helper rather than self-transmissible. So it
+starts with two, and a coupling protein is the only route to three.</p>
+<p>Measured here: of the 26 IME rows across the whole benchmark, none is high. 25 have
+exactly 2 anchor classes; one has 3 and is still medium. 18 of the 26 are
+additionally flagged <code>machinery_degraded</code> for <code>low_system_wholeness</code> — an artefact
+of CONJscan's MOB model describing more genes than an IME carries, so finding the
+relaxase alone scores 0.333 wholeness. By contrast 30 of the 53 ICE rows are high.</p>
+<p>Lowering <code>MIN_ANCHOR_CLASSES_FOR_HIGH</code> to 2 does not lift the ceiling cleanly
+either: only 8 of the 26 IME rows would become eligible, because 17 of the rest are
+independently capped by <code>machinery_not_intact</code> and one by <code>at_contig_boundary</code>. The
+change buys 8 relabelled rows and simultaneously makes every two-anchor ICE-like
+cluster eligible for <code>high</code>. For an IME, medium is the ceiling, and <code>mobility</code> plus
+<code>machinery_intact</code> are the columns carrying the information.</p>
+</div>
+<h3 id="calls-on-a-genome-that-should-have-none">Calls on a genome that should have none<a class="headerlink" href="#calls-on-a-genome-that-should-have-none" title="Permanent link">&para;</a></h3>
+<p>Read the <strong>class</strong> before the count.</p>
+<table>
+<thead>
+<tr>
+<th>You see</th>
+<th>Do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>evidence_level=profile_hits_only</code></td>
+<td>the module's weakest evidence: the profiles were seen, no system was assembled. Filter these out for reporting, or raise <code>coverage_profile</code></td>
+</tr>
+<tr>
+<td><code>mge_class=cime_or_island</code>, <code>mobility=passive</code></td>
+<td>no mobility claim and no tier, so not a false positive</td>
+</tr>
+<tr>
+<td>a call at medium or better with a real mobility claim</td>
+<td>investigate before dismissing</td>
+</tr>
+<tr>
+<td>calls in an archaeon or a very distant lineage</td>
+<td>the CONJscan and ICEscan models are bacterial. Treat any call as suspect on those grounds alone</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-knobs-one-by-one">The knobs, one by one<a class="headerlink" href="#the-knobs-one-by-one" title="Permanent link">&para;</a></h2>
+<p>Defaults are as shipped. "Measured" means there is a run behind the claim; where nothing
+has been swept, this page says so rather than offering a plausible-sounding
+recommendation.</p>
+<h3 id="coverage_profile-the-one-layer-a-knob-that-changes-what-is-detected"><code>coverage_profile</code> — the one Layer A knob that changes what is detected<a class="headerlink" href="#coverage_profile-the-one-layer-a-knob-that-changes-what-is-detected" title="Permanent link">&para;</a></h3>
+<p>The fraction of an HMM profile a protein must align to before the hit is kept
+(<code>mobilome.coverage_profile</code>, default <strong>0.5</strong>, <code>80_mobilome.smk:190</code>). Not identity, not
+an E-value: a hit can be statistically beyond doubt and still be dropped by this rule
+alone. It is applied to <strong>both</strong> MacSyFinder searches deliberately — their hit tables
+are merged, so different stringencies would make an element's class depend on which
+model set was looser.</p>
+<p>Lowering it admits divergent full-length relaxases that share only a catalytic core, and
+also genuine fragments. Measured end to end over 18 curated ICEs, 12 curated IMEs and 12
+genomes with no curated element (32.6 Mb), with the ICEscan layer on
+(<code>config/config.yaml:397-400</code>):</p>
+<table>
+<thead>
+<tr>
+<th><code>coverage_profile</code></th>
+<th>curated ICEs</th>
+<th>curated IMEs</th>
+<th>calls on the negative set</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>0.5</strong> (shipped)</td>
+<td>15 of 18</td>
+<td>5 of 12</td>
+<td>5 (2 without ICEscan)</td>
+</tr>
+<tr>
+<td>0.4</td>
+<td>15 of 18</td>
+<td>6 of 12</td>
+<td>7 (4 without ICEscan)</td>
+</tr>
+<tr>
+<td>0.3</td>
+<td>15 of 18</td>
+<td>6 of 12</td>
+<td>9 (5 without ICEscan)</td>
+</tr>
+</tbody>
+</table>
+<p>Across 30 curated elements, lowering recovers exactly <strong>one</strong>: a 23 kb IME in
+<em>Faecalibacterium duncaniae</em>, found in full (right edge 53 bp off the published
+coordinates) and correctly classed. It appears at 0.4 and gains nothing further at 0.3.</p>
+<p>The cost at 0.4 is two more calls, in <em>E. coli</em> K-12 MG1655 and <em>P. aeruginosa</em> PAO1.
+Read the class first: every call added at 0.4 is <code>cime_or_island</code> /
+<code>passive</code> / <code>low</code> / <code>profile_hits_only</code>, claiming no mobility and carrying no tier. At
+0.3 that stops holding — a 21.6 kb IME appears in <em>S. aureus</em> N315 at <strong>medium</strong>
+confidence with a real mobility claim, unverified either way.</p>
+<p><strong>When to lower it anyway.</strong> Across all 395 curated IMEs, 73 carry a relaxase hit that
+is clean on E-value and fails only this rule — 60 of them the <code>T4SS_MOBT</code> family at
+about 0.32 coverage, largely the <em>Streptococcus salivarius</em> clade
+(<code>config/config.yaml:432-436</code>). If your isolates sit in that space, 0.4 is worth trying.
+Nothing measured supports 0.3 for single isolates. The EBI mobilome-annotation-pipeline
+runs 0.3, which reflects a metagenome pipeline's priorities — recall first, because MAG
+proteins are fragmentary anyway — not a verdict on what a single-isolate workflow should
+do.</p>
+<div class="admonition note">
+<p class="admonition-title">Why the gain is so small when the raw evidence moves a lot</p>
+<p>0.4 adds 5% more MacSyFinder hits and changes the hit table in 13 of 40 genomes; 0.3
+adds 12% and changes 19 of 40. Almost none of it reaches the element table, because
+the caller needs an integrase within 50 kb of conjugation machinery before it seeds
+anything. <strong>Coverage sits upstream of a stronger constraint, and co-localisation is
+what binds.</strong></p>
+</div>
+<h3 id="element-geometry-real-knobs-but-not-config-keys">Element geometry — real knobs, but not config keys<a class="headerlink" href="#element-geometry-real-knobs-but-not-config-keys" title="Permanent link">&para;</a></h3>
+<p><code>rule conjscan_ice</code> passes none of these, so <code>conjscan_to_ice.py</code>'s own defaults are
+what every measured result in this project was produced at. They are Layer B.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th style="text-align: right;">Default</th>
+<th>Raising it</th>
+<th>Lowering it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--window-bp</code></td>
+<td style="text-align: right;">15,000</td>
+<td>chains more machinery genes into one element; risks fusing two neighbouring systems</td>
+<td>splits one operon into several candidates, each then too small to survive the size floor</td>
+</tr>
+<tr>
+<td><code>--min-element-bp</code></td>
+<td style="text-align: right;">8,000</td>
+<td>fewer, larger ICE candidates</td>
+<td>admits short machinery spans; <code>cluster_shorter_than_min</code> stops firing</td>
+</tr>
+<tr>
+<td><code>--min-ime-element-bp</code></td>
+<td style="text-align: right;">2,000</td>
+<td>the knob with the largest measured effect — see below</td>
+<td>admits sub-2 kb clusters, which cannot physically hold both a relaxase and an integrase</td>
+</tr>
+<tr>
+<td><code>--max-element-bp</code></td>
+<td style="text-align: right;">500,000</td>
+<td>admits runaway anchor chains</td>
+<td>drops genuinely large ICEs</td>
+</tr>
+<tr>
+<td><code>--boundary-bp</code></td>
+<td style="text-align: right;">1,000</td>
+<td>more candidates flagged as probably truncated and capped at low</td>
+<td>fewer caps, and you stop being told that a call ran into the end of its contig</td>
+</tr>
+<tr>
+<td><code>--integrase-window-bp</code></td>
+<td style="text-align: right;">50,000</td>
+<td>an integrase further from the machinery may still anchor the element</td>
+<td>more <code>integrase_without_conjugation_machinery</code> orphans, so fewer ICE/IME calls</td>
+</tr>
+<tr>
+<td><code>--att-flank-window-bp</code></td>
+<td style="text-align: right;">50,000</td>
+<td>more candidate repeats to rank</td>
+<td>the element's real ends may sit outside the window</td>
+</tr>
+</tbody>
+</table>
+<p>Defaults read from <code>conjscan_to_ice.py:905, 906, 911, 912, 925, 1820</code> and
+<code>att_search.py:99</code>.</p>
+<p><strong>Why there is a separate IME floor.</strong> The floor is applied to the <em>anchor-cluster span</em>,
+and that span scales with the number of machinery genes, not with the element's length.
+An ICE carries a roughly 20-gene mating-apparatus operon, so its span is naturally tens
+of kb. An IME carries a relaxase and an integrase — two genes — so its span is 1–6 kb.
+An 8,000 bp floor selects for ICEs by construction. AICEs take the lower floor for the
+same reason.</p>
+<p>Measured here over the 28 small-machinery calls (IME + AICE) in the benchmark:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">floor</th>
+<th style="text-align: right;">calls dropped (of 28)</th>
+<th style="text-align: right;">curated IMEs still detected (of 12)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><strong>2,000</strong> (default)</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td style="text-align: right;">3,000</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td style="text-align: right;">5,000</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td style="text-align: right;">8,000 (= the ICE floor)</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">1</td>
+</tr>
+</tbody>
+</table>
+<p>The recall cliff is between 3,000 and 5,000, not at the default: the five detected
+curated IMEs have machinery spans of 3,840 / 4,959 / 5,942 / 6,252 / 8,164 bp
+(<code>config/config.yaml:788-789</code>). <strong>3,000 bp drops five calls at a measured cost of zero
+curated IMEs</strong> — that is where to go if 2,000 feels unevidenced. It does not make 3,000
+the better default: five calls is a small sample and none of the five is a known false
+positive.</p>
+<div class="admonition warning">
+<p class="admonition-title">2,000 bp is an empirical cut, not a published bound</p>
+<p>There is no published minimum size for an IME's machinery. The value was chosen
+against a handful of observations in one benchmark. Say so in a methods write-up
+rather than implying it is a property of IMEs.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">The att search is always given the 8,000 bp floor</p>
+<p>Never the 2,000 bp IME one, and it refuses any repeat pair implying an element
+outside its range. So an IME admitted at 3 kb can never have its boundaries
+resolved, however clean the repeat pair: it keeps <code>boundary_method=none</code> and reports
+the machinery span. Four of the five curated IMEs this module detects sit under that
+floor. The deliberate reading is that an att pair implying a 3 kb element is mostly
+noise; the honest reading is that IME boundaries are therefore largely unresolved.
+Making the floors agree per class would change results, so it has not been done
+quietly (<code>config/config.yaml:783-792</code>).</p>
+</div>
+<p><code>--integrase-window-bp</code> is deliberately much larger than <code>--window-bp</code>: conjugation
+machinery is an operon and clusters tightly, whereas the integrase sits at the element
+boundary, tens of kb away on a large ICE. It was widened to 50 kb after a 15 kb window
+produced <code>conjugative_region</code> instead of ICE on two clinical <em>K. pneumoniae</em> isolates —
+on both, the ICE<em>Kp</em> integrase sits 33,361 bp from the machinery cluster — and put the
+ICE label on a different element 1.1 Mb away.</p>
+<p><code>--att-flank-window-bp</code> was 30,000 until SPI-7 showed why that was too narrow: its
+<em>attR</em> sits 5,800 bp outside a 30 kb window, so the element was reported 50 kb short.
+80 kb, 120 kb and 200 kb change no element's answer on the benchmark, so 50 kb is
+where the curve flattens rather than an arbitrary larger number.</p>
+<h3 id="the-composite-span-and-the-co-localisation-constants">The composite span, and the co-localisation constants<a class="headerlink" href="#the-composite-span-and-the-co-localisation-constants" title="Permanent link">&para;</a></h3>
+<p><code>mobilome.max_composite_span_bp</code> (Layer A, default <strong>20,000</strong>, <code>00_common.smk:1168</code>) is
+the longest span accepted for a composite transposon, which is ladder tier 3. Real
+composites run from about 2.5 kb (IS<em>26</em> translocatable units) to about 25 kb. The
+measured span is always reported next to the call, in <code>flanking_span_bp</code>.</p>
+<p>Everything else in the co-localisation step is Layer C, in <code>colocalise.py</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th style="text-align: right;">Line</th>
+<th style="text-align: right;">Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HYBRID_PROMOTER_MAX_BP</code></td>
+<td style="text-align: right;">153</td>
+<td style="text-align: right;">500</td>
+<td>how close an upstream, correctly oriented IS must be before the module says it may be driving the gene from an outward-reading promoter (tier 2). IS<em>Ecp1</em> sits 42–266 bp upstream of <em>bla</em><sub>CTX-M</sub></td>
+</tr>
+<tr>
+<td><code>IS_ADJACENT_MAX_BP</code></td>
+<td style="text-align: right;">158</td>
+<td style="text-align: right;">5,000</td>
+<td>beyond this the nearest IS is still reported in <code>distance_bp</code> but no longer sets <code>mge_context</code></td>
+</tr>
+<tr>
+<td><code>CONTIG_END_WINDOW_BP</code></td>
+<td style="text-align: right;">173</td>
+<td style="text-align: right;">1,000</td>
+<td>triggers the boundary flag and the low-confidence cap on an AMR row</td>
+</tr>
+<tr>
+<td><code>MIN_AMR_FRACTION_INSIDE_ELEMENT</code></td>
+<td style="text-align: right;">178</td>
+<td style="text-align: right;">0.9</td>
+<td>fraction of the AMR gene inside a named element before the element is said to carry it</td>
+</tr>
+<tr>
+<td><code>MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION</code></td>
+<td style="text-align: right;">183</td>
+<td style="text-align: right;">0.5</td>
+<td>fraction overlapped by an IS before the CDS is called disrupted (likely inactivated) rather than merely overlapping</td>
+</tr>
+<tr>
+<td><code>ABUTTING_IS_MAX_GAP_BP</code></td>
+<td style="text-align: right;">191</td>
+<td style="text-align: right;">25</td>
+<td>how flush an IS must be against a <strong>partial</strong> AMR hit to read the pair as "the IS split this gene". Tight on purpose: it tests "butted up against", not "nearby"</td>
+</tr>
+<tr>
+<td><code>MIN_COVERAGE_FOR_INTACT_GENE</code></td>
+<td style="text-align: right;">196</td>
+<td style="text-align: right;">90.0</td>
+<td>below this percent coverage an AMRFinderPlus hit is treated as a fragment. Used only with the abutting-IS test</td>
+</tr>
+<tr>
+<td><code>ORIENTATION_EXEMPT_IS_FAMILIES</code></td>
+<td style="text-align: right;">206</td>
+<td style="text-align: right;"><code>{IS6, IS26, …}</code></td>
+<td>families exempt from the same-orientation rule for composites</td>
+</tr>
+<tr>
+<td><code>UNINFORMATIVE_FAMILY_VALUES</code></td>
+<td style="text-align: right;">211</td>
+<td style="text-align: right;"><code>{"", NA, NEW, UNKNOWN, ISNCY, …}</code></td>
+<td>ISEScan family labels carrying no information about <em>which</em> element this is</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Do not remove IS26 from <code>ORIENTATION_EXEMPT_IS_FAMILIES</code></p>
+<p>IS<em>26</em> forms translocatable units with its copies in <strong>direct</strong> orientation, which
+breaks the same-orientation rule the composite pattern otherwise depends on. Without
+the exemption, the module misses the single most clinically important AMR
+architecture.</p>
+<p><code>UNINFORMATIVE_FAMILY_VALUES</code> guards the opposite error: two IS both labelled "new"
+must not be called a composite on family grounds.</p>
+</div>
+<p>None of the Layer C values here have been swept. They are documented so that you can see
+what a given audit reason is testing, not because there is evidence that a different
+value is better.</p>
+<h3 id="the-naming-thresholds">The naming thresholds<a class="headerlink" href="#the-naming-thresholds" title="Permanent link">&para;</a></h3>
+<p>Both naming layers are <em>optional</em> and stay off until you give each a source — see
+<a href="../enabling/">Turning it on</a>. Once on, four Layer A keys decide what gets a name.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th style="text-align: right;">Default</th>
+<th>Source</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mobilome.tncentral.min_identity</code></td>
+<td style="text-align: right;">90.0</td>
+<td><code>00_common.smk:1206</code></td>
+<td>percent identity before a BLAST hit may confer a curated <strong>name</strong>. Below it the sequence may be a relative of the element, but the name would claim more than the data shows</td>
+</tr>
+<tr>
+<td><code>mobilome.tncentral.min_reference_coverage</code></td>
+<td style="text-align: right;">0.80</td>
+<td><code>00_common.smk:1207</code></td>
+<td>fraction of the <strong>reference element</strong> that must be present — "is the whole of this known transposon here?"</td>
+</tr>
+<tr>
+<td><code>mobilome.iceberg.min_identity</code></td>
+<td style="text-align: right;">80.0</td>
+<td><code>00_common.smk:1224</code></td>
+<td>identity floor for an ICE name</td>
+</tr>
+<tr>
+<td><code>mobilome.iceberg.min_overlap_fraction</code></td>
+<td style="text-align: right;">0.50</td>
+<td><code>00_common.smk:1225</code></td>
+<td>how much of <em>our</em> candidate the curated element must cover to be treated as the same thing. Lenient next to the transposon cascade, because ICEs are mosaic and their cargo varies between strains</td>
+</tr>
+</tbody>
+</table>
+<p>Neither layer changes any gene's tier by loosening: <code>mobilome.iceberg.*</code> only labels the
+candidates already found, and <code>mobilome.tncentral.*</code> decides whether a curated element is
+named at all.</p>
+<p><code>min_reference_coverage</code> is the one with a measured story, and it is why tier 4 is hard
+to reach on a fragmented assembly. On a clinical hybrid run, every Tn<em>Ecp1.1</em> candidate
+was refused:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>TnEcp1.1: only 49% of the 3417 bp reference element is present (needs 80%).
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>A fragment of a transposon is not that transposon - on a short-read assembly
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>this usually means the element is split across contigs.
+</code></pre></div>
+<p>and a second at 12%. That refusal is correct behaviour, but it means the gene stays at
+tier 2 and you have to open <code>{sample}_named_elements_discarded.tsv</code> before concluding
+that a genome holds no named transposon. Lowering the threshold to admit a 49% fragment
+has <strong>not been measured</strong>, and it means asserting a named architecture from half the
+evidence; if you do it, read the audit and state in the methods what coverage you
+accepted.</p>
+<h3 id="the-three-contig-end-windows">The three contig-end windows<a class="headerlink" href="#the-three-contig-end-windows" title="Permanent link">&para;</a></h3>
+<p>They answer different questions about different objects, which is why they are separate
+numbers and only one of them is a config key.</p>
+<table>
+<thead>
+<tr>
+<th>Window</th>
+<th style="text-align: right;">Value</th>
+<th>Where</th>
+<th>Question it answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mobilome.contig_boundary_bp</code></td>
+<td style="text-align: right;">100</td>
+<td>Layer A, <code>00_common.smk:1174</code>; passed to <code>isescan_to_table.py</code> as <code>--boundary-bp</code></td>
+<td>is an <strong>IS call</strong> sitting on the edge of its contig? Feeds <code>at_contig_boundary</code> and <code>fraction_at_contig_boundary</code> in the IS summary</td>
+</tr>
+<tr>
+<td><code>CONTIG_END_WINDOW_BP</code></td>
+<td style="text-align: right;">1,000</td>
+<td>Layer C, <code>colocalise.py:173</code></td>
+<td>was there enough flanking sequence to have <strong>seen</strong> a neighbouring element at all? Caps confidence in the mobility table</td>
+</tr>
+<tr>
+<td><code>--boundary-bp</code> on <code>conjscan_ice</code></td>
+<td style="text-align: right;">1,000</td>
+<td>Layer B, <code>conjscan_to_ice.py:925</code></td>
+<td>the same question again, for an <strong>ICE/IME candidate</strong> rather than an AMR gene</td>
+</tr>
+</tbody>
+</table>
+<p>An IS 500 bp from a contig end is not "at the edge", but you still could not have seen
+its partner 2 kb away — so absence of evidence there is not evidence of absence. That is
+why the second window is ten times the first. Note that the first and third share the
+flag name <code>--boundary-bp</code> while meaning different things, and only the first is wired to
+a config key.</p>
+<p>A high <code>fraction_at_contig_boundary</code> means the assembly broke exactly where the IS
+elements are, and the located IS count should be read as a floor. For reference, the two
+hybrid clinical assemblies run here score 0.0089 (1 of 112 IS calls) and 0.0103 (1 of
+97) — near-closed genomes. A short-read draft will be far higher.</p>
+<p>ISEScan itself is run with <strong>no</strong> <code>--removeShortIS</code>, on purpose: partials are kept and
+tiered rather than discarded. <code>--min-length-bp</code> on <code>rule isescan_table</code> defaults to <strong>0</strong>
+(<code>isescan_to_table.py:958</code>) — set it to 500 if you want the discard-below-500-bp
+convention applied to IS calls too.</p>
+<h3 id="boundaries-the-att-search">Boundaries: the att search<a class="headerlink" href="#boundaries-the-att-search" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Knob</th>
+<th style="text-align: center;">Layer</th>
+<th style="text-align: right;">Default</th>
+<th>Source</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mobilome.require_trna_boundary_for_high</code></td>
+<td style="text-align: center;">A</td>
+<td style="text-align: right;"><code>false</code></td>
+<td><code>00_common.smk:1189</code></td>
+<td>whether an element must have tRNA-anchored ends before it may be called <strong>high</strong> confidence</td>
+</tr>
+<tr>
+<td><code>MIN_ATT_REPEAT_BP</code></td>
+<td style="text-align: center;">C</td>
+<td style="text-align: right;">15</td>
+<td><code>att_search.py:480</code></td>
+<td>shortest exact repeat that may be an <em>att</em> site. Matches ICEfinder2; DBSCAN-SWA uses 12</td>
+</tr>
+<tr>
+<td><code>DENOVO_MAX_EXPECTED_CHANCE_MATCHES</code></td>
+<td style="text-align: center;">C</td>
+<td style="text-align: right;">0.05</td>
+<td><code>att_search.py:117</code></td>
+<td>how many chance repeats to tolerate when picking the shortest believable length for <em>this</em> pair of flanks</td>
+</tr>
+<tr>
+<td><code>MAX_ATT_COPIES_OUTSIDE_TRNA</code></td>
+<td style="text-align: center;">C</td>
+<td style="text-align: right;">2</td>
+<td><code>att_search.py:606</code></td>
+<td>copies of the repeat allowed outside any annotated tRNA before it is judged a repeat <em>family</em> rather than a single integration scar</td>
+</tr>
+<tr>
+<td><code>MAX_SEED_MATCHES</code></td>
+<td style="text-align: center;">C</td>
+<td style="text-align: right;">200,000</td>
+<td><code>att_search.py:500</code></td>
+<td>compute guard in repeat-dense regions</td>
+</tr>
+</tbody>
+</table>
+<p><code>require_trna_boundary_for_high</code> folds two different questions into one number: <em>is this
+an ICE?</em> (anchors, machinery, one contig) and <em>where does it end?</em> (<code>boundary_method</code>).
+By default they are reported side by side and only the first sets confidence.</p>
+<p>Measured cost of turning it on: across the 85 element rows produced by the 52 complete
+records in the benchmark tree, 30 reach high confidence and only <strong>7</strong> of those have
+<code>boundary_method=tRNA</code>. The key demotes 23 of 30 high calls to medium <strong>even on closed
+genomes</strong>. Use it on closed long-read assemblies, where an unresolved boundary is a
+warning sign rather than the norm.</p>
+<p>Either way, cargo is never assigned from an unresolved boundary: a de novo repeat is
+reported but never widens an element, so the interval stays the machinery span, a floor.</p>
+<div class="admonition note">
+<p class="admonition-title">Two things about the att search that are easy to assume wrongly</p>
+<p><strong>The length floor is not the guard that does the work.</strong> The chance-match
+calculation resolves to 18 bp at the shipped 50 kb window — and returned 18 at the
+old 30 kb window too, so widening the window does not move it
+(<code>att_search.py:362-364</code>). It also does not filter much: measured on the
+<em>K. pneumoniae</em> positive-control chromosome over 300 randomly placed non-ICE spans,
+the length threshold alone let 22% of them return a confident boundary against the
+1.3% the formula predicts. The guard that actually works is the copy count,
+<code>MAX_ATT_COPIES_OUTSIDE_TRNA</code> — an rRNA operon repeat clears every length threshold
+and fails the copy count cleanly.</p>
+<p><strong>Ranking is by anchoring first, then length</strong> — there is no tRNA score bonus. A
+fixed bonus was tried and removed, because the two properties are not comparable
+quantities: repeat length says how unlikely a match is by chance, sitting at a tRNA
+3′ end says the match is where integration actually happens. Measured on SPI-7, a
+51 bp repeat in ordinary sequence beat the real 24 bp <em>att</em> pair at tRNA-Phe and the
+element came out 50 kb short (<code>att_search.py:770-789</code>).</p>
+<p><strong><code>MAX_SEED_MATCHES</code> truncates silently.</strong> Hitting it breaks out of the scan, so a
+real repeat sitting among the unexamined seeds is missed and the element reports
+<code>boundary_method=none</code> — indistinguishable from "the flanks carry no repeat". No
+audit row says the search was cut short. Across 246 att searches over 52 benchmark
+genomes no window reached the cap, so this is a latent gap rather than a live
+problem (<code>att_search.py:487-499</code>).</p>
+</div>
+<h3 id="is-copy-number-and-replicon-calling">IS copy number and replicon calling<a class="headerlink" href="#is-copy-number-and-replicon-calling" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Knob</th>
+<th style="text-align: center;">Layer</th>
+<th style="text-align: right;">Default</th>
+<th>Source</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mobilome.isosdb.min_covered_percent</code></td>
+<td style="text-align: center;">A</td>
+<td style="text-align: right;">90.0</td>
+<td><code>00_common.smk:1244</code></td>
+<td>a database entry must be covered end to end before its depth is believed. A partially covered entry is usually a conserved domain shared with another family, and averaging it in inflates every estimate</td>
+</tr>
+<tr>
+<td><code>mobilome.isosdb.min_copy_number</code></td>
+<td style="text-align: center;">A</td>
+<td style="text-align: right;">0.5</td>
+<td><code>00_common.smk:1245</code></td>
+<td>below this multiple of the genome baseline the element is treated as absent. Under 1.0 on purpose: a real single-copy IS sits near 1×, and sampling noise plus mapping loss routinely push it to 0.6–0.8×</td>
+</tr>
+<tr>
+<td><code>--min-chromosome-bp</code></td>
+<td style="text-align: center;">B</td>
+<td style="text-align: right;">2,000,000</td>
+<td><code>platon_replicons.py:260</code></td>
+<td>above this length an unclassified contig may be called the chromosome</td>
+</tr>
+</tbody>
+</table>
+<p>The copy-number leg is <em>optional</em> (<code>mobilome.isosdb.fasta_url</code>) and runs in Illumina and
+hybrid modes only, because it needs reads. It changes no AMR gene's tier and must not: it
+says nothing about <em>where</em> the extra copies are, only that they exist.</p>
+<p><code>--min-chromosome-bp</code> matters more than it looks. An ICE integrates into a chromosome by
+definition, so machinery on a contig called <code>plasmid</code> is a conjugative plasmid region,
+not an ICE — audit reason <code>ice_demoted_on_plasmid_replicon</code>. On an <code>unknown</code> contig you
+get <code>ice_on_unclassified_replicon</code> instead. The floor is not Platon's 500 kb because
+megaplasmids run to 1–2 Mb; between the two the module says <code>unknown</code> and lets the
+confidence cap reflect that.</p>
+<h2 id="the-two-directions">The two directions<a class="headerlink" href="#the-two-directions" title="Permanent link">&para;</a></h2>
+<h3 id="tightening-for-a-dossier">Tightening for a dossier<a class="headerlink" href="#tightening-for-a-dossier" title="Permanent link">&para;</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">No knob tightens tier 6</p>
+<p>The obvious framing — a false <em>predicted self-transmissible</em> is the expensive error,
+so tighten the knobs — is not how the code works. Tier 6 is set by
+exactly two things: an AMR gene inside an element classed <code>ice</code>, or a gene on a
+plasmid Platon typed <code>conjugative</code>. <strong>Nothing in Layer A or Layer B touches either.</strong></p>
+<p>Measured on 40 benchmark genomes at coverage 0.5, the ICE calls are identical with
+the ICEscan layer on and off — 37 rows in both arms, the same 16 high / 19 medium /
+2 low, and not one row's confidence changes. <code>--min-ime-element-bp</code> acts only on
+IME/AICE-architecture clusters, and the naming thresholds change names, not tiers.
+So every lever tightens the <strong>tier-5</strong> branch or the naming layer.</p>
+<p>What actually guards tier 6 is not tunable: three of the five anchor classes for <code>high</code>,
+the absolute <code>spans_contigs</code> cap, the truncation check, and the
+chromosome-versus-plasmid replicon rule. <strong>Reporting less is not the same as
+claiming less.</strong> For a stricter dossier, filter the deliverable rather than turn a
+knob:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Tier-6 rows you are willing to defend. Columns by name, not by number.</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># This table writes booleans as yes / no / NA.</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>awk<span class="w"> </span>-F<span class="s1">'\t'</span><span class="w"> </span><span class="s1">'NR==1 {for (i = 1; i &lt;= NF; i++) col[$i] = i; print; next}</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="s1">            $col["mobility_tier"] == 6 &amp;&amp;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="s1">            $col["confidence"]    == "high" &amp;&amp;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="s1">            $col["spans_contigs"] != "yes"'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="m">08</span>.mobilome/S1/S1_amr_mobility.tsv
+</code></pre></div>
+<p>Report the rows you dropped, with their reasons, alongside the ones you kept. That
+is a defensible position; a narrower config is not.</p>
+</div>
+<p>The levers that do help, and what each costs:</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Effect</th>
+<th>Measured cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>leave <code>coverage_profile: 0.5</code></td>
+<td>keeps MacSyFinder's own default</td>
+<td>nothing measured supports going lower for a single isolate</td>
+</tr>
+<tr>
+<td>raise the naming thresholds (<code>tncentral.min_identity</code> to 95.0, <code>min_reference_coverage</code> to 0.9, <code>iceberg.min_identity</code> to 90.0)</td>
+<td>a name is a claim, so demand more of it</td>
+<td>not measured; changes names, not tiers</td>
+</tr>
+<tr>
+<td><code>--min-ime-element-bp 3000</code> (Layer B)</td>
+<td>drops 5 of 28 small-machinery calls</td>
+<td><strong>zero</strong> curated IMEs on this evidence</td>
+</tr>
+<tr>
+<td><code>--min-ime-element-bp 8000</code> (Layer B)</td>
+<td>stops reporting the IME architecture</td>
+<td>curated IME recall 5/12 → 1/12, 15 of 28 calls gone. Buys the removal of one IME call on the negative set</td>
+</tr>
+</tbody>
+</table>
+<p>The audit will then hold more <code>dropped</code> rows, dominated by <code>cluster_shorter_than_min</code>
+with the span and the threshold in <code>detail</code>, and more
+<code>reference_coverage_below_threshold</code> and <code>identity_below_naming_threshold</code> in
+<code>{sample}_named_elements_discarded.tsv</code> — where the action word is <code>discarded</code>, not
+<code>dropped</code>. Small IME-architecture clusters stop being reported at all, so <strong>absence of an
+IME row is not evidence of absence</strong>; the audit is where they went, and a dossier should
+say so.</p>
+<h3 id="widening-for-a-survey">Widening for a survey<a class="headerlink" href="#widening-for-a-survey" title="Permanent link">&para;</a></h3>
+<p>Use this where missing a real element is the expensive error — an exploratory survey, or
+an organism nobody has curated.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">mobilome</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="c1"># 0.4, not 0.3. 0.4 recovers one curated IME and every call it adds to the</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="c1"># negative set is passive / low / profile_hits_only. 0.3 adds nothing further</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="c1"># and produces the first negative-control call that actually asserts mobility.</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">coverage_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.4</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span><span class="c1"># A wider composite window. A convention, not biology, and the measured span</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="c1"># is always in flanking_span_bp next to the call.</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nt">max_composite_span_bp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">25000</span>
+</code></pre></div>
+<p>Turning the ICEscan layer on roughly doubles the IME rows and is the only way to get an
+AICE call at all; it needs its own source, which <a href="../enabling/">Turning it on</a> covers.
+Measured against an otherwise unchanged configuration rather than a half-changed one — the
+"before" being CONJscan alone at 0.5 and the "after" the union at 0.4 — IMEs go 2/12 to
+6/12, ICEs stay at 15/18, and negative-set calls go 2 to 7.</p>
+<p>The table is now a <strong>candidate list to triage</strong>, not a set of findings. Filter it before
+reading, and treat nothing at <code>evidence_level=profile_hits_only</code> as a finding without
+looking at the genes yourself:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Everything that actually claims mobility, with a system behind it.</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>awk<span class="w"> </span>-F<span class="s1">'\t'</span><span class="w"> </span><span class="s1">'NR==1 {for (i = 1; i &lt;= NF; i++) col[$i] = i; print; next}</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="s1">            $col["evidence_level"] != "profile_hits_only" &amp;&amp;</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="s1">            $col["mge_class"]      != "cime_or_island"'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="m">08</span>.mobilome/S1/S1_ice_candidates.tsv
+</code></pre></div>
+<p>The audit will hold far fewer <code>dropped</code> rows and many more <code>kept_flagged</code> ones —
+<code>no_assembled_system</code>, <code>few_anchor_classes</code>, <code>mpf_marker_without_typed_system</code>,
+<code>machinery_not_intact</code>. That is the shape of a wider net working correctly: the extra
+material arrives already labelled weak.</p>
+<h2 id="on-a-draft-assembly">On a draft assembly<a class="headerlink" href="#on-a-draft-assembly" title="Permanent link">&para;</a></h2>
+<p>Fragmentation is not a threshold problem, and almost nothing on this page fixes it. The
+measurement cut 40 benchmark genomes to three contiguities and re-ran the whole chain,
+and its result is one line: the <strong>class</strong> survives fragmentation, the <strong>extent</strong> does
+not. <a href="../draft-assemblies/">Draft assemblies</a> has the full treatment; what follows is only
+what changes about tuning.</p>
+<p><strong>Read the first row of the audit before anything else.</strong> <code>{sample}_ice_discarded.tsv</code>
+opens with an <code>assembly_qc</code> row carrying the sample's own contig count and N50, plus one
+sentence saying which of three measured bands it falls in. The band edges are 150 kb and
+30 kb (<code>conjscan_to_ice.py:1215-1216</code>); 30 kb rather than 50 kb because the divider has
+to sit <em>between</em> the two arms it separates, and detection held at the 50 kb arm.</p>
+<p><strong>Do not turn on <code>require_trna_boundary_for_high</code>.</strong> On the 52 complete records it
+already demotes 23 of 30 high-confidence calls, because only 7 of them have
+tRNA-anchored ends. On a short-read draft, where the flanks are usually simply absent, it
+caps essentially everything, and a confidence column that always reads "medium" tells a
+reviewer nothing. Conservative does not mean "cap everything"; it means make the strong
+claim rarer and better evidenced.</p>
+<p><strong>Expect <code>min_reference_coverage</code> to block tier 4, and do not lower it to unblock it.</strong>
+A curated element split across contigs fails the coverage test by construction — already
+visible at 12% and 49% on 5- and 6-contig assemblies. Admitting the fragment names a
+transposon from half of it.</p>
+<p><strong>Check <code>fraction_at_contig_boundary</code> in <code>{sample}_is_summary.tsv</code> every time.</strong> A high
+value means the assembly broke exactly where the IS elements are, so the located IS count
+is a floor. If reads are available, the <em>optional</em> copy-number leg
+(<code>mobilome.isosdb.fasta_url</code>) is what turns that warning into a number.</p>
+<h2 id="what-no-knob-fixes">What no knob fixes<a class="headerlink" href="#what-no-knob-fixes" title="Permanent link">&para;</a></h2>
+<p>These are limits of the design and of the data, and a methods section should say so.</p>
+<p><strong>A 70.6% IME detection ceiling.</strong> Measured over all 395 curated IMEs at production
+settings: 279 carry a relaxase that can be detected at all. The remaining 30% are not
+waiting behind a threshold — validated with a shuffled-protein control, which produces
+<strong>0 of 395</strong> hits at production settings. Size-matched, IMEs are detected as well as or
+better than ICEs in every size bin; the earlier appearance otherwise was a size confound.</p>
+<p><strong>Elements that carry no relaxase.</strong> NBU1, NBU2, Tn<em>4555</em> and the MGI series are
+mobilised in <em>trans</em> by a co-resident element, so they encode no relaxase because they do
+not use one. This module is relaxase-anchored, which makes them out of scope by design
+rather than misses. No threshold reaches them.</p>
+<p><strong>Elements below about 2 kb.</strong> 22 curated IMEs (5.6%) are under 2 kb, 17 of them a single
+ORF. 18 of the 22 produce no relaxase signal at any threshold. Lowering
+<code>--min-ime-element-bp</code> below 2,000 does not recover them; it admits noise.</p>
+<p><strong><code>spans_contigs</code> caps at low, absolutely.</strong> MacSyFinder is run over the whole draft as
+one pseudo-replicon, so genes it joined across a contig break may simply be unrelated
+genes that happen to be adjacent in the file. Not a threshold, and not exposed.</p>
+<p><strong>Boundaries on fragmented assemblies.</strong> If the flanking sequence is not on the contig,
+no parameter finds an <em>att</em> site. <code>boundary_method=none</code> is the correct answer, and the
+interval is honestly a floor.</p>
+<h2 id="traps">Traps<a class="headerlink" href="#traps" title="Permanent link">&para;</a></h2>
+<p><strong>Lowering a threshold changes what "detected" means.</strong> A recall score that counts any
+overlap flatters a looser setting, because one large call can cover several curated
+elements and each counts as a hit. At <code>coverage_profile: 0.4</code> the internal scorer prints
+16/18 ICEs rather than 15/18 — the extra "detection" is a 3,187 bp call clipping the tail
+of a 161 kb element, 1.9% of it, and classed <code>ime</code> rather than <code>ice</code>. Honest ICE recall
+is 15/18 at every coverage value tested. Always report the recovered fraction and the
+class next to the count.</p>
+<p><strong>Whenever you loosen a threshold to see what you were missing, run the loosened setting
+over shuffled or decoy input as well.</strong> A permissive HMM pass finds a relaxase hit in 373
+of 395 curated IMEs, which looks like a 94% ceiling until the shuffled control is run at
+the same setting: <strong>277 of 395</strong> shuffled sequences also produce a hit. The permissive
+pass is roughly 70% noise. Without the control you cannot tell recovery from noise.</p>
+<p><strong>A negative control must be inspected, not counted.</strong> The negative set here included
+<em>Bacillus subtilis</em> 168 on the grounds of having no curated ICEberg entry, and the module
+called an ICE at 529,362–549,932. That is ICEBs1, discovered in <em>B. subtilis</em> 168
+(Auchtung <em>et al.</em> 2005) — a true positive ICEberg has not curated, and it came close to
+being recorded as a false alarm. Expect the curated databases to be incomplete rather
+than the caller to be wrong.</p>
+<p><strong>Say which arm and which build a before/after came from.</strong> "15/18 ICEs, 5/12 IMEs, 2
+calls in 32.6 Mb" mixes arms: the pilot figures come from runs with the ICEscan layer on,
+while the "2 calls" figure comes from negative genomes that had no ICEscan directory. The
+like-for-like negative figure for that configuration is <strong>5</strong>, not 2.</p>
+<p><strong>Turning a knob makes a run non-comparable with the last one.</strong> The audit records the
+value that was applied, but only per run, and a half-and-half result set is very hard to
+unpick later. If you change a threshold mid-project, re-run everything — and keep the
+<code>PROVENANCE.txt</code> each download rule writes, since the databases come from unversioned
+addresses (<a href="../enabling/">Turning it on</a>).</p>
+<h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Read it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../output/">Reading the output</a></td>
+<td>what every column of the mobility table means</td>
+</tr>
+<tr>
+<td><a href="../draft-assemblies/">Draft assemblies</a></td>
+<td>the full fragmentation measurement and which columns survive it</td>
+</tr>
+<tr>
+<td><a href="../enabling/">Turning it on</a></td>
+<td>the master switch and the four optional layers</td>
+</tr>
+<tr>
+<td><a href="../mobility-ladder/">The mobility ladder</a></td>
+<td>what each tier claims, and what it does not</td>
+</tr>
+<tr>
+<td><a href="../validation/">Validation</a></td>
+<td>the benchmarks these numbers come from, and what they do not show</td>
+</tr>
+<tr>
+<td><a href="../worked-example/">Worked example</a></td>
+<td>one genome end to end, with the "why not" trail</td>
+</tr>
+<tr>
+<td><a href="../../reference/configuration/">Configuration</a></td>
+<td>every config key and its default, in the file's own order</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

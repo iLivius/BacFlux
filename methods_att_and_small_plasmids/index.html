@@ -1,0 +1,2994 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../methods_amr_intrinsic_acquired/">
+      
+      
+        <link rel="next" href="../methods_icescan_union/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>att sites and small plasmids - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#method-reference-att-site-detection-and-small-plasmid-recovery" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              att sites and small plasmids
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Turning it on
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#part-1-how-att-sites-are-actually-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 1 — How att sites are actually detected
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 1 — How att sites are actually detected">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-failure-that-prompted-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The failure that prompted this
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-reference-tools-do-every-one-searches-a-range-of-lengths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the reference tools do — every one searches a range of lengths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-a-fixed-length-cannot-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a fixed length cannot work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stepping-the-probe-down-no-precedent-and-weaker-anyway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stepping the probe down: no precedent, and weaker anyway
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nobody-has-published-a-false-positive-rate-for-boundary-calling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nobody has published a false-positive rate for boundary calling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-bacflux-does-as-a-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What BacFlux does as a result
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-not-vmatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why not Vmatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#licensing-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licensing note
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-2-why-small-plasmids-go-missing-and-what-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 2 — Why small plasmids go missing, and what to do
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 2 — Why small plasmids go missing, and what to do">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#it-is-not-the-assembler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        It is not the assembler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-two-causes-that-do-explain-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two causes that do explain it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measured-on-our-own-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measured on our own data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#so-why-is-length_weight-still-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        So why is length_weight still 1?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-doubled-circle-artifact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The doubled-circle artifact
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-options-and-why-only-one-of-them-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The options, and why only one of them ships
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-newer-assemblers-are-not-in-the-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why newer assemblers are not in the table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-3-the-compounding-trap-in-our-own-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 3 — The compounding trap in our own pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#part-1-how-att-sites-are-actually-detected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 1 — How att sites are actually detected
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 1 — How att sites are actually detected">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-failure-that-prompted-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The failure that prompted this
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-reference-tools-do-every-one-searches-a-range-of-lengths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the reference tools do — every one searches a range of lengths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-a-fixed-length-cannot-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a fixed length cannot work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stepping-the-probe-down-no-precedent-and-weaker-anyway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stepping the probe down: no precedent, and weaker anyway
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nobody-has-published-a-false-positive-rate-for-boundary-calling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nobody has published a false-positive rate for boundary calling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-bacflux-does-as-a-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What BacFlux does as a result
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-not-vmatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why not Vmatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#licensing-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licensing note
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-2-why-small-plasmids-go-missing-and-what-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 2 — Why small plasmids go missing, and what to do
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 2 — Why small plasmids go missing, and what to do">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#it-is-not-the-assembler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        It is not the assembler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-two-causes-that-do-explain-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two causes that do explain it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measured-on-our-own-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measured on our own data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#so-why-is-length_weight-still-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        So why is length_weight still 1?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-doubled-circle-artifact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The doubled-circle artifact
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-options-and-why-only-one-of-them-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The options, and why only one of them ships
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-newer-assemblers-are-not-in-the-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why newer assemblers are not in the table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-3-the-compounding-trap-in-our-own-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 3 — The compounding trap in our own pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/methods_att_and_small_plasmids.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="method-reference-att-site-detection-and-small-plasmid-recovery">Method reference: att-site detection and small-plasmid recovery<a class="headerlink" href="#method-reference-att-site-detection-and-small-plasmid-recovery" title="Permanent link">&para;</a></h1>
+<p>Two problems that look unrelated and are not. <strong>Where does a mobile element stop?</strong>
+and <strong>why did a small plasmid vanish from the assembly?</strong> Both come down to short
+repeated sequences.</p>
+<p>Every claim carries its source. Two are NEGATIVE results — questions the published
+literature does not answer — and they are flagged as such, because those are the ones
+to be careful with in a paper.</p>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><em>att</em> site</strong></td>
+<td>the short repeated sequence left at each end of an element when it integrates into a genome. Finding the pair is how an element's true edges are established</td>
+</tr>
+<tr>
+<td><strong>attL / attR</strong></td>
+<td>the left and right copies of that repeat</td>
+</tr>
+<tr>
+<td><strong>ICE</strong></td>
+<td>integrative and conjugative element — a mobile element that sits in the chromosome and can move itself to another cell</td>
+</tr>
+<tr>
+<td><strong>direct repeat</strong></td>
+<td>two copies of a sequence in the same orientation</td>
+</tr>
+<tr>
+<td><strong>HMM</strong></td>
+<td>hidden Markov model, a statistical profile used to recognise a protein family</td>
+</tr>
+<tr>
+<td><strong>IS</strong></td>
+<td>insertion sequence, the smallest kind of mobile element</td>
+</tr>
+<tr>
+<td><strong>MEM</strong></td>
+<td>maximal exact match — a shared stretch that cannot be extended further at either end</td>
+</tr>
+<tr>
+<td><strong>ONT</strong></td>
+<td>Oxford Nanopore Technologies, the long-read sequencing platform</td>
+</tr>
+<tr>
+<td><strong>DAG</strong></td>
+<td>the graph of rules Snakemake builds to decide what still has to run</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The evidence comes from the primary sources, the tools' own source code, and two
+failures on clinical <em>Klebsiella pneumoniae</em> hybrid data — isolates TUM24772
+(PRJNA1168299) and K3 (PRJNA1291976).</p>
+<hr />
+<h2 id="part-1-how-att-sites-are-actually-detected">Part 1 — How att sites are actually detected<a class="headerlink" href="#part-1-how-att-sites-are-actually-detected" title="Permanent link">&para;</a></h2>
+<h3 id="the-failure-that-prompted-this">The failure that prompted this<a class="headerlink" href="#the-failure-that-prompted-this" title="Permanent link">&para;</a></h3>
+<p>BacFlux's att search took a <strong>fixed 25 bp probe</strong> from the 3′ end of a tRNA and
+looked for a second copy bracketing the candidate element. On two clinical
+ICE<em>Kp</em> elements it found nothing at 25 bp, but candidate pairs appeared at
+18 bp.</p>
+<p>The reason is measured, not inferred: <strong>the ICE<em>Kp</em> direct repeat is 17 bp</strong>
+(<code>CCAGTCAGAGGAGCCAA</code>), reported by Lam <em>et al.</em> 2018.
+A 25 bp probe cannot match a 17 bp repeat under any mismatch budget. This was a
+structural defect, not a tuning problem.</p>
+<blockquote>
+<p>Lam MMC <em>et al.</em> (2018) <em>Genetic diversity, mobilisation and spread of the
+yersiniabactin-encoding mobile element ICEKp in Klebsiella pneumoniae
+populations.</em> Microbial Genomics.
+<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6202445/">https://pmc.ncbi.nlm.nih.gov/articles/PMC6202445/</a></p>
+</blockquote>
+<h3 id="what-the-reference-tools-do-every-one-searches-a-range-of-lengths">What the reference tools do — every one searches a range of lengths<a class="headerlink" href="#what-the-reference-tools-do-every-one-searches-a-range-of-lengths" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>tool</th>
+<th>att method</th>
+<th>length rule</th>
+<th>source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ICEfinder</strong> (Ou lab, the reference ICE tool)</td>
+<td>ARAGORN locates tRNA/tmRNA 3′ termini; <strong>Vmatch</strong> finds the direct repeats marking the tRNA-distal boundary</td>
+<td>maximal exact repeats — variable by construction</td>
+<td><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6323972/">ICEberg 2.0 paper</a></td>
+</tr>
+<tr>
+<td><strong>ICEfinder2</strong></td>
+<td>same, in code</td>
+<td><strong><code>vmatch -l 15</code></strong> — floor 15 bp, length read from the output</td>
+<td><a href="https://github.com/EBI-Metagenomics/icefinder2/blob/main/script/single.py"><code>script/single.py</code> L286</a></td>
+</tr>
+<tr>
+<td><strong>icefinder-opt</strong> (maintained 2025 fork)</td>
+<td>unchanged</td>
+<td>still <code>vmatch -l 15</code></td>
+<td><a href="https://github.com/guogenglin/icefinder-opt">repo</a></td>
+</tr>
+<tr>
+<td><strong>DEPhT</strong></td>
+<td><strong>BLASTN of the left flank against the right flank</strong>, scoring <em>all</em> resulting pairs</td>
+<td>whatever the local alignment returns</td>
+<td><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9303363/">DEPhT paper</a></td>
+</tr>
+<tr>
+<td><strong>DBSCAN-SWA</strong></td>
+<td>same flank-vs-flank BLAST pattern</td>
+<td>explicit <strong>12 bp</strong> minimum, ranked by bitscore</td>
+<td><a href="https://github.com/HIT-ImmunologyLab/DBSCAN-SWA/blob/master/bin/dbscan-swa.py"><code>bin/dbscan-swa.py</code></a></td>
+</tr>
+<tr>
+<td><strong>Islander / TIGER</strong></td>
+<td>sidesteps repeats entirely — integration splits a tDNA and the island restores it, so it hunts the <strong>displaced tDNA fragment</strong> by sensitive BLASTN</td>
+<td>whatever the alignment returns</td>
+<td><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4383910/">Islander paper</a></td>
+</tr>
+<tr>
+<td><strong>IntegronFinder</strong></td>
+<td>covariance model (Infernal) for <em>attC</em></td>
+<td>bounded variable length, defaults 40–200 bp</td>
+<td><a href="https://academic.oup.com/nar/article/44/10/4539/2516972">NAR 2016</a></td>
+</tr>
+<tr>
+<td>IslandViewer components (IslandPath-DIMOB, SIGI-HMM), alien_hunter, PAIDB</td>
+<td><strong>do not detect att sites at all</strong> — compositional / mobility-gene methods</td>
+<td>n/a</td>
+<td><a href="https://academic.oup.com/nar/article/45/W1/W30/3787837">IslandViewer 4</a></td>
+</tr>
+</tbody>
+</table>
+<p>IslandViewer integrates Islander <em>specifically because</em> its own compositional
+predictors have poor boundary accuracy — so they offer no precedent for
+boundary calling.</p>
+<h3 id="why-a-fixed-length-cannot-work">Why a fixed length cannot work<a class="headerlink" href="#why-a-fixed-length-cannot-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Bacterial ICE direct repeats span roughly <strong>10–60 bp</strong>
+  (<a href="https://academic.oup.com/femsre/article/41/4/512/3089980">FEMS Microbiol Rev</a>),
+  so any single value sits arbitrarily inside the real distribution.</li>
+<li>Integrase family predicts the range: <strong>tyrosine</strong>-integrase elements at tRNA
+  sites (which ICE<em>Kp</em> is) sit at <strong>20–45 bp</strong> cores, <strong>serine</strong>-integrase
+  elements go as low as <strong>3–12 bp</strong> (<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9303363/">DEPhT</a>).</li>
+</ul>
+<h3 id="stepping-the-probe-down-no-precedent-and-weaker-anyway">Stepping the probe down: no precedent, and weaker anyway<a class="headerlink" href="#stepping-the-probe-down-no-precedent-and-weaker-anyway" title="Permanent link">&para;</a></h3>
+<p>The obvious repair — try 25, then 24, 23 … and take the longest that works — has
+<strong>no published precedent</strong> in att-site or genomic-island detection. Nobody needs
+it: a maximal-repeat search (Vmatch) or a local alignment (BLAST) returns the
+longest repeat in a single pass. Exact k-mer stepping is also strictly <em>weaker</em>,
+because it cannot absorb the indels and mismatches an aligner handles automatically,
+and it yields no bitscore to weight confidence with.</p>
+<h3 id="nobody-has-published-a-false-positive-rate-for-boundary-calling">Nobody has published a false-positive rate for boundary calling<a class="headerlink" href="#nobody-has-published-a-false-positive-rate-for-boundary-calling" title="Permanent link">&para;</a></h3>
+<p>There is <strong>no published false-positive rate or statistical treatment specific to
+att-site detection</strong>. Existing benchmarks measure genomic-island <em>calling</em>, not
+<em>boundary</em> calling. Islander's paper admits only "the few false positives", with
+no number.</p>
+<p>That gap is why the rate below can be stated as the best-characterised figure
+available: it is measured rather than borrowed. Measured on 300 randomly placed 15 kb non-ICE spans of a clinical
+<em>K. pneumoniae</em> chromosome, with the real IS mask applied: <strong>22%</strong> of them
+returned a confident de novo "boundary", falling to <strong>16%</strong> once the
+repeat-family guard was added, and to <strong>~1%</strong> reaching the AMR table once de novo
+repeats stopped being applied at all. Quote <strong>16%</strong> as the current de novo
+false-boundary rate — 22% is the <em>before</em> figure, and the two are easy to confuse
+because both appear in the code comments.</p>
+<p><em>(The source comment in <code>att_search.py</code> names this chromosome "KPNIH1" and
+<code>mobilome_worked_example.md</code> attributes it to ATCC BAA-2146. Those are two
+different genomes — see the note in the worked example — and which one carried
+this particular measurement has not been re-established, so no strain is claimed
+here. The rate itself is unaffected either way.)</em></p>
+<p>This is also why de novo repeats are <strong>reported but not applied</strong>: at a
+one-in-six error rate a de novo pair is a reasonable lead for a human to follow
+and an unacceptable basis for silently redefining an element, since widening an
+interval turns every gene inside it into predicted cargo. tRNA-anchored pairs
+<em>are</em> applied, because they start from a position integrases are known to target.</p>
+<h3 id="what-bacflux-does-as-a-result">What BacFlux does as a result<a class="headerlink" href="#what-bacflux-does-as-a-result" title="Permanent link">&para;</a></h3>
+<p><strong>Exact maximal repeats between the two flanks, computed in standard-library
+Python</strong> — <code>vmatch -l N</code> semantics, which is what ICEfinder and ICEfinder2 use.
+The search is in <code>workflow/scripts/80_mobilome/att_search.py</code>
+(<code>find_maximal_repeats</code> / <code>search_maximal_repeat</code>).</p>
+<p>It calls no external program. <code>att_search.py</code> is standard-library only and the rule
+that runs it has no conda environment of its own, so shelling out to <code>blastn</code> would
+make the module depend on whatever happened to be on <code>PATH</code>. A BLAST search would be
+more sensitive — it absorbs mismatches and gaps, which an exact repeat search cannot —
+so this is a deliberate trade of sensitivity for a rule with no dependencies, not an
+equivalence.</p>
+<p>How it works, and where each choice comes from:</p>
+<ul>
+<li><strong>Exact maximal repeats</strong>: index every <em>k</em>-mer of the left flank, find matches
+  in the right flank, then extend each match outwards for as long as the two
+  sequences agree. One pass returns the longest repeat, so nothing has to "step
+  the probe down".</li>
+<li><strong>A 50 kb flank window each side</strong> (<code>DEFAULT_FLANK_WINDOW_BP</code>), raised from
+  30 kb. Measured on SPI-7 (<code>AL513382</code>): the correct attR sits in a tRNA-Phe
+  5,800 bp <em>outside</em> a 30 kb window, so the element was reported 50 kb short for
+  want of anywhere to look. Widening to 50 kb recovers it, and 80 kb, 120 kb and
+  200 kb change no element's answer on the benchmark — so this is where the curve
+  flattens, not simply a bigger round number. The cost is more candidate repeats
+  to rank, which is why the ranking rule below matters more at 50 kb than at 30.</li>
+<li><strong>Floor of 15 bp</strong>, matching ICEfinder2 and icefinder-opt; DBSCAN-SWA uses 12,
+  so 15 is the more conservative of the two published choices. The floor actually
+  applied is the <strong>larger</strong> of 15 and a chance-match threshold computed from the
+  two window sizes: at 15 bp, two 50 kb flanks are expected to share <strong>~2.3</strong>
+  repeats by luck alone, so a flat 15 would report noise on any large window. At
+  the shipped 50 kb window this resolves to <strong>18 bp</strong> — as it also did at 30 kb,
+  so widening the window did not move the floor.
+  Note this threshold assumes DNA is a random string of four equally likely
+  letters, which real chromosomes are not; it is a floor against random
+  background, not a filter against repetitive sequence. The 16% figure above is
+  what happens when it is asked to do more than that.</li>
+<li><strong>One search, not two modes.</strong> tRNA proximity is a <strong>ranking term inside the
+  single search</strong>, not a separate search: every maximal repeat that brackets the
+  machinery is found first, and only then are they ranked. This follows
+  ICEfinder's division of labour — the tRNA <em>locates</em> a candidate site, the
+  repeat search <em>delimits</em> it — and DEPhT's treatment of integrase proximity as
+  one term among several rather than as a gate.</li>
+<li><strong>Anchoring outranks length.</strong> Candidates are ordered by whether <em>at least one</em>
+  copy sits inside an annotated tRNA <strong>first</strong>, and by repeat length only within
+  each group. The two are not comparable quantities: length says how unlikely the
+  match is by chance, a tRNA 3′ end says the match is where integration actually
+  happens. Measured on SPI-7 (<code>AL513382</code>), a 51 bp repeat in ordinary sequence
+  beat the real 24 bp <em>att</em> pair at tRNA-Phe and the element came out 50 kb short;
+  under this ordering the tRNA-anchored pair wins and the call lands on the
+  curated interval. (A small <code>TRNA_ANCHOR_BONUS_BP = 10</code> also exists in the score,
+  from the earlier tie-break design.)</li>
+<li><strong>Both copies inside tRNAs of the <em>same amino acid</em> is rejected outright</strong> —
+  that is two paralogous tRNA genes, not an integration scar. Two copies in
+  tRNAs of <em>different</em> amino acids is allowed, and the distinction is not
+  academic: ICE<em>Ec2</em> (<code>GU725392</code>) has its real 22 bp <em>att</em> pair in tRNA-Phe at
+  one end and tRNA-Ser at the other, and the earlier blanket rule threw that
+  boundary away, reporting the element 37 kb short. This is why the ordering
+  above tests "at least one copy in a tRNA" rather than "exactly one": by the
+  time ranking happens, the paralogue case has already been removed.</li>
+<li>The label written to <code>boundary_method</code> is therefore an <strong>outcome</strong>, not a mode:
+  <code>tRNA</code> when the winning repeat has a copy in a tRNA, <code>denovo</code> when it does not,
+  <code>none</code> when nothing survived.</li>
+</ul>
+<p><strong>No new dependency, and no external program</strong>: the search is pure Python
+standard library.</p>
+<h3 id="why-not-vmatch">Why not Vmatch<a class="headerlink" href="#why-not-vmatch" title="Permanent link">&para;</a></h3>
+<p>Vmatch is available — <code>bioconda/vmatch 2.3.1</code> exists for linux-64 and osx-64, so
+packaging is not the obstacle. It is rejected on licensing alone: the recipe declares
+<code>license: Unknown / OTHER</code> and vmatch.de was unreachable, so its terms cannot be
+verified — which under the project's §11 rule is still a blocker for an
+MIT-licensed workflow. The spec has been corrected to give the right reason.</p>
+<p>There is now also a <strong>measured</strong> reason, which matters more than the licence one.
+Because the search above already computes vmatch's own semantics, a second
+implementation was built on vmatch's actual data structure — prefix-doubling
+suffix array, Kasai LCP array, cross-flank MEM enumeration — and run against ours
+on every real flank window in the benchmark.</p>
+<p>The script is
+<code>BacFlux_v2_validation/phase7_benchmark/verify_att_equivalence.py</code>
+and it re-runs in about ten minutes. It does not generate windows of its own: it
+replays the actual caller (<code>conjscan_to_ice.py</code>) over the benchmark genomes with
+<code>find_maximal_repeats</code> wrapped in a recorder, so every window tested is one the
+pipeline genuinely searched — after IS masking, at the real element coordinates,
+at the real computed floor.</p>
+<p><strong>Result:</strong> 52 benchmark genomes, 246 att
+searches, <strong>180 distinct flank windows, 1,033 repeats, exact set equality on
+every window</strong>. No window hit either implementation's internal cap. So the
+conclusion holds: <strong>a vmatch-based search would find nothing that is not already
+found</strong>, and the licence blocker costs no sensitivity.</p>
+<p>One related idea is disposed of by the same measurement: shipping both
+searches and treating their agreement as a confidence signal would be worthless.
+Two implementations of identical semantics are <em>expected</em> to agree exactly, so
+their agreement carries no information about whether a boundary is real. It tests
+the code, once, and that is all it is for.</p>
+<h3 id="licensing-note">Licensing note<a class="headerlink" href="#licensing-note" title="Permanent link">&para;</a></h3>
+<p>ICEfinder2 is <strong>CC BY-NC-SA 4.0</strong>. Its source was read only to establish the
+algorithm and its parameters, which spec §11 explicitly permits. <strong>No code was
+copied.</strong></p>
+<p>What was taken from ICEfinder2 is <strong>which algorithm to use and with what
+parameters</strong> — maximal exact repeats between the flanks, floor 15 bp — and spec
+§11 is explicit that design decisions and thresholds are facts, not expression.
+The algorithm itself is not ICEfinder2's to license: maximal exact repeat search
+is standard published string processing (Vmatch, and REPuter before it), and
+<code>find_maximal_repeats</code> is an independent stdlib Python implementation written
+from that definition. Vmatch's own terms are a separate question and are the
+reason it is not installed — see above.</p>
+<hr />
+<h2 id="part-2-why-small-plasmids-go-missing-and-what-to-do">Part 2 — Why small plasmids go missing, and what to do<a class="headerlink" href="#part-2-why-small-plasmids-go-missing-and-what-to-do" title="Permanent link">&para;</a></h2>
+<h3 id="it-is-not-the-assembler">It is not the assembler<a class="headerlink" href="#it-is-not-the-assembler" title="Permanent link">&para;</a></h3>
+<p>Flye is one of the <strong>better</strong> long-read assemblers for small plasmids, not an
+offender. Recovery of plasmids <strong>&lt;10 kb</strong>
+(<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10272865/">Microbial Genomics 2023</a>):</p>
+<table>
+<thead>
+<tr>
+<th>assembler</th>
+<th>&lt;10 kb recovery</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unicycler (hybrid)</td>
+<td>100%</td>
+</tr>
+<tr>
+<td>Canu</td>
+<td>100%</td>
+</tr>
+<tr>
+<td><strong>Flye <code>--nano-raw</code></strong></td>
+<td><strong>79%</strong></td>
+</tr>
+<tr>
+<td>Flye <code>--meta</code></td>
+<td>73%</td>
+</tr>
+<tr>
+<td><strong>Flye <code>--nano-hq</code></strong></td>
+<td><strong>67%</strong></td>
+</tr>
+<tr>
+<td>Miniasm/Minipolish</td>
+<td>64%</td>
+</tr>
+<tr>
+<td>Raven</td>
+<td>39%</td>
+</tr>
+</tbody>
+</table>
+<p>Wick &amp; Holt independently report NECAT "failed to assemble many plasmids",
+NextDenovo "performed poorly on plasmid assembly", and Raven "wasn't good with
+small plasmids"
+(<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6966772/">[Genome Biol]</a>).
+<strong>Switching assemblers would mostly make this worse.</strong></p>
+<blockquote>
+<p><strong>Actionable side-finding:</strong> <code>--nano-hq</code> is the <em>worst</em> of Flye's three modes
+for small plasmids (67% vs 79% for <code>--nano-raw</code>), and BacFlux auto-selects the
+mode. Worth revisiting if small replicons matter more than consensus accuracy.
+Note also that Flye's <code>--plasmids</code> flag <strong>no longer exists</strong> — added in 2.4,
+removed in 2.9.</p>
+</blockquote>
+<h3 id="the-two-causes-that-do-explain-it">The two causes that do explain it<a class="headerlink" href="#the-two-causes-that-do-explain-it" title="Permanent link">&para;</a></h3>
+<p><strong>1. ONT ligation library prep.</strong> Plasmids &lt;20 kb are under-represented in
+ligation read sets by a mean factor of <strong>~4</strong>, and up to <strong>&gt;100-fold</strong> for the
+smallest (one 2.4 kb plasmid). Unfragmented circular plasmids never receive a
+blunt-end adapter. <strong>Rapid (transposase) prep shows no such bias.</strong>
+This is unfixable <em>in silico</em>.
+(<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8549360/">Microbial Genomics</a>)</p>
+<p><strong>2. Our own read QC.</strong> BacFlux hard-coded <code>--keep_percent 90 --length_weight 10</code>;
+filtlong's own default for the second is 1. Filtlong scores reads as</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>(Length^lw × MeanQ^mqw)^(1/(lw+mqw)) × WindowQ
+</code></pre></div>
+<p>and <code>--keep_percent</code> deletes the bottom of that ranking. <strong>A plasmid cannot
+produce reads longer than itself</strong>, so its reads sit at the bottom by
+construction, and the more length dominates the score the further down they sit.</p>
+<p>Wick's Feb 2026 read-QC benchmark (5 genomes, 11 assemblers) found the same
+failure and is worth reading carefully, because it does <strong>not</strong> say what we first
+took it to say. His <code>Filtlong-defaults</code> arm ran filtlong at its <strong>own defaults</strong>
+(<code>--target_bases</code> = 100 × genome size, so <code>length_weight</code> 1 — the value we now
+ship), and that arm <em>"removed all reads below 10 kbp, essentially erasing these
+plasmids"</em> in the 3 of 5 genomes that had sub-10 kb plasmids, with more
+structural errors as a result. So it is not independent confirmation of our
+<code>length_weight 10</code> finding: it is a warning that filtlong's default length
+weighting is already enough to erase small plasmids once you cull hard to a
+target. His recommendation is to go <strong>below</strong> the default —
+<code>--length_weight 0 --window_q_weight 0</code>. Note this bears directly on <code>nanopore</code>
+mode, which culls with <code>--target_bases</code> exactly as his arm did.
+<a href="https://rrwick.github.io/2026/02/05/read_qc_testing.html">https://rrwick.github.io/2026/02/05/read_qc_testing.html</a></p>
+<h3 id="measured-on-our-own-data">Measured on our own data<a class="headerlink" href="#measured-on-our-own-data" title="Permanent link">&para;</a></h3>
+<p><em>Klebsiella pneumoniae</em> <strong>TUM24772</strong> — BioProject PRJNA1168299, closed genome
+GCA_043950115.1, chromosome CP171785.1. A clinical test isolate, and <strong>not</strong> one
+of the BAA-2146 / KPNIH1 mobilome positive controls; this project has conflated
+those before, so the distinction is worth stating. Its 5,596 bp Col2 plasmid
+(pMTY24772_Col2, CP171790.1) was missing from our assembly while sitting complete
+in the Illumina data.</p>
+<p>Reads mapping to that plasmid, for all four combinations of the two keys. Counts
+are <code>minimap2 -x map-ont</code> against <code>CP171790.1</code>, keeping reads with an alignment
+block of at least 1 kb; on that measure the <strong>raw</strong> read set holds <strong>603</strong>:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>length_weight 10</code></th>
+<th><code>length_weight 1</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>keep_percent 90</code></strong> — the old value</td>
+<td><strong>93</strong></td>
+<td>413</td>
+</tr>
+<tr>
+<td><strong><code>keep_percent 95</code></strong></td>
+<td>500</td>
+<td><strong>502</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Both keys matter, and <code>keep_percent</code> is the one to reach for.</strong> At the 95 that
+now ships, changing <code>length_weight</code> is worth two reads; at the old 90 it is worth
+320. The plasmid needed 90 and 10 acting together to disappear, and either change
+on its own brings most of it back.</p>
+<h3 id="so-why-is-length_weight-still-1">So why is <code>length_weight</code> still 1?<a class="headerlink" href="#so-why-is-length_weight-still-1" title="Permanent link">&para;</a></h3>
+<p>Because the two keys protect different size classes, which only shows in the
+read-length distribution. Reads per band, same sample — the raw ONT set holds
+2,954 reads of 1–3 kb and 3,418 of 3–6 kb:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>1–3 kb</th>
+<th>3–6 kb</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keep_percent 90</code>, <code>lw 10</code></td>
+<td><strong>0</strong></td>
+<td>318</td>
+</tr>
+<tr>
+<td><code>keep_percent 95</code>, <code>lw 10</code></td>
+<td><strong>0</strong></td>
+<td>2,666</td>
+</tr>
+<tr>
+<td><code>keep_percent 90</code>, <code>lw 1</code></td>
+<td>123</td>
+<td>2,331</td>
+</tr>
+<tr>
+<td><code>keep_percent 95</code>, <code>lw 1</code></td>
+<td>605</td>
+<td>2,935</td>
+</tr>
+</tbody>
+</table>
+<p><code>length_weight 10</code> empties the 1–3 kb band at <strong>both</strong> <code>keep_percent</code> values.
+Raising <code>keep_percent</code> rescues the 3–6 kb band, which is why it rescued this
+5.6 kb plasmid, but only lowering <code>length_weight</code> rescues 1–3 kb. So
+<strong><code>keep_percent</code> protects plasmids of a few kb; <code>length_weight</code> protects plasmids
+under ~3 kb</strong>, and this one happened to sit in <code>keep_percent</code>'s range.</p>
+<p>Total bases barely moved across the arms (208 → 227 Mb), so none of this was ever
+about depth — only about <em>which</em> reads survived. At the old 90/10, 3.1% of kept
+reads were ≤6 kb, against 47.0% of the raw set.</p>
+<p><strong>Fix applied:</strong> <code>parameters.long_read_qc.keep_percent</code> now defaults to <strong>95</strong>
+(was 90) and <code>length_weight</code> to <strong>1</strong> (was 10), both configurable. Note that
+<code>length_weight</code> reaches filtlong in <strong>hybrid mode only</strong> — the <code>nanopore</code> rule
+never passes <code>--length_weight</code>, so in two of the four modes the key does nothing.</p>
+<h3 id="the-doubled-circle-artifact">The doubled-circle artifact<a class="headerlink" href="#the-doubled-circle-artifact" title="Permanent link">&para;</a></h3>
+<p>Our 23,928 bp contig is the 11,970 bp Col plasmid <strong>duplicated within one
+contig</strong> (2 × 11,970 = 23,940). This is documented: start/end overlap in small
+plasmids produces ~200% contiguity, and the Plassembler paper names Flye
+specifically as having "multiplicated many small plasmids" on real data.</p>
+<p><strong>dnaapler does not fix this.</strong> dnaapler only <em>rotates</em> contigs, which cures a
+few duplicated bases at a circular junction, not a whole-plasmid concatemer.
+<code>autocycler trim</code> does handle it, but cannot distinguish artifact from genuine
+duplication and expects to run inside the Autocycler pipeline.</p>
+<h3 id="the-options-and-why-only-one-of-them-ships">The options, and why only one of them ships<a class="headerlink" href="#the-options-and-why-only-one-of-them-ships" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>option</th>
+<th>what it would require</th>
+<th>verdict</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>keep_percent</code> 90 → 95</strong> (and <code>length_weight</code> 10 → 1)</td>
+<td>nothing — a config change</td>
+<td><strong>This is what BacFlux ships.</strong> Recovers 502 of the plasmid's 603 reads — but <em>not</em> the assembled plasmid</td>
+</tr>
+<tr>
+<td><strong>SPAdes rescue</strong></td>
+<td>no new tool or database</td>
+<td>Published recommendation, not a hack: small plasmids "usually appear as circular contigs" in a short-read graph (<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9980784/">Wick/Judd/Holt</a>). We already write <code>assembly_graph_with_scaffolds.gfa</code></td>
+</tr>
+<tr>
+<td><strong>Plassembler</strong></td>
+<td>a new tool, and the PLSDB database</td>
+<td><strong>MIT, bioconda 1.8.3</strong>, purpose-built. Pools reads that do <em>not</em> map to the Flye contigs and hybrid-assembles them with Unicycler — exactly where a Flye-absent plasmid lands. Can <strong>reuse our existing Flye assembly</strong> (<code>--flye_directory</code>), and writes empty outputs when it finds nothing, so the DAG never breaks. Cost: PLSDB is mandatory (<code>-d</code>, no skip flag) and states <strong>no licence at all</strong> — handle exactly as TnCentral/ICEberg per spec §5.5</td>
+</tr>
+<tr>
+<td><strong>Hybracter</strong></td>
+<td>replacing the whole assembly stage</td>
+<td>MIT, bioconda, wraps Plassembler — but replaces the <em>entire</em> assembly stage and nests Snakemake inside Snakemake, with two schedulers competing for cores</td>
+</tr>
+<tr>
+<td><strong>Autocycler</strong></td>
+<td>replacing the whole assembly stage</td>
+<td><strong>Would probably not have helped.</strong> Aimed at chromosome consensus accuracy; its own paper reports the smallest plasmid tested (2.5 kb) was occasionally missed and needed manual curation. Its clustering discards any cluster seen in too few input assemblies — precisely the small-plasmid case. Its own docs say: <em>if small plasmids matter, add Plassembler</em></td>
+</tr>
+<tr>
+<td><strong>Trycycler</strong></td>
+<td>manual curation per genome</td>
+<td>Unusable unattended; superseded by Autocycler</td>
+</tr>
+<tr>
+<td><strong>Union of multiple long-read assemblers</strong></td>
+<td>running several assemblers per sample</td>
+<td>Would probably not have helped — the failure is shared across assemblers and driven by the read set</td>
+</tr>
+</tbody>
+</table>
+<h3 id="why-newer-assemblers-are-not-in-the-table">Why newer assemblers are not in the table<a class="headerlink" href="#why-newer-assemblers-are-not-in-the-table" title="Permanent link">&para;</a></h3>
+<p>Switching assembler is the obvious alternative to the options above, and it cannot
+be judged on evidence. The newer long-read assemblers — Myloasm, metaMDBG, LJA,
+hifiasm — have been benchmarked for accuracy through 2025 and 2026, but no
+head-to-head study reports <strong>small-plasmid recovery</strong> per assembler. That is the
+number this section turns on, so there is nothing to compare against and none of
+them can be recommended or ruled out here.</p>
+<hr />
+<h2 id="part-3-the-compounding-trap-in-our-own-pipeline">Part 3 — The compounding trap in our own pipeline<a class="headerlink" href="#part-3-the-compounding-trap-in-our-own-pipeline" title="Permanent link">&para;</a></h2>
+<p>Independent of everything above, BacFlux has a second route to losing a plasmid,
+<strong>upstream of the assembler</strong>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>decontamination selects contigs by genus
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>        ↓
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>only reads mapping to SELECTED contigs become SEL_R1/SEL_R2
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        ↓
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>filtlong uses SEL_R1/SEL_R2 as its short-read reference
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        ↓
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>ONT reads for unselected sequence score as low quality and are discarded
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        ↓
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>Flye never sees the plasmid
+</code></pre></div>
+<p>This happens when a plasmid's best BLAST hit is a <strong>different genus from the
+host</strong> — which is not unusual, since plasmids cross genus boundaries constantly.
+On <em>K. pneumoniae</em> <strong>ATCC BAA-2146</strong>, <code>auto</code> mode dropped a genuine plasmid —
+pMYS, <code>NZ_CP006660.1</code>, 2,014 bp — because <em>E. coli</em> database entries outnumbered
+<em>Klebsiella</em> ones 58,709 to 16,253: BLAST bestsum follows database composition,
+not biology. (<code>NZ_CP006660.1</code> is a BAA-2146 replicon; KPNIH1 is a different genome,
+<code>CP008827.1</code> — the two are easy to confuse.)</p>
+<p><strong>It did not cause the TUM24772 loss</strong> — that plasmid survived decontamination
+(verified: present in <code>contigs_filt.fasta</code>), and was lost at the read-filtering
+step instead, to <code>keep_percent 90</code> and <code>length_weight 10</code> acting together. Both
+mechanisms must be ruled out separately.</p>
+<p><strong>How to check, then fix:</strong> see the annotated <code>decontamination:</code> block in
+<code>config/config.yaml</code>. In short: read
+<code>contig_taxonomy_decisions.tsv</code> for a discarded plasmid-sized contig whose genus
+differs from the sample's; then re-run with <code>mode: include</code> naming both genera,
+or <code>mode: off</code>, or <code>discard_no_hit: false</code>. Snakemake redoes only what changed.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

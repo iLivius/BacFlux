@@ -1,0 +1,2593 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../methods_medaka_model/">
+      
+      
+        <link rel="next" href="../methods_att_and_small_plasmids/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Intrinsic vs acquired AMR - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#method-reference-intrinsic-versus-acquired-amr-and-what-bacflux-can-actually-say" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Intrinsic vs acquired AMR
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Turning it on
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-two-kinds-of-resistance-and-why-one-is-invisible-to-blast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Two kinds of resistance, and why one is invisible to BLAST
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Two kinds of resistance, and why one is invisible to BLAST">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-this-matters-for-the-intrinsicacquired-question" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this matters for the intrinsic/acquired question
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-caveat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The caveat
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-why-bacflux-does-not-classify-genes-as-intrinsic-or-acquired" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Why BacFlux does not classify genes as intrinsic or acquired
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-efsa-bacillus-catalogue-what-it-is-and-why-we-do-not-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The EFSA Bacillus catalogue — what it is, and why we do not use it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The EFSA Bacillus catalogue — what it is, and why we do not use it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-was-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it was built
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-finding-most-relevant-to-bacflux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The finding most relevant to BacFlux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-is-not-built-into-bacflux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it is not built into BacFlux
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sourcing-standing-licence-and-stated-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sourcing: standing, licence, and stated limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-two-kinds-of-resistance-and-why-one-is-invisible-to-blast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Two kinds of resistance, and why one is invisible to BLAST
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Two kinds of resistance, and why one is invisible to BLAST">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-this-matters-for-the-intrinsicacquired-question" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this matters for the intrinsic/acquired question
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-caveat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The caveat
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-why-bacflux-does-not-classify-genes-as-intrinsic-or-acquired" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Why BacFlux does not classify genes as intrinsic or acquired
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-efsa-bacillus-catalogue-what-it-is-and-why-we-do-not-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The EFSA Bacillus catalogue — what it is, and why we do not use it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The EFSA Bacillus catalogue — what it is, and why we do not use it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-was-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it was built
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-finding-most-relevant-to-bacflux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The finding most relevant to BacFlux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-is-not-built-into-bacflux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it is not built into BacFlux
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sourcing-standing-licence-and-stated-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sourcing: standing, licence, and stated limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/methods_amr_intrinsic_acquired.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="method-reference-intrinsic-versus-acquired-amr-and-what-bacflux-can-actually-say">Method reference: intrinsic versus acquired AMR, and what BacFlux can actually say<a class="headerlink" href="#method-reference-intrinsic-versus-acquired-amr-and-what-bacflux-can-actually-say" title="Permanent link">&para;</a></h1>
+<p>A regulator asking about a resistance gene wants to know one thing: did this strain
+always have it, or did it acquire it? This page covers what BacFlux can answer, and
+what it deliberately refuses to answer. For the short version, see
+<a href="../mobilome/mobility-ladder/">The mobility ladder</a>.</p>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>AMR</strong></td>
+<td>antimicrobial resistance</td>
+</tr>
+<tr>
+<td><strong>intrinsic</strong></td>
+<td>resistance shared by essentially all strains of a species — a property of the species, not of this isolate</td>
+</tr>
+<tr>
+<td><strong>acquired</strong></td>
+<td>resistance gained horizontally, from a plasmid or mobile element</td>
+</tr>
+<tr>
+<td><strong>EFSA</strong></td>
+<td>European Food Safety Authority, whose guidance drives the intrinsic/acquired question</td>
+</tr>
+<tr>
+<td><strong>FEEDAP</strong></td>
+<td>the EFSA panel that issues the guidance for feed additives</td>
+</tr>
+<tr>
+<td><strong>QPS</strong></td>
+<td>Qualified Presumption of Safety, EFSA's list of species accepted as safe</td>
+</tr>
+<tr>
+<td><strong>MIC</strong></td>
+<td>minimum inhibitory concentration — the lab measurement of resistance</td>
+</tr>
+<tr>
+<td><strong>ANI</strong></td>
+<td>average nucleotide identity, a genome-to-genome similarity measure</td>
+</tr>
+<tr>
+<td><strong>IS</strong></td>
+<td>insertion sequence, the smallest kind of mobile element</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Three questions arise when an <code>08.mobilome</code> table is read next to a regulatory
+checklist:</p>
+<ol>
+<li>AMRFinderPlus reports point mutations. How is that different from a BLAST
+   search like ABRicate's, and why does it need <code>--organism</code>?</li>
+<li>EFSA defines an "intrinsic" AMR gene as one shared by the vast majority of
+   strains of a species. Does that mean BacFlux would have to compare against
+   every genome of that taxon in NCBI?</li>
+<li>EFSA publishes a catalogue of AMR genes in <em>Bacillus</em>. Is that a new AMR
+   database? Should BacFlux use it?</li>
+</ol>
+<p>Short answers: it is a fundamentally different question, not a stricter search;
+yes, and that is why BacFlux does not attempt it; and no, it is not a database
+and BacFlux does not use it.</p>
+<hr />
+<h2 id="1-two-kinds-of-resistance-and-why-one-is-invisible-to-blast">1. Two kinds of resistance, and why one is invisible to BLAST<a class="headerlink" href="#1-two-kinds-of-resistance-and-why-one-is-invisible-to-blast" title="Permanent link">&para;</a></h2>
+<p>A bacterium becomes resistant in one of two ways.</p>
+<p><strong>It acquires a gene it did not have.</strong> A <em>bla</em>CTX-M or a <em>tet</em>(M) arrives by
+horizontal transfer. Before, the gene was absent; after, it is present.</p>
+<p><strong>It mutates a gene it already had.</strong> A single amino-acid substitution in <em>gyrA</em>
+(fluoroquinolones), <em>rpoB</em> (rifampicin) or <em>rpsL</em> (streptomycin). These are
+essential genes, present in every strain of the species whether resistant or
+susceptible. One residue differs.</p>
+<p>ABRicate answers <em>"is this gene present?"</em> by BLAST, and reports identity and
+coverage. That question is exactly right for the first mechanism and structurally
+blind to the second: query a susceptible genome for <em>gyrA</em> and you get a hit at
+~99.9% identity; query a resistant one and you get a hit at ~99.9% identity. The
+substitution that decides the phenotype is averaged away inside the percentage.
+No threshold separates them, because the difference is not one of degree — it is
+one residue at one coordinate. Lowering the cutoff only adds noise.</p>
+<p>AMRFinderPlus with <code>--organism</code> asks a different question. It loads a curated set
+of <em>known resistance-conferring substitutions</em> for that species, aligns the query
+to the reference allele, and inspects the specific coordinate: not "is <em>gyrA</em>
+here" but "is residue 83 of GyrA a serine or a leucine". Hits are reported with
+<code>Method: POINTX</code> / <code>POINTP</code>, naming the substitution.</p>
+<p>Two further differences matter even where no mutation is involved:</p>
+<ul>
+<li><strong>Per-gene curated cutoffs</strong> rather than one blanket threshold. Gene families
+  differ in natural diversity, so a single cutoff is either too permissive for
+  conserved families or too strict for variable ones. This is why BacFlux applies
+  the EFSA 80%/70% thresholds to the <strong>ABRicate leg only</strong> — imposing them on
+  AMRFinderPlus would replace curation with a blunter rule.</li>
+<li><strong>Structured output</strong>: element type (AMR / STRESS / VIRULENCE), class and
+  subclass, and a partial-at-contig-end flag. The mobilome module consumes these.</li>
+</ul>
+<h3 id="why-this-matters-for-the-intrinsicacquired-question">Why this matters for the intrinsic/acquired question<a class="headerlink" href="#why-this-matters-for-the-intrinsicacquired-question" title="Permanent link">&para;</a></h3>
+<p>Point mutations <em>are</em> the chromosomal, non-transferable mechanism. So this is the
+one place a single genome can speak to the intrinsic side. Everything else the
+module does — replicon, mobile-element context, mobility tier — addresses the
+acquired and mobile side.</p>
+<h3 id="the-caveat">The caveat<a class="headerlink" href="#the-caveat" title="Permanent link">&para;</a></h3>
+<p><code>--organism</code> only engages for organisms AMRFinderPlus curates mutations for:
+roughly three dozen, overwhelmingly clinical — <em>Escherichia</em>, <em>Salmonella</em>,
+<em>Klebsiella</em>, <em>Staphylococcus aureus</em>, <em>Campylobacter</em>, <em>Pseudomonas aeruginosa</em>,
+<em>Enterococcus</em>, <em>Vibrio</em>, <em>Neisseria</em> and similar.</p>
+<p>On a batch of plant- and environment-associated strains — the Bacillaceae and
+soil Pseudomonadota that make up most environmental collections — <code>--organism</code>
+was applied to <strong>none of them</strong>. Every
+<code>{sample}_amrfinder_organism_audit.tsv</code> recorded the same reason: <em>no curated
+organism for this taxon</em>. Every <code>{sample}_amrfinderplus_mutations.tsv</code> was
+therefore header-only.</p>
+<p><strong>Read those empty files as "not assessed", never as "no mutations found."</strong>
+BacFlux writes the refusal and its reason to the audit file so the distinction
+survives.</p>
+<hr />
+<h2 id="2-why-bacflux-does-not-classify-genes-as-intrinsic-or-acquired">2. Why BacFlux does not classify genes as intrinsic or acquired<a class="headerlink" href="#2-why-bacflux-does-not-classify-genes-as-intrinsic-or-acquired" title="Permanent link">&para;</a></h2>
+<p>EFSA's definitions are population-level, and the wording is explicit:</p>
+<blockquote>
+<p><strong>Intrinsic AMR gene</strong> — "Gene inherent to strains of a bacterial species …
+An AMR gene is considered 'intrinsic' when it is shared by the vast majority of
+wild type strains of the same species (or subspecies) and is restricted to those
+located on the chromosome."</p>
+<p><strong>Acquired AMR gene</strong> — "A resistance gene novel for the strain under
+assessment, acquired through horizontal transfer … Acquired AMR genes could be
+integrated in the bacterial chromosome <strong>or</strong> harboured on a separate genetic
+element."</p>
+<p>— EFSA Scientific Committee (2025), Glossary</p>
+</blockquote>
+<p>Two consequences follow, and both constrain what this workflow may claim.</p>
+<p><strong>You cannot establish "intrinsic" from one genome.</strong> The claim is about the
+species, not the isolate. Determining it means comparing gene presence across many
+genomes of that taxon — which is why EFSA publishes a separate method
+(EFSA BIOHAZ Panel, 2023a) and a separate tool for it, described as a <em>"Pipeline
+for the automated analysis of gene distribution in microbial species"</em>.
+BacFlux implements no population comparison of any kind: every analysis is
+per-genome.</p>
+<p><strong>Chromosomal does not mean intrinsic.</strong> An acquired gene may sit on the
+chromosome. This is why mobility tier 1 is labelled <strong><code>intrinsic_candidate</code></strong> and
+not <code>intrinsic</code>. The qualifier is doing real work and should not be dropped: the
+module observed that a gene is chromosomal with no mobile-element context, which
+is <em>consistent with</em> intrinsic and does not establish it.</p>
+<p>So: <strong>BacFlux produces supporting evidence for the intrinsic/acquired judgement.
+It does not produce the judgement.</strong> The confirmatory work is a species-wide
+distribution analysis, plus phenotypic testing (MIC against the relevant
+antimicrobial), per the decision tree
+in EFSA (2025) §3.2.1.</p>
+<p>Where BacFlux does align well: EFSA (2024a) requires the AMR search to run against
+<strong>at least two</strong> maintained/curated databases, at ≥80% identity and ≥70% length
+coverage. BacFlux runs ten database queries across three independent legs —
+ABRicate over eight databases (<code>argannot</code>, <code>card</code>, <code>ecoh</code>, <code>ecoli_vf</code>, <code>megares</code>,
+<code>ncbi</code>, <code>resfinder</code>, <code>vfdb</code>), AMRFinderPlus, and a BBMap→CARD read-mapping leg
+that is immune to assembly collapse — with those thresholds applied on the
+ABRicate leg.</p>
+<hr />
+<h2 id="3-the-efsa-bacillus-catalogue-what-it-is-and-why-we-do-not-use-it">3. The EFSA <em>Bacillus</em> catalogue — what it is, and why we do not use it<a class="headerlink" href="#3-the-efsa-bacillus-catalogue-what-it-is-and-why-we-do-not-use-it" title="Permanent link">&para;</a></h2>
+<p><strong>It is not an AMR gene database.</strong> It is a <strong>prevalence catalogue</strong>: how often
+each of a set of AMR gene sequences occurs among published genomes of five
+<em>Bacillus</em> species. It answers the population question BacFlux structurally
+cannot.</p>
+<h3 id="how-it-was-built">How it was built<a class="headerlink" href="#how-it-was-built" title="Permanent link">&para;</a></h3>
+<p><em>(EFSA 2024b, §3.)</em></p>
+<p><strong>Genomes.</strong> NCBI <strong>RefSeq</strong>, restricted to assembly level <em>complete genome</em>,
+snapshot <strong>30 November 2023</strong>.</p>
+<p><strong>The query set is the unusual part.</strong> The AMR sequences searched for were <strong>not</strong>
+taken from CARD, ResFinder or NCBI as a database. They were <strong>extracted from
+dossiers submitted to EFSA by applicants</strong> up to December 2023 — the AMR hits
+those applicants had themselves reported in their production or active-agent
+strains. Identifiers arrived in four different currencies (NCBI protein ID, NCBI
+nucleotide accession, <strong>CARD ARO ID</strong>, <strong>UniProt</strong> accession) and were all
+normalised back to NCBI protein IDs. Hits that resolved to no database record were
+dropped.</p>
+<p>So CARD and UniProt appear only as <em>lookup services</em> for resolving identifiers,
+not as the source of the gene set. The set is bounded by what applicants happened
+to report, not by AMR biology.</p>
+<p><strong>Species selection.</strong> Nineteen <em>Bacillus</em> and related species from the QPS list
+were screened; those with <strong>≥30 complete genomes</strong> were analysed. Five qualified:</p>
+<table>
+<thead>
+<tr>
+<th>Species</th>
+<th style="text-align: right;">Screened</th>
+<th style="text-align: right;">Confirmed (ANI ≥95%)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>B. velezensis</em></td>
+<td style="text-align: right;">329</td>
+<td style="text-align: right;">328 (99.7%)</td>
+</tr>
+<tr>
+<td><em>B. subtilis</em></td>
+<td style="text-align: right;">299</td>
+<td style="text-align: right;">299 (100%)</td>
+</tr>
+<tr>
+<td><em>B. amyloliquefaciens</em></td>
+<td style="text-align: right;">76</td>
+<td style="text-align: right;">57 (75%)</td>
+</tr>
+<tr>
+<td><em>B. licheniformis</em></td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">40 (100%)</td>
+</tr>
+<tr>
+<td><em>B. paralicheniformis</em></td>
+<td style="text-align: right;">26</td>
+<td style="text-align: right;">26 (100%)</td>
+</tr>
+</tbody>
+</table>
+<p><em>B. paralicheniformis</em> was included below the threshold because many dossiers
+concerned it. <em>Priestia megaterium</em> had 40 genomes and was excluded anyway, because
+no dossier had ever been submitted for it. The catalogue is shaped by the
+regulatory caseload, not by the genus.</p>
+<p><strong>Pipeline.</strong> fastANI v1.32 (one-to-many) against each species' reference/type
+strain; genomes at <strong>ANI ≥95%</strong> retained; ANIclustermap for trees. A local BLAST
+database built from the retained genomes, with <strong>plasmid sequences separated from
+chromosomes</strong> by a custom script so plasmid hits are reported separately. Searches
+with <strong>tblastn</strong> (protein queries) and <strong>blastn</strong> (nucleotide queries), E-value
+0.05. Then: deduplicate within a genome keeping the highest identity, apply
+<strong>≥80% identity / ≥70% coverage</strong>, compute the frequency of strains matching each
+query, and the median identity and coverage. Python 3 with R 4.3.3 for plots.</p>
+<p><strong>Controls.</strong> Every table carries internal positive controls — <em>rpoB</em>, <em>gyrA</em>,
+<em>gyrB</em> and 16S rRNA from the species' own reference genome, which should be
+near-universal — and a negative control, <em>fimA</em> from <em>Salmonella</em>, which should
+be absent. In the published tables the housekeeping
+genes return ~100% of genomes and <em>fimA</em> returns 0% every time. The pipeline
+demonstrates its own validity in each result table.</p>
+<p><strong>Scale of the output</strong> (Annex A): 358 raw matches across the five species,
+192 valid and non-duplicated, and <strong>95 hits above threshold</strong> actually analysed.</p>
+<h3 id="the-finding-most-relevant-to-bacflux">The finding most relevant to BacFlux<a class="headerlink" href="#the-finding-most-relevant-to-bacflux" title="Permanent link">&para;</a></h3>
+<p>The catalogue is a clear demonstration of <strong>threshold brittleness at 80%
+identity</strong>:</p>
+<ul>
+<li><em>rphB</em> in <em>B. subtilis</em>: found above threshold in <strong>85.3%</strong> of genomes when
+  queried as nucleotide, but <strong>1.3%</strong> when queried as protein — because most
+  genomes sit at <strong>79–79.9%</strong> identity, just under the cutoff.</li>
+<li><em>rphC</em> behaves the same way in <em>B. amyloliquefaciens</em> (79.8% median) and
+  <em>B. velezensis</em> (79.8%): absent by the rule, near-universal in reality.</li>
+<li><em>satA</em> in <em>B. amyloliquefaciens</em>: ~91% of genomes by nucleotide, ~12–21% by
+  protein, with a median identity of 79.2%.</li>
+</ul>
+<p>The same sequence is "present in nearly all strains" or "essentially absent"
+depending on whether it is queried as DNA or as protein. Since BacFlux applies the
+same 80%/70% EFSA thresholds on its ABRicate leg, the lesson transfers directly:
+<strong>a gene just under the cutoff is not absent, and a borderline call should be read
+from the actual identity value, not from presence/absence.</strong> This is a further
+argument for keeping AMRFinderPlus's per-gene curated cutoffs unmodified.</p>
+<p>Also instructive: <em>tet</em>L sits in ~63% of <em>B. subtilis</em> chromosomes — neither
+"vast majority" nor rare, i.e. genuinely undecidable by the intrinsic rule. Genes
+originating in other species (ANT(4′)-Ib from an <em>S. aureus</em> plasmid, <em>erm</em>B from
+<em>E. faecium</em>, <em>cat</em> from a <em>Streptococcus</em> phage) appear in 1–4% of genomes, which
+is what a real acquired gene looks like.</p>
+<h3 id="why-it-is-not-built-into-bacflux">Why it is not built into BacFlux<a class="headerlink" href="#why-it-is-not-built-into-bacflux" title="Permanent link">&para;</a></h3>
+<p><strong>Coverage.</strong> It spans five species. On one environmental batch, fewer than a
+fifth of the isolates fell inside those five; roughly another third were <em>Bacillus</em>
+or <em>Priestia</em> species outside them, and the rest were other genera entirely. For
+most of a typical environmental collection it would return nothing.</p>
+<p><strong>It is a snapshot.</strong> RefSeq at 30 November 2023, dossiers to December 2023. It
+carries no update mechanism.</p>
+<p><strong>It answers a question BacFlux does not ask.</strong> Wiring it in as another ABRicate
+database would be a category error — it is not a detection resource. The only
+sensible use is the reverse: after AMRFinderPlus reports a gene in one of the five
+species, look up whether EFSA already regards that gene as widespread there. That
+is a manual cross-check, and it is how we treat it.</p>
+<p><strong>Recommended use:</strong> consult it by hand for <em>B. subtilis</em>, <em>B. velezensis</em>,
+<em>B. amyloliquefaciens</em>, <em>B. licheniformis</em> and <em>B. paralicheniformis</em> isolates
+when a regulatory question is actually in play. Note that the general-purpose
+pipeline behind it is published separately and can be run for <em>any</em> species with
+enough genomes — that, not the catalogue, is the reusable artefact.</p>
+<hr />
+<h2 id="sourcing-standing-licence-and-stated-limitations">Sourcing: standing, licence, and stated limitations<a class="headerlink" href="#sourcing-standing-licence-and-stated-limitations" title="Permanent link">&para;</a></h2>
+<p>Not all of these carry the same weight, and the difference matters if any of this
+is quoted in a dossier.</p>
+<p><strong>Peer-reviewed EFSA guidance (highest standing)</strong></p>
+<ul>
+<li><strong>EFSA Scientific Committee (2025).</strong> <em>Guidance on the characterisation of
+  microorganisms in support of the risk assessment of products used in the food
+  chain.</em> EFSA Journal 23(11):e9705. doi:10.2903/j.efsa.2025.9705. Adopted
+  24 September 2025. Open access (CC BY-ND). <strong>This is the current guidance</strong>, and
+  its Appendix A lists the parts of the 2018 FEEDAP guidance it supersedes.
+  Definitions quoted above are from its Glossary; the AMR decision tree is §3.2.1.</li>
+<li><strong>EFSA BIOHAZ Panel (2023a).</strong> <em>Statement on how to interpret the QPS
+  qualification on 'acquired antimicrobial resistance genes'.</em> EFSA Journal
+  21(10):8323. doi:10.2903/j.efsa.2023.8323. The method for discriminating
+  intrinsic from acquired.</li>
+<li><strong>EFSA (2024a).</strong> <em>EFSA statement on the requirements for whole genome sequence
+  analysis of microorganisms intentionally used in the food chain.</em> EFSA Journal
+  22(8):e8912. doi:10.2903/j.efsa.2024.8912. Source of the ≥2-databases
+  requirement and the 80%/70% thresholds.</li>
+</ul>
+<p><strong>Technical report (lower standing — not a peer-reviewed panel opinion)</strong></p>
+<ul>
+<li><strong>EFSA (2024b).</strong> <em>Catalogue of antimicrobial resistance genes in species of
+  Bacillus used to produce food enzymes and feed additives.</em> EFSA Supporting
+  Publication 2024:EN-8931, 33 pp. doi:10.2903/sp.efsa.2024.EN-8931. Approved
+  3 July 2024. ISSN 2397-8325. <em>"Reproduction is authorised provided the source is
+  acknowledged."</em></li>
+</ul>
+<p>It is an EFSA <strong>Technical Report</strong>, not an EFSA Journal guidance or opinion —
+  a commissioned technical output. Its standing comes from being cited by the
+  2025 Guidance (as EFSA, 2024b) as an available implementation. Cite it as a
+  supporting technical report, not as guidance.</p>
+<p><strong>Limitations the report states about itself:</strong> 95% ANI cannot separate
+  <em>B. velezensis</em> from <em>B. amyloliquefaciens</em>, so their discrimination "only
+  relies on the annotation by RefSeq, which constitutes a limitation in the
+  analysis"; several NCBI accessions used were already superseded at publication.</p>
+<p><strong>Limitation we add:</strong> the query set is dossier-derived. It reflects what
+  applicants reported, so absence from the catalogue is not evidence that a gene
+  is absent from the species — only that no dossier raised it.</p>
+<p><strong>Non-EFSA</strong></p>
+<ul>
+<li><strong>Siguier P, Gourbeyre E, Varani A, Ton-Hoang B, Chandler M (2015).</strong>
+  <em>Everyman's guide to bacterial insertion sequences.</em> Microbiology Spectrum
+  3(2):MDNA3-0030-2014. doi:10.1128/microbiolspec.mdna3-0030-2014. Cited for IS
+  size range (0.7–2.5 kb) and abundance.</li>
+</ul>
+<p><strong>Verified from software, not literature</strong></p>
+<ul>
+<li>The AMRFinderPlus organism list, the <code>--organism</code> refusals and the empty
+  mutation tables were read from this repository's own run outputs and audit
+  files, not from documentation.</li>
+</ul>
+<p><strong>Inference, not quoted from any source</strong></p>
+<ul>
+<li>That ABRicate-style BLAST is <em>structurally</em> unable to resolve point mutations.
+  This follows from what the tools compute and is not a claim any of the cited
+  documents makes.</li>
+<li>That the threshold-brittleness seen in the catalogue transfers to BacFlux's own
+  ABRicate leg. The mechanism is identical (same thresholds, same kind of search),
+  but no source states it about BacFlux.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

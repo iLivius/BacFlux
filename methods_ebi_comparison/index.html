@@ -1,0 +1,3476 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../methods_icescan_union/">
+      
+      
+        <link rel="next" href="../methods_reference_genome_run/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Head-to-head vs the EBI pipeline - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#comparing-bacfluxs-iceime-caller-against-the-ebi-mobilome-annotation-pipeline" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Head-to-head vs the EBI pipeline
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Turning it on
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-the-two-callers-are-not-independent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. The two callers are not independent
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-each-pipeline-is-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What each pipeline is for
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-how-the-comparison-was-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. How the comparison was run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. How the comparison was run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-genome-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The genome set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-scoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Scoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-which-map-and-the-two-environment-fixes-needed-to-run-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Which MAP, and the two environment fixes needed to run it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-completeness-of-the-map-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Completeness of the MAP run
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-converting-maps-output-so-the-same-scorer-could-read-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Converting MAP's output so the same scorer could read it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Converting MAP&#39;s output so the same scorer could read it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-the-so-term-integron-trap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 The SO-term integron trap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-class-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Class vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-conversion-cross-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Conversion cross-check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-per-pilot-detection-bacflux-alone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Per-pilot detection, BacFlux alone
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-class-assignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Class assignment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-call-burden-negative-controls-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Call burden, negative controls, boundaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Call burden, negative controls, boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-call-burden" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Call burden
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-negative-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Negative controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#honesty-note-what-the-094-figure-covers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Honesty note: what the 0.94 figure covers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-why-vmatch-was-evaluated-and-not-adopted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Why vmatch was evaluated and not adopted
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-citations-and-credit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Citations and credit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Citations and credit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#licensing-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licensing position
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-the-two-callers-are-not-independent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. The two callers are not independent
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-each-pipeline-is-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What each pipeline is for
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-how-the-comparison-was-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. How the comparison was run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. How the comparison was run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-the-genome-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 The genome set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-scoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Scoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-which-map-and-the-two-environment-fixes-needed-to-run-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Which MAP, and the two environment fixes needed to run it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-completeness-of-the-map-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Completeness of the MAP run
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-converting-maps-output-so-the-same-scorer-could-read-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Converting MAP's output so the same scorer could read it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Converting MAP&#39;s output so the same scorer could read it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-the-so-term-integron-trap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 The SO-term integron trap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-class-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Class vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-conversion-cross-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Conversion cross-check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-per-pilot-detection-bacflux-alone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Per-pilot detection, BacFlux alone
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-class-assignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Class assignment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-call-burden-negative-controls-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Call burden, negative controls, boundaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Call burden, negative controls, boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-call-burden" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Call burden
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-negative-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Negative controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#honesty-note-what-the-094-figure-covers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Honesty note: what the 0.94 figure covers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-why-vmatch-was-evaluated-and-not-adopted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Why vmatch was evaluated and not adopted
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-citations-and-credit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Citations and credit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Citations and credit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#licensing-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licensing position
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/methods_ebi_comparison.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="comparing-bacfluxs-iceime-caller-against-the-ebi-mobilome-annotation-pipeline">Comparing BacFlux's ICE/IME caller against the EBI Mobilome Annotation Pipeline<a class="headerlink" href="#comparing-bacfluxs-iceime-caller-against-the-ebi-mobilome-annotation-pipeline" title="Permanent link">&para;</a></h1>
+<p>The obvious question about any new caller is whether an established one does better.
+This page answers it directly: BacFlux's mobilome module and the EBI Mobilome
+Annotation Pipeline, run on the same genomes and scored by the same code.</p>
+<p>The two callers share ancestry, so this is <strong>not</strong> an independent check —
+treating it as one would overstate what agreement between them proves.</p>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MAP</strong></td>
+<td>the EBI <strong>M</strong>obilome <strong>A</strong>nnotation <strong>P</strong>ipeline, the caller compared against</td>
+</tr>
+<tr>
+<td><strong>ICE</strong></td>
+<td>integrative and conjugative element — integrates into the chromosome and carries its own conjugation machinery, so it can move itself</td>
+</tr>
+<tr>
+<td><strong>IME</strong></td>
+<td>integrative mobilisable element — integrates and can be moved, but has no machinery of its own and needs a helper</td>
+</tr>
+<tr>
+<td><strong>AICE</strong></td>
+<td>actinomycete integrative and conjugative element, a third class using a different transfer mechanism</td>
+</tr>
+<tr>
+<td><strong>T4SS / T4CP</strong></td>
+<td>type IV secretion system and its coupling protein — the apparatus that pushes DNA into the next cell</td>
+</tr>
+<tr>
+<td><strong><em>att</em> site</strong></td>
+<td>the short repeat marking an integrated element's ends</td>
+</tr>
+<tr>
+<td><strong>SO</strong></td>
+<td>Sequence Ontology, the controlled vocabulary used for feature types in GFF output</td>
+</tr>
+<tr>
+<td><strong>GFF</strong></td>
+<td>the tab-separated annotation format both pipelines write features to</td>
+</tr>
+<tr>
+<td><strong>AMR</strong></td>
+<td>antimicrobial resistance</td>
+</tr>
+<tr>
+<td><strong>CDS</strong></td>
+<td>coding sequence — one predicted protein-coding gene</td>
+</tr>
+<tr>
+<td><strong>IS</strong></td>
+<td>insertion sequence, the smallest kind of mobile element</td>
+</tr>
+<tr>
+<td><strong>MPF</strong></td>
+<td>mating-pair formation, the class of the mating apparatus a conjugative element carries</td>
+</tr>
+<tr>
+<td><strong>MAG</strong></td>
+<td>metagenome-assembled genome, a genome reconstructed from a mixed community</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr />
+<h2 id="0-the-two-callers-are-not-independent">0. The two callers are not independent<a class="headerlink" href="#0-the-two-callers-are-not-independent" title="Permanent link">&para;</a></h2>
+<p>BacFlux's ICE/IME caller and the EBI Mobilome Annotation Pipeline (MAP) both find
+conjugation machinery by running <strong>MacSyFinder with the ICEscan model set</strong>. MAP
+does it inside its <code>ICEFINDER2_LITE</code> subworkflow; BacFlux does it in the
+<code>conjscan</code> / <code>icescan</code> rules of <code>workflow/rules/shared/80_mobilome.smk</code>. The
+versions differ slightly — MacSyFinder 2.1.4 in MAP's container, 2.1.6 in
+BacFlux's conda environment (<code>workflow/envs/macsyfinder.yaml</code>) — but the profile
+HMMs and the system definitions that decide <em>"is there a conjugation system here
+at all"</em> are the same models.</p>
+<p>The consequence must not be glossed over:</p>
+<blockquote>
+<p><strong>Agreement at the detection layer is partly tautological.</strong> When both callers
+find the same element, that is substantially the same engine agreeing with
+itself. It is <em>not</em> two independent lines of evidence, and it must never be
+reported as independent confirmation of detection.</p>
+</blockquote>
+<p>What <em>is</em> genuinely independent, and therefore what this comparison can actually
+measure:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Shared or independent?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Machinery detection (does a conjugation system exist here)</td>
+<td><strong>Shared</strong> — same models, same engine</td>
+</tr>
+<tr>
+<td>Clustering (which machinery genes belong to one element)</td>
+<td><strong>Independent</strong> — different code, different rules</td>
+</tr>
+<tr>
+<td>Boundary refinement (where does the element start and stop)</td>
+<td><strong>Independent</strong> — MAP runs <code>vmatch</code> plus an ICEfinder2-derived script; BacFlux runs its own exact maximal-repeat search</td>
+</tr>
+<tr>
+<td>Class assignment (ICE vs IME vs AICE)</td>
+<td><strong>Partly independent</strong> — same model vocabulary, different decision rules</td>
+</tr>
+</tbody>
+</table>
+<p>So read the detection numbers as a <em>consistency check</em> — did two implementations
+of the same idea behave the same way, and where did they diverge — and read the
+boundary and class numbers as the real comparison.</p>
+<p>One place where the shared engine does <strong>not</strong> apply, and where agreement
+therefore does carry information, is §6.2: on <em>Bacillus subtilis</em> 168 the two
+pipelines converge on byte-identical coordinates and the same 60 bp repeat by two
+different boundary algorithms. That agreement is about <strong>boundaries</strong>, which are
+independent, so it means something.</p>
+<hr />
+<h2 id="1-what-each-pipeline-is-for">1. What each pipeline is for<a class="headerlink" href="#1-what-each-pipeline-is-for" title="Permanent link">&para;</a></h2>
+<p>These are not competing implementations of one task. They answer different
+questions, and the overlap is one subworkflow.</p>
+<p><strong>EBI Mobilome Annotation Pipeline (MAP)</strong> — a broad <strong>mobilome census</strong>. Given an
+assembly, it inventories every class of mobile element it can: insertion
+sequences (ISEScan), integrons (IntegronFinder), plasmids and prophages
+(geNomad, CheckV), ICEs and IMEs (ICEfinder2-lite), plus compositional outliers,
+and merges them into one reconciled GFF. Its design centre is <strong>metagenomes and
+MAGs</strong>, where the question is <em>what mobile elements are present in this
+community</em> and the input is fragmented, taxonomically mixed and un-curated. It is
+Nextflow, container-based, and carries optional functional-annotation branches
+(AMRFinderPlus, DeepARG, RGI, antiSMASH, SanntiS, GECCO) for downstream biology.</p>
+<p><strong>BacFlux's mobilome module</strong> — an <strong>AMR-mobility assessment on a single
+isolate</strong>. It starts from the AMR genes actually detected in one characterised
+strain and asks, per gene, <em>is this gene inside a mobile element, and how
+transferable is that element</em>, placing each on a six-rung ladder from
+"chromosomal, intrinsic candidate" to "<strong>predicted</strong> self-transmissible". The
+regulatory framing is EFSA's intrinsic-versus-acquired distinction for strains
+entering the food and feed chain. The module is <strong>off by default</strong> and is one
+stage of a workflow whose main business is assembly, decontamination, taxonomy,
+annotation and AMR calling.</p>
+<p><strong>These are complementary scopes.</strong> MAP goes wider across element classes and is
+built for community-level data; BacFlux goes narrower but ties every call back to
+a specific resistance gene in a specific isolate and reports a mobility tier with
+a confidence level. Neither is a reduced version of the other, and this document
+should not be read as ranking them. The difference is the unit of analysis, not
+the tool list: MAP runs AMRFinderPlus too, on by default. What differs is that it
+is built for metagenomes and MAGs, where a contig's host is itself uncertain,
+while BacFlux assumes one isolate and can therefore attach a mobility tier to a
+named gene on a named replicon.</p>
+<p>A practical consequence for users: for a full
+mobilome inventory of an isolate, or for anything metagenomic, MAP is the right
+tool and BacFlux writes <code>{sample}_contigs.fna</code> and <code>{sample}.gbk</code> ready to feed it.
+Consuming MAP's <code>mobilome.gff.gz</code> carries no licensing consequence for BacFlux
+(§10).</p>
+<hr />
+<h2 id="2-how-the-comparison-was-run">2. How the comparison was run<a class="headerlink" href="#2-how-the-comparison-was-run" title="Permanent link">&para;</a></h2>
+<h3 id="21-the-genome-set">2.1 The genome set<a class="headerlink" href="#21-the-genome-set" title="Permanent link">&para;</a></h3>
+<p>Forty closed reference genomes, in three groups, all downloaded from GenBank and
+used as-is:</p>
+<table>
+<thead>
+<tr>
+<th>Set</th>
+<th>n</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ICE pilot</td>
+<td>18</td>
+<td>Genomes/deposits carrying an ICE with <strong>curated coordinates in ICEberg</strong>, spanning 14 genera</td>
+</tr>
+<tr>
+<td>IME pilot</td>
+<td>12</td>
+<td>Same, for IMEs, 10 genera, sizes deliberately straddling the module's size floor (522 bp to 110 kb)</td>
+</tr>
+<tr>
+<td>Negative control</td>
+<td>12</td>
+<td>Closed genomes with <strong>no</strong> curated ICEberg entry: 32,601,100 bp total</td>
+</tr>
+</tbody>
+</table>
+<p>Two accessions (<code>CP048437.1</code>, <code>NC_004668.1</code>) carry both a curated ICE and a
+curated IME, so 40 genomes yield <strong>30 curated elements</strong>. The negative set is
+three reduced endosymbionts, two streamlined marine genomes, a deep-branching
+thermophile, four full-size reference strains (<em>E. coli</em> K-12 MG1655, <em>B.
+subtilis</em> 168, <em>P. aeruginosa</em> PAO1, <em>S. aureus</em> N315, <em>S.</em> Typhimurium LT2) and
+an archaeon (<em>Halobacterium</em> sp. NRC-1). The archaeon is a <strong>construction
+check</strong>: CONJscan and ICEscan are bacterial models, so any call there would be
+spurious by definition.</p>
+<p>Both callers were given <strong>the same FASTA files</strong> from
+<code>phase7_benchmark/genomes/</code>. No re-assembly, no re-annotation on our side of the
+fence — MAP does its own gene calling (Prodigal), BacFlux uses Bakta, which is one
+of the differences the comparison contains rather than controls for.</p>
+<h3 id="22-scoring">2.2 Scoring<a class="headerlink" href="#22-scoring" title="Permanent link">&para;</a></h3>
+<p>Both callers' output was reduced to one table per genome,
+<code>work/{sample}/ice_elements.tsv</code>, with the columns <code>phase7_benchmark/score.py</code>
+reads. <code>score.py</code> was then run <strong>unmodified</strong> over both. It:</p>
+<ul>
+<li>takes the curated ICEberg interval as truth;</li>
+<li>among a caller's calls on that genome, selects the one with the <strong>largest
+  overlap</strong> with the curated interval;</li>
+<li>reports start offset, end offset, and <code>recovered_fraction</code> = overlapping bp ÷
+  curated length.</li>
+</ul>
+<p>Using the same scoring code on both sides is the point. Any bias in <code>score.py</code> —
+and there is at least one, see §7 — applies equally to both callers.</p>
+<h3 id="23-which-map-and-the-two-environment-fixes-needed-to-run-it">2.3 Which MAP, and the two environment fixes needed to run it<a class="headerlink" href="#23-which-map-and-the-two-environment-fixes-needed-to-run-it" title="Permanent link">&para;</a></h3>
+<p>MAP <strong>v5.0.0</strong> (<code>ebi-metagenomics/mobilome-annotation-pipeline</code>, repo checkout at
+<code>3aa408d</code>), run with <code>-profile singularity</code>. Recorded tool versions inside the
+containers: MacSyFinder 2.1.4, ISEScan 1.7.3, IntegronFinder 2.0.6, geNomad
+1.11.1, HMMER 3.4, Aragorn 1.2.41.</p>
+<p>Two host-specific problems had to be solved first. Both are recorded in
+<code>benchmark/ebi_comparison/nf_env.sh</code> and <code>benchmark/ebi_comparison/run_map.sh</code>; anyone repeating this will hit them.</p>
+<p><strong>(a) Apptainer instead of the host's Singularity.</strong> This machine carries
+Singularity <strong>2.6.1</strong>, which predates the SIF container format that all current
+biocontainers use — it cannot run them at all. Apptainer (the renamed, modern
+continuation of Singularity) was installed into a private conda environment and
+put ahead of the system binary on <code>PATH</code>. It runs rootless here because the kernel
+has unprivileged user namespaces enabled, and the conda package ships a
+<code>singularity</code> → <code>apptainer</code> symlink, which lets Nextflow's stock <code>singularity</code>
+profile work unmodified.</p>
+<p><strong>(b) <code>NXF_VER=24.10.6</code>.</strong> On Nextflow 26.04.6 — the current release, and what a
+fresh conda install gives you — MAP v5.0.0 dies inside its own ICEfinder2-lite
+subworkflow:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ERROR ~ Invalid method invocation `call` with arguments:
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>        [[id:pos_test], null, .../pos_test_uniprot_names.tsv] on _closure11 type
+</code></pre></div>
+<p>This is the <code>.join(..., remainder: true)</code> feeding <code>REFINE_BOUNDARIES</code> in
+<code>subworkflows/local/icefinder2lite.nf</code> handing a three-element tuple to a closure
+written for six. Newer Nextflow stopped tolerating that arity mismatch. MAP's
+manifest only requires <code>!&gt;=24.04.0</code> and its CI does not pin a version, so this is
+a genuine forward-compatibility gap in MAP rather than a local misconfiguration.
+Pinned to 24.10.6, the same commit runs <code>REFINE_BOUNDARIES</code> to completion.</p>
+<p><strong>(c) Functional branches switched off</strong> (<code>ebi_map/skip_functional.config</code>).
+AMRFinderPlus, DeepARG, RGI-CARD, PathoFact2, SanntiS, GECCO and antiSMASH were
+disabled: they answer a different question, each needs its own multi-GB database,
+and they contribute nothing to a boundary comparison. geNomad and CheckV are
+<strong>not</strong> skippable in MAP and feed its overlap integrator, so they ran. Note these
+have to be set in a config file, not as <code>--skip_x</code> on the command line: MAP
+validates parameters with nf-schema in strict mode and a bare CLI <code>--skip_x</code>
+arrives as the string <code>"true"</code>, failing the boolean type check.</p>
+<h3 id="24-completeness-of-the-map-run">2.4 Completeness of the MAP run<a class="headerlink" href="#24-completeness-of-the-map-run" title="Permanent link">&para;</a></h3>
+<p><strong>40/40 genomes reached <code>COMPLETED</code></strong> (<code>benchmark/ebi_comparison/map_status_40.tsv</code>). Median
+wall-clock 30.3 min per genome (range 23.4–39.9). Twelve genomes produced no
+<code>ices.tsv</code> because no ICE candidate survived MAP's prescan; that is a real
+result — no call — not a failure, and it is scored as zero calls.</p>
+<p>Three run-level caveats:</p>
+<ul>
+<li><code>CP016079.1</code> — a <strong>non-ICE</strong> stage aborted (<code>GFF_MAPPING:ABORTED</code>). The
+  ICEfinder2-lite table was written and is what we scored, so the ICE/IME result
+  stands, but MAP's merged GFF for that genome is incomplete.</li>
+<li><code>NC_000964.3</code> and <code>U15027</code> — some stages were reused from an earlier run via
+  Nextflow <code>-resume</code>. <code>U15027</code> shows 0.1 min elapsed because it was served almost
+  entirely from cache. The status table records which run directory is canonical
+  for each accession, and the converter reads that table rather than guessing.</li>
+</ul>
+<hr />
+<h2 id="3-converting-maps-output-so-the-same-scorer-could-read-it">3. Converting MAP's output so the same scorer could read it<a class="headerlink" href="#3-converting-maps-output-so-the-same-scorer-could-read-it" title="Permanent link">&para;</a></h2>
+<p>MAP writes a merged GFF that pools every predictor it runs. Turning that into the
+two-column-plus-metadata table <code>score.py</code> expects required three judgement calls.
+All three are written into <code>ebi_map/scoring/convert_map_to_ice_elements.py</code> at the
+point where they take effect. The converter does <strong>no</strong> filtering, no
+re-thresholding and no coordinate arithmetic — only translation.</p>
+<h3 id="31-the-so-term-integron-trap">3.1 The SO-term <code>integron</code> trap<a class="headerlink" href="#31-the-so-term-integron-trap" title="Permanent link">&para;</a></h3>
+<p>MAP labels rows with Sequence Ontology terms. It writes the term <strong><code>integron</code>
+(SO:0000365) for two completely different things</strong>: an ICEfinder2-lite <strong>IME</strong>,
+and a genuine <strong>IntegronFinder integron</strong>. Filtering MAP's GFF on the <code>type</code>
+column alone therefore imports integrons into MAP's ICE/IME score.</p>
+<p>Counted directly across all 40 merged GFFs:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>GFF <code>type</code></th>
+<th>Rows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ICEfinder</code></td>
+<td><code>conjugative_integron</code></td>
+<td>37</td>
+</tr>
+<tr>
+<td><code>ICEfinder</code></td>
+<td><code>integron</code></td>
+<td><strong>27</strong> ← these are IMEs</td>
+</tr>
+<tr>
+<td><code>IntegronFinder</code></td>
+<td><code>integron</code></td>
+<td><strong>6</strong> ← these are integrons</td>
+</tr>
+<tr>
+<td><code>ICEfinder</code></td>
+<td><code>direct_repeat_element</code></td>
+<td>22</td>
+</tr>
+<tr>
+<td><code>ISEScan</code></td>
+<td><code>insertion_sequence</code></td>
+<td>926</td>
+</tr>
+<tr>
+<td><code>IntegronFinder</code></td>
+<td><code>attC_site</code></td>
+<td>279</td>
+</tr>
+<tr>
+<td><code>geNomad</code></td>
+<td><code>prophage</code> / <code>plasmid</code></td>
+<td>67 / 7</td>
+</tr>
+<tr>
+<td><code>MAP</code></td>
+<td><code>compositional_outlier</code></td>
+<td>657</td>
+</tr>
+</tbody>
+</table>
+<p>A naive <code>type == "integron"</code> filter would have pulled <strong>6 unrelated
+IntegronFinder integrons</strong> into MAP's element set — inflating its call count and
+its called base pairs, and scoring it against ICE coordinates it never claimed.
+Nothing would have errored.</p>
+<p>The fix: <strong>filter on the GFF <code>source</code> column first</strong> (<code>ICEfinder</code> only), then read
+the class from the <code>mobile_element_type</code> <strong>attribute</strong>, never from the type
+column. <code>direct_repeat_element</code> rows are excluded too — those are the att sites
+bounding an element, not elements.</p>
+<h3 id="32-class-vocabulary">3.2 Class vocabulary<a class="headerlink" href="#32-class-vocabulary" title="Permanent link">&para;</a></h3>
+<p>MAP's <code>mobile_element_type</code> maps one-to-one onto ours for the three classes it
+can emit:</p>
+<table>
+<thead>
+<tr>
+<th>MAP</th>
+<th>BacFlux</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>T4SS-type_ICE</code></td>
+<td><code>ice</code></td>
+</tr>
+<tr>
+<td><code>IME</code></td>
+<td><code>ime</code></td>
+</tr>
+<tr>
+<td><code>AICE</code></td>
+<td><code>aice</code></td>
+</tr>
+</tbody>
+</table>
+<p>The <code>_with_DRs</code> suffix is <strong>not</strong> a fourth class — it means ICEfinder2-lite
+refined that element's boundary onto a flanking direct-repeat pair. It is
+stripped from the class and recorded as <code>boundary_method=direct_repeat</code>, which is
+where BacFlux keeps the same fact. We deliberately do <strong>not</strong> claim
+<code>boundary_method=tRNA</code> for MAP: its <code>close_to_RNA</code> column is a separate
+annotation and does not mean the boundary was derived from the tRNA.</p>
+<p>BacFlux has two classes MAP has no equivalent for (<code>cime_or_island</code>,
+<code>conjugative_region</code>); MAP has none we lack. Noted, not scored.</p>
+<h3 id="33-conversion-cross-check">3.3 Conversion cross-check<a class="headerlink" href="#33-conversion-cross-check" title="Permanent link">&para;</a></h3>
+<p>The converter reads MAP's merged GFF, then cross-checks against ICEfinder2-lite's
+own <code>{sample}_ices.tsv</code> — the same elements in a different layout. <strong>All 40
+genomes agree</strong>: 64 elements in the GFF, 64 rows in the TSV, decomposing as 32
+ICEs + 27 IMEs + 5 AICEs (<code>ebi_map/scoring/map_conversion_audit.tsv</code>). All five
+AICE calls fall in <em>Streptomyces scabiei</em>, which is biologically correct — AICEs
+are the actinomycete class.</p>
+<hr />
+<h2 id="4-detection">4. Detection<a class="headerlink" href="#4-detection" title="Permanent link">&para;</a></h2>
+<p>Thirty curated elements, both callers, same genomes.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Found by <strong>both</strong></td>
+<td>17</td>
+</tr>
+<tr>
+<td>Found by <strong>BacFlux only</strong></td>
+<td><strong>3</strong></td>
+</tr>
+<tr>
+<td>Found by <strong>MAP only</strong></td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>Found by neither</td>
+<td>10</td>
+</tr>
+<tr>
+<td><strong>Totals</strong></td>
+<td><strong>BacFlux 20/30, MAP 17/30</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The three BacFlux-only detections are <strong>ICEVflInd1</strong> (<em>Vibrio fluvialis</em>),
+<strong>Tn4451</strong> (<em>Clostridium perfringens</em>) and <strong>MTnPi10</strong> (<em>Prevotella intermedia</em>).
+In each, MAP's prescan produced no ICE candidate and no table.</p>
+<p><strong>MAP found nothing BacFlux missed.</strong> Given §0, this is the strongest form the
+detection result can take: the difference cannot be explained by a better
+machinery model, because the machinery models are shared. It is attributable to
+what sits around the shared engine — candidate seeding, the class-aware size
+floor, and BacFlux's decision to report low-quorum machinery at low confidence
+rather than discard it.</p>
+<p><strong>Honesty note on ICEVflInd1.</strong> BacFlux detects the locus but classifies it
+<code>cime_or_island</code> — integrase + T4CP + T4SS, <strong>no relaxase</strong> — not <code>ice</code>. It is
+counted as detected because the scorer asks whether a call overlaps the curated
+interval, which it does (0.289 recovered). It is <em>not</em> a correct ICE class call,
+and should not be presented as one.</p>
+<h3 id="41-per-pilot-detection-bacflux-alone">4.1 Per-pilot detection, BacFlux alone<a class="headerlink" href="#41-per-pilot-detection-bacflux-alone" title="Permanent link">&para;</a></h3>
+<p>From <code>phase7_benchmark/results_final.tsv</code> and <code>ime_results_final.tsv</code>:</p>
+<p><strong>ICE pilot: 15/18</strong> — chromosomal 9/11, standalone 6/7.</p>
+<p>The <strong>true ceiling is 17/18</strong>, not 18/18. <code>SXT(HN1)</code> (AB450045) is a broken
+benchmark record: the deposit is <strong>19,086 bp carrying 17 CDS</strong> (verified by
+counting the Bakta <code>.faa</code>), standing in for a ~100 kb element, and contains <strong>no
+relaxase and no T4SS</strong>. No machinery-based caller can find a conjugation system
+that is not in the sequence, and MAP does not find it either. It should be
+removed from, or footnoted in, any future version of this benchmark.</p>
+<p>The other two misses are real:</p>
+<ul>
+<li><strong>ICEPsy10</strong> (<em>P. syringae</em>, 161 kb) — no relaxase, T4CP or VirB4 anywhere in
+  the element. MacSyFinder's own <code>rejected_candidates.tsv</code> says
+  <em>"quorum of mandatory genes required (3) is not reached: 0"</em>.</li>
+<li><strong>ICEB2</strong> (<em>Mycoplasma bovis</em>) — machinery divergent enough that the models do
+  not cover it. A genuine model-coverage limitation, and one that will apply to
+  any tool built on the same profiles, MAP included.</li>
+</ul>
+<p><strong>IME pilot: 5/12</strong>, median recovered fraction 0.69. The misses concentrate at the
+small end (522 bp, 1,248 bp, 5,123 bp), where the size floor and the two-anchor
+requirement apply, and at SGI1 (42 kb) and MGIVvuTai1 (19 kb), which produced no
+overlapping call at all. IME detection is the weaker half of this module and
+should be described that way.</p>
+<hr />
+<h2 id="5-class-assignment">5. Class assignment<a class="headerlink" href="#5-class-assignment" title="Permanent link">&para;</a></h2>
+<p>Of the 17 elements both callers found, the classes agree on <strong>14</strong> and differ on
+<strong>3</strong>. Every disagreement is the same shape:</p>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>ICEberg curation</th>
+<th>BacFlux</th>
+<th>MAP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SPI-7 (<em>S. enterica</em>)</td>
+<td>ICE</td>
+<td><strong>ice</strong></td>
+<td>ime</td>
+</tr>
+<tr>
+<td>ICE_EfalV583_tRNALys (<em>E. faecalis</em>)</td>
+<td>ICE</td>
+<td><strong>ice</strong></td>
+<td>ime</td>
+</tr>
+<tr>
+<td>ICE_Step12228_tRNAser (<em>S. epidermidis</em>)</td>
+<td>ICE</td>
+<td><strong>ice</strong></td>
+<td>ime</td>
+</tr>
+</tbody>
+</table>
+<p>All three are ICEberg-curated <strong>ICEs</strong> that MAP called <strong>IMEs</strong>; BacFlux agrees
+with the curation on all three.</p>
+<p>This is not a cosmetic difference. ICE versus IME <strong>is</strong> the
+self-transmissible-versus-needs-a-helper distinction, which is rungs 6 and 5 of
+the mobility ladder and the exact axis the EFSA intrinsic/acquired framing rests
+on. Calling a self-transmissible element "mobilisable with a helper" understates
+transfer risk.</p>
+<p><strong>Two honesty notes.</strong></p>
+<ol>
+<li>There is a fourth element, <strong>TR2</strong> (<em>Streptomyces scabiei</em>), where <strong>both</strong>
+   callers say <code>ime</code> against an ICEberg <strong>ICE</strong> curation. It is not counted among
+   the three disagreements because the two callers agree with each other. It is a
+   shared miss, and it means the score above is "BacFlux agrees with ICEberg on 3
+   elements where MAP does not", <strong>not</strong> "BacFlux is right about class and MAP is
+   wrong in general".</li>
+<li>Class was assessed only on elements both callers found, so this is a
+   17-element comparison, not 30. With n=3 disagreements, the direction is
+   consistent but the sample is small. It should be reported as a consistent
+   direction, not a rate.</li>
+</ol>
+<hr />
+<h2 id="6-call-burden-negative-controls-boundaries">6. Call burden, negative controls, boundaries<a class="headerlink" href="#6-call-burden-negative-controls-boundaries" title="Permanent link">&para;</a></h2>
+<h3 id="61-call-burden">6.1 Call burden<a class="headerlink" href="#61-call-burden" title="Permanent link">&para;</a></h3>
+<p>Across all 40 genomes:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Calls</th>
+<th>Total bp called</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BacFlux</td>
+<td>65</td>
+<td>2,630,059</td>
+</tr>
+<tr>
+<td>MAP</td>
+<td>64</td>
+<td>2,881,859</td>
+</tr>
+</tbody>
+</table>
+<p>One call apart, and BacFlux claims <strong>8.7% fewer</strong> base pairs while recovering
+three more curated elements. <strong>Neither caller achieves recall by volume</strong> — the
+higher recall in §4 does not come from making many more calls.</p>
+<blockquote>
+<p><strong>Provenance of these two rows.</strong> <code>ebi_map/scoring/call_burden.tsv</code> was written
+at 09:29 on 2026-07-31 from a snapshot of our calls taken at 09:26 — <em>before</em>
+the att-search fix regenerated them at ~11:12. Its BacFlux row therefore reads 66 calls /
+2,472,667 bp, which is stale. The figures above are recomputed from the live
+<code>phase7_benchmark/work/*/ice_elements.tsv</code> over the same 40 samples. Three
+samples changed: <code>AL513382</code> 95,548 → 145,727 bp; <code>GU725392</code> 2 calls / 57,721 bp
+→ 1 call / 92,237 bp; <code>NC_013929</code> 200,047 → 272,744 bp. <strong>MAP's row is
+unchanged</strong> — its run was never re-done, so the comparison remains like for
+like.</p>
+</blockquote>
+<h3 id="62-negative-controls">6.2 Negative controls<a class="headerlink" href="#62-negative-controls" title="Permanent link">&para;</a></h3>
+<p>Twelve genomes with no curated ICEberg entry, 32,601,100 bp
+(<code>ebi_map/scoring/negative_side_by_side.tsv</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Genome</th>
+<th>BacFlux</th>
+<th>MAP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>B. subtilis</em> 168</td>
+<td><code>ice</code> 529,362–549,932 (20.6 kb)</td>
+<td><code>ice</code> 529,362–549,932 (20.6 kb)</td>
+</tr>
+<tr>
+<td><em>S.</em> Typhimurium LT2</td>
+<td><code>ime</code> 2,900,443–2,906,075 (5.6 kb)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><em>S. aureus</em> N315</td>
+<td>—</td>
+<td><code>ime</code> 36,435–42,455 (6.0 kb)</td>
+</tr>
+<tr>
+<td>Other nine (incl. <em>E. coli</em> K-12, <em>P. aeruginosa</em> PAO1, <em>Halobacterium</em>)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Two calls each. The difference between the callers is one call each</strong>, and they
+are on different genomes.</p>
+<p><strong>The <em>B. subtilis</em> 168 call is the same element, found twice.</strong> Both pipelines
+return <strong>base-pair-identical coordinates</strong>, the same 60 bp flanking repeat, the
+same MOBT relaxase and the same MPF type — reached by two <em>different</em> boundary
+algorithms (MAP: vmatch plus an ICEfinder2-derived refiner; BacFlux: its own
+exact maximal-repeat search). Because boundary refinement is the genuinely
+independent layer (§0), this agreement is real evidence, and what it evidences is
+that <strong>ICEBs1 is a real element that ICEberg has not catalogued</strong>: 20,571 bp
+against a ~20.5 kb element, all four anchor classes present, and the boundary
+resolved by a tRNA-anchored att site at tRNA-Leu(gag) — ICEBs1 integrates at
+<em>trnS-leu2</em>. Bakta independently names the integrase "ICEBs1 integrase".</p>
+<p>BacFlux's other call, on <em>S.</em> Typhimurium LT2, is an integrase beside a protein
+Bakta annotates only as "DNA-binding protein" but which the T4SS_MOBM profile
+hits at i-eval 1.8 × 10⁻⁸⁴ over 98.6% of the profile. Whether that locus is a
+bona fide IME is a domain question this benchmark cannot settle.</p>
+<p><strong>Two caveats, both mandatory when quoting these numbers.</strong></p>
+<blockquote>
+<p><strong>This is an upper bound of 2 candidate calls, NOT a false-positive rate.</strong>
+"Absent from ICEberg" is not "contains no mobile element". ICEberg is a curated
+catalogue, not an exhaustive one. The only quantity here that is genuinely
+comparable is the <em>difference</em> between the two columns, because the imperfect
+negative applies equally to both callers.</p>
+<p><strong>Every call in a negative control must be examined, never merely counted.</strong>
+This set originally justified including <em>B. subtilis</em> 168 on the grounds that
+"ICEBs1 is absent from 168 itself". That is <strong>false</strong> — ICEBs1 was <em>discovered</em>
+in strain 168 (Auchtung et al. 2005). Had the calls been tallied instead of
+inspected, a textbook-correct detection would have been recorded as a false
+positive, and the pipeline would have been "fixed" to stop making it.</p>
+</blockquote>
+<h3 id="63-boundaries">6.3 Boundaries<a class="headerlink" href="#63-boundaries" title="Permanent link">&para;</a></h3>
+<p>Measured on the elements both callers found
+(<code>ebi_map/scoring/boundary_agreement.tsv</code>; chromosomal n=9, standalone n=5):</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>BacFlux</th>
+<th>MAP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chromosomal ICEs, median |start offset|</td>
+<td><strong>5,141 bp</strong></td>
+<td>7,427 bp</td>
+</tr>
+<tr>
+<td>Chromosomal ICEs, median |end offset|</td>
+<td><strong>14,912 bp</strong></td>
+<td>23,745 bp</td>
+</tr>
+<tr>
+<td>Standalone ICEs, median recovered fraction</td>
+<td>0.94</td>
+<td>0.94</td>
+</tr>
+</tbody>
+</table>
+<p>The callers match on standalone span recovery, and BacFlux is closer on both
+chromosomal offsets. On <strong>ICEEc2</strong> (GU725392) they land on <strong>exactly the same
+interval</strong>, 27–92,263, from independent algorithms.</p>
+<div class="admonition warning">
+<p class="admonition-title">This comparison changed the code it was measuring</p>
+<p>An earlier version of BacFlux's att search scored worse than MAP on both
+chromosomal offsets, and this comparison is what prompted two fixes: a ranking
+that put raw repeat length above tRNA anchoring (on SPI-7 a 51 bp repeat in
+ordinary sequence was beating the real 24 bp pair at tRNA-Phe), and a flank
+window of 30 kb when SPI-7's true <em>attR</em> sits 5.8 kb outside it. The numbers
+above are measured after those fixes.</p>
+<p>Stated because tuning against a benchmark and then reporting that benchmark is
+a methodological weakness, and a reader is entitled to know it happened. Two
+things limit it: the fixes were to defects identifiable without the comparison,
+and the conservative policy was <strong>not</strong> loosened to achieve them — a de novo
+repeat pair is still <em>reported and not applied</em>, and both recovered boundaries
+are tRNA-anchored, so they apply under the pre-existing rule.</p>
+</div>
+<p><strong>Neither fix was a better repeat finder.</strong> Of the four elements where MAP's boundary
+beat ours, <strong>zero</strong> were cases where MAP found a repeat BacFlux could not. Two were
+repeats BacFlux found and then discarded through the defects above; two were
+candidate-extent differences with no repeats on either side. That is what §8 tests.</p>
+<blockquote>
+<h3 id="honesty-note-what-the-094-figure-covers">Honesty note: what the 0.94 figure covers<a class="headerlink" href="#honesty-note-what-the-094-figure-covers" title="Permanent link">&para;</a></h3>
+<p>The standalone median of <strong>0.94</strong> is computed over the <strong>five</strong> standalone ICEs
+that <strong>both</strong> callers found — it is a like-for-like head-to-head figure and MAP's
+0.94 is computed over exactly the same five.</p>
+<p>Across <strong>all six</strong> standalone ICEs BacFlux detected, the median recovered
+fraction is <strong>0.669</strong>, because the sixth is ICEVflInd1 at 0.289 — an element MAP
+did not find at all. Detecting one extra, hard element <em>lowers</em> your own median.
+When quoting a pilot-wide number for BacFlux alone, use <strong>0.669</strong>; when quoting
+a head-to-head number, use 0.94 and say it is on the five shared elements.
+The BacFlux-only ICE-pilot summary is therefore: chromosomal median recovered
+<strong>0.476</strong> (n=9), standalone median recovered <strong>0.669</strong> (n=6).</p>
+</blockquote>
+<p>Both callers remain far from the curated coordinates on large chromosomal ICEs.
+On TR2 both recover 0.055 of a 154 kb element; on IMEMlNZP2037-1 both recover
+0.074 of 110 kb; on ICEMsp.M1D BacFlux recovers 0.198 and MAP 0.080. Large
+chromosomal element delimitation is an open problem for both, and the module's
+own output flags this — those calls carry <code>boundary_method=none</code>, meaning the
+machinery span was reported because no att pair was resolvable.</p>
+<hr />
+<h2 id="7-limitations">7. Limitations<a class="headerlink" href="#7-limitations" title="Permanent link">&para;</a></h2>
+<p>Read these as constraints on every number above.</p>
+<ol>
+<li><strong>The callers share a detection engine.</strong> §0. Detection agreement is partly
+   tautological. Never cite it as independent confirmation.</li>
+<li><strong>Small n.</strong> 30 curated elements; 17 in the class comparison; 9 chromosomal and
+   5 standalone in the boundary comparison. Medians over five to nine values move
+   a long way on one element. Report directions, not rates, and never a
+   significance claim.</li>
+<li><strong>ICEberg coordinates are the truth standard, and they are neither perfect nor
+   exhaustive.</strong> One record in this set is demonstrably broken (SXT(HN1), §4.1),
+   and one negative-control genome contains a real element ICEberg lacks (ICEBs1,
+   §6.2). The first counts as a miss for both callers; the second scores a correct
+   call as a false positive.</li>
+<li><strong>The negative control gives an upper bound on candidate calls, not a
+   false-positive rate.</strong> §6.2.</li>
+<li><strong><code>score.py</code> selects the largest-overlap call.</strong> Where a caller emits several
+   calls on one genome, the metric rewards the biggest overlapping interval. A
+   caller that emitted one enormous call per genome would score well on
+   <code>recovered_fraction</code> and badly on nothing the scorer measures. This is why the
+   call-burden table (§6.1) must be reported alongside recall, and it applies
+   symmetrically to both callers.</li>
+<li><strong>Closed reference genomes, not draft assemblies.</strong> These are single-contig
+   sequences. BacFlux's short-read entry point produces fragmented SPAdes
+   assemblies where IS elements themselves cause the contig breaks, and calls
+   there will be materially worse. Nothing in this comparison measures that. Any
+   element spanning contigs is capped at <code>low</code> confidence by design.</li>
+<li><strong>Different gene callers.</strong> MAP uses Prodigal, BacFlux uses Bakta. That is a
+   real difference contained in the comparison rather than controlled for, and it
+   affects both the protein set the shared HMMs search and the integrase
+   annotation regex.</li>
+<li><strong>One run per genome, no replicates</strong>, and three genomes carry run caveats
+   (§2.4).</li>
+<li><strong>MAP was run with functional branches disabled.</strong> Fair for a boundary
+   comparison, but it means nothing here evaluates MAP's full output.</li>
+<li><strong>Bacterial models only.</strong> ICEscan and CONJscan are bacterial. The archaeal
+    genome is a construction check, not coverage.</li>
+</ol>
+<hr />
+<h2 id="8-why-vmatch-was-evaluated-and-not-adopted">8. Why vmatch was evaluated and not adopted<a class="headerlink" href="#8-why-vmatch-was-evaluated-and-not-adopted" title="Permanent link">&para;</a></h2>
+<p>MAP refines boundaries with <strong>vmatch</strong>; BacFlux does not. When MAP's boundaries
+were measurably better (§6.3), the obvious hypothesis was that vmatch was the
+reason. It was tested rather than assumed, and the hypothesis was wrong twice
+over.</p>
+<p><strong>First, the two searches are the same search.</strong> BacFlux's att search has not used
+<code>blastn</code>; it computes <strong>exact maximal repeats in standard-
+library Python</strong> (<code>workflow/scripts/80_mobilome/att_search.py</code>), which is vmatch's
+own semantics. To test that properly rather than argue it, a second search was
+built on vmatch's actual data structure — prefix-doubling suffix array, Kasai LCP
+array, cross-flank MEM enumeration — and run against ours on every real flank
+window in the benchmark:</p>
+<blockquote>
+<p><strong>35/35 windows, 122 repeats, exact set equality.</strong></p>
+</blockquote>
+<p>Two searches over the same DNA return the same set of repeats. vmatch would find
+nothing BacFlux does not already find. The same measurement also disposes of a
+related idea: <strong>treating agreement between two repeat searches as evidence is empty</strong>,
+because when the two searches have identical semantics the agreement is
+guaranteed and therefore carries no information.</p>
+<p><strong>Second, the boundary gap was not a repeat-finding gap at all.</strong> Of the four
+elements where MAP's boundary beat ours, none involved a repeat MAP found and we
+could not (§6.3).</p>
+<p><strong>The licensing position is secondary but real.</strong> An earlier version of the spec
+rejected vmatch as "not on bioconda", which was <strong>wrong</strong> — <code>bioconda/vmatch
+2.3.1</code> exists for linux-64 and osx-64. The rejection stands on different ground:
+the recipe declares <code>license: Unknown / OTHER</code> and vmatch.de is unreachable, so
+its terms <strong>cannot be established</strong>. For an MIT workflow that is weaker ground
+than a known-restrictive licence, because there is nothing to comply with. With
+no measured benefit on one side and unverifiable terms on the other, vmatch is not
+adopted.</p>
+<blockquote>
+<p><strong>Reproducibility gap.</strong> The 35/35 set-equality measurement is recorded in the
+commit message that introduced it, but the diagnostic script that produced it is not
+retained in the repository or the benchmark tree. Before this appears in a
+publication it should be re-run and the script and its output archived
+alongside the other validation artefacts.</p>
+</blockquote>
+<hr />
+<h2 id="9-summary">9. Summary<a class="headerlink" href="#9-summary" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Are these independent callers?</td>
+<td><strong>No.</strong> Shared MacSyFinder + ICEscan detection engine. Boundaries and clustering are independent.</td>
+</tr>
+<tr>
+<td>Detection, 30 curated elements</td>
+<td>BacFlux 20/30, MAP 17/30; MAP found nothing BacFlux missed</td>
+</tr>
+<tr>
+<td>Class, 17 shared elements</td>
+<td>Agree on 14; all 3 differences are ICEberg ICEs that MAP called IMEs</td>
+</tr>
+<tr>
+<td>Call burden, 40 genomes</td>
+<td>BacFlux 65 calls / 2.63 Mb; MAP 64 calls / 2.88 Mb</td>
+</tr>
+<tr>
+<td>Negative controls, 32.6 Mb</td>
+<td>2 candidate calls each; identical coordinates on the one shared call</td>
+</tr>
+<tr>
+<td>Boundaries</td>
+<td>Comparable — chromosomal median |start offset| 5,141 bp vs MAP 7,427; standalone recovery 0.94 vs 0.94. §6.3 records that this comparison prompted two fixes to our att search</td>
+</tr>
+<tr>
+<td>Is vmatch needed?</td>
+<td>No — exact set equality with our search on 35/35 flank windows</td>
+</tr>
+</tbody>
+</table>
+<p>Nothing here supports a claim that either pipeline is better than the other. It
+supports three narrower claims: BacFlux's caller recovers the curated elements MAP
+recovers plus three more; it assigns the ICE/IME class in line with ICEberg's
+curation in the three cases where the two callers differ; and its boundary
+refinement is comparable to a vmatch-based refiner without
+requiring vmatch.</p>
+<p>Every mobility statement derived from these calls remains a <strong>prediction</strong>. An
+element reported as <strong>predicted self-transmissible</strong> has conjugation machinery
+that looks intact; it has not been shown to transfer. The confirmatory experiment
+is a <strong>filter or broth mating assay</strong>, and no output of this module substitutes
+for one.</p>
+<hr />
+<h2 id="10-citations-and-credit">10. Citations and credit<a class="headerlink" href="#10-citations-and-credit" title="Permanent link">&para;</a></h2>
+<p>The tools and resources this comparison depends on, credited plainly. Reading
+EBI's pipeline is how we found the ICEscan model set, which materially improved
+BacFlux's IME and AICE handling; that debt should be acknowledged in any
+publication.</p>
+<ul>
+<li><strong>EBI Mobilome Annotation Pipeline</strong> — ebi-metagenomics/mobilome-annotation-pipeline,
+  v5.0.0, <strong>Apache-2.0</strong>. EMBL-EBI Microbiome Informatics team.
+  https://github.com/ebi-metagenomics/mobilome-annotation-pipeline</li>
+<li><strong>ICEfinder2</strong> — Wang J., <em>et al.</em> ICEberg 3.0: functional categorization and
+  analysis of the integrative and conjugative elements in bacteria. <em>Nucleic Acids
+  Research</em> (2024). ICEfinder2 provides the ICEscan models and the boundary-
+  refinement approach MAP's ICEfinder2-lite implements.</li>
+<li><strong>CONJScan / MacSyFinder</strong> — Cury J., Abby S.S., Doppelt-Azeroual O.,
+  Néron B., Rocha E.P.C. Identifying conjugative plasmids and integrative
+  conjugative elements with CONJscan. <em>Methods in Molecular Biology</em> (2020);
+  and Abby S.S., Néron B., Ménager H., Touchon M., Rocha E.P.C. MacSyFinder:
+  a program to mine genomes for molecular systems with an emphasis on CRISPR-Cas
+  systems. <em>PLoS ONE</em> (2014).</li>
+<li><strong>Conjugation system classification</strong> — Coluzzi C., Garcillán-Barcia M.P.,
+  de la Cruz F., Rocha E.P.C. Evolution of plasmid mobility: origin and
+  fate of conjugative and non-conjugative plasmids. <em>Molecular Biology and
+  Evolution</em> (2022).</li>
+<li><strong>ICEberg</strong> (curated coordinates used as truth) — Wang J. <em>et al.</em>, <em>NAR</em> (2024).</li>
+<li><strong>ICEBs1 discovery</strong> (the negative-control lesson, §6.2) — Auchtung J.M.,
+  Lee C.A., Monson R.E., Lehman A.P., Grossman A.D. Regulation of a <em>Bacillus
+  subtilis</em> mobile genetic element by intercellular signaling and the global DNA
+  damage response. <em>PNAS</em> (2005).</li>
+</ul>
+<h3 id="licensing-position">Licensing position<a class="headerlink" href="#licensing-position" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>No code from EBI's pipeline was copied.</strong> Three of its scripts
+  (<code>bin/ice_boundary_refinement.py</code>, <code>bin/map_tools/icefinder_process.py</code>,
+  <code>bin/prescan_to_fasta.py</code>) are ICEfinder2-derived and carry <strong>CC BY-NC-SA 4.0</strong>,
+  which is non-commercial and share-alike and therefore incompatible with
+  BacFlux's MIT licence. Share-alike attaches to distributed source, not to
+  execution, so a default-off flag would not cure it. Reading that code to
+  understand an approach is permitted and is how the ICEscan model set was found;
+  the separation between reading and copying was kept real.</li>
+<li><strong>CONJScan and ICEscan model sets are both CC BY-NC-SA 4.0</strong> (Institut
+  Pasteur/CNRS; ICEscan is an ICEfinder2 fork of CONJScan 2.0.1 by the same
+  authors). They are <strong>fetched at runtime from a configured URL and never
+  vendored</strong>, the mobilome module is <strong>off by default</strong>, and
+  <code>docs/about/licensing.md</code> carries the non-commercial notice — the same pattern
+  BacFlux already uses for every
+  licence-encumbered database.</li>
+<li><strong>Consuming MAP's <code>mobilome.gff.gz</code> output carries no licensing consequence</strong>
+  for BacFlux. Users who want a full mobilome census are pointed at MAP in the
+  README, and BacFlux writes <code>{sample}_contigs.fna</code> and <code>{sample}.gbk</code> ready for it.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2750 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../taxonomy/">
+      
+      
+        <link rel="next" href="../amr/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Annotation - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#annotation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Annotation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#bakta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bakta
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bakta">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-genus-hint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The genus hint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#circular-replicons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Circular replicons
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#eggnog-mapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eggNOG-mapper
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="eggNOG-mapper">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-dbmem-the-ram-trade-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --dbmem: the RAM trade-off
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#antismash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        antiSMASH
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dbcan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dbCAN
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="dbCAN">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-database-and-the-integrity-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The database, and the integrity check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-check-afterwards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to check afterwards
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Turning it on
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#bakta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bakta
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bakta">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-genus-hint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The genus hint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#circular-replicons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Circular replicons
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#eggnog-mapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eggNOG-mapper
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="eggNOG-mapper">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-dbmem-the-ram-trade-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --dbmem: the RAM trade-off
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#antismash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        antiSMASH
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dbcan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dbCAN
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="dbCAN">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-database-and-the-integrity-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The database, and the integrity check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-check-afterwards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to check afterwards
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/analysis/annotation.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="annotation">Annotation<a class="headerlink" href="#annotation" title="Permanent link">&para;</a></h1>
+<p>Stage <code>04.annotation</code> turns the finished genome into gene calls and functional labels.
+Four tools run here, in all four modes, all of them in
+<code>workflow/rules/shared/40_annotation.smk</code>. Every front end has already converged on one
+canonical assembly (<code>02.assembly/{sample}/contigs_final.fasta</code>), so nothing in this
+stage branches on the sequencing technology.</p>
+<p>Bakta goes first and the other three read its output, not the contigs, so one gene
+set underlies every functional layer: a CAZyme cluster, a biosynthetic cluster and an
+orthologous group all sit on the same coordinates.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Version</th>
+<th>Answers</th>
+<th>Written to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/oschwengers/bakta">Bakta</a></td>
+<td>1.12.0</td>
+<td>where the genes are, and what they are called</td>
+<td><code>04.annotation/bakta/{sample}/</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/eggnogdb/eggnog-mapper">eggNOG-mapper</a></td>
+<td>2.1.15</td>
+<td>what each protein's orthologous group is known to do</td>
+<td><code>04.annotation/eggnog/{sample}/</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/antismash/antismash">antiSMASH</a></td>
+<td>8.0.4</td>
+<td>which biosynthetic gene clusters the genome carries</td>
+<td><code>04.annotation/antismash/{sample}/</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/bcb-unl/run_dbcan">run_dbcan</a></td>
+<td>5.1.2</td>
+<td>which sugars and polysaccharides it can process</td>
+<td><code>04.annotation/dbcan/{sample}/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Three of the four are terminal products — you read them, nothing downstream does.
+Bakta is the exception: MultiQC summarises it, and the optional mobilome module reads
+its proteins and its GFF3.</p>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CDS</strong></td>
+<td>coding sequence, the stretch of a gene that is translated into protein</td>
+</tr>
+<tr>
+<td><strong>rRNA</strong></td>
+<td>ribosomal RNA</td>
+</tr>
+<tr>
+<td><strong>HMM</strong></td>
+<td>hidden Markov model, a statistical profile of a gene or protein family</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="bakta">Bakta<a class="headerlink" href="#bakta" title="Permanent link">&para;</a></h2>
+<p><em>Rule <code>annotation</code>.</em></p>
+<p>Bakta calls CDS, tRNA, rRNA, ncRNA and CRISPR arrays on the delivered genome and
+writes the whole standard annotation set. The output is declared to Snakemake as a
+<strong>directory</strong>, because Bakta names the files inside it; every downstream rule takes
+its dependency on the directory and reaches in for the one file it wants.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>In</strong></td>
+<td><code>02.assembly/{sample}/contigs_final.fasta</code>; the per-genus composition table from <a href="../decontamination/">decontamination</a>; the replicon table in the long-read modes</td>
+</tr>
+<tr>
+<td><strong>Out</strong></td>
+<td><code>04.annotation/bakta/{sample}/</code> — <code>{sample}.faa</code>, <code>.gff3</code>, <code>.gbff</code>, <code>.tsv</code> and the rest</td>
+</tr>
+<tr>
+<td><strong>Next</strong></td>
+<td>eggNOG-mapper (<code>.faa</code>), antiSMASH (<code>.gbff</code>), dbCAN (<code>.faa</code> + <code>.gff3</code>), MultiQC, and the <a href="../../mobilome/">mobilome module</a> (<code>.faa</code> + <code>.gff3</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The settings that are worth knowing:</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Value</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--translation-table</code></td>
+<td><code>11</code></td>
+<td>the bacterial genetic code</td>
+</tr>
+<tr>
+<td><code>--min-contig-length</code></td>
+<td><code>500</code></td>
+<td>contigs shorter than this are not annotated</td>
+</tr>
+<tr>
+<td><code>--keep-contig-headers</code></td>
+<td>—</td>
+<td>keeps the assembler's contig names, so coordinates in every later stage refer to the same sequence IDs</td>
+</tr>
+<tr>
+<td><code>--locus-tag</code></td>
+<td>derived</td>
+<td>the sample name, with anything outside letters, digits and <code>_ . -</code> replaced by <code>_</code>, then cut to 24 characters. Bakta rejects some characters in a locus tag; your sample name itself is untouched</td>
+</tr>
+<tr>
+<td><code>--strain</code></td>
+<td>sample name</td>
+<td>what appears in the GenBank header</td>
+</tr>
+</tbody>
+</table>
+<p>The database is <code>directories.bakta_db</code> and must be <strong>v6.0</strong> — Bakta 1.12.1 refuses an
+older one. See <a href="../../getting-started/databases/">Reference databases</a>.</p>
+<h3 id="the-genus-hint">The genus hint<a class="headerlink" href="#the-genus-hint" title="Permanent link">&para;</a></h3>
+<p>Bakta annotates more accurately when it knows roughly what it is looking at, so the
+rule derives a genus from the composition table decontamination wrote, and passes it
+as <code>--genus X --species sp.</code>. It is a hint and nothing more: a wrong genus costs
+annotation accuracy, never contigs or reads. Lines for the literal genus <code>no-hit</code> are
+skipped first, so a poorly-placed sample cannot end up annotated as <code>--genus no-hit</code>.
+A sample with no usable genus is still annotated, just without the hint.</p>
+<div class="admonition note">
+<p class="admonition-title">Check which genus was used</p>
+<p>When the table lists more than one genus, the line picked is <strong>not</strong> the most
+abundant one. Every line carries two labelled figures — see
+<a href="../decontamination/#the-composition-report">the composition report</a> — so the numeric
+sort that reads them scores each line zero, and the tie then breaks on the whole
+line, reversed: the alphabetically last genus wins. On the four-genus sample
+described there (<em>Aneurinibacillus</em> 0.40 of the DNA, <em>Bacillus</em> 0.29,
+<em>Paenibacillus</em> 0.16, <em>Brevibacillus</em> 0.11) Bakta is handed <em>Paenibacillus</em>.</p>
+<p>Nothing announces it during the run, so on a mixed assembly read the first line of
+<code>logs/annotation_{sample}.log</code>: it records the genus that was used, or says that
+none was found.</p>
+</div>
+<h3 id="circular-replicons">Circular replicons<a class="headerlink" href="#circular-replicons" title="Permanent link">&para;</a></h3>
+<p><em><code>nanopore</code> and <code>hybrid</code> only.</em></p>
+<p>Bakta treats every sequence as a linear contig unless told otherwise, and that costs
+genes: on a sequence declared circular, Pyrodigal may call a gene running across the
+origin instead of leaving two partial CDS at the ends. On a closed chromosome that is
+typically a handful of genes at position 1, often including <em>dnaA</em> itself.</p>
+<p>Long-read assemblies are the only ones where the topology is measured, so
+<code>build_replicons</code> writes a small table — topology from Flye's circularity call, type
+from dnaapler's marker hit — and the rule adds <code>--replicons</code> when that table exists
+and is not empty. In <code>illumina</code> and <code>contigs</code> mode the flag is simply absent. See
+<a href="../../modes/nanopore/">Nanopore mode</a>.</p>
+<h2 id="eggnog-mapper">eggNOG-mapper<a class="headerlink" href="#eggnog-mapper" title="Permanent link">&para;</a></h2>
+<p><em>Rule <code>functional_annotation</code>.</em></p>
+<p>eggNOG-mapper assigns each protein Bakta predicted to an orthologous group and
+attaches what that group is known to do — COG category, GO terms, KEGG KO and pathway,
+EC number.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>In</strong></td>
+<td><code>{sample}.faa</code> from the Bakta directory</td>
+</tr>
+<tr>
+<td><strong>Out</strong></td>
+<td><code>04.annotation/eggnog/{sample}/</code> with the <code>{sample}.emapper.*</code> tables</td>
+</tr>
+<tr>
+<td><strong>Next</strong></td>
+<td>nobody — you. MultiQC does not read it</td>
+</tr>
+</tbody>
+</table>
+<p>The search runs in DIAMOND mode (<code>-m diamond</code>) against <code>directories.eggnog_db</code>. A
+scratch directory is written alongside the results and deleted by Snakemake when the
+rule ends; it is a sibling of the kept output, never inside it, so cleanup can never
+reach into a directory you keep.</p>
+<div class="admonition warning">
+<p class="admonition-title">Do not cite the version in the output header</p>
+<p>Line 2 of every <code>.emapper.annotations</code> and <code>.emapper.seed_orthologs</code> file records
+a version like <code>emapper-v1.3.0-90-g5b66bc3</code>, and the run log offers a matching
+ready-made citation sentence. <strong>That string is not an eggNOG-mapper version.</strong>
+eggNOG-mapper builds it by running <code>git describe</code>, and Snakemake runs rules from
+the repository root, so it reports BacFlux's git description instead of its own.</p>
+<p>The results are unaffected — this is the header only. The authoritative version is
+the pin in <code>workflow/envs/eggnog-mapper.yaml</code>, <strong>eggnog-mapper 2.1.15</strong>, which is
+what a methods section should cite.</p>
+</div>
+<h3 id="-dbmem-the-ram-trade-off"><code>--dbmem</code>: the RAM trade-off<a class="headerlink" href="#-dbmem-the-ram-trade-off" title="Permanent link">&para;</a></h3>
+<p>This is the slowest part of a BacFlux run, and usually the last rule still going. The
+reason is the annotation phase: it does random-access lookups into a 39 GB SQLite
+database, once per seed ortholog. <code>--dbmem</code> loads that database wholly into memory so
+the lookups become in-memory ones, and releases it when eggNOG-mapper exits.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">eggnog</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">dbmem</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">        </span><span class="c1"># true = load the 39 GB eggnog.db into RAM</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>dbmem: false</code> (default)</th>
+<th><code>dbmem: true</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Where <code>eggnog.db</code> is read from</td>
+<td>disk, one random-access lookup per seed ortholog</td>
+<td>memory</td>
+</tr>
+<tr>
+<td>RAM per <strong>concurrent</strong> eggNOG job</td>
+<td>eggNOG-mapper's own working set</td>
+<td>~42 GB</td>
+</tr>
+<tr>
+<td>Worth it when</td>
+<td>anything else</td>
+<td>the machine has RAM to spare and this rule is what you are waiting for</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Measured: 4.4x faster, and it depends where the database lives</p>
+<p>Three closed genomes (3,869-6,378 proteins), same input, only the flag changed:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;"><code>dbmem: false</code></th>
+<th style="text-align: right;"><code>dbmem: true</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>three genomes, total</td>
+<td style="text-align: right;">7,223 s (120 min)</td>
+<td style="text-align: right;"><strong>1,628 s (27 min)</strong></td>
+</tr>
+<tr>
+<td>per genome</td>
+<td style="text-align: right;">1,861-2,798 s</td>
+<td style="text-align: right;">530-552 s</td>
+</tr>
+</tbody>
+</table>
+<p>Annotations were <strong>byte-identical</strong> both ways, so this is a pure performance
+switch. The DIAMOND search is only ~150 s of that; over 90% of the default
+runtime is the seed-ortholog lookup phase, which is what the flag removes.</p>
+<p>The size of the win depends on your storage. On the machine measured, <code>eggnog.db</code>
+sits on <strong>NFS</strong>, so every cache miss is a network round-trip — the worst case for
+random access, and the best case for this flag. On a local SSD expect less. The
+three <code>dbmem</code> runtimes barely differ despite a 65% spread in protein count: once
+the database is resident, the fixed ~39 GB load dominates, so the saving grows
+with genome size and with the number of genomes in the batch.</p>
+</div>
+<p>Two things happen when you switch it on, both at parse time, before any job starts:</p>
+<ul>
+<li>If <code>resources.ram_gb</code> is below 42, the run <strong>stops</strong> with a message naming the key
+  to change. One <code>--dbmem</code> job that cannot fit would run out of memory the instant it
+  started.</li>
+<li>BacFlux prints how many such jobs fit in your declared budget, together with the
+  exact <code>--resources mem_gb=N</code> flag to add to the launch line.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">The flag is not optional if you want the limit enforced</p>
+<p><code>mem_gb</code> is a gigabyte figure, not a core count, and Snakemake only schedules
+against a named resource when the launch line passes it. Without
+<code>--resources mem_gb=N</code>, eggNOG concurrency falls back to the <code>--cores</code> bound alone:
+as many eggNOG jobs as your cores allow start together, each claiming 42 GB. See
+<a href="../../reference/running/">Running BacFlux</a>.</p>
+<p>The number comes from <code>resources.ram_gb</code>, the budget you declared, not from
+probing free memory. A live probe cannot predict how many jobs will run at once,
+reports the host's RAM inside a container, and on a cluster reads the submit
+node rather than the compute node.</p>
+</div>
+<h2 id="antismash">antiSMASH<a class="headerlink" href="#antismash" title="Permanent link">&para;</a></h2>
+<p><em>Rules <code>secondary_metabolites_db</code> (or <code>secondary_metabolites_db_local</code>) and
+<code>secondary_metabolites_analysis</code>.</em></p>
+<p>antiSMASH scans the genome for biosynthetic gene clusters — antibiotics, siderophores
+and the rest of secondary metabolism — and reports each cluster with its type and its
+closest known relative.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>In</strong></td>
+<td><code>{sample}.gbff</code> from the Bakta directory; the antiSMASH reference database</td>
+</tr>
+<tr>
+<td><strong>Out</strong></td>
+<td><code>04.annotation/antismash/{sample}/</code></td>
+</tr>
+<tr>
+<td><strong>Next</strong></td>
+<td>nobody — you</td>
+</tr>
+</tbody>
+</table>
+<p>It runs with <code>--taxon bacteria</code> and <code>--genefinding-tool none</code>. The second flag tells
+antiSMASH not to re-predict genes but to reuse Bakta's calls, which travel inside the
+<code>.gbff</code>. That is why this rule consumes the annotated GenBank file rather than the bare
+FASTA, and it keeps cluster coordinates on the same gene set as everything else in
+this stage.</p>
+<p>The reference database is fetched once by <code>download-antismash-databases</code> into
+<code>04.annotation/antismash/databases/</code>, and every sample waits on it. Setting
+<code>directories.antismash_db</code> to a copy you already hold skips the download: that same
+<code>databases/</code> directory is then filled with symlinks pointing into your copy.</p>
+<div class="admonition note">
+<p class="admonition-title">Why a symlink view instead of pointing antiSMASH at your path</p>
+<p>The database is a <code>directory()</code> output, and Snakemake deletes a directory output
+before re-running its rule. If that path were your own shared database, any
+re-run trigger — a changed environment file, a <code>--forcerun</code>, an interrupted job —
+would wipe it for everyone using it. Both rules therefore write only inside
+BacFlux's own output tree and read yours. The same pattern is used for dbCAN,
+VirSorter2, CheckV and geNomad.</p>
+</div>
+<h2 id="dbcan">dbCAN<a class="headerlink" href="#dbcan" title="Permanent link">&para;</a></h2>
+<p><em>Rules <code>cazyme_db_download</code> (or <code>cazyme_db_local</code>) and <code>cazyme_gene_cluster</code>.</em></p>
+<p>dbCAN finds the carbohydrate-active enzymes, groups neighbouring ones into CAZyme Gene
+Clusters, and predicts the substrate each cluster acts on.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>In</strong></td>
+<td><code>{sample}.faa</code> and <code>{sample}.gff3</code> from the Bakta directory; the verified dbCAN database</td>
+</tr>
+<tr>
+<td><strong>Out</strong></td>
+<td><code>04.annotation/dbcan/{sample}/</code></td>
+</tr>
+<tr>
+<td><strong>Next</strong></td>
+<td>nobody — you</td>
+</tr>
+</tbody>
+</table>
+<p>Four <code>run_dbcan</code> sub-commands run in sequence, all writing into that one directory:</p>
+<ol>
+<li><code>CAZyme_annotation</code> — HMM, DIAMOND and dbCAN-sub over the proteins</li>
+<li><code>gff_process</code> — put those calls back on the genome via Bakta's GFF3</li>
+<li><code>cgc_finder</code> — group adjacent CAZymes into clusters</li>
+<li><code>substrate_prediction</code> — predict what each cluster acts on</li>
+</ol>
+<p>Step 2 is passed <code>--gff_type prodigal</code>, which is correct for a Bakta GFF3: Bakta calls
+its CDS with Pyrodigal.</p>
+<h3 id="the-database-and-the-integrity-check">The database, and the integrity check<a class="headerlink" href="#the-database-and-the-integrity-check" title="Permanent link">&para;</a></h3>
+<p><code>links.dbcan_link</code> must point at a <code>.tar.gz</code>; the checksum URL and the name of the
+extracted directory are both derived from it, so the folder can never disagree with
+the link. The download rule fetches the archive and its <code>.sha256</code>, compares the two
+hashes, and <strong>fails rather than extracting</strong> if they differ. Only on a match does it
+extract and write the verified hash into a small marker file, <code>.verified.sha256</code>.</p>
+<p>The analysis rule waits for that marker file rather than for the database directory
+itself, and the difference matters: a directory can be left behind by an interrupted or
+never-verified run, whereas the marker is written only after the checksum has passed. So
+dbCAN cannot start against a database that failed its check. Setting
+<code>directories.dbcan_db</code> to a copy you already hold builds a symlink view instead, for the
+reason given under antiSMASH above, and writes a marker that says in words <code>local copy,
+not independently checksummed</code> — the analysis rule tests only that the marker exists, so
+the integrity claim holds for the download path alone.</p>
+<div class="admonition note">
+<p class="admonition-title">Why run_dbcan is pinned to 5.1.2</p>
+<p>The tool and its database move together, and run_dbcan's own mirror only ever hosts
+the current database — so the shipped link is a version-pinned copy on Zenodo
+(<a href="https://zenodo.org/records/18622157">record 18622157</a>) instead.</p>
+<p>Upgrading is a project of its own rather than a URL swap: 5.2.x changed both the
+sub-command arguments and the output files, and it changes the answer. On the same
+proteins 5.2.9 called <strong>205</strong> CAZyme genes where 5.1.2 called <strong>315</strong>. The extra
+ones are almost all weak hits found by a single method (<code>dbCAN_sub</code>), which 5.2.9
+drops and 5.1.2 keeps. Calls backed by two or three methods are the same either
+way — so treat a single-method hit here with care.</p>
+</div>
+<h2 id="resources">Resources<a class="headerlink" href="#resources" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th style="text-align: right;">Threads</th>
+<th>Memory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>annotation</code></td>
+<td style="text-align: right;">capped at 24</td>
+<td>none declared</td>
+</tr>
+<tr>
+<td><code>functional_annotation</code></td>
+<td style="text-align: right;">capped at 24</td>
+<td><code>mem_gb: 42</code>, only with <code>--dbmem</code> on</td>
+</tr>
+<tr>
+<td><code>secondary_metabolites_analysis</code></td>
+<td style="text-align: right;">capped at 24</td>
+<td>none declared</td>
+</tr>
+<tr>
+<td><code>cazyme_gene_cluster</code></td>
+<td style="text-align: right;">capped at 24</td>
+<td>none declared</td>
+</tr>
+</tbody>
+</table>
+<p>"Capped at 24" means the rule requests <code>min(resources.threads, 24)</code>, so lowering
+<code>threads</code> lowers all four at once and nothing needs configuring per rule; <code>--cores N</code>
+caps the total at run time.</p>
+<p>The database rules ask for nothing in particular; they fetch or link, once, for the
+whole run. <code>cazyme_db_download</code> is the one to know about: it runs in the environment
+BacFlux was launched from rather than a conda environment of its own, so <code>wget</code>, <code>tar</code>,
+<code>sha256sum</code> and <code>awk</code> must be available there — see
+<a href="../../getting-started/installation/">Installation</a>.</p>
+<h2 id="what-to-check-afterwards">What to check afterwards<a class="headerlink" href="#what-to-check-afterwards" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The Bakta panel in <code>09.report/multiqc_report.html</code> — feature counts per sample, side
+  by side, which is the quickest way to spot a genome that annotated badly.</li>
+<li><code>logs/annotation_{sample}.log</code> — the genus hint that was used, and the replicon
+  table if one was passed.</li>
+<li><code>logs/functional_annotation_{sample}.log</code>, <code>logs/secondary_metabolites_{sample}.log</code>,
+  <code>logs/cazyme_{sample}.log</code> — one per sample per tool.</li>
+<li><code>logs/cazyme_db_download.log</code> — the two downloads. If the rule failed, either a fetch
+  did not complete or the tarball's checksum did not match; nothing was extracted
+  either way.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
