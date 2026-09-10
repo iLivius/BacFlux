@@ -637,6 +637,11 @@ rule viral_quality:
               "$viral_fasta" \
               {output.checkv_dir} \
               -t {threads} \
-              -d "$checkv_db_dir" > {log} 2>&1
+              -d "$checkv_db_dir" > {log} 2>&1 || {{
+                echo "" >> {log}
+                echo "NOTE: CheckV exited non-zero. It grades prophage predictions and nothing downstream reads the grades, so the run continues with a header-only quality_summary.tsv - the same file an isolate with no prophage gets. Check the log above." >> {log}
+                printf "contig_id\tcontig_length\tprovirus\tproviral_length\tgene_count\tviral_genes\thost_genes\tcheckv_quality\tmiuvig_quality\tcompleteness\tcompleteness_method\tcontamination\tkmer_freq\twarnings\n" \
+                  > {output.checkv_dir}/quality_summary.tsv
+              }}
         fi
         """

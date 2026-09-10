@@ -397,6 +397,23 @@ fails loudly and prints the first bytes it received. Turning those layers on is
 covered in
 [Optional layers](mobilome/optional-layers.md#what-the-download-rules-do-besides-downloading).
 
+## A tool runs inside the workflow but not by hand
+
+A few tools — QUAST and ISEScan among them — start with `#!/usr/bin/env python`,
+so when called directly they run under whichever `python` is first on the `PATH`,
+not the one in their own environment. Outside an activated environment that is
+usually the system Python, which has none of the tool's libraries, and the tool
+fails with an import error that looks like a broken install (QUAST reports a
+missing `joblib3`).
+
+Inside a run this never happens: Snakemake activates the environment before
+every command. To reproduce a step by hand, activate the environment first:
+
+```bash
+conda activate <path to the environment, under .snakemake/conda/ or your --conda-prefix>
+quast ...
+```
+
 ## Config (YAML) errors
 
 Snakemake reports any config problem with one generic message:

@@ -121,6 +121,34 @@ building them takes a while.
     `--conda-create-envs-only` builds every environment and stops. Useful before
     a long run, and on machines where only the login node reaches the network.
 
+## Pin files: the exact environments
+
+Beside every environment file in `workflow/envs/` sits a `<name>.linux-64.pin.txt`.
+It lists every package in that environment, down to the exact build, as it was
+when the workflow was validated. On a linux-64 machine Snakemake finds it
+automatically and installs from it instead of solving the yaml, so two installs
+made months apart on different machines get identical environments. Nothing
+needs configuring; the run log shows `Using pinnings from ...` for each one.
+
+On any other platform the pin file is ignored and the yaml is solved fresh. The
+Python version and the tool version are pinned there too, so the environment is
+still close to the validated one, but the other packages may move.
+
+!!! note "One environment has no pin file, on purpose"
+
+    `dbcan` is installed through pip, and a pin file is a conda package list: it
+    cannot record pip packages, and an install made from a pin file skips the
+    yaml's pip section entirely. That environment therefore always builds from
+    its yaml. The comment at the top of `dbcan.yaml` says the same, so nobody
+    regenerates a pin file for it.
+
+To regenerate a pin file after deliberately changing an environment, validate
+the rebuilt environment first, then:
+
+```bash
+conda list --explicit -p <path to the built environment> > workflow/envs/<name>.linux-64.pin.txt
+```
+
 ## `--cores` is the CPU budget
 
 `--cores N` is the one CPU knob, and it is enough on its own. Every rule that
@@ -238,6 +266,25 @@ directly, and faster than reasoning about it.
     when one fails, so a whole batch is not lost to one bad sample. It applies
     only to runtime failures, never to a parse or DAG error.
 
+## When a QC tool fails
+
+Four tools produce reports that nothing else in the workflow reads: QUAST
+(assembly metrics), Qualimap (read-mapping quality), NanoPlot (long-read QC) and
+CheckV (prophage grading). MultiQC gathers what they wrote; no analysis step
+depends on them. So if one of them crashes on a sample, the rule finishes
+anyway: it creates its output directory first, lets the tool fail, and writes a
+note beginning `NOTE:` into that sample's log under `logs/`. The run carries on,
+and that sample simply has no section for that tool in the MultiQC report.
+
+The reverse is deliberate too. CheckM, the genome-staging step and the
+assembly-depth step look like QC but feed later rules — GTDB-Tk, QUAST itself,
+the IS copy-number layer — so a failure there stops the run rather than letting
+a bad input flow downstream.
+
+For everything else, `--keep-going` (`-k`) is the flag to reach for: when one
+sample's job fails, the other samples keep running to completion instead of the
+whole batch stopping. Fix the one sample, then resume with `--rerun-incomplete`.
+
 ## What survives between runs
 
 | Kept where | Contents | Cost of deleting it |
@@ -313,6 +360,19 @@ pytest workflow/scripts -q
 # mentions but that no longer exists
 python miscellaneous/check_comment_references.py
 ```
+
+### Before tagging a release
+
+Run the whole workflow, not a dry run. A dry run resolves the graph and checks
+inputs; it never builds an environment and never executes a tool. Building the
+environments without running them is not enough either: a package can install
+cleanly and still break at runtime, as happened when a plotting library dropped
+a function NanoPlot calls, and when a pip package was absent from an environment
+that had installed without complaint.
+
+The check that catches these: a fresh clone, a fresh `--conda-prefix`, one small
+public genome, every mode. It takes an hour or two, and it is the only test that
+exercises what a new user actually gets.
 
 ## See also
 

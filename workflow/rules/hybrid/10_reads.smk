@@ -257,5 +257,8 @@ rule raw_long_read_qc:
           --threads {threads} \
           --loglength \
           --prefix "{wildcards.sample}_" \
-          --outdir {output.nanoplot_raw_dir} > {log} 2>&1
+          --outdir {output.nanoplot_raw_dir} > {log} 2>&1 || {{
+            echo "" >> {log}
+            echo "NOTE: NanoPlot exited non-zero. This is a QC report, not an input to any other step, so the run continues; the long-read QC plots will be missing from MultiQC for this sample. Check the log above." >> {log}
+          }}
         """

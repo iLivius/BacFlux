@@ -2,6 +2,15 @@ name: dbcan
 channels:
   - conda-forge
   - bioconda
+# This is the ONE environment without a .linux-64.pin.txt beside it, on purpose.
+# dbcan is installed through pip below, and a pin file is a conda explicit
+# package list: it cannot record pip packages, and when Snakemake installs from
+# a pin file it skips the yaml's pip section entirely. A pin file generated
+# from a working copy of this environment therefore produces one with no
+# run_dbcan in it, and cazyme_gene_cluster fails with "command not found".
+# That happened on a fresh install. Do not add a pin file here unless dbcan
+# moves to a conda package (bioconda carries 5.2.x, not the 5.1.2 the database
+# matches). The python pin below is what keeps this environment reproducible.
 dependencies:
   - python=3.11
   - pip

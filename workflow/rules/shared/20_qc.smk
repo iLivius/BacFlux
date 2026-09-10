@@ -154,12 +154,20 @@ rule genome_assembly_evaluation:
     shell:
         # The shell expands the *.fasta glob, not Snakemake; the files are
         # guaranteed to be there because genomes_dir is an input of this rule.
+        # QUAST is a report: nothing downstream reads its output and MultiQC only
+        # searches the directory, so a QUAST crash must not cost the batch. The output
+        # directory is created first, the tool is allowed to fail, and a note goes to
+        # the log - the same three-part guard rule isescan uses.
         """
+        mkdir -p {output.quast_dir}
         quast \
           {input.genomes_dir}/*.fasta \
           -o {output.quast_dir} \
           --no-icarus \
-          -t {threads} > {log} 2>&1
+          -t {threads} > {log} 2>&1 || {{
+            echo "" >> {log}
+            echo "NOTE: QUAST exited non-zero. This is a QC report, not an input to any other step, so the run continues; the assembly-metrics table will be missing from MultiQC for this sample. Check the log above." >> {log}
+          }}
         """
 
 
@@ -282,6 +290,8 @@ if HAS_READS:
         log:
             LOGS + "/map_evaluation_{sample}.log"
         shell:
+            # Qualimap reports on the read mapping; nothing downstream reads it. Same guard
+            # as QUAST: make the output directory, tolerate the tool, note the log.
             """
             # Qualimap renders its charts with JFreeChart, which reaches into Swing
             # for theme colours. With DISPLAY set -- an SSH session with X11
@@ -291,10 +301,14 @@ if HAS_READS:
             unset DISPLAY
             export JAVA_OPTS="-Djava.awt.headless=true ${{JAVA_OPTS:-}}"
 
+            mkdir -p {output.qualimap_dir}
             qualimap bamqc \
               -bam {input.bam} \
               --java-mem-size={resources.java_mem}G \
               -nt {threads} \
               -outdir {output.qualimap_dir} \
-              -outformat html > {log} 2>&1
+              -outformat html > {log} 2>&1 || {{
+                echo "" >> {log}
+                echo "NOTE: Qualimap exited non-zero. This is a QC report, not an input to any other step, so the run continues; the mapping-quality report will be missing from MultiQC for this sample. Check the log above." >> {log}
+              }}
             """
