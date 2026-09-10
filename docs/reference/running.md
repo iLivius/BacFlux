@@ -366,9 +366,7 @@ python miscellaneous/check_comment_references.py
 Run the whole workflow, not a dry run. A dry run resolves the graph and checks
 inputs; it never builds an environment and never executes a tool. Building the
 environments without running them is not enough either: a package can install
-cleanly and still break at runtime, as happened when a plotting library dropped
-a function NanoPlot calls, and when a pip package was absent from an environment
-that had installed without complaint.
+cleanly and still break at runtime.
 
 The check that catches these: a fresh clone, a fresh `--conda-prefix`, one small
 public genome, every mode. It takes an hour or two, and it is the only test that
