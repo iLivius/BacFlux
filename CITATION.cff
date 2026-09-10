@@ -1,11 +1,13 @@
 # Machine-readable citation metadata (Citation File Format 1.2.0).
 # GitHub and Zenodo read this file to generate a citation for BacFlux.
 #
-# ONE THING IS LEFT FOR THE MAINTAINER TO FILL IN AFTER EACH RELEASE, because it
-# cannot be known until Zenodo has archived it: the VERSION DOI. Zenodo mints a
-# new one per release under the concept DOI recorded in `identifiers` below; add
-# it there as a second entry of type `doi`. The concept DOI never changes and is
-# the one the README badge carries.
+# AFTER EACH RELEASE, one thing has to be filled in here, because it cannot be
+# known until Zenodo has archived the release: the VERSION DOI. Zenodo mints a
+# new one per release under the concept DOI, and both are recorded in
+# `identifiers` below - concept first, then the version. On the next release,
+# REPLACE the version entry rather than adding a third: this file describes the
+# version named above, not a changelog. The concept DOI never changes and is the
+# one the README badge carries.
 #
 # `date-released` is the day the version below is tagged. It is set ahead of
 # tagging; if the tag lands on a different day, correct it before tagging.
@@ -52,6 +54,9 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.11143917
     description: "Concept DOI — always resolves to the latest BacFlux release."
+  - type: doi
+    value: 10.5281/zenodo.22687288
+    description: "Version DOI for v2.0.1 — cite this when the exact code matters."
 
 keywords:
   - bacterial genomics
