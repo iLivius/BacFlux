@@ -1,14 +1,14 @@
 # Machine-readable citation metadata (Citation File Format 1.2.0).
 # GitHub and Zenodo read this file to generate a citation for BacFlux.
 #
-# TWO THINGS ARE DELIBERATELY LEFT FOR THE MAINTAINER TO FILL IN, because they
-# cannot be known before the release is actually tagged and archived:
+# ONE THING IS LEFT FOR THE MAINTAINER TO FILL IN AFTER EACH RELEASE, because it
+# cannot be known until Zenodo has archived it: the VERSION DOI. Zenodo mints a
+# new one per release under the concept DOI recorded in `identifiers` below; add
+# it there as a second entry of type `doi`. The concept DOI never changes and is
+# the one the README badge carries.
 #
-#   1. date-released — the day v2.0.0 is tagged. Add it as `date-released: YYYY-MM-DD`
-#      just below `version:`.
-#   2. the VERSION DOI — Zenodo mints a new one for each release under the concept
-#      DOI recorded in `identifiers` below. Add it as a second entry of type `doi`
-#      once the release is archived.
+# `date-released` is the day the version below is tagged. It is set ahead of
+# tagging; if the tag lands on a different day, correct it before tagging.
 #
 # Also left out on purpose: an ORCID for the author (none was on file here), and
 # the v1 Zenodo record's co-authors — Großkinsky D. K., Koch H., Trognitz F.,
@@ -37,7 +37,8 @@ abstract: >-
   genetic element and how transferable that element is predicted to be. Every
   tool runs in its own conda environment.
 type: software
-version: 2.0.0
+version: 2.0.1
+date-released: 2026-09-10
 license: MIT
 repository-code: "https://github.com/iLivius/BacFlux"
 url: "https://github.com/iLivius/BacFlux"

@@ -1,7 +1,7 @@
 {
   "upload_type": "software",
   "title": "BacFlux: a unified Snakemake workflow for bacterial whole-genome sequencing",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "language": "eng",
   "access_right": "open",
   "license": "MIT",

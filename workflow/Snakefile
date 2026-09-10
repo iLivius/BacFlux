@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — Unified bacterial whole-genome sequencing workflow.
+# BacFlux v2.0.1 — Unified bacterial whole-genome sequencing workflow.
 #
 # One Snakefile, four input modes. config["mode"] selects the pipeline:
 #   illumina → Illumina paired-end short reads   (rules/illumina/*.smk)
@@ -40,7 +40,7 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|
 
-BacFlux v2.0.0
+BacFlux v2.0.1
 Unified genomic analysis of bacterial genomes
 Illumina · Nanopore · Hybrid · Pre-assembled contigs
 

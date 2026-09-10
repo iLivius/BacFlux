@@ -7,7 +7,7 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|
 
-v2.0.0
+v2.0.1
 ```
 
 **Bacterial whole-genome workflow — Illumina, Nanopore, both, or a finished assembly — from
