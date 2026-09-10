@@ -7,7 +7,7 @@ placement, functional annotation, and screening for resistance genes, virulence
 factors, plasmids and prophages. It can also report, for each resistance gene found,
 whether it sits inside something that can move to another bacterium. A single key in
 the config file, `mode`, decides which of four front ends runs. This site documents
-version **v2.0.0**.
+version **v2.0.1**.
 
 BacFlux belongs to the [BioFlux](https://github.com/stars/iLivius/lists/bioflux)
 family of pipelines.

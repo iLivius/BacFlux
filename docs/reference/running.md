@@ -372,6 +372,22 @@ The check that catches these: a fresh clone, a fresh `--conda-prefix`, one small
 public genome, every mode. It takes an hour or two, and it is the only test that
 exercises what a new user actually gets.
 
+The version number is declared in five places, and they have to move together:
+
+| File | What to change |
+|---|---|
+| `workflow/Snakefile` | the header comment and the banner it prints |
+| `README.md` | the label under the ASCII banner |
+| `docs/index.md` | "This site documents version ..." |
+| `.zenodo.json` | `version` |
+| `CITATION.cff` | `version`, and `date-released` for the tag day |
+
+Leave every other mention of an old version alone: most of them are statements
+about what that release changed, and they stay true.
+
+After Zenodo archives the release, add the version DOI it mints to the
+`identifiers` block in `CITATION.cff`, replacing the previous version entry.
+
 ## See also
 
 - [Configuration](configuration.md) — every key named here, in the file's own order.
