@@ -14,7 +14,7 @@ public accessions and can be downloaded again; the results can be recomputed. Th
 | File | What it is |
 |---|---|
 | `ground_truth.tsv` | 1,677 curated elements extracted from an ICEberg 3.0 download. Every score is measured against these coordinates |
-| `pilot_set.tsv` | The 18 ICE positives: a hand-made stratified draw from `ground_truth.tsv`, six of them the positive controls named in the design spec and the rest chosen to widen the set to 14 genera |
+| `pilot_set.tsv` | The 18 ICE positives: a hand-made stratified draw from `ground_truth.tsv`, six of them classic positive controls and the rest chosen to widen the set to 14 genera |
 | `ime_pilot_set.tsv` | The 12 IME positives, deliberately stacked around the module's size floor — six sit **below** it and are expected misses |
 | `negative_set.tsv` | The 12 genomes with no curated ICEberg entry |
 | `pilot_set_classified.tsv`, `ime_pilot_classified.tsv` | The above, with the `class` column `classify_pilot.py` derives |
@@ -34,11 +34,12 @@ with real chromosomal context.
 
 ## `ebi_comparison/` — the head-to-head against the EBI pipeline
 
-The conversion and scoring layer that made BacFlux's calls and the EBI Mobilome
-Annotation Pipeline's calls comparable, so both could be scored by the same code. The
-pipeline run itself is not kept — it is large and re-runnable — but this layer is where
-the work went, and it is what
-[the write-up](../docs/methods_ebi_comparison.md) rests on.
+The scripts that ran the EBI Mobilome Annotation Pipeline (MAP) on the benchmark
+genomes (`run_map.sh`, `nf_env.sh`), collated its runs, and compared and scored its
+ICE/IME calls against BacFlux's. The pipeline run itself is not kept — it is large and
+re-runnable. The converter that turned MAP's merged GFF into `score.py`'s input is not
+included; its three judgement calls are described in
+[the write-up](../docs/methods_ebi_comparison.md).
 
 ## Repeating a benchmark
 
@@ -50,12 +51,17 @@ python benchmark/mobilome/classify_pilot.py      # if the classified files need 
 python benchmark/mobilome/score.py benchmark/mobilome/pilot_set_classified.tsv results.tsv
 ```
 
-Both scripts take paths as arguments and hold no BacFlux-specific state.
+Both read `genomes/` and `work/` from `benchmark/mobilome/` itself, so add those folders
+there first.
 
-The `ebi_comparison/` scripts are not portable in the same way. They carry the
-absolute paths of the machine the comparison was run on, near the top of each file,
-because they are the record of that particular run rather than a general tool.
-Repeating that half means pointing those paths at your own copies first.
+The `ebi_comparison/` scripts are not portable in the same way. They are the record of
+one particular run rather than a general tool. They read two folders from the
+environment and stop with a message if one they need is not set. Before repeating that
+half, set `EBI_MAP_ROOT` to your own MAP work directory and `BENCH` to your own copy of
+the benchmark. `run_map.sh` lists what the MAP work directory must hold. `BENCH` holds
+the set files, `ground_truth.tsv`, the genomes in `genomes/` and BacFlux's calls in
+`work/<sample>/ice_elements.tsv`. `benchmark/mobilome/` itself will serve once you add
+those two folders to it.
 
 !!! note
     `ground_truth.tsv` came from ICEberg 3.0, which is unversioned and carries no reuse

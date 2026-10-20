@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Score the ICE caller against ICEberg's curated coordinates (spec §8 Phase 7).
+"""Score the ICE caller against ICEberg's curated coordinates.
 
 WHAT IS BEING MEASURED
-    Two numbers per curated element, exactly as the spec asks:
+    Two numbers per curated element:
       RECALL          did we call ANY element overlapping the curated interval?
       BOUNDARY OFFSET how far off were our start and end, in bp?
 
@@ -165,7 +165,7 @@ def main():
 
     # ── Summary ──────────────────────────────────────────────────────────────
     print("=" * 78)
-    print("PHASE 7 BENCHMARK — ICE detection vs ICEberg curated coordinates")
+    print("MOBILOME BENCHMARK — ICE detection vs ICEberg curated coordinates")
     print("=" * 78)
 
     for class_name, note in (("chromosomal", "detection + boundary measurable"),

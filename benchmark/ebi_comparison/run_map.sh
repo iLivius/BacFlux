@@ -8,7 +8,7 @@
 # Example: ./run_map.sh samplesheet_pilot3.csv pilot3
 #
 # Reads : a MAP samplesheet (sample,assembly,...) pointing at the .fna files in
-#         phase7_benchmark/genomes/ - the same FASTAs our own caller was scored on.
+#         $BENCH/genomes/ - the same FASTAs our own caller was scored on.
 # Writes: runs/<run_name>/results/<sample>/prediction/icefinder2lite/<sample>_ices.tsv
 #         which is the table the comparison reads.
 
@@ -17,7 +17,12 @@ set -euo pipefail
 SAMPLESHEET="${1:?usage: run_map.sh <samplesheet.csv> <run_name>}"
 RUN_NAME="${2:?usage: run_map.sh <samplesheet.csv> <run_name>}"
 
-EBI_MAP_ROOT=/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map
+# EBI_MAP_ROOT is your MAP work directory, set in the environment (no default).
+# It must hold a copy of nf_env.sh from this folder, the envs/nf conda env that
+# nf_env.sh describes, the MAP checkout in map/, and your own dbs.config and
+# skip_functional.config (used below). Each run is written to runs/<run_name>/
+# inside it.
+EBI_MAP_ROOT="${EBI_MAP_ROOT:?set EBI_MAP_ROOT to your MAP work directory}"
 source "${EBI_MAP_ROOT}/nf_env.sh"
 
 # Pin Nextflow to 24.10.6.

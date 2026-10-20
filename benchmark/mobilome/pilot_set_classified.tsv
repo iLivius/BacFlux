@@ -1,10 +1,10 @@
 kind	element	accession	start	end	length_bp	organism	why	record_bp	flank_bp	element_covers_record	class
-ICE	SXT(HN1)	AB450045	1	19086	19086	Vibrio cholerae	spec control: SXT	19086	0	1.000	standalone
-ICE	R391	AY090559	1	88532	88532	Providencia rettgeri	spec control: R391	88532	0	1.000	standalone
-ICE	ICEKpnQD23-1	CP042858.1	4831525	5022379	190855	Klebsiella pneumoniae	spec control: ICEKp	5803733	5612878	0.033	chromosomal
-ICE	ICEEc2	GU725392	77	93971	93895	Escherichia coli	spec control: ICEEc2	93971	76	0.999	standalone
-ICE	ICE_EfmISMMSVRE1_Tn916	CP012430.1	2171009	2187902	16894	Enterococcus faecium	spec control: Tn916	3130373	3113479	0.005	chromosomal
-ICE	ICE(Tn4371)6061	KP299160	1	43841	43841	Pseudomonas aeruginosa	spec control: Tn4371	43841	0	1.000	standalone
+ICE	SXT(HN1)	AB450045	1	19086	19086	Vibrio cholerae	classic positive control: SXT	19086	0	1.000	standalone
+ICE	R391	AY090559	1	88532	88532	Providencia rettgeri	classic positive control: R391	88532	0	1.000	standalone
+ICE	ICEKpnQD23-1	CP042858.1	4831525	5022379	190855	Klebsiella pneumoniae	classic positive control: ICEKp	5803733	5612878	0.033	chromosomal
+ICE	ICEEc2	GU725392	77	93971	93895	Escherichia coli	classic positive control: ICEEc2	93971	76	0.999	standalone
+ICE	ICE_EfmISMMSVRE1_Tn916	CP012430.1	2171009	2187902	16894	Enterococcus faecium	classic positive control: Tn916	3130373	3113479	0.005	chromosomal
+ICE	ICE(Tn4371)6061	KP299160	1	43841	43841	Pseudomonas aeruginosa	classic positive control: Tn4371	43841	0	1.000	standalone
 ICE	CMGE(TZ080501)	KX077897	1321	127099	125779	Streptococcus suis	genus diversity: Streptococcus	128795	3016	0.977	standalone
 ICE	ICEKpn16_GR_13-1	CP027036.1	332495	484436	151942	Klebsiella pneumoniae	genus diversity: Klebsiella	5426917	5274975	0.028	chromosomal
 ICE	ICEMsp.M1D	CP034444.1	1694617	1893992	199376	Mesorhizobium sp.	genus diversity: Mesorhizobium	7127907	6928531	0.028	chromosomal

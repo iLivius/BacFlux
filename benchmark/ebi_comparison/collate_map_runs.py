@@ -7,10 +7,9 @@ Why this exists
 ---------------
 MAP was run over the 40 BacFlux benchmark genomes in four separate Nextflow
 runs (pilot3, ime12, negative, ice15), because they were launched at different
-times as the host became free. Each run writes its own Nextflow execution
-trace. This script reads those traces plus the published results tree and
-answers, per genome: did MAP finish, how long did it take, and where did its
-ICE/IME calls land.
+times. Each run writes its own Nextflow execution trace. This script reads
+those traces plus the published results tree and answers, per genome: did MAP
+finish, how long did it take, and where did its ICE/IME calls land.
 
 The one non-obvious point about MAP's output
 --------------------------------------------
@@ -29,16 +28,26 @@ checking that PRESCAN_TO_FASTA completed for the sample.
 Inputs : runs/<run>/results/pipeline_info/execution_trace_*.txt  (Nextflow trace)
          runs/<run>/results/<sample>/prediction/icefinder2lite/<sample>_ices.tsv
 Output : a TSV on stdout, one row per genome, consumed by the benchmark writeup.
+         Its ices_tsv_path column is relative to EBI_MAP_ROOT.
 """
 
 import csv
 import glob
 import os
 import re
+import sys
 from datetime import datetime
 
-EBI_MAP = "/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map"
-BENCH = "/media/data/antonielli_dir/BacFlux_v2_validation/phase7_benchmark"
+# The two folders this script reads. Both are set in the environment and have
+# no default, so the script stops rather than read from a guessed location.
+#   EBI_MAP_ROOT : your MAP work directory; run_map.sh writes runs/<run>/ there
+#   BENCH        : your benchmark folder, with the three set files read below
+EBI_MAP_ROOT = os.environ.get("EBI_MAP_ROOT", "")
+if not EBI_MAP_ROOT:
+    sys.exit("set EBI_MAP_ROOT to your MAP work directory")
+BENCH = os.environ.get("BENCH", "")
+if not BENCH:
+    sys.exit("set BENCH to your benchmark folder")
 
 # The runs to scan, in the order they were launched. A genome can appear in
 # more than one run (NC_000964.3 and U15027 were in the 3-genome smoke test as
@@ -91,7 +100,7 @@ def scan_run(run):
     elapsed time, NOT a share of the total, and the two do not sum.
     """
     traces = sorted(glob.glob(
-        os.path.join(EBI_MAP, "runs", run, "results", "pipeline_info",
+        os.path.join(EBI_MAP_ROOT, "runs", run, "results", "pipeline_info",
                      "execution_trace_*.txt")))
     if not traces:
         return {}
@@ -170,9 +179,13 @@ def main():
         rec = entry["rec"]
         stages = rec["stages"]
 
-        # Where MAP publishes the ICE/IME table for this sample.
-        ices = os.path.join(EBI_MAP, "runs", run, "results", sid,
-                            "prediction", "icefinder2lite", f"{sid}_ices.tsv")
+        # Where MAP publishes the ICE/IME table for this sample. The output
+        # table records the path relative to EBI_MAP_ROOT, so it does not
+        # depend on where anyone keeps the runs; the full path is used only to
+        # check that the file exists and to count its rows.
+        ices_relative = os.path.join("runs", run, "results", sid, "prediction",
+                                     "icefinder2lite", f"{sid}_ices.tsv")
+        ices = os.path.join(EBI_MAP_ROOT, ices_relative)
         has_file = os.path.exists(ices)
         n_calls = ""
         if has_file:
@@ -219,10 +232,9 @@ def main():
             elapsed = f"{(rec['end'] - rec['start']) / 60:.1f}"
 
         rows.append([accession, sid, kinds, run, status, elapsed,
-                     n_calls, outcome, ices if has_file else ""])
+                     n_calls, outcome, ices_relative if has_file else ""])
 
-    writer = csv.writer(__import__("sys").stdout, delimiter="\t",
-                        lineterminator="\n")
+    writer = csv.writer(sys.stdout, delimiter="\t", lineterminator="\n")
     writer.writerow(["accession", "map_sample_id", "set", "run", "status",
                      "elapsed_min", "n_ice_calls", "outcome", "ices_tsv_path"])
     writer.writerows(rows)

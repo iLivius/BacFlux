@@ -5,7 +5,7 @@ own calls and next to ICEberg's curated coordinates, for the same genomes.
 
 Why this exists
 ---------------
-BacFlux's ICE caller (workflow/scripts/mobilome/conjscan_to_ice.py) and MAP's
+BacFlux's ICE caller (workflow/scripts/80_mobilome/conjscan_to_ice.py) and MAP's
 ICEfinder2-lite are two independent implementations that happen to run the SAME
 CONJScan/ICEscan v2.0.1 HMM profile set. So when they disagree about where an
 element starts and ends, the disagreement is in the logic wrapped around the
@@ -23,8 +23,9 @@ Inputs (all read-only, nothing here writes into the repo or the benchmark)
                renamed contigs back to the accessions everything else uses.
                Renaming changes names only, never sequence, so coordinates are
                already in the same frame - no offset correction is needed.
-  3. BacFlux : phase7_benchmark/work/<sample>/ice_elements.tsv
-  4. Truth   : phase7_benchmark/ground_truth.tsv, ICEberg's curated coordinates.
+  3. BacFlux : work/<sample>/ice_elements.tsv
+  4. Truth   : ground_truth.tsv, ICEberg's curated coordinates.
+  1 and 2 are read from EBI_MAP_ROOT, 3 and 4 from BENCH (see below).
 
 Output
   A TSV on stdout, one row per (genome, caller, element), plus overlap and
@@ -36,8 +37,17 @@ import csv
 import os
 import sys
 
-BENCH = "/media/data/antonielli_dir/BacFlux_v2_validation/phase7_benchmark"
-EBI = "/media/data/antonielli_dir/BacFlux_v2_validation/ebi_map"
+# The two folders this script reads. Both are set in the environment and have
+# no default, so the script stops rather than read from a guessed location.
+#   BENCH        : your benchmark folder, with ground_truth.tsv and BacFlux's
+#                  calls in work/<sample>/
+#   EBI_MAP_ROOT : your MAP work directory; run_map.sh writes runs/<run>/ there
+BENCH = os.environ.get("BENCH", "")
+if not BENCH:
+    sys.exit("set BENCH to your benchmark folder")
+EBI_MAP_ROOT = os.environ.get("EBI_MAP_ROOT", "")
+if not EBI_MAP_ROOT:
+    sys.exit("set EBI_MAP_ROOT to your MAP work directory")
 
 
 def read_contig_name_map(path):
@@ -68,7 +78,7 @@ def read_map_ices(sample, run_name):
     style). We split that into integers so the offsets against the curated
     coordinates are a plain subtraction.
     """
-    base = os.path.join(EBI, "runs", run_name, "results", sample)
+    base = os.path.join(EBI_MAP_ROOT, "runs", run_name, "results", sample)
     ices_path = os.path.join(base, "prediction", "icefinder2lite", f"{sample}_ices.tsv")
     name_map = read_contig_name_map(
         os.path.join(base, "preprocessing", f"{sample}_contigID.map")
@@ -105,7 +115,7 @@ def read_map_ices(sample, run_name):
 def read_bacflux_ices(sample):
     """Read BacFlux's own ICE/IME calls for the same genome.
 
-    Produced by the phase-7 benchmark harness (process_one.sh -> conjscan_to_ice.py).
+    Produced by conjscan_to_ice.py, which the benchmark harness ran on each genome.
     """
     path = os.path.join(BENCH, "work", sample, "ice_elements.tsv")
     calls = []
