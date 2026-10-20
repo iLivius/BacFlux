@@ -548,7 +548,7 @@ rule blob_table:
 #   decisions = CONTIG_DECISIONS  the audit TSV: every contig, its genus, and the
 #                                 REASON it was kept or dropped. Required by the
 #                                 project convention that every filtering decision
-#                                 is auditable (CLAUDE.md).
+#                                 is auditable (CONTRIBUTING.md).
 #   contigs   = DECONTAM_CONTIGS  the kept sequences — the per-mode table in this
 #                                 file's header says who consumes them next
 #

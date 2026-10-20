@@ -811,7 +811,7 @@ def startup_audit_rows(sample, isescan_out, results_file, n_records):
     An absent --isescan-out path is a third case and a different kind of problem
     (the rule's wiring, not the tool), so it gets its own reason token.
 
-    BacFlux hard rule (CLAUDE.md): every such decision gets an audit row with a
+    BacFlux rule (CONTRIBUTING.md): every such decision gets an audit row with a
     reason, so "the tool produced nothing" is never indistinguishable from "the
     biology genuinely had nothing".
     """

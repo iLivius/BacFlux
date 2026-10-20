@@ -672,8 +672,8 @@ BLOB_TABLE_PREFIX = DECONTAM_DIR + "/bestscore"
 BLOB_TABLE        = BLOB_TABLE_PREFIX + ".blob.blobDB.table.txt"
 
 # Selector outputs other than COMPOSITION. CONTIG_DECISIONS keeps its v1 name (no
-# {sample} prefix): it is the per-contig audit trail named in CLAUDE.md and the
-# mobilome spec, and other tooling looks for it by that exact name.
+# {sample} prefix): it is the per-contig audit trail that CONTRIBUTING.md asks of
+# every filtering step, and other tooling looks for it by that exact name.
 CONTIG_LIST      = DECONTAM_DIR + "/contigs.list"
 CONTIG_DECISIONS = DECONTAM_DIR + "/contig_taxonomy_decisions.tsv"
 

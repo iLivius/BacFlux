@@ -443,8 +443,8 @@ def test_completely_empty_results_file_is_graceful(tmp_path):
 
 # ── "The tool produced nothing" vs "the genome has nothing" ──────────────────
 # An empty IS table has two completely different meanings for anyone judging a
-# mobility call, so the audit file must always say which one applies (CLAUDE.md:
-# every such decision gets an audit row with a reason).
+# mobility call, so the audit file must always say which one applies
+# (CONTRIBUTING.md: every such decision gets an audit row with a reason).
 
 def test_missing_results_file_and_empty_results_file_get_different_reasons(tmp_path):
     # This is the whole point: the two situations must not look alike.
