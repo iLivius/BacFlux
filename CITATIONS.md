@@ -8,8 +8,8 @@ used** — not just BacFlux. The mobilome module in particular is an integrator:
 it decides how to combine other tools' calls, and every underlying detection
 belongs to somebody else.
 
-Two sections, following the structure set out in
-`docs/mobilome_module_SPEC.md` §11:
+Two sections, because using another project's code or data is not the same as
+learning from its design:
 
 1. **Tools and databases used** — code that runs, or data that is read.
 2. **Design influence** — work we learned from and adopted decisions from,
@@ -115,7 +115,8 @@ Two sections, following the structure set out in
   *ISfinder: the reference centre for bacterial insertion sequences.*
   Nucleic Acids Research 34(Database issue):D32–D36.
   *Terms require written authorisation to download and forbid redistribution.
-  Opt-in only; BacFlux ships a URL, never the data.*
+  BacFlux offers no URL for it and never ships the data; see
+  [Licensing](https://ilivius.github.io/BacFlux/about/licensing/#isfinder-is-not-wired-in).*
 
 - **ISOSDB / pseudoR** — Kirsch JM, Hryckowian AJ, Duerkop BA. (2024)
   *A metagenomics pipeline reveals insertion sequence-driven evolution of the
@@ -144,7 +145,7 @@ Two sections, following the structure set out in
   *Identification of mobile genetic elements with geNomad.* Nature Biotechnology 42:1303–1312.
   *⚠ Licence: Berkeley Lab **academic / non-commercial use only** — not BSD, despite
   the bioconda recipe's tag. Opt-in, default off; VirSorter2 is the default phage
-  caller. See spec §3.1.*
+  caller. See [Licensing](https://ilivius.github.io/BacFlux/about/licensing/).*
 
 ### Supporting tools
 
@@ -188,8 +189,8 @@ of theirs:
 | **Scope of the workflow** | mobilome annotation | reads → assembly → decontamination → annotation → taxonomy → AMR → plasmids → phage → AMR mobility |
 | **Runtime** | Nextflow | Snakemake, conda-per-rule |
 
-What we took from them — all of it facts and design decisions, which spec §11
-expressly permits:
+What we took from them — all of it facts and design decisions, not code (see
+[Licensing](https://ilivius.github.io/BacFlux/about/licensing/#what-this-repository-deliberately-does-not-contain)):
 
 - that **ICEscan** exists, ships the IME and AICE models, and is worth running;
 - Sequence Ontology terms for the mobilome GFF `Type` column;
@@ -203,8 +204,7 @@ expressly permits:
 **CC BY-NC-SA 4.0** headers. That licence is non-commercial and share-alike, so
 copying or adapting any of it would contaminate BacFlux's MIT licence and impose
 a non-commercial restriction on everyone downstream. Reading it to understand an
-algorithm is fine and is what was done; the separation is real and deliberate
-(spec §11).
+algorithm is fine and is what was done; the separation is real and deliberate.
 
 **Escape hatch for users.** For full ICE delimitation and deeper mobilome
 analysis, run their pipeline — BacFlux writes `{sample}_contigs.fna` and

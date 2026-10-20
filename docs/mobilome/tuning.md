@@ -204,7 +204,7 @@ it — a boundary problem, not a threshold one) or `nearest_mobile_element_too_f
 
 !!! warning "Read the audit before you turn the knob the literature points at"
 
-    A worked case measured here. *Streptococcus salivarius* CP002888.1 carries the
+    A worked case. *Streptococcus salivarius* CP002888.1 carries the
     curated IME_Ssal57I_tRNAlys at 70,384–75,506. This clade is exactly the `T4SS_MOBT`
     biology that profile coverage is supposed to hold back, so lowering
     `coverage_profile` ought to recover it. Measured at 0.5, 0.4 and 0.3 it is missed at
@@ -255,7 +255,7 @@ awk -F'\t' '$5=="kept_flagged"' 08.mobilome/S1/S1_ice_discarded.tsv | cut -f6 | 
     is what makes it mobilisable-with-a-helper rather than self-transmissible. So it
     starts with two, and a coupling protein is the only route to three.
 
-    Measured here: of the 26 IME rows across the whole benchmark, none is high. 25 have
+    Measured: of the 26 IME rows across the whole benchmark, none is high. 25 have
     exactly 2 anchor classes; one has 3 and is still medium. 18 of the 26 are
     additionally flagged `machinery_degraded` for `low_system_wholeness` — an artefact
     of CONJscan's MOB model describing more genes than an IME carries, so finding the
@@ -357,7 +357,7 @@ of kb. An IME carries a relaxase and an integrase — two genes — so its span 
 An 8,000 bp floor selects for ICEs by construction. AICEs take the lower floor for the
 same reason.
 
-Measured here over the 28 small-machinery calls (IME + AICE) in the benchmark:
+Measured over the 28 small-machinery calls (IME + AICE) in the benchmark:
 
 | floor | calls dropped (of 28) | curated IMEs still detected (of 12) |
 |--:|--:|--:|
@@ -488,9 +488,10 @@ flag name `--boundary-bp` while meaning different things, and only the first is 
 a config key.
 
 A high `fraction_at_contig_boundary` means the assembly broke exactly where the IS
-elements are, and the located IS count should be read as a floor. For reference, the two
-hybrid clinical assemblies run here score 0.0089 (1 of 112 IS calls) and 0.0103 (1 of
-97) — near-closed genomes. A short-read draft will be far higher.
+elements are, and the located IS count should be read as a floor. For reference, the
+hybrid assemblies of the clinical *K. pneumoniae* isolates TUM24772 and K3 score 0.0089
+(1 of 112 IS calls) and 0.0103 (1 of 97) — near-closed genomes. A short-read draft will
+be far higher.
 
 ISEScan itself is run with **no** `--removeShortIS`, on purpose: partials are kept and
 tiered rather than discarded. `--min-length-bp` on `rule isescan_table` defaults to **0**
@@ -512,7 +513,7 @@ an ICE?* (anchors, machinery, one contig) and *where does it end?* (`boundary_me
 By default they are reported side by side and only the first sets confidence.
 
 Measured cost of turning it on: across the 85 element rows produced by the 52 complete
-records in the benchmark tree, 30 reach high confidence and only **7** of those have
+records in the benchmark, 30 reach high confidence and only **7** of those have
 `boundary_method=tRNA`. The key demotes 23 of 30 high calls to medium **even on closed
 genomes**. Use it on closed long-read assemblies, where an unresolved boundary is a
 warning sign rather than the norm.

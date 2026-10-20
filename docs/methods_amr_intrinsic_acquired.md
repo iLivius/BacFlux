@@ -82,18 +82,18 @@ acquired and mobile side.
 ### The caveat
 
 `--organism` only engages for organisms AMRFinderPlus curates mutations for:
-roughly three dozen, overwhelmingly clinical — *Escherichia*, *Salmonella*,
+31 in version 4.2.7, overwhelmingly clinical — *Escherichia*, *Salmonella*,
 *Klebsiella*, *Staphylococcus aureus*, *Campylobacter*, *Pseudomonas aeruginosa*,
 *Enterococcus*, *Vibrio*, *Neisseria* and similar.
 
-On a batch of plant- and environment-associated strains — the Bacillaceae and
-soil Pseudomonadota that make up most environmental collections — `--organism`
-was applied to **none of them**. Every
-`{sample}_amrfinder_organism_audit.tsv` recorded the same reason: *no curated
-organism for this taxon*. Every `{sample}_amrfinderplus_mutations.tsv` was
-therefore header-only.
+So most plant- and environment-associated strains fall outside that list. The
+Bacillaceae and soil Pseudomonadota common in environmental collections usually
+get no `--organism` at all. For such a sample,
+`{sample}_amrfinder_organism_audit.tsv` records the reason: *no curated organism
+for this taxon*. Its `{sample}_amrfinderplus_mutations.tsv` then holds no mutation
+rows, only a line saying point-mutation screening was not available.
 
-**Read those empty files as "not assessed", never as "no mutations found."**
+**Read such a mutations file as "not assessed", never as "no mutations found."**
 BacFlux writes the refusal and its reason to the audit file so the distinction
 survives.
 
@@ -237,10 +237,9 @@ is what a real acquired gene looks like.
 
 ### Why it is not built into BacFlux
 
-**Coverage.** It spans five species. On one environmental batch, fewer than a
-fifth of the isolates fell inside those five; roughly another third were *Bacillus*
-or *Priestia* species outside them, and the rest were other genera entirely. For
-most of a typical environmental collection it would return nothing.
+**Coverage.** It spans five species, all of them *Bacillus*. Other *Bacillus*
+species and every other genus fall outside it. For most of a typical environmental
+collection it would return nothing.
 
 **It is a snapshot.** RefSeq at 30 November 2023, dossiers to December 2023. It
 carries no update mechanism.
@@ -312,9 +311,11 @@ is quoted in a dossier.
 
 **Verified from software, not literature**
 
-- The AMRFinderPlus organism list, the `--organism` refusals and the empty
-  mutation tables were read from this repository's own run outputs and audit
-  files, not from documentation.
+- The AMRFinderPlus organism list was read from the installed tool
+  (`amrfinder --list_organisms`, version 4.2.7), not from its documentation.
+- What BacFlux writes when no organism matches was read from its own code: the
+  audit reason from `gtdb_amrfinder_organism.py`, and the one-line mutations file
+  from the `amrfinderplus` rule in `80_mobilome.smk`.
 
 **Inference, not quoted from any source**
 

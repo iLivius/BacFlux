@@ -133,15 +133,16 @@ an archaeon (*Halobacterium* sp. NRC-1). The archaeon is a **construction
 check**: CONJscan and ICEscan are bacterial models, so any call there would be
 spurious by definition.
 
-Both callers were given **the same FASTA files** from
-`phase7_benchmark/genomes/`. No re-assembly, no re-annotation on our side of the
-fence — MAP does its own gene calling (Prodigal), BacFlux uses Bakta, which is one
-of the differences the comparison contains rather than controls for.
+Both callers were given **the same FASTA files**: the benchmark genomes, fetched by
+accession from the set files in `benchmark/mobilome/`. No re-assembly, no
+re-annotation on our side of the fence — MAP does its own gene calling (Prodigal),
+BacFlux uses Bakta, which is one of the differences the comparison contains rather
+than controls for.
 
 ### 2.2 Scoring
 
 Both callers' output was reduced to one table per genome,
-`work/{sample}/ice_elements.tsv`, with the columns `phase7_benchmark/score.py`
+`work/{sample}/ice_elements.tsv`, with the columns `benchmark/mobilome/score.py`
 reads. `score.py` was then run **unmodified** over both. It:
 
 - takes the curated ICEberg interval as truth;
@@ -160,17 +161,18 @@ MAP **v5.0.0** (`ebi-metagenomics/mobilome-annotation-pipeline`, repo checkout a
 containers: MacSyFinder 2.1.4, ISEScan 1.7.3, IntegronFinder 2.0.6, geNomad
 1.11.1, HMMER 3.4, Aragorn 1.2.41.
 
-Two host-specific problems had to be solved first. Both are recorded in
-`benchmark/ebi_comparison/nf_env.sh` and `benchmark/ebi_comparison/run_map.sh`; anyone repeating this will hit them.
+Two environment problems can make MAP fail. The fixes for both are in
+`benchmark/ebi_comparison/nf_env.sh` and `benchmark/ebi_comparison/run_map.sh`.
+Without them, a fresh setup may hit either.
 
-**(a) Apptainer instead of the host's Singularity.** This machine carries
-Singularity **2.6.1**, which predates the SIF container format that all current
-biocontainers use — it cannot run them at all. Apptainer (the renamed, modern
-continuation of Singularity) was installed into a private conda environment and
-put ahead of the system binary on `PATH`. It runs rootless here because the kernel
-has unprivileged user namespaces enabled, and the conda package ships a
-`singularity` → `apptainer` symlink, which lets Nextflow's stock `singularity`
-profile work unmodified.
+**(a) Apptainer instead of an old Singularity.** Singularity **2.x** predates the
+SIF container format that all current biocontainers use, so it cannot run them at
+all. If your host's Singularity is that old, install Apptainer (the renamed, modern
+continuation of Singularity) into a conda environment of its own and put it ahead of
+the system binary on `PATH`. Running it without root needs a kernel with
+unprivileged user namespaces enabled. The conda package ships a `singularity` →
+`apptainer` symlink, which lets Nextflow's stock `singularity` profile work
+unmodified.
 
 **(b) `NXF_VER=24.10.6`.** On Nextflow 26.04.6 — the current release, and what a
 fresh conda install gives you — MAP v5.0.0 dies inside its own ICEfinder2-lite
@@ -188,7 +190,7 @@ manifest only requires `!>=24.04.0` and its CI does not pin a version, so this i
 a genuine forward-compatibility gap in MAP rather than a local misconfiguration.
 Pinned to 24.10.6, the same commit runs `REFINE_BOUNDARIES` to completion.
 
-**(c) Functional branches switched off** (`ebi_map/skip_functional.config`).
+**(c) Functional branches switched off.**
 AMRFinderPlus, DeepARG, RGI-CARD, PathoFact2, SanntiS, GECCO and antiSMASH were
 disabled: they answer a different question, each needs its own multi-GB database,
 and they contribute nothing to a boundary comparison. geNomad and CheckV are
@@ -220,9 +222,9 @@ Three run-level caveats:
 
 MAP writes a merged GFF that pools every predictor it runs. Turning that into the
 two-column-plus-metadata table `score.py` expects required three judgement calls.
-All three are written into `ebi_map/scoring/convert_map_to_ice_elements.py` at the
-point where they take effect. The converter does **no** filtering, no
-re-thresholding and no coordinate arithmetic — only translation.
+Each is described below. The conversion script, which is not in the repository,
+does **no** filtering, no re-thresholding and no coordinate arithmetic — only
+translation.
 
 ### 3.1 The SO-term `integron` trap
 
@@ -280,9 +282,8 @@ BacFlux has two classes MAP has no equivalent for (`cime_or_island`,
 The converter reads MAP's merged GFF, then cross-checks against ICEfinder2-lite's
 own `{sample}_ices.tsv` — the same elements in a different layout. **All 40
 genomes agree**: 64 elements in the GFF, 64 rows in the TSV, decomposing as 32
-ICEs + 27 IMEs + 5 AICEs (`ebi_map/scoring/map_conversion_audit.tsv`). All five
-AICE calls fall in *Streptomyces scabiei*, which is biologically correct — AICEs
-are the actinomycete class.
+ICEs + 27 IMEs + 5 AICEs. All five AICE calls fall in *Streptomyces scabiei*,
+which is biologically correct — AICEs are the actinomycete class.
 
 ---
 
@@ -317,7 +318,7 @@ and should not be presented as one.
 
 ### 4.1 Per-pilot detection, BacFlux alone
 
-From `phase7_benchmark/results_final.tsv` and `ime_results_final.tsv`:
+Scored by `benchmark/mobilome/score.py` on the ICE and IME pilot sets:
 
 **ICE pilot: 15/18** — chromosomal 9/11, standalone 6/7.
 
@@ -395,20 +396,16 @@ One call apart, and BacFlux claims **8.7% fewer** base pairs while recovering
 three more curated elements. **Neither caller achieves recall by volume** — the
 higher recall in §4 does not come from making many more calls.
 
-> **Provenance of these two rows.** `ebi_map/scoring/call_burden.tsv` was written
-> at 09:29 on 2026-07-31 from a snapshot of our calls taken at 09:26 — *before*
-> the att-search fix regenerated them at ~11:12. Its BacFlux row therefore reads 66 calls /
-> 2,472,667 bp, which is stale. The figures above are recomputed from the live
-> `phase7_benchmark/work/*/ice_elements.tsv` over the same 40 samples. Three
-> samples changed: `AL513382` 95,548 → 145,727 bp; `GU725392` 2 calls / 57,721 bp
-> → 1 call / 92,237 bp; `NC_013929` 200,047 → 272,744 bp. **MAP's row is
-> unchanged** — its run was never re-done, so the comparison remains like for
-> like.
+> **Provenance of these two rows.** BacFlux's row was recomputed over the same 40
+> samples after a fix to the att search. Three samples changed: `AL513382`
+> 95,548 → 145,727 bp; `GU725392` 2 calls / 57,721 bp → 1 call / 92,237 bp;
+> `NC_013929` 200,047 → 272,744 bp. **MAP's row is unchanged** — its run was never
+> re-done, so the comparison remains like for like.
 
 ### 6.2 Negative controls
 
-Twelve genomes with no curated ICEberg entry, 32,601,100 bp
-(`ebi_map/scoring/negative_side_by_side.tsv`):
+Twelve genomes with no curated ICEberg entry, 32,601,100 bp (listed in
+`benchmark/mobilome/negative_set.tsv`):
 
 | Genome | BacFlux | MAP |
 |---|---|---|
@@ -453,8 +450,7 @@ bona fide IME is a domain question this benchmark cannot settle.
 
 ### 6.3 Boundaries
 
-Measured on the elements both callers found
-(`ebi_map/scoring/boundary_agreement.tsv`; chromosomal n=9, standalone n=5):
+Measured on the elements both callers found (chromosomal n=9, standalone n=5):
 
 | Metric | BacFlux | MAP |
 |---|---|---|
@@ -566,7 +562,8 @@ built on vmatch's actual data structure — prefix-doubling suffix array, Kasai 
 array, cross-flank MEM enumeration — and run against ours on every real flank
 window in the benchmark:
 
-> **35/35 windows, 122 repeats, exact set equality.**
+> **52 benchmark genomes (more than the 40 compared here), 246 att searches, 180
+> distinct flank windows, 1,033 repeats, exact set equality on every window.**
 
 Two searches over the same DNA return the same set of repeats. vmatch would find
 nothing BacFlux does not already find. The same measurement also disposes of a
@@ -578,20 +575,13 @@ guaranteed and therefore carries no information.
 elements where MAP's boundary beat ours, none involved a repeat MAP found and we
 could not (§6.3).
 
-**The licensing position is secondary but real.** An earlier version of the spec
-rejected vmatch as "not on bioconda", which was **wrong** — `bioconda/vmatch
-2.3.1` exists for linux-64 and osx-64. The rejection stands on different ground:
-the recipe declares `license: Unknown / OTHER` and vmatch.de is unreachable, so
-its terms **cannot be established**. For an MIT workflow that is weaker ground
-than a known-restrictive licence, because there is nothing to comply with. With
-no measured benefit on one side and unverifiable terms on the other, vmatch is not
-adopted.
-
-> **Reproducibility gap.** The 35/35 set-equality measurement is recorded in the
-> commit message that introduced it, but the diagnostic script that produced it is not
-> retained in the repository or the benchmark tree. Before this appears in a
-> publication it should be re-run and the script and its output archived
-> alongside the other validation artefacts.
+**The licensing position is secondary but real.** vmatch is on bioconda
+(`bioconda/vmatch 2.3.1`, for linux-64 and osx-64), so packaging is not the
+obstacle; the licence is. The recipe declares `license: Unknown / OTHER` and
+vmatch.de is unreachable, so its terms **cannot be established**. For an MIT
+workflow that is weaker ground than a known-restrictive licence, because there is
+nothing to comply with. With no measured benefit on one side and unverifiable terms
+on the other, vmatch is not adopted.
 
 ---
 
@@ -605,7 +595,7 @@ adopted.
 | Call burden, 40 genomes | BacFlux 65 calls / 2.63 Mb; MAP 64 calls / 2.88 Mb |
 | Negative controls, 32.6 Mb | 2 candidate calls each; identical coordinates on the one shared call |
 | Boundaries | Comparable — chromosomal median \|start offset\| 5,141 bp vs MAP 7,427; standalone recovery 0.94 vs 0.94. §6.3 records that this comparison prompted two fixes to our att search |
-| Is vmatch needed? | No — exact set equality with our search on 35/35 flank windows |
+| Is vmatch needed? | No — exact set equality with our search on all 180 flank windows |
 
 Nothing here supports a claim that either pipeline is better than the other. It
 supports three narrower claims: BacFlux's caller recovers the curated elements MAP

@@ -72,9 +72,9 @@ A sample with no usable genus is still annotated, just without the hint.
     abundant one. Every line carries two labelled figures — see
     [the composition report](decontamination.md#the-composition-report) — so the numeric
     sort that reads them scores each line zero, and the tie then breaks on the whole
-    line, reversed: the alphabetically last genus wins. On the four-genus sample
-    described there (*Aneurinibacillus* 0.40 of the DNA, *Bacillus* 0.29,
-    *Paenibacillus* 0.16, *Brevibacillus* 0.11) Bakta is handed *Paenibacillus*.
+    line, reversed: the alphabetically last genus wins. On the illustrative four-genus
+    file shown there (GenusA 0.46 of the DNA, GenusB 0.31, GenusC 0.14, GenusD 0.09)
+    Bakta is handed GenusD.
 
     Nothing announces it during the run, so on a mixed assembly read the first line of
     `logs/annotation_{sample}.log`: it records the genus that was used, or says that
@@ -158,12 +158,13 @@ parameters:
     switch. The DIAMOND search is only ~150 s of that; over 90% of the default
     runtime is the seed-ortholog lookup phase, which is what the flag removes.
 
-    The size of the win depends on your storage. On the machine measured, `eggnog.db`
-    sits on **NFS**, so every cache miss is a network round-trip — the worst case for
-    random access, and the best case for this flag. On a local SSD expect less. The
-    three `dbmem` runtimes barely differ despite a 65% spread in protein count: once
-    the database is resident, the fixed ~39 GB load dominates, so the saving grows
-    with genome size and with the number of genomes in the batch.
+    The size of the win depends on your storage. These timings were taken with
+    `eggnog.db` on network storage (**NFS**), where every cache miss is a network
+    round-trip — the worst case for random access, and the best case for this flag.
+    On a local SSD expect a smaller gain. The three `dbmem` runtimes barely differ
+    despite a 65% spread in protein count: once the database is resident, the fixed
+    ~39 GB load dominates, so the saving grows with genome size and with the number of
+    genomes in the batch.
 
 Two things happen when you switch it on, both at parse time, before any job starts:
 
@@ -269,7 +270,7 @@ the integrity claim holds for the download path alone.
 
     Upgrading is a project of its own rather than a URL swap: 5.2.x changed both the
     sub-command arguments and the output files, and it changes the answer. On the same
-    proteins 5.2.9 called **205** CAZyme genes where 5.1.2 called **315**. The extra
+    proteins 5.2.9 calls markedly fewer CAZyme genes than 5.1.2. The extra
     ones are almost all weak hits found by a single method (`dbCAN_sub`), which 5.2.9
     drops and 5.1.2 keeps. Calls backed by two or three methods are the same either
     way — so treat a single-method hit here with care.

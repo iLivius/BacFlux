@@ -309,9 +309,8 @@ read: BacFlux builds a local symlink view rather than touching your directory.
 
 !!! warning "geNomad's database gets two extra checks"
 
-    A shared copy can be *partly* readable: on this machine 11 of 27 files were
-    mode 0640 — `version.txt`, both hallmark tables and the whole
-    `genomad_integrase_db` set — while the big files beside them were
+    A shared copy can be *partly* readable: some small files, `version.txt`
+    among them, can end up mode 0640 while the big files beside them are
     world-readable. A file can be listed and still refuse to open, so checking
     that it exists is not enough: the run would start and die minutes later on a
     permission error. Every file is therefore checked for read access, and the
@@ -322,7 +321,7 @@ read: BacFlux builds a local symlink view rather than touching your directory.
     `genomad_marker_metadata.tsv` positionally from the last columns, so an older
     database shifts every field by one and geNomad dies on
     `ValueError: invalid literal for int() with base 10: '1398618at2'` — a marker
-    accession being read as a hallmark count. Verified here on 2026-07-24 with
+    accession being read as a hallmark count. Verified on 2026-07-24 with
     database v1.7 against geNomad 1.12.0. BacFlux tests for the trailing
     `PREVIOUS_MARKER_ACCESSION` column instead of guessing at version numbers.
 
@@ -351,8 +350,7 @@ links:
 
 The CheckV and geNomad mirrors exist for one reason: both databases are served
 from `portal.nersc.gov` ([NERSC](https://www.nersc.gov/)), which is unreachable
-often enough to cost real time (it
-was down for the whole of 2026-07-22, blocking three validation runs here), and
+often enough to cost real time (it was down for the whole of 2026-07-22), and
 geNomad's downloader has no option to point elsewhere. Several of these
 databases carry terms of their own; BacFlux ships none of the data, and the
 licence of each is tabulated on [licensing](../about/licensing.md).
@@ -478,7 +476,7 @@ construction and are discarded first.
 | `keep_percent` | Keep the best N% of **bases** by the score above | `95` | both long-read modes |
 | `length_weight` | How much length dominates the ranking | `1` (Filtlong's own default) | `hybrid` only |
 
-Measured here on *Klebsiella pneumoniae* TUM24772 (BioProject PRJNA1168299,
+Measured on *Klebsiella pneumoniae* TUM24772 (BioProject PRJNA1168299,
 closed genome GCA_043950115.1) — a clinical test isolate, not one of the mobilome
 positive controls. Its 5,596 bp Col2 plasmid (CP171790.1) was missing from the
 assembly while sitting complete in the Illumina data. Of the 603 raw ONT reads
@@ -513,7 +511,7 @@ range.
 
 !!! warning "Recovering the reads is necessary, not sufficient"
 
-    No setting tried here assembled that plasmid — raw unfiltered reads included.
+    None of the settings tried assembled that plasmid — raw unfiltered reads included.
     ONT ligation prep under-represents small circular plasmids roughly four-fold,
     and no filter setting undoes that half of the problem. Read this table as
     "these settings stop the reads being thrown away", not as "and then it
@@ -715,7 +713,7 @@ added on the negative controls at 0.4 is a `cime_or_island` at `passive`
 mobility, `low` confidence, claiming nothing and carrying no tier — the tiering
 absorbs it, which is what it is for. At 0.3 that stops being true: a 21.6 kb IME
 is called in *Staphylococcus aureus* N315 at medium confidence with a real
-mobility claim. Nothing measured here supports 0.3 for single isolates. If your
+mobility claim. Nothing measured so far supports 0.3 for single isolates. If your
 isolates sit in the space where it might help — of 395 curated IMEs, 73 carry a
 relaxase hit that is clean on E-value and fails only this rule, 60 of them
 `T4SS_MOBT` at about 0.32 coverage — 0.4 is worth trying, and the audit TSV
@@ -960,13 +958,13 @@ the benchmark afterwards.
     not. `idfilter` does not filter the primary alignment of a properly-paired
     read (BBMap 39.33, `align2/AbstractMapThread.java`: the guard reads
     `if(!r.paired() && …)`), so every result the leg ever produced was screened at
-    BBMap's default of 0.76. Measured on the same reads: paired, `idfilter=0.99`
-    kept 1240 alignments, 1238 of them below 99% identity; the same reads treated
-    as single-end kept 1.
+    BBMap's default of 0.76. Mapping one set of reads both ways shows it. Run as
+    pairs, nearly every alignment that `idfilter=0.99` kept was below 99% identity,
+    some far below. Run as single-end, almost none survived.
 
     The rule now passes `minid=0.76` — which changes no output, and stops the code
     claiming a stringency it never applied. It is deliberately not raised: at a
-    real 0.99 the same reads keep 2 alignments instead of 1240, which would
+    real 0.99 the same reads keep almost none of their alignments, which would
     disable the one AMR leg immune to assembly collapse. Specificity comes from requiring
     ≥70% of the reference gene's **length** to be covered, which is why the loose
     identity floor is tolerable. There is no second pass and no divergent tier.

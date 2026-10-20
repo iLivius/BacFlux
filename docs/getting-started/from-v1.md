@@ -126,8 +126,8 @@ cleaned down to results and archived.
 One downstream difference is deliberate and appears in the two long-read modes: Bakta
 gains or loses a single feature, because it is now handed a `--replicons` table
 declaring a closed chromosome circular. That makes its gene caller run in closed mode,
-which shifts a couple of marginal start codons. It is 0.02% of the features, and the
-better call.
+which shifts a couple of marginal start codons. It is one feature in several thousand,
+and the better call.
 
 ## Next
 

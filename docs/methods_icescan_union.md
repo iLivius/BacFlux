@@ -33,10 +33,10 @@ ICE caller was given ICEscan's table (`mobilome.icescan.run: true`).
 > not be quoted.** A later rework of the *att*-site search moved many of them
 > substantially: SPI-7 is listed below at 83,403 bp and is now called at 133,582 bp
 > against a curated 133,500; ICE*Ec2* at 55,055 bp is now 92,237 bp. Current
-> per-element numbers are in `results_final.tsv` and `ime_results_final.tsv` in the
-> benchmark tree, current headline figures in `docs/mobilome/validation.md` and
-> `methods_ebi_comparison.md`. Both arms used the same *att* search, so the two-arm
-> comparison is unaffected.
+> headline figures are on [Validation](mobilome/validation.md) and
+> [Head-to-head vs the EBI pipeline](methods_ebi_comparison.md); the per-element
+> tables behind them are not in the repository. Both arms used the same *att*
+> search, so the two-arm comparison is unaffected.
 
 **Short version.** ICEscan is not a second opinion — it is a fork of the tool we
 already run. We add it alongside CONJScan, take only two things from it (integrase
@@ -144,11 +144,6 @@ quorum, for ICEscan's `IME` and `AICE` models. Per genome, that trade is bad:
 SGI1's genome goes to **zero** machinery hits under ICEscan alone: it is mobilised by
 a helper plasmid, its CONJScan signal is a `MOB` relaxase, and ICEscan deleted that
 model. ICEEc2 drops from 24 supporting hits to 3.
-
-> **Not re-verifiable.** Earlier notes record a swap arm in which corroboration across
-> the two model sets fell from **88% to 68%**. Those percentages cannot be reproduced
-> from the surviving arms and **should not be quoted in a paper**. The per-genome
-> collapse above is directly re-measurable and makes the same point.
 
 **The union rule.** Both model sets run at `--coverage-profile 0.5` over the same
 Bakta proteins; the two `best_solution.tsv` tables are merged before the ICE caller
@@ -287,15 +282,11 @@ finds a single `MOB` relaxase hit and no integrase. **No coverage threshold can 
 CONJScan find a profile it does not ship.** The same holds for `IME_CdiR20291_ND`.
 
 **The ICE improvements seen at 0.3 are 100% threshold.** They reproduce with plain
-CONJScan at 0.3 and no ICEscan at all. That arm is kept as `icescan_cov03/` and
-deliberately **not** used. Whether to lower the threshold is a separate question,
-separately measurable, and is not decided here.
+CONJScan at 0.3 and no ICEscan at all. That arm is deliberately **not** used.
+Whether to lower the threshold is a separate question, separately measurable, and is
+not decided here.
 
-> ⚠ **`run_icescan.sh` does not reproduce the scored runs.** It hard-codes
-> `--coverage-profile 0.3` at lines 13 (comment) and 34 (command); the scored runs are
-> at 0.5. It caches on `best_solution.tsv`, so the next `rm -rf work/*/icescan` would
-> silently regenerate the whole benchmark at 0.3.
-> **Fix the script before anyone re-runs it.**
+> ⚠ **To repeat the scored runs, use `--coverage-profile 0.5` for both model sets.**
 
 ---
 
@@ -317,12 +308,13 @@ TraB generically; pSAM2's copy is TraSA.)
 > itself by rolling-circle replication *inside* one cell, and that intermediate is
 > single-stranded (te Poele *et al.* 2008, PMID 18523858).
 
-The mobility ladder (spec §2.5) has no tier for this, for bookkeeping reasons rather
-than biological ones. Tiers 5 and 6 are **defined by machinery**: tier 5 is "a relaxase
-but no mating apparatus, so a helper must supply one", tier 6 is "a relaxase plus its
-own". An AICE carries neither protein, so neither tier measures anything about it —
-and with this branch's validation at nil (below), reading its transfer ability as tier
-6 would be the worse error. It is reported as its own thing:
+The [mobility ladder](mobilome/mobility-ladder.md) has no tier for this, for
+bookkeeping reasons rather than biological ones. Tiers 5 and 6 are **defined by
+machinery**: tier 5 is "a relaxase but no mating apparatus, so a helper must supply
+one", tier 6 is "a relaxase plus its own". An AICE carries neither protein, so
+neither tier measures anything about it — and with this branch's validation at nil
+(below), reading its transfer ability as tier 6 would be the worse error. It is
+reported as its own thing:
 
 | field | value |
 |---|---|
@@ -381,7 +373,7 @@ length; "honest" means 0.4 ≤ ratio ≤ 2.0.
 
 Exactly one scored element changes, and it changes **for the worse** — see §9.
 
-### 8.2 IME pilot — 3/12 → 5/12, honest 1 → 3
+### 8.2 IME pilot — 3/12 → 5/12, honest 1 → 3 (original run)
 
 | element | true bp | control bp | ratio | union bp | ratio | conf |
 |---|---:|---:|---:|---:|---:|---|
@@ -402,6 +394,12 @@ Both new detections are **honest** rather than oversized intervals that merely c
 the curated element: Tn*4451* at ratio 0.94 (start offset +75 bp) and
 `IME_CdiR20291_ND` at 0.69 (start offset +37 bp) — the two best-bounded IME recoveries
 the caller has produced.
+
+With today's code the control arm (CONJScan alone) finds 2 of the 12, not 3. Its third
+detection, `IME_SsuNSUI002_NS`, was a 181,279 bp call laid over an 11,112 bp element.
+The scorer counts any overlap, so it passed. The union arm still finds 5, so the layer
+now adds three IMEs: the two above, and `IME_SsuNSUI002_NS` itself, now recovered as a
+4,959 bp call starting 63 bp from its curated start.
 
 ### 8.3 Whole-set census (all 63 calls, not just scored ones)
 
@@ -428,9 +426,11 @@ are all IME or AICE — tier 5 or no tier.
 
 "Bounded by an att pair" here means `boundary_method=tRNA` specifically, the only
 method the caller acts on: a `denovo` pair is reported but never applied to the
-coordinates (see the tuning guide's note). Restricted to `ice`-class calls, where a
-real element and a fragment are not conflated, the rate is identical between the arms
-— ICEscan neither helps nor hurts how often an ICE gets its true edges.
+coordinates (see
+[Tuning](mobilome/tuning.md#the-interval-looks-far-too-big-or-far-too-small)).
+Restricted to `ice`-class calls, where a real element and a fragment are not
+conflated, the rate is identical between the arms — ICEscan neither helps nor hurts
+how often an ICE gets its true edges.
 
 ---
 
@@ -549,22 +549,21 @@ of which 0 are confirmed errors**.
 
 ### Boundaries
 
-About half of all calls are reported unbounded. On the union arm (`results_final.tsv`
-/ `ime_results_final.tsv`), **10 of the 20 detected curated elements (50%)** carry an
-*att* pair; across all calls the rate is **34 of 63 (54%)**. The chromosomal median
-absolute offsets are **5,141 bp at the start and 14,912 bp at the end**. Mind the
-denominator: 50% is over *detected curated elements*, 54% over *all calls*, and the two
-are different questions.
+About half of all calls are reported unbounded. On the union arm, **10 of the 20
+detected curated elements (50%)** carry an *att* pair; across all calls the rate is
+**34 of 63 (54%)**. The chromosomal median absolute offsets are **5,141 bp at the
+start and 14,912 bp at the end**. Mind the denominator: 50% is over *detected curated
+elements*, 54% over *all calls*, and the two are different questions.
 
-The arm comparison was made with the earlier *att* search, which
+The arm comparison was made with the earlier *att* search, which has since been
 reworked. Under it, 6 of 18 detected elements carried a direct repeat in the
 CONJScan-only arm and 6 of 20 in the union arm, and on the nine ICE pilot elements that
 are both detected and *chromosomal* (the only ones where boundary error is a meaningful
 question — see the standalone-deposit note below) the median absolute offsets were
 **14,294 bp at the start and 34,239 bp at the end**, **identical in both arms**:
-ICEscan moved boundaries not at all. The CONJScan-only arm has **not** been re-run
-since it was replaced, so that holds only for the older search; likely, but not measured, for
-the current one.
+ICEscan moved boundaries not at all. That boundary comparison has **not** been repeated
+for the CONJScan-only arm since the search was replaced, so it holds only for the older
+search; likely, but not measured, for the current one.
 
 Either way the shape of the problem is unchanged: half of all elements are reported
 unbounded, their start and end being the outermost machinery genes rather than the true
@@ -600,10 +599,11 @@ non-commercial use only. This is the same licence as the CONJScan models the mod
 already fetches.
 
 **BacFlux ships neither.** Both are fetched at run time from a URL in
-`config/config.yaml`, default `run: false`, exactly as the spec's hard rule (§11)
-requires for every licence-encumbered database. Setting `run: true` means *you*
-download them under your own agreement with the licensor. Commercial users should
-leave this off or obtain permission from the model authors.
+`config/config.yaml`, default `run: false`, exactly as BacFlux handles its other
+opt-in databases: it ships the URL, never the data (see
+[Licensing](about/licensing.md#data-and-code-are-two-different-problems)). Setting
+`run: true` means *you* download them under your own agreement with the licensor.
+Commercial users should leave this off or obtain permission from the model authors.
 
 No ICEscan model, profile or code is present in this repository, and none of EBI's
 CC BY-NC-SA-derived scripts has been copied or adapted (see CITATIONS.md).
@@ -642,8 +642,9 @@ CC BY-NC-SA-derived scripts has been copied or adapted (see CITATIONS.md).
 Reading their pipeline is how we learned that ICEscan existed, that it ships the IME
 and AICE models, and at what coverage threshold it is run. **No code was copied** —
 three of their scripts are CC BY-NC-SA-derived, and copying them would contaminate
-BacFlux's MIT licence (spec §11). Adopting facts, parameters and design decisions is
-permitted, and is what was done.
+BacFlux's MIT licence (see
+[Licensing](about/licensing.md#what-this-repository-deliberately-does-not-contain)).
+Adopting facts, parameters and design decisions is permitted, and is what was done.
 
 **Element ground truth**
 > ICEberg 3.0 curated ICE/IME coordinates, as above.
@@ -653,9 +654,10 @@ permitted, and is what was done.
 ## 13. Bottom line
 
 Adopt the union. ICE detection (15/18), predicted self-transmissible counts (36) and
-high-confidence counts (16) are untouched; IME detection goes 3/12 → 5/12 with two
-genuinely well-bounded new recoveries; all four integrase exclusions demonstrably
-fire; the `CP042858.1` regression check holds byte-identically in both arms.
+high-confidence counts (16) are untouched; IME detection goes 3/12 → 5/12 in the
+original run (2/12 → 5/12 with today's code, §8.2), with genuinely well-bounded new
+recoveries; all four integrase exclusions demonstrably fire; the `CP042858.1`
+regression check holds byte-identically in both arms.
 
-`run_icescan.sh` needs its threshold fixed; the FIX-4 tie-break's second key is worth
-revisiting; and this benchmark still cannot measure a false-positive rate.
+The integrase tie-break's second key ("then the closest", §9) is worth revisiting,
+and this benchmark still cannot measure a false-positive rate.

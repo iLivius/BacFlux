@@ -23,10 +23,16 @@ and expect more low-confidence calls than a closed genome would give.
 
 ## How this was measured
 
-40 benchmark genomes — 30 carrying curated ICE or IME elements, 12 negative controls —
-were cut into contigs at three contiguities, **re-annotated with Bakta** and re-run
-through the whole chain with the same commands and parameters as the closed runs. 120
-assemblies, 191 draft calls.
+40 benchmark genomes — 28 carrying 30 curated ICE or IME elements, and 12 negative
+controls — were cut into contigs at three contiguities, **re-annotated with Bakta** and
+re-run through the whole chain with the same commands and parameters as the closed runs.
+120 assemblies, 191 draft calls.
+
+The closed and the draft runs both had the optional
+[ICEscan model set](optional-layers.md#icescan-models) switched on. It is off by default.
+Without it fewer IMEs are found: with the current code, 2 of the 12 on the closed
+genomes instead of 5 ([Validation](validation.md#what-the-second-model-set-adds)). On a
+default run, expect fewer IMEs than the tables below show.
 
 | Arm | Target N50 | Achieved (median) | Contigs (median) | Curated elements still on one contig |
 |---|---|---|---|---|
@@ -39,10 +45,9 @@ that is what breaks a real assembly — and sequence was deleted at each break. 
 were length-sorted and about half reverse-complemented, so cross-contig clustering could
 not be flattered by contigs happening to sit in genome order.
 
-**For calibration:** a survey of 28 real BacFlux Illumina assemblies gives a median N50
-of **307 kb**, with 26 of the 28 at or above 150 kb. The sweep is deliberately
-pessimistic — a failure at "good" is a serious result, a failure at "poor" may simply be
-the assembly.
+To see which arm matches your data, compare your assembly's N50 in the QUAST report
+(`02.assembly/{sample}/eval/quast/`) with the table above. A failure at "good" is a
+serious result; a failure at "poor" may simply be the assembly.
 
 ## What degrades, and by how much
 
@@ -64,9 +69,9 @@ Three things there matter more than the rest.
 
 **Detection is flat down to 50 kb N50.** ICE recall is identical to the closed genomes
 at both 150 kb and 50 kb, and only breaks at 20 kb. The IME arm is weak everywhere,
-closed genomes included: most IME misses are elements below the module's size floor
-(522 bp, 1.2 kb, 5.1 kb) that were already missed before any cutting, so fragmentation
-costs 2 IMEs, not 9.
+closed genomes included. Most IMEs missed on the drafts were already missed on the
+closed genomes, among them the three smallest (522 bp, 1.2 kb and 5.1 kb). So
+fragmentation costs 2 IMEs, not 9.
 
 **The length collapses, but the caller is not what lost it.** Against the *true* element
 the median recovered length falls from 0.55 to 0.22. Against the **largest surviving
@@ -171,6 +176,15 @@ less.
     element* — the evidence for the mating bridge is not on the contig you are looking at,
     and cannot be checked there.
 
+**One thing MacSyFinder cannot see.** It runs with `--db-type ordered_replicon`, so on a
+draft it treats the whole assembly as one replicon. At the *good*, *typical* and *poor*
+arms, 28%, 50% and 59% of its systems spanned more than one contig. In 87–93% of those,
+the joined genes were not next to each other in the real genome. At *good* the median
+gap between them was 1.36 Mb. BacFlux's own caller clusters per contig, so no reported
+interval joins sequence from two contigs. The damage is limited to the system type a
+call inherits from MacSyFinder. The `spans_contigs` and `mpf_from_other_contig` columns
+flag it.
+
 ## One worked call, closed and broken
 
 ICE*Msp*.M1D, a 199,376 bp chromosomal ICE in a *Mesorhizobium* sp. (`CP034444.1`).
@@ -205,6 +219,50 @@ finding worth following up. **What not to conclude:** that the element is 16 kb;
 is not an ICE (the integrase is elsewhere in the assembly, not absent from the genome);
 or that the 16 kb interval defines its cargo.
 
+## Two guards added after this measurement
+
+The sweep exposed two gaps, and a guard was added for each. Neither changes anything on
+a closed genome: re-run with both guards in place, the 68 closed-genome calls came back
+with no difference in any column. On the 120 fragmented assemblies the only changes were
+the new flag and the ten boundary claims withdrawn below; every class, confidence and
+coordinate stayed the same.
+
+**1. A de novo repeat is now counted across the whole assembly, not just its contig.** A
+real integration scar exists in exactly two copies, *attL* and *attR*, so the *att*
+search already refused a repeat with three or more. But it counted the copies on the
+contig it was given. On a closed genome each contig is a whole replicon, so the two
+counts rarely differ. On a draft they often do. All 35 de novo repeats reported on the
+drafts had exactly two copies on their own contig, but 10 of them had 3 to 30 copies
+across the assembly — repeat families, not integration scars. The worst, an 89 bp repeat
+with 30 copies, was attached to a high-confidence call. Those ten boundary claims are
+now withdrawn: the *att* columns are cleared, `boundary_method` goes back to `none`, and
+`{sample}_ice_discarded.tsv` records the reason `denovo_att_is_a_repeat_family`. No
+coordinate moves, because a de novo repeat never widened an element in the first place.
+
+The assembly-wide count is **not** yet applied to tRNA-anchored pairs: their copies are
+still counted on their own contig only. That matters, because a tRNA-anchored pair is
+the kind that moves an element's edges, and so decides which AMR genes count as cargo.
+The gap is left open on purpose for now. A tRNA-anchored pair is a stronger claim to
+begin with, since one copy has to overlap an annotated tRNA. Extending the count to it
+would change calls and could lose real elements, so it needs its own benchmark run
+first.
+
+**2. A new column marks an ICE whose mating-pair genes are on another contig.** This is
+`mpf_from_other_contig`, described in the warning box above, and it is for information
+only. It changes no class: the row stays an ICE, so a real ICE is not demoted just
+because a contig break moved its mating-pair genes onto another contig. It changes no
+confidence, because `spans_contigs` already caps these rows at low.
+
+**A guard that was considered and rejected on the evidence.** Refusing to widen an
+element onto an *att* pair when either copy sits near a contig end sounds prudent, but
+it would have done harm. Four tRNA-anchored pairs on the drafts sat within 2 kb of a
+contig end. Three of them give exactly the same element length as the closed genome. The
+fourth is the ICE*Ec2* positive control (`GU725392`), recovered at 99.9% precision; its
+pair sits 26 bp from the end of the closed record too, because the deposited record *is*
+the element. The guard would have cost a positive control and caught nothing: every one
+of the 43 *att* pairs reported on the drafts is sequence that occurs at least twice in
+the closed genome. It was not added.
+
 ## What this measurement could not establish
 
 These are simulated breaks, not real short-read assemblies.
@@ -225,6 +283,3 @@ The IME arm is underpowered (3–5 of 12) and the negative-control arm is small 
 so those rows carry wide uncertainty. And several of ICEberg's own element boundaries are
 themselves predictions, so "agrees with the curated length" means agreement with a
 curation, not with truth.
-
-Full working, including the two guards added after this measurement:
-[`mobilome_draft_assemblies.md`](https://github.com/iLivius/BacFlux/blob/main/docs/mobilome_draft_assemblies.md).

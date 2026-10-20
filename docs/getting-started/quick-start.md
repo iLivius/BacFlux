@@ -116,10 +116,10 @@ the part before `_R1` becomes the sample name used in every output file:
 
 ```text
 /data/reads/illumina/
-├── PE212-1_R1.fastq.gz
-├── PE212-1_R2.fastq.gz
-├── PE253-B_R1.fastq.gz
-└── PE253-B_R2.fastq.gz          →  samples PE212-1 and PE253-B
+├── isolate1_R1.fastq.gz
+├── isolate1_R2.fastq.gz
+├── isolate2_R1.fastq.gz
+└── isolate2_R2.fastq.gz         →  samples isolate1 and isolate2
 ```
 
 All files of one kind must share one extension (`fastq`, `fq`, `fastq.gz` or
@@ -189,8 +189,8 @@ What is checked before the first job starts, and what each failure looks like:
 [BacFlux] mode=illumina removes PhiX spike-in reads before assembly, which requires 'links.phix_link' to be set in the config.
 [BacFlux] mode=illumina runs the read-based CARD AMR leg, which requires 'links.card_link' to be set in the config.
 [BacFlux] directories.checkv_db points at '/data/db/checkv', which is not a directory. …
-Missing Illumina mate pair for sample 'PE212-1': /data/reads/illumina/PE212-1_R2.fastq.gz
-Sample name 'PE 212' contains unsupported characters.
+Missing Illumina mate pair for sample 'isolate1': /data/reads/illumina/isolate1_R2.fastq.gz
+Sample name 'isolate 1' contains unsupported characters.
 ```
 
 A config with no `mode` at all stops with a `KeyError: 'mode'` from

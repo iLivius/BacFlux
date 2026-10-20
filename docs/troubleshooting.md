@@ -175,7 +175,7 @@ below that is refused at parse time rather than allowed to fail on the first job
 
 Pointing BacFlux at a copy of a database that somebody else installed is supported
 and saves a great deal of downloading — every `directories.*_db` path is only ever
-read. Three things go wrong with it, and all three have happened here.
+read. Three things can go wrong with it.
 
 **The annotation crawls.** eggNOG-mapper's annotation phase does random-access
 lookups into the 39 GB `eggnog.db`, once per seed ortholog. That phase is the slow
@@ -196,16 +196,16 @@ symlinks to the big read-only files, plus an index built by its own DIAMOND
 (`00_common.smk:186-203`). It costs ~950 MB once per output directory, and nothing
 is written to your copy.
 
-**Some files are readable by their owner and not by you.** Seen on a shared geNomad
-database: 11 of 27 files were mode 0640, `version.txt` among them, while the big
-data files beside them were world-readable. A file you may stat but not read passes
+**Some files are readable by their owner and not by you.** In a shared geNomad
+database, some small files, `version.txt` among them, can end up mode 0640 while the
+big data files beside them are world-readable. A file you may stat but not read passes
 an existence check and kills the run minutes later, so BacFlux tests every file in
 that directory for real read access at parse time, then names the first six
 offenders and counts the rest (`00_common.smk:300-314`):
 
 ```text
-[BacFlux] directories.genomad_db is '/shared/db/genomad_db', but 11 file(s) in it are
-not readable by you: <first six names> (and 5 more). geNomad needs all of them and
+[BacFlux] directories.genomad_db is '/shared/db/genomad_db', but 9 file(s) in it are
+not readable by you: <first six names> (and 3 more). geNomad needs all of them and
 would fail partway through the run. Ask whoever owns that directory to make it
 readable (chmod -R a+r), or point at a copy you own.
 ```
@@ -223,9 +223,8 @@ readable (chmod -R a+r), or point at a copy you own.
 **Cause.** `auto` runs `medaka tools resolve_model --auto_model consensus_bacteria`
 over the filtered reads, which reads the basecaller model out of the FASTQ headers.
 Guppy and Dorado stamp it there; older data, re-headered data and much public data
-do not carry it at all. Confirmed on a real ONT test set: no basecaller tag in
-either the raw FASTQ or the filtlong output, so `auto` cannot work for that dataset
-at all.
+do not carry it at all. Read filtering is not the cause: if the filtered reads lack
+the basecaller tag, the raw FASTQ lacked it too. For such data `auto` cannot work.
 
 **Fix.** Name the model explicitly, under the block named after your mode
 (`parameters.hybrid` for a hybrid run):
@@ -308,21 +307,23 @@ pinned together is in
 
     CheckM reports a badly incomplete genome that is **not** contaminated, and
     `logs/select_contigs_{sample}.log` carries the warning the selector prints
-    whenever it drops more than 20% of the assembly:
+    whenever it drops more than 20% of the assembly, for example:
 
     ```text
-    WARNING: decontamination is discarding 52% of the assembly (2,340,112 of
-    4,501,776 bp). If the kept assembly then looks incomplete but NOT contaminated,
+    WARNING: decontamination is discarding 47% of the assembly (2,115,000 of
+    4,500,000 bp). If the kept assembly then looks incomplete but NOT contaminated,
     the filter has most likely removed genome rather than contamination.
     ```
 
 **Cause.** `auto` mode keeps the genus carried by the most contigs, and BLAST
 routinely scatters one organism across several related genus names. When the vote
-is close, the wrong half wins. One isolate lost its entire 4.5 Mb chromosome to a
-2-2 tie between *Bacillus* and *Peribacillus*, broken alphabetically. The curated
-alias table exists so that tie never has to be broken at all
-([the genus aliases](analysis/decontamination.md#the-genus-aliases)), but it covers
-only the splits it knows about.
+is close, the wrong half can win. Ties are broken alphabetically, so when one
+organism's contigs split evenly between two genus names, the losing name's contigs
+go, and they can include the whole chromosome. The curated alias table merges common
+splits such as *Bacillus* and *Peribacillus*, so whichever of the two wins the vote,
+the other is kept with it
+([the genus aliases](analysis/decontamination.md#the-genus-aliases)). It covers only
+the splits it knows about.
 
 **Fix.** Read `02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv` —
 every contig carries the reason it went — and

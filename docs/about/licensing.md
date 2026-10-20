@@ -115,13 +115,14 @@ supplying one would route around an authorisation only you can obtain.
 **This does not cost you anything.** ISEScan, which is how BacFlux actually finds
 insertion sequences, uses its own bundled profile HMMs and needs no ISfinder data.
 
-**Where it could still reach you.** TnCentral serves several endpoints, and two of them
-bundle ISfinder content. Only `nc/tn`, the transposon set on its own, appears in the
-configuration; `tn_in_is` and `prot/tn_is` are named in the config comments **solely to
-record that they are deliberately left out** (`config/config.yaml`, the comment above `mobilome.tncentral`). Point
-`mobilome.tncentral.url` at one of those two and ISfinder's terms become yours to
-satisfy — which is a decision to make deliberately, not one to make by copying a URL out
-of a comment.
+**Where it could still reach you.** TnCentral serves several endpoints, and three of
+them bundle ISfinder content: `nc/tn_is`, `nc/tn_in_is` and `prot/tn_is`. Only
+`nc/tn`, the transposon set on its own, appears in the configuration; endpoints that
+carry ISfinder content are named in the config comments **solely to record that they
+are deliberately left out** (`config/config.yaml`, the comment above
+`mobilome.tncentral`). Point `mobilome.tncentral.url` at one of those three and
+ISfinder's terms become yours to satisfy — which is a decision to make deliberately,
+not one to make by copying a URL out of a comment.
 
 ## What a run tells you
 

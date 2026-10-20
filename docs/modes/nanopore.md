@@ -105,8 +105,9 @@ different one, are in [The Medaka polishing model](../methods_medaka_model.md).
     `--nano-raw`, anything else `--nano-hq`. Fast basecalling means noisier reads, so
     the coupling is deliberate — but it means a change of polisher model silently
     changes the assembly. Set `flye_input_mode` explicitly to pin one without the
-    other. The reasoning, and the cases where inference fails, are in
-    [`methods_medaka_model_choice.md`](https://github.com/iLivius/BacFlux/blob/main/docs/methods_medaka_model_choice.md).
+    other. The reasoning is under
+    [Long-read assembly and polishing](../reference/configuration.md#long-read-assembly-and-polishing-nanoporehybrid).
+    The cases where model inference fails are on the Medaka page linked above.
 
 ## 3. Assembly and reorientation
 

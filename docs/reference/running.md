@@ -175,7 +175,7 @@ correctly wins. Lowering `--cores` is how you run fewer heavy jobs side by side.
     For a local run `--jobs`/`-j` is an **alias** for `--cores`, not a second,
     independent "N jobs of M cores each" setting — a natural but wrong
     assumption. Passing both switches the core budget off rather than adding a
-    cap on top of it. Measured here: two rules each declaring `threads: 8`,
+    cap on top of it. Measured: two rules each declaring `threads: 8`,
     launched with `--jobs 2 --cores 8`, both received their full 8 threads and
     ran together — 16 real threads against a declared 8-core budget. The same
     rules with `--cores 8` alone ran one at a time. `--jobs` belongs on cluster

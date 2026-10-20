@@ -76,7 +76,8 @@ authoritative:
 - every decision, **including every refusal**, is written to
   `{sample}_amrfinder_organism_audit.tsv` with its reason;
 - a genome with no confident mapping gets **no** `--organism` rather than a guess;
-- an empty mutations file therefore means *not assessed*, never *none found*.
+- a mutations file with no mutation rows therefore means *not assessed*, never *none
+  found*.
 
 Re-check the table when you change the GTDB release.
 

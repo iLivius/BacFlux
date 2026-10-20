@@ -146,11 +146,10 @@ and `--cleanup` to delete the intermediates.
 A local geNomad database is checked at parse time, before any job starts, because both ways it
 can fail are slow and confusing to diagnose mid-run:
 
-- **Partly readable.** On a shared copy it is easy for a few small files to end up mode 0640
-  while the large data files beside them are world-readable — seen here as 11 of 27 files,
-  including `version.txt` and the whole integrase set. `os.path.exists()` is true for a file
-  you may stat but not read, so BacFlux tests real read access on every file and names the
-  offenders.
+- **Partly readable.** On a shared copy it is easy for a few small files, `version.txt` among
+  them, to end up mode 0640 while the large data files beside them are world-readable.
+  `os.path.exists()` is true for a file you may stat but not read, so BacFlux tests real read
+  access on every file and names the offenders.
 - **Too old for the installed geNomad.** geNomad parses `genomad_marker_metadata.tsv` by
   position from the end of each row, so a database with one fewer trailing column shifts every
   field and dies minutes in on `invalid literal for int()` — a marker accession being read as a

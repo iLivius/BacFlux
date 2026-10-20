@@ -149,9 +149,9 @@ residue 83 of GyrA a serine or a leucine" — and reports the hit with `Method: 
 where it can, and why the mutations file is a separate deliverable
 ([Turning it on](enabling.md)).
 
-An empty `{sample}_amrfinderplus_mutations.tsv` means **not assessed**, not "no mutations
-found": AMRFinderPlus curates mutations for roughly three dozen mostly clinical
-organisms, and the refusal, with its reason, is written to
+A `{sample}_amrfinderplus_mutations.tsv` with no mutation rows means **not assessed**,
+not "no mutations found": AMRFinderPlus curates mutations for 31 mostly clinical
+organisms (version 4.2.7), and the refusal, with its reason, is written to
 `{sample}_amrfinder_organism_audit.tsv`.
 
 ## Language discipline

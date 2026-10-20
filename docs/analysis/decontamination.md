@@ -276,7 +276,7 @@ line, `#` starts a comment, and its contents are *added* to `exclude_genera`.
 ```
 
 ```text
-# known_contaminants.txt — genera this lab has decided are never the isolate.
+# known_contaminants.txt — genera your lab has decided are never the isolate.
 # One per line; blank lines and # comments are ignored.
 GenusB
 GenusC
@@ -359,11 +359,13 @@ The two per-sample keys work differently:
 
 !!! example "Adding versus replacing"
 
-    Run-wide `include_genera: "Bacillus"`, and one sample needs *Priestia* too.
+    Run-wide `include_genera: "Bacillus"`, and one sample needs *Lysinibacillus* too.
 
-    - via `include_genera_by_sample` → that sample keeps **Bacillus and Priestia**
-    - via `sample_overrides` with `include_genera = Priestia` → that sample keeps
-      **Priestia only**, because the row replaced the list rather than extending it
+    - via `include_genera_by_sample` → that sample keeps **Bacillus and
+      Lysinibacillus**
+    - via `sample_overrides` with `include_genera = Lysinibacillus` → that sample
+      keeps **Lysinibacillus only**, because the row replaced the list rather than
+      extending it
 
     Both are reasonable; they are not interchangeable.
 
@@ -386,18 +388,22 @@ alias there would delete contigs the user never named.
 ### The composition report
 
 `contaminants/{sample}_composition.txt` describes the assembly BlobTools saw, kept and
-dropped contigs alike, with two figures per genus:
+dropped contigs alike, with two figures per genus. An illustrative file, for an assembly
+whose contigs BLAST assigned to four genera:
 
 ```text
-Aneurinibacillus: bases 0.40  contigs 0.26
-Bacillus: bases 0.29  contigs 0.30
+GenusA: bases 0.46  contigs 0.22
+GenusB: bases 0.31  contigs 0.38
+GenusC: bases 0.14  contigs 0.24
+GenusD: bases 0.09  contigs 0.16
 ```
 
 `bases` is the share of the assembly's DNA; `contigs` is the share of the contig count.
 **`auto` mode votes on the contig count**, so a genus can win the vote while another
 genus holds most of the genome. When that happens the two columns disagree and the file
-says so at a glance — the case above is real, and the wrong half of a single genome was
-kept.
+says so at a glance. In the example, `auto` keeps only GenusB, because it has the most
+contigs. GenusA holds more of the DNA but is discarded. If the four are really one
+genome that BLAST has split, `auto` keeps less than a third of it.
 
 The file is sorted by DNA, which is the more honest ranking of "what is this sample
 mostly made of". It is also read back by the annotation stage as Bakta's `--genus`
@@ -408,35 +414,37 @@ gets handed is the alphabetically last one, not the most abundant. See
 ### The two warnings
 
 Both are advisory: they change no decision, they ask a human to look. They go to
-`logs/select_contigs_{sample}.log`.
+`logs/select_contigs_{sample}.log`. For the illustrative assembly above, both fire:
 
 ```text
-WARNING: 4 genera each hold at least 5% of this assembly (Aneurinibacillus 40%, Bacillus 29%, ...).
+WARNING: 4 genera each hold at least 5% of this assembly (GenusA 46%, GenusB 31%, ...).
 Either the sample is a mixed culture, or one genome is being split across related genera
 by the BLAST assignment. Check the kept/removed split in contig_taxonomy_decisions.tsv
 before trusting this assembly.
 ```
 
 ```text
-WARNING: decontamination is discarding 52% of the assembly (N of M bp). If the kept
+WARNING: decontamination is discarding 69% of the assembly (N of M bp). If the kept
 assembly then looks incomplete but NOT contaminated, the filter has most likely
 removed genome rather than contamination.
 ```
 
 The thresholds are **5%** of the assembly's DNA for a genus to count as "major", **2**
 major genera to trigger the first warning, and **20%** removed to trigger the second.
-They come from one 56-isolate batch, in which 54 isolates had a single genus holding
-essentially all the DNA and 55 discarded under 3% of it. The two exceptions were the
-only two problem samples in the batch, and they failed in opposite directions:
+A clean isolate has one genus holding essentially all of its DNA, and the filter removes
+only a little of the assembly. A second major genus, or a large removal, is therefore
+already a reason to look. The first warning names two causes, and CheckM tells them
+apart:
 
-- one genome split across four related genera — *Aneurinibacillus* 40%, *Bacillus* 29%,
-  *Paenibacillus* 16%, *Brevibacillus* 11% — which discarded 52% of the assembly and
-  ended up 28% complete and 0% contaminated;
-- a genuine two-organism culture — *Priestia* 61% / *Bacillus* 39% — 100% complete and
-  104% **contaminated**, i.e. two genomes in one assembly.
+- one genome split across several related genera by the BLAST assignment, so the filter
+  discards part of the genome: CheckM reports the kept assembly as incomplete but not
+  contaminated;
+- a genuine two-organism culture in which the filter keeps both genomes, for example
+  because [the alias table](#the-genus-aliases) merges their two genera or `include`
+  names both: CheckM reports the kept assembly as complete and heavily **contaminated**,
+  i.e. two genomes in one assembly.
 
-Zero false positives against the other 54. That is one batch, so treat the numbers as a
-well-supported starting point rather than a calibrated cutoff.
+Treat the numbers as a starting point rather than a calibrated cutoff.
 
 A third message reports contigs that BlobTools judged but that are not in the FASTA at
 all:

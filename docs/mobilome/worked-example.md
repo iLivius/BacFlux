@@ -10,9 +10,8 @@ chromosome and four plasmids, carrying `blaNDM-1`, `blaCTX-M-15`, `blaOXA-1`, `b
 and metal-resistance genes. Run as `mode: contigs` with `mobilome.run: true`, all four
 optional layers configured, and `phage.caller: genomad`.
 
-The isolates in BacFlux's own validation set are environmental and carry no acquired
-resistance, so they only ever exercise the bottom of the ladder. This genome exercises
-almost all of it.
+Many environmental isolates carry no acquired resistance, so they only ever exercise the
+bottom of the ladder. This genome exercises almost all of it.
 
 !!! abstract "Terms used on this page"
 
@@ -217,18 +216,20 @@ absence. See [Decontamination](../analysis/decontamination.md).
 **`genomad_fdr` is `NA`, deliberately.** geNomad computes an FDR only when its
 score-calibration module has run, and that module is off by default. Switching it on is
 worse rather than better for an isolate: calibration needs enough sequences to estimate
-the sample's composition, and below 1,000 *contigs* it silently substitutes a metagenome
-preset whose assumed composition is 11% virus — which does not describe a finished
-bacterial genome. Run on this genome, it collapsed three genuinely different plasmid
-scores (0.9925, 0.9937, 0.9943) into one identical 0.9991 with the same FDR for all
-three, carrying no discriminating power. Use
-`plasmid_score`, which is populated either way and does discriminate. See
+the sample's composition, and below 1,000 *contigs* it substitutes a metagenome preset
+whose assumed composition is 11% virus — which does not describe a finished bacterial
+genome. geNomad announces the switch in a warning, which names `--force-auto` as the way
+to estimate the composition from the sample anyway. Run on this genome, calibration
+collapsed three genuinely different plasmid scores (0.9925, 0.9937, 0.9943) into one
+identical 0.9991 with the same FDR for all three. Use `genomad_score`, which holds
+geNomad's `plasmid_score` and is populated either way. See
 [Plasmids](../analysis/plasmids.md).
 
 ## What this run demonstrates
 
 - Point mutations are reported (tier 1) — the category a homology screen cannot see.
-- IS-adjacent genes are called expression modulation, **not** mobilisation (tier 2).
+- Tier 2 is not reached: its one candidate, the chromosomal `bla`CTX-M-15 with IS*Ecp1*
+  48 bp upstream, is lifted to tier 4 by its curated Tn*Ecp1.1* name.
 - A class 1 integron's 3′ conserved segment is recovered as a composite (tier 3).
 - Plasmid mobility is typed, and a non-mobilisable plasmid is labelled honestly (tier 5).
 - `bla`NDM-1, on a conjugative plasmid, reaches tier 6 at high confidence — because
@@ -252,8 +253,5 @@ Nor is any of it "EFSA-compliant", a claim BacFlux does not make. What the modul
 produces is supporting evidence for the intrinsic-versus-acquired judgement. The
 judgement remains the analyst's.
 
-The longer write-up, with the full file inventory and the corrections made to it along
-the way, is
-[`mobilome_worked_example.md`](https://github.com/iLivius/BacFlux/blob/main/docs/mobilome_worked_example.md);
-example output files are in
-[`docs/validation/`](https://github.com/iLivius/BacFlux/tree/main/docs/validation).
+The full list of files the module writes is on
+[Reading the output](output.md#everything-else-stage-08-writes).

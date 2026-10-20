@@ -68,16 +68,16 @@ page.
 
 ### ICE pilot — 18 genomes
 
-Six are the positive controls named in the design spec; the rest widen the set to 14 genera.
+Six are classic positive controls; the rest widen the set to 14 genera.
 
 | Accession | Organism | Curated element | Length | Why this one |
 |---|---|---|--:|---|
-| `AB450045` | *Vibrio cholerae* | SXT(HN1) | 19.1 kb | spec control: SXT |
-| `AY090559` | *Providencia rettgeri* | R391 | 88.5 kb | spec control: R391 |
-| `CP042858.1` | *Klebsiella pneumoniae* | ICEKpnQD23-1 | 190.9 kb | spec control: ICEKp |
-| `GU725392` | *Escherichia coli* | ICEEc2 | 93.9 kb | spec control: ICEEc2 |
-| `CP012430.1` | *Enterococcus faecium* | ICE_EfmISMMSVRE1_Tn916 | 16.9 kb | spec control: Tn916 |
-| `KP299160` | *Pseudomonas aeruginosa* | ICE(Tn4371)6061 | 43.8 kb | spec control: Tn4371 |
+| `AB450045` | *Vibrio cholerae* | SXT(HN1) | 19.1 kb | classic positive control: SXT |
+| `AY090559` | *Providencia rettgeri* | R391 | 88.5 kb | classic positive control: R391 |
+| `CP042858.1` | *Klebsiella pneumoniae* | ICEKpnQD23-1 | 190.9 kb | classic positive control: ICEKp |
+| `GU725392` | *Escherichia coli* | ICEEc2 | 93.9 kb | classic positive control: ICEEc2 |
+| `CP012430.1` | *Enterococcus faecium* | ICE_EfmISMMSVRE1_Tn916 | 16.9 kb | classic positive control: Tn916 |
+| `KP299160` | *Pseudomonas aeruginosa* | ICE(Tn4371)6061 | 43.8 kb | classic positive control: Tn4371 |
 | `KX077897` | *Streptococcus suis* | CMGE(TZ080501) | 125.8 kb | genus diversity: Streptococcus |
 | `CP027036.1` | *Klebsiella pneumoniae* | ICEKpn16_GR_13-1 | 151.9 kb | genus diversity: Klebsiella |
 | `CP034444.1` | *Mesorhizobium* sp. | ICEMsp.M1D | 199.4 kb | genus diversity: Mesorhizobium |
@@ -102,7 +102,7 @@ the floor, so they are expected misses that measure what the floor costs.
 | `CP001103` | *Alteromonas mediterranea* | MGIAmaMed1 | 1,248 bp | deep sub-floor: 1.2 kb MGI, Gram-negative counterpart to the 522 bp case; genus diversity: Alteromonas |
 | `CP002888.1` | *Streptococcus salivarius* | IME_Ssal57I_tRNAlys | 5,123 bp | modal sub-floor architecture: S. salivarius tRNALys ~5.1 kb family, 11 near-identical copies in ICEberg |
 | `NC_013316.1` | *Clostridioides difficile* | IME_CdiR20291_ND | 5,551 bp | sub-floor, no named integration site (ND) so no tRNA hint for the att search; genus diversity: Clostridioides |
-| `U15027` | *Clostridium perfringens* | Tn4451 | 6,338 bp | named IME control: tnpX serine recombinase + oriT, no T4SS = the integrase+relaxase/no-T4SS row of the Phase 4 table; 1.7 kb below the floor |
+| `U15027` | *Clostridium perfringens* | Tn4451 | 6,338 bp | named IME control: tnpX serine recombinase + oriT, no T4SS = the IME row of the [classification table](output.md#an-ice-cannot-sit-on-a-plasmid) (integrase and relaxase, no T4SS); 1.7 kb below the floor |
 | `NC_017860` | *Prevotella intermedia* | MTnPi10 | 7,591 bp | floor edge case: 7591 bp, only 409 bp below min_element_bp; sits on a 580 kb second chromosome |
 | `NC_004668.1` | *Enterococcus faecalis* | IME_EfalV583_rpsI | 9,405 bp | just above the floor; same chromosome as ICE pilot entry ICE_EfalV583_tRNALys, so it tests ICE vs IME discrimination in one genome |
 | `CP011419.1` | *Streptococcus suis* | IME_SsuNSUI002_NS | 11.1 kb | above floor, no named integration site; genus diversity: Streptococcus suis |
@@ -157,10 +157,11 @@ and the two are [not interchangeable](#the-094-figure-is-not-the-0669-figure).
 Median recovered fraction 0.69. **This is the weaker half of the module and is
 described that way everywhere it appears.**
 
-The misses concentrate at the small end — 522 bp, 1,248 bp and 5,123 bp — where the
-caller's 2 kb floor for IME-shaped machinery and its requirement for two anchor
-classes both apply; and at SGI1 (42 kb) and MGI*Vvu*Tai1 (19 kb), which produced no
-overlapping call at all.
+The misses concentrate at the small end — 522 bp, 1,248 bp and 5,123 bp — and at SGI1
+(42 kb) and MGI*Vvu*Tai1 (19 kb). Elements under about 2 kb rarely give any relaxase
+signal. The 5.1 kb element is lost to integrase assignment instead: a nearer integrase
+joins the machinery cluster, and the element's own integrase is left with nothing to
+attach to (see [Tuning](tuning.md#an-element-you-know-is-there-was-not-reported)).
 
 There is a second, structural limit on this half of the module, and it is visible in
 the code rather than in the score. The *att* search is always given the 8 kb ICE floor
@@ -226,14 +227,20 @@ table.
 | Calls carrying a predicted self-transmissible claim | 36 | **36 — unchanged** |
 | Confidence `high` | 16 | **16 — unchanged** |
 
+This table is the original run. With the current code the default models find 2 of the
+12: the third detection above was a 181,279 bp call laid over an 11,112 bp IME, counted
+only because the scorer accepts any overlap. The ICEscan arm still finds 5, so the layer
+now adds three IMEs: the two below, and `IME_SsuNSUI002_NS`, now recovered as a
+4,959 bp call starting 63 bp from its curated start.
+
 **No element gained a self-transmissible claim.** Every net-new call in the ICEscan
 arm is an IME or an AICE — tier 5 or no tier at all. The layer can add elements at the
 mobilisable end of the ladder; it cannot promote anything to the top rung.
 
-Both new IME detections fit the curated element closely rather than being oversized
-intervals that merely contain it: Tn*4451* at 0.94 of its curated length (start offset
-+75 bp) and `IME_CdiR20291_ND` at 0.69 (start offset +37 bp) — the two best-bounded IME
-recoveries the caller has produced.
+The two new detections of the original run fit the curated element closely rather than
+being oversized intervals that merely contain it: Tn*4451* at 0.94 of its curated length
+(start offset +75 bp) and `IME_CdiR20291_ND` at 0.69 (start offset +37 bp) — the two
+best-bounded IME recoveries the caller has produced.
 
 It costs something, and the cost is reported. One curated element, `CMGE(TZ080501)`,
 loses 12,324 bp of recovered length because an ICEscan integrase sits 0 bp from the
@@ -409,9 +416,7 @@ assembly.
 | Calls on the 12 negative controls | 5 | 4 | 3 | 2 |
 
 **Detection is flat down to 50 kb N50.** ICE recall is identical to the closed genomes
-at both 150 kb and 50 kb, and only breaks at 20 kb. For calibration, a survey of 28
-real BacFlux Illumina assemblies from this lab gives a median N50 of 307 kb, with 26
-of the 28 at or above 150 kb — so the sweep is deliberately pessimistic.
+at both 150 kb and 50 kb, and only breaks at 20 kb.
 
 **The length collapses, but the caller is not what collapses it.** Against the true
 element, median recovered length falls from 0.55 to 0.22. Against the largest
@@ -436,10 +441,13 @@ page](draft-assemblies.md).
 The pilots test the ICE caller. The module's actual output — one row per AMR gene with
 a tier and a confidence — is exercised on *Klebsiella pneumoniae* ATCC BAA-2146
 (`GCF_000364385.3`), a pan-resistant genome whose plasmids are described in the
-published literature. That run reaches tiers 1, 2, 3, 5 and 6; it recovers the
-chromosomal ICE at 0.946 of its curated length with a tRNA-anchored boundary and still
-ends 3,138 bp inside the curated element, because a called interval is a floor. It does
-not reach tier 4 — see [below](#tiers-4-and-5-the-thinnest-tested-part-of-the-ladder).
+published literature. With all four optional layers on, that run reaches tiers 1, 3, 4,
+5 and 6. Tier 2 is missing only because the TnCentral layer names the transposon
+Tn*Ecp1.1* around the chromosomal `bla`CTX-M-15. With the layer that gene scores tier 4;
+without it, tier 2 — see [below](#tiers-4-and-5-the-thinnest-tested-part-of-the-ladder).
+The run recovers the chromosomal ICE at 0.946 of its curated length with a
+tRNA-anchored boundary and still ends 3,138 bp inside the curated element, because a
+called interval is a floor.
 The walkthrough is the [worked example](worked-example.md); the columns are on
 [Reading the output](output.md).
 
@@ -539,10 +547,11 @@ Tier 6 and tier 1 carry the benchmark work above. The middle of the ladder does 
   the ≥80% reference-coverage rule is strict: on fragmented clinical assemblies the same
   Tn*Ecp1.1* was refused at 12% and 49% coverage. Expect tier 4 on closed genomes far
   more than on drafts.
-- **Tier 5** is exercised, but only by one of its two routes. Every tier 5 row on disk
-  is a gene on a mobilisable plasmid. **No AMR gene in any run has been assigned an
-  IME context**, so the "inside an IME" half of tier 5 is untested end to end — which
-  matters, because the IME pilot is the weaker half of the module to begin with.
+- **Tier 5** is exercised, but only by one of its two routes. Every tier 5 row measured
+  so far is a gene on a plasmid (mobilisable, or typed non-mobilisable like pCuAs in the
+  worked example). **No AMR gene in any run has been assigned an IME context**, so the
+  "inside an IME" half of tier 5 is untested end to end — which matters, because the
+  IME pilot is the weaker half of the module to begin with.
 
 Neither gap is a reason to distrust tiers 1 and 6. Both are a reason to treat a tier 4
 or tier 5 call as an unvalidated code path rather than a measured one, and to say so
@@ -562,9 +571,9 @@ the shipped one on every flank window the caller genuinely searched — after
 insertion-sequence masking, at the real element coordinates, at the real computed
 repeat-length floor:
 
-> **52 genomes from the benchmark tree — a wider set than the 40 scored above — 246
-> *att* searches, 180 distinct flank windows, 1,033 repeats, exact set equality on
-> every window.** No window hit either implementation's internal cap.
+> **52 benchmark genomes — a wider set than the 40 scored above — 246 *att* searches,
+> 180 distinct flank windows, 1,033 repeats, exact set equality on every window.** No
+> window hit either implementation's internal cap.
 
 Two searches over the same DNA return the same set of repeats, so vmatch would find
 nothing that is not already found, and the search needs no external program at all.
@@ -583,8 +592,7 @@ other, it is not adopted.
     repeats". It does not reproduce under any scoping that could be reconstructed,
     because the script that produced it was never kept. The equality result itself
     reproduces, over roughly five times as many windows, and the numbers above are the
-    ones to use. The script that produces them is retained with the benchmark
-    artefacts and re-runs in about ten minutes.
+    ones to use. The script that produces them is not distributed.
 
 ## No code from the EBI pipeline is used here
 
@@ -597,14 +605,18 @@ tool, model set and database the module can use are listed on
 
 ## Where the numbers come from
 
-The benchmark tree — per-element tables, the scoring script, the fragmentation sweep
-and the conversion audit — is kept with the benchmark run itself, outside this
-repository. The method write-ups that these figures are drawn from are in the
-repository and readable on GitHub: `docs/methods_ebi_comparison.md` (the head-to-head),
-`docs/methods_icescan_union.md` (the two-arm model-set experiment),
-`docs/methods_att_and_small_plasmids.md` (the *att* search and the vmatch measurement),
-`docs/mobilome_draft_assemblies.md` (the fragmentation sweep) and
-`docs/mobilome_worked_example.md` (the end-to-end run).
+The benchmark design is in the repository, under
+[`benchmark/mobilome/`](https://github.com/iLivius/BacFlux/tree/main/benchmark/mobilome):
+the three genome sets, with the reason each genome was chosen, and the scoring script,
+`score.py`. The genomes and the full run outputs are not in the repository. The genomes
+are public accessions, so the closed-genome scoring can be repeated with `score.py`. The
+scripts that cut the draft assemblies and converted the EBI output are not distributed.
+The method write-ups these figures are drawn from are
+[Head-to-head vs the EBI pipeline](../methods_ebi_comparison.md),
+[CONJScan + ICEscan together](../methods_icescan_union.md) (the two-arm model-set
+experiment), [att sites and small plasmids](../methods_att_and_small_plasmids.md) (the
+*att* search and the vmatch measurement), [Draft assemblies](draft-assemblies.md) (the
+fragmentation sweep) and the [Worked example](worked-example.md) (the end-to-end run).
 
 Call totals differ slightly between measurements — 51 and 63 in the two-arm
 experiment over the 28 pilot genomes, 65 in the call-burden table over all 40, 68 in

@@ -117,18 +117,18 @@ Set `links.card_link` to CARD's `broadstreet-*.tar.bz2` archive, or point
     remaining sites runs `for(int i=sites.size()-1; i>0; i--)` — it stops before
     index 0, so the top site is never reached.
 
-    Measured on real BacFlux reads (400k pairs) under the old setting: **1,240
-    alignments retained, 1,238 of them below 99% identity, the lowest at 48.59%**.
-    The same reads run as single-end kept 1. So every CARD result this workflow
-    has ever produced was screened at BBMap's default of **0.76**.
+    Mapping one set of reads both ways under the old setting confirms it. Run as
+    pairs, nearly every alignment the reads kept was below 99% identity, some far
+    below. Run as single-end, almost none survived. So every CARD result this
+    workflow has ever produced was screened at BBMap's default of **0.76**.
 
     The rule now passes `minid=0.76`, which does apply. That is not a tightening
     and it changes no output — it states what has always been running, using the
     flag that enforces it.
 
 The identity floor was deliberately **not** raised to 0.99. At a real 0.99 the
-same reads keep 2 alignments instead of 1,240, which would leave almost nothing
-in the one AMR leg that is immune to assembly collapse.
+same reads keep almost none of their alignments, so the one AMR leg that is
+immune to assembly collapse would report almost nothing.
 
 The leg is a sensitive screen whose specificity comes from the ≥70%
 reference-length gate, not from per-read identity. A methods section can say
@@ -173,23 +173,25 @@ is the regulator of the operon named without it (MexR regulates *mexAB*). The
 convention is not a guarantee, so it is applied **only** where CARD's own
 mechanism for the entry is efflux — CARD's regulator entries are almost all
 efflux-pump regulators. Without that guard the suffix rule misfires on genuine
-determinants that happen to end in R: measured on a *Bacillus* isolate from this
-project's own test set, *vmlR* — an ABC-F ribosomal protection protein, CARD
-mechanism "antibiotic target protection", a real resistance gene — was demoted to
-`regulator`.
+determinants that happen to end in R. *vmlR*, for example — an ABC-F ribosomal
+protection protein, CARD mechanism "antibiotic target protection", a real
+resistance gene — would be demoted to `regulator`.
 
-Three rows from a real *Pseudomonas* isolate, in the order the report puts them:
+Three illustrative rows for a *Pseudomonas* isolate, in the order the report puts
+them. The coverage values are invented for this example:
 
 | `aro_accession` | `aro_name` | `covered_percent` | `category` | `resistance_mechanism` | `reference_organism` |
 |---|---|--:|---|---|---|
-| ARO:3000804 | MexF | 100.00 | `efflux_component` | antibiotic efflux | Pseudomonas aeruginosa PAO1 |
-| ARO:3003681 | TriC | 95.77 | `efflux_component` | antibiotic efflux | Pseudomonas aeruginosa PAO1 |
-| ARO:3000829 | CpxR | 99.00 | `regulator` | antibiotic efflux | Escherichia coli |
+| ARO:3000804 | MexF | 91.82 | `efflux_component` | antibiotic efflux | Pseudomonas aeruginosa PAO1 |
+| ARO:3003681 | TriC | 84.25 | `efflux_component` | antibiotic efflux | Pseudomonas aeruginosa PAO1 |
+| ARO:3000829 | CpxR | 96.44 | `regulator` | antibiotic efflux | Escherichia coli |
 
-Rows are sorted so the ones to look at first come first — determinants above
-efflux machinery — then by coverage, which is why CpxR at 99% sits below TriC at
-95.77%. The rule's log prints the per-category counts, so the shape of the table
-is visible without opening it:
+Rows are sorted by category first, so the ones to look at first come first:
+determinants, then efflux machinery, then regulators, and last the
+`presence_indicates_susceptibility` rows. Coverage orders rows only within a
+category. That is why CpxR, at 96.44%, sits below TriC at 84.25%. The rule's log
+prints the per-category counts, so the shape of the table is visible without
+opening it:
 
 ```text
 Sample <name>: <total> CARD sequences at >= 70% covered length.
@@ -309,7 +311,7 @@ calls, so the rule refuses to guess — including when a hybrid sample's two ass
 disagree. Every decision, and its reason, lands in
 `{sample}_amrfinder_organism_audit.tsv`.
 
-!!! warning "An empty mutations file means 'not assessed', never 'no mutations found'"
+!!! warning "A mutations file with no mutation rows means 'not assessed', never 'no mutations found'"
 
     When no organism matches, `{sample}_amrfinderplus_mutations.tsv` is written
     with a single line saying point-mutation screening was not available. Writing
@@ -402,4 +404,4 @@ For what happens to an AMR call once the mobilome module has it, see
 The claim that a BLAST-style presence search is *structurally* unable to resolve
 point mutations is inference from what the tools compute, not a statement any of
 the sources above makes. The `idfilter` behaviour was read from BBMap's own source
-and confirmed by mapping a test isolate's reads with the filter set both ways.
+and confirmed by mapping one set of reads both as pairs and as single-end.

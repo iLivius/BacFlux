@@ -98,12 +98,6 @@ repeats stopped being applied at all. Quote **16%** as the current de novo
 false-boundary rate — 22% is the *before* figure, and the two are easy to confuse
 because both appear in the code comments.
 
-*(The source comment in `att_search.py` names this chromosome "KPNIH1" and
-`mobilome_worked_example.md` attributes it to ATCC BAA-2146. Those are two
-different genomes — see the note in the worked example — and which one carried
-this particular measurement has not been re-established, so no strain is claimed
-here. The rate itself is unaffected either way.)*
-
 This is also why de novo repeats are **reported but not applied**: at a
 one-in-six error rate a de novo pair is a reasonable lead for a human to follow
 and an unacceptable basis for silently redefining an element, since widening an
@@ -161,8 +155,7 @@ How it works, and where each choice comes from:
   happens. Measured on SPI-7 (`AL513382`), a 51 bp repeat in ordinary sequence
   beat the real 24 bp *att* pair at tRNA-Phe and the element came out 50 kb short;
   under this ordering the tRNA-anchored pair wins and the call lands on the
-  curated interval. (A small `TRNA_ANCHOR_BONUS_BP = 10` also exists in the score,
-  from the earlier tie-break design.)
+  curated interval.
 - **Both copies inside tRNAs of the *same amino acid* is rejected outright** —
   that is two paralogous tRNA genes, not an integration scar. Two copies in
   tRNAs of *different* amino acids is allowed, and the distinction is not
@@ -181,10 +174,10 @@ standard library.
 ### Why not Vmatch
 
 Vmatch is available — `bioconda/vmatch 2.3.1` exists for linux-64 and osx-64, so
-packaging is not the obstacle. It is rejected on licensing alone: the recipe declares
+packaging is not the obstacle; its licence is. The recipe declares
 `license: Unknown / OTHER` and vmatch.de was unreachable, so its terms cannot be
-verified — which under the project's §11 rule is still a blocker for an
-MIT-licensed workflow. The spec has been corrected to give the right reason.
+verified (see
+[Licensing](about/licensing.md#what-this-repository-deliberately-does-not-contain)).
 
 There is now also a **measured** reason, which matters more than the licence one.
 Because the search above already computes vmatch's own semantics, a second
@@ -192,9 +185,7 @@ implementation was built on vmatch's actual data structure — prefix-doubling
 suffix array, Kasai LCP array, cross-flank MEM enumeration — and run against ours
 on every real flank window in the benchmark.
 
-The script is
-`BacFlux_v2_validation/phase7_benchmark/verify_att_equivalence.py`
-and it re-runs in about ten minutes. It does not generate windows of its own: it
+The check script is not distributed. It does not generate windows of its own: it
 replays the actual caller (`conjscan_to_ice.py`) over the benchmark genomes with
 `find_maximal_repeats` wrapped in a recorder, so every window tested is one the
 pipeline genuinely searched — after IS masking, at the real element coordinates,
@@ -204,7 +195,7 @@ at the real computed floor.
 searches, **180 distinct flank windows, 1,033 repeats, exact set equality on
 every window**. No window hit either implementation's internal cap. So the
 conclusion holds: **a vmatch-based search would find nothing that is not already
-found**, and the licence blocker costs no sensitivity.
+found**, and leaving vmatch out costs no sensitivity.
 
 One related idea is disposed of by the same measurement: shipping both
 searches and treating their agreement as a confidence signal would be worthless.
@@ -215,12 +206,14 @@ the code, once, and that is all it is for.
 ### Licensing note
 
 ICEfinder2 is **CC BY-NC-SA 4.0**. Its source was read only to establish the
-algorithm and its parameters, which spec §11 explicitly permits. **No code was
-copied.**
+algorithm and its parameters: reading source to understand an algorithm is
+permitted, copying it is not (see
+[Licensing](about/licensing.md#what-this-repository-deliberately-does-not-contain)).
+**No code was copied.**
 
 What was taken from ICEfinder2 is **which algorithm to use and with what
-parameters** — maximal exact repeats between the flanks, floor 15 bp — and spec
-§11 is explicit that design decisions and thresholds are facts, not expression.
+parameters**: maximal exact repeats between the flanks, with a 15 bp floor. Design
+decisions and thresholds like these are facts, not expression.
 The algorithm itself is not ICEfinder2's to license: maximal exact repeat search
 is standard published string processing (Vmatch, and REPuter before it), and
 `find_maximal_repeats` is an independent stdlib Python implementation written
@@ -293,12 +286,11 @@ target. His recommendation is to go **below** the default —
 mode, which culls with `--target_bases` exactly as his arm did.
 <https://rrwick.github.io/2026/02/05/read_qc_testing.html>
 
-### Measured on our own data
+### Measured on a public clinical isolate
 
 *Klebsiella pneumoniae* **TUM24772** — BioProject PRJNA1168299, closed genome
-GCA_043950115.1, chromosome CP171785.1. A clinical test isolate, and **not** one
-of the BAA-2146 / KPNIH1 mobilome positive controls; this project has conflated
-those before, so the distinction is worth stating. Its 5,596 bp Col2 plasmid
+GCA_043950115.1, chromosome CP171785.1. A clinical test isolate, and **not** the
+BAA-2146 mobilome positive control. Its 5,596 bp Col2 plasmid
 (pMTY24772_Col2, CP171790.1) was missing from our assembly while sitting complete
 in the Illumina data.
 
@@ -362,7 +354,7 @@ duplication and expects to run inside the Autocycler pipeline.
 |---|---|---|
 | **`keep_percent` 90 → 95** (and `length_weight` 10 → 1) | nothing — a config change | **This is what BacFlux ships.** Recovers 502 of the plasmid's 603 reads — but *not* the assembled plasmid |
 | **SPAdes rescue** | no new tool or database | Published recommendation, not a hack: small plasmids "usually appear as circular contigs" in a short-read graph ([Wick/Judd/Holt](https://pmc.ncbi.nlm.nih.gov/articles/PMC9980784/)). We already write `assembly_graph_with_scaffolds.gfa` |
-| **Plassembler** | a new tool, and the PLSDB database | **MIT, bioconda 1.8.3**, purpose-built. Pools reads that do *not* map to the Flye contigs and hybrid-assembles them with Unicycler — exactly where a Flye-absent plasmid lands. Can **reuse our existing Flye assembly** (`--flye_directory`), and writes empty outputs when it finds nothing, so the DAG never breaks. Cost: PLSDB is mandatory (`-d`, no skip flag) and states **no licence at all** — handle exactly as TnCentral/ICEberg per spec §5.5 |
+| **Plassembler** | a new tool, and the PLSDB database | **MIT, bioconda 1.8.3**, purpose-built. Pools reads that do *not* map to the Flye contigs and hybrid-assembles them with Unicycler — exactly where a Flye-absent plasmid lands. Can **reuse our existing Flye assembly** (`--flye_directory`), and writes empty outputs when it finds nothing, so the DAG never breaks. Cost: PLSDB is mandatory (`-d`, no skip flag) and states **no licence at all** — handle exactly as TnCentral/ICEberg: opt-in, and never redistributed (see [Licensing](about/licensing.md#components-you-switch-on-yourself)) |
 | **Hybracter** | replacing the whole assembly stage | MIT, bioconda, wraps Plassembler — but replaces the *entire* assembly stage and nests Snakemake inside Snakemake, with two schedulers competing for cores |
 | **Autocycler** | replacing the whole assembly stage | **Would probably not have helped.** Aimed at chromosome consensus accuracy; its own paper reports the smallest plasmid tested (2.5 kb) was occasionally missed and needed manual curation. Its clustering discards any cluster seen in too few input assemblies — precisely the small-plasmid case. Its own docs say: *if small plasmids matter, add Plassembler* |
 | **Trycycler** | manual curation per genome | Unusable unattended; superseded by Autocycler |
@@ -401,8 +393,7 @@ host** — which is not unusual, since plasmids cross genus boundaries constantl
 On *K. pneumoniae* **ATCC BAA-2146**, `auto` mode dropped a genuine plasmid —
 pMYS, `NZ_CP006660.1`, 2,014 bp — because *E. coli* database entries outnumbered
 *Klebsiella* ones 58,709 to 16,253: BLAST bestsum follows database composition,
-not biology. (`NZ_CP006660.1` is a BAA-2146 replicon; KPNIH1 is a different genome,
-`CP008827.1` — the two are easy to confuse.)
+not biology.
 
 **It did not cause the TUM24772 loss** — that plasmid survived decontamination
 (verified: present in `contigs_filt.fasta`), and was lost at the read-filtering

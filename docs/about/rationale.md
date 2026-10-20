@@ -25,7 +25,7 @@ there is now a single workflow where there used to be four.
 
 BacFlux began as one workflow, for Illumina paired-end reads. Three more followed, each
 because a project needed it — FastaFlux for genomes that arrived already assembled,
-BacFluxL when Oxford Nanopore Technologies (ONT) sequencing became routine here, and
+BacFluxL when Oxford Nanopore Technologies (ONT) sequencing became routine, and
 BacFluxL+ for isolates sequenced both ways. FastaFlux was a second Snakefile alongside
 the first; the two long-read ones had repositories of their own. All four were released,
 and work published with them stays citable — BacFluxL and BacFluxL+ are retired in
@@ -58,7 +58,7 @@ which one a given dataset belongs in.
 ## What writing a step once buys
 
 **Results become comparable across sequencing strategies.** The comparison that comes up
-most often here is between technologies: the same isolate assembled from short reads and
+most often is between technologies: the same isolate assembled from short reads and
 from long reads, or one collaborator's Illumina genome against another's ONT genome. When
 those two answers come out of two sets of rules, every difference between them is
 confounded by the code, and you cannot separate a real biological difference from a
@@ -73,10 +73,10 @@ ships without a DIAMOND index, so the index in any shared copy was built by whic
 DIAMOND version that site happened to have, and the pinned one could not read it. The
 fix — build a local view of the read-only database from symlinks plus an index this
 workflow builds itself — was written in one rule, and all four modes had it. Two of the
-three bugs found that week were invisible in the `illumina` and `nanopore` runs, because
-those samples call zero viral contigs and take the empty-input shortcut before ever
-touching the database. Only the `hybrid` sample, which carries a prophage, went down
-that path — and fixing it there fixed it everywhere.
+three bugs found that week stayed hidden in the `illumina` and `nanopore` test runs: a
+sample with no viral contigs takes the empty-input shortcut and never touches the
+database. Only the `hybrid` run went down that path — and fixing it there fixed it
+everywhere.
 
 **A new capability is built once.** The mobilome module is 22 rules and eleven Python
 helpers. Across the four it would have been copied four times and maintained in
@@ -125,23 +125,21 @@ results.
 ## The merge was checked, not assumed
 
 "Consolidation changed the plumbing, not the biology" is a testable claim, so it was
-tested. Each read-based mode was re-run on the isolate its predecessor had been run on —
-an *Arthrobacter* — and the delivered genome compared byte for byte against the earlier
-result.
+tested. Each read-based mode was re-run on the same test data its predecessor had been
+run on, and the delivered genome compared byte for byte against the earlier result.
 
 | Mode | Compared against | Genome chain |
 |---|---|---|
 | `illumina` | BacFlux 1.3.1 | draft and decontaminated assembly identical |
 | `nanopore` | BacFluxL | Flye assembly, dnaapler reorientation, decontamination, Medaka consensus and delivered genome identical |
 | `hybrid` | BacFluxL+ | SPAdes draft, Flye assembly, Medaka consensus and the Polypolish-corrected genome identical |
-| `contigs` | — | no earlier run to compare against; exercised on its own code with six genomes, three of SPAdes and three of Flye origin |
+| `contigs` | — | no earlier run to compare against; exercised on its own code with assemblies from both SPAdes and Flye |
 
 One downstream difference is deliberate and appears in the two long-read modes: Bakta
-gains or loses a single feature (4,999 → 4,998 in `nanopore`, 4,773 → 4,774 in `hybrid`)
-because BacFlux now hands it a `--replicons` table declaring a closed chromosome
-circular. That makes Bakta's gene caller run in closed mode, which shifts a couple of
-marginal start codons anywhere in the genome. It is 0.02% of the features, and it is the
-better call.
+gains or loses a single feature in each, because BacFlux now hands it a `--replicons`
+table declaring a closed chromosome circular. That makes Bakta's gene caller run in
+closed mode, which shifts a couple of marginal start codons anywhere in the genome. It
+is one feature in several thousand, and it is the better call.
 
 The helper scripts that carry real logic — the Medaka model check, the replicon table,
 CARD reporting, plasmid concordance and the mobilome helpers — are plain Python and are
