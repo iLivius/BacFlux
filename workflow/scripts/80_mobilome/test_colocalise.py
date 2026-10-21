@@ -3,8 +3,8 @@
 colocalise.py writes the module's deliverable: one row per AMR gene saying which
 mobile element the gene sits in or beside, and how far that element could carry
 it. The rungs of the mobility ladder are spelled out in colocalise.py's own
-docstring (spec §2.5); the sections below walk them in order, tier 1 to tier 6,
-and then the special cases.
+docstring and in docs/mobilome/mobility-ladder.md; the sections below walk them
+in order, tier 1 to tier 6, and then the special cases.
 
 Everything here runs on SYNTHETIC tables written into a temp directory: no
 ISEScan, no AMRFinderPlus, no Platon, no database, no network. The point is to
@@ -687,7 +687,7 @@ def test_tier6_conjugative_plasmid_is_predicted_self_transmissible(tmp_path):
     )
     row = report[0]
     assert row["mobility_tier"] == "6"
-    # Language discipline: "predicted", never a bare "transmissible" (spec §2.6).
+    # Language discipline: "predicted", never a bare "transmissible".
     assert row["mobility_tier_label"] == "predicted_self_transmissible"
     assert row["mge_context"] == "plasmid"
     assert row["plasmid_mobility"] == "conjugative"
@@ -1173,13 +1173,13 @@ def test_reversed_element_coordinates_are_repaired(tmp_path):
     assert (element["start"], element["end"]) == (8000, 9000)
 
 
-# ── Regression anchor: the real AMRFinderPlus output for 006 ─────────────────
+# ── Regression anchor: a typical Pseudomonas intrinsic set ───────────────────
 #
-# Runs only when the shared fixture is present. Sample 006 is a Pseudomonas_E
-# Five chromosomal, intrinsic-looking AMR genes (efflux pumps + AmpC) and nothing
-# acquired, in a real AMRFinderPlus column layout — so the honest answer is five
-# tier-1 rows. The identifiers and coordinates are invented; only the shape of the
-# table and the gene symbols are real.
+# Runs only when the shared fixture is present. It holds a typical Pseudomonas
+# intrinsic set: five chromosomal, intrinsic-looking AMR genes (efflux pumps +
+# AmpC) and nothing acquired, in a real AMRFinderPlus column layout — so the
+# honest answer is five tier-1 rows. The identifiers and coordinates are invented;
+# only the shape of the table and the gene symbols are real.
 
 REAL_AMRFINDER = os.path.join(os.path.dirname(__file__), "testdata",
                               "amrfinderplus_synthetic.tsv")
@@ -1241,7 +1241,7 @@ def test_degraded_ice_machinery_caps_the_genes_confidence(tmp_path):
 
 
 def test_ice_spanning_contigs_is_capped_at_low_and_says_so(tmp_path):
-    """Spec §8 phase 6: spanning contigs caps at low, whatever else is true.
+    """Phase 6 rule: spanning contigs caps at low, whatever else is true.
 
     The generic cross-contig detector cannot see this case — an ICE id embeds its
     contig and each element is one row — so the element's own flag is the only
@@ -1353,7 +1353,7 @@ def test_an_ice_row_does_not_stand_in_for_missing_is_calls(tmp_path):
 def test_a_gene_inside_a_conjugative_region_is_not_an_intrinsic_candidate(tmp_path):
     """conjugative_region / genomic_island were unrecognised and vanished.
 
-    They deliberately do not raise the tier (spec §8 phase 4 — a conjugative
+    They deliberately do not raise the tier (the Phase 4 rules — a conjugative
     region with no integrase has no established boundaries). But being unmapped
     made them invisible to every test, so the gene came back "intrinsic candidate,
     high confidence" with a contradictory "unrecognised element_type" audit line.
@@ -1472,7 +1472,7 @@ def test_an_is_abutting_a_partial_hit_is_called_inactivation_not_expression(tmp_
 
     When an IS lands in a resistance gene, AMRFinderPlus reports only the
     surviving fragment, so the gene's coordinates STOP where the IS starts and the
-    overlap is ~0. Taken from the reviewer's real-world example: a PARTIALX
+    overlap is ~0. The case modelled here is a PARTIALX
     aac(3)-IIa fragment with an IS26 flush against its upstream side. This used to
     come out as tier 2 "expression modulation" — the opposite conclusion (gene
     working harder) from the true one (gene broken).
@@ -1557,7 +1557,7 @@ def test_verified_machinery_lets_a_conjugative_plasmid_keep_high_confidence(tmp_
 
 
 def test_the_machinery_is_named_in_the_deliverable(tmp_path):
-    """Spec §9 asks for relaxase_type / mpf_type / machinery_intact in the table,
+    """The table reports relaxase_type / mpf_type / machinery_intact,
     so a reader can see WHICH machinery justifies the claim without opening the
     ICE file. machinery_source says whether it surrounds the gene or merely
     shares the replicon."""

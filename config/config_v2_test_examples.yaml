@@ -34,14 +34,6 @@
 #
 # None of the blocks sets `phage:` or `mobilome:`, so every dry run below uses
 # the defaults: VirSorter2 as the virus caller, and the mobilome module off.
-#
-# (Written for Stage 1 of the migration — docs/unification_migration_plan.md —
-# when this header also required a creatable, writable output_dir and warned that
-# a relative input path would resolve under the output dir. Both were true while
-# 00_common.smk still used Snakemake's `workdir:` directive, which entered the
-# output directory at parse time. It does not any more — it resolves one absolute
-# output root and never changes the working directory, so neither rule survives.
-# See section 2 of rules/shared/00_common.smk.)
 # ═══════════════════════════════════════════════════════════════════════
 
 

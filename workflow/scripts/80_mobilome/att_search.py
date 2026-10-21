@@ -56,7 +56,7 @@ by repeats — terminal inverted repeats, plus the short direct repeat of target
 DNA they duplicate on transposition. A region holding several IS copies is
 therefore FULL of direct repeats that have nothing to do with ICE integration,
 and run over raw sequence they swamp every real signal. So the flanks are MASKED
-against the ISEScan calls first (see mask_intervals); the spec names this as the
+against the ISEScan calls first (see mask_intervals). Skipping that mask is the
 single most likely way to get att search wrong.
 
 Where it runs: imported by conjscan_to_ice.py, which already holds the candidate
@@ -117,11 +117,11 @@ DENOVO_ABSOLUTE_MIN_REPEAT_BP = 12
 DENOVO_MAX_EXPECTED_CHANCE_MATCHES = 0.05
 
 # Sanity bounds on the element the boundaries imply: an att pair implying
-# something smaller or larger than these is not believed. The numbers match the
-# spec's proposed ice.min_element_bp / ice.max_element_bp, but those config keys
-# were never wired up — conjscan_to_ice.py carries its own constants of the same
-# names and values, and rule conjscan_ice passes NEITHER, so in practice both
-# ends of the range only move by editing code.
+# something smaller or larger than these is not believed. They are not config
+# keys: conjscan_to_ice.py carries its own constants of the same names and
+# values, rule conjscan_ice passes neither --min-element-bp nor --max-element-bp,
+# so in practice both ends of the range only move by editing code (see "Element
+# geometry" in docs/mobilome/tuning.md).
 DEFAULT_MIN_ELEMENT_BP = 8_000
 DEFAULT_MAX_ELEMENT_BP = 500_000
 
@@ -242,8 +242,8 @@ def mask_intervals(sequence, intervals):
     direct repeats of target DNA behind when they transpose, so a region with a
     few IS copies is densely repetitive for reasons that have nothing to do with
     ICE integration. The de novo scan below skips any k-mer containing N, so
-    masking removes those decoys before they can outrank the real att site. The
-    spec names this as the most likely way to get att search wrong.
+    masking removes those decoys before they can outrank the real att site.
+    Skipping it is the most likely way to get att search wrong.
 
     Masking deliberately does NOT shift coordinates — the string keeps its full
     length — so every position reported afterwards still refers to the real
@@ -832,7 +832,7 @@ def build_result(method, left_copy, right_copy, att_sequence, mismatches,
                  trna_name, trna_start, trna_end, repeat_orientation):
     """Package one att-site call into the dict conjscan_to_ice.py writes out.
 
-    Keys mirror the spec's Phase 3 output — attL, attR, att_seq, tRNA,
+    Keys are the Phase 3 (boundary search) outputs — attL, attR, att_seq, tRNA,
     boundary_method — plus the refined element interval those boundaries imply
     and the evidence (repeat length) behind the call.
 
@@ -918,7 +918,7 @@ def find_att_sites(sequence, element_start, element_end, trnas=(),
     # probe came from an annotated tRNA and was trusted on that basis. There is
     # no privileged probe any more — every candidate is found by the same repeat
     # search — so IS terminal repeats would flood it exactly as they flood a
-    # blind scan. The spec calls this the single most likely way to get this
+    # blind scan. Leaving the mask off is the single most likely way to get this
     # wrong.
     masked_sequence = mask_intervals(sequence, mask)
     hit = search_maximal_repeat(

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Place every AMR gene in its mobile-element context and give it a mobility tier.
 
-The analytical heart of the mobilome module (spec `docs/mobilome_module_SPEC.md`
-§7 = work package D, and §2.5 = the mobility ladder). It answers ONE question per
-AMR gene:
+The analytical heart of the mobilome module, and the step that places each AMR
+gene on the mobility ladder (docs/mobilome/mobility-ladder.md). It answers ONE
+question per AMR gene:
 
     is this resistance gene sitting inside (or next to) a mobile genetic element,
     and if so how transferable is that element?
@@ -18,7 +18,7 @@ determinant INTRINSIC or ACQUIRED, and is it TRANSFERABLE. What comes out of
 here is the supporting evidence for that judgement, never the judgement itself,
 and it must never be labelled "EFSA-compliant".
 
-The mobility ladder implemented here (spec §2.5), lowest rung to highest:
+The mobility ladder implemented here, lowest rung to highest:
 
     1  chromosomal, no mobile-element context      -> intrinsic candidate
     2  IS sitting upstream and pointing at the gene -> the IS can supply an
@@ -41,12 +41,12 @@ has landed INSIDE the AMR coding sequence. That usually INACTIVATES the gene
 
 What a fragmented assembly can and cannot show
 ----------------------------------------------
-Read this before trusting any output (spec §2.3). On short-read (SPAdes)
-assemblies, IS elements are the main reason contigs break: multiple identical IS
-copies collapse into one, and the assembler cannot tell which copy went where.
-So the AMR gene and the IS that flanks it very often land on DIFFERENT contigs —
-the exact structure we are trying to detect is what destroyed the assembly.
-Consequences hard-wired here:
+Read this before trusting any output (see docs/mobilome/draft-assemblies.md). On
+short-read (SPAdes) assemblies, IS elements are the main reason contigs break:
+multiple identical IS copies collapse into one, and the assembler cannot tell
+which copy went where. So the AMR gene and the IS that flanks it very often land
+on DIFFERENT contigs — the exact structure we are trying to detect is what
+destroyed the assembly. Consequences hard-wired here:
 
   * a located IS count is a FLOOR, never a count;
   * ABSENCE of a flanking IS may simply mean the contig ended, so every row
@@ -70,9 +70,9 @@ Where the inputs come from, and what happens when one is missing
 All four are plain TSV, parsed with the standard library only — no pandas, no
 bedtools, the interval arithmetic is written out below so it can be read.
 
-  --amrfinder       AMRFinderPlus 4.x TSV (rule amrfinderplus — "work package A"
-                    in the spec, the step that surfaces AMRFinderPlus's full
-                    report instead of just the gene names Bakta shows). One row per
+  --amrfinder       AMRFinderPlus 4.x TSV (rule amrfinderplus, the step that
+                    surfaces AMRFinderPlus's full report instead of just the gene
+                    names Bakta shows; see docs/analysis/amr.md). One row per
                     AMR/STRESS/VIRULENCE hit with contig + 1-based coordinates.
                     This is the ONLY required input — it defines the output rows.
   --is-table        mobile elements with coordinates, one row per element.
@@ -104,9 +104,9 @@ plasmid. Those cases degrade gracefully and are written into the audit file, so
 "no evidence" is never silently confused with "no data".
 
 Outputs, both under 08.mobilome/:
-  --out-table  one row per AMR gene, the deliverable (spec §9). Written to
-               {sample}_amr_mobility.tsv, which is a rule-all target and the
-               module's terminal product — no other rule reads it.
+  --out-table  one row per AMR gene, the deliverable (docs/mobilome/output.md).
+               Written to {sample}_amr_mobility.tsv, which is a rule-all target
+               and the module's terminal product — no other rule reads it.
   --out-audit  the decision trail, {sample}_amr_mobility_audit.tsv: an explicit
                reason for every gene that got no mobile-element context, every
                candidate structure that was rejected, and every confidence cap
@@ -123,7 +123,7 @@ taken from EBI's mobilome-annotation-pipeline (parts of which are CC BY-NC-SA an
 incompatible with BacFlux's MIT licence). Only conventions are borrowed — the
 Sequence-Ontology vocabulary, the "assign a CDS to an element at >=0.9 coverage"
 threshold and the discard-with-reason file pattern — and conventions are facts,
-not expression (spec §11).
+not expression (docs/about/licensing.md draws the same line).
 
 Standalone CLI, stdlib only, exercised by test_colocalise.py with synthetic
 tables and no tools or databases.
@@ -142,8 +142,8 @@ import sys
 # threshold can re-judge a row without re-running anything.
 
 # Longest block of DNA we are willing to call a composite transposon. Real
-# composites run from ~2.5 kb (IS26 translocatable units) to ~25 kb; 20 kb is the
-# spec's default and is overridable on the command line.
+# composites run from ~2.5 kb (IS26 translocatable units) to ~25 kb. 20 kb is a
+# convention; the workflow passes mobilome.max_composite_span_bp (also 20 kb).
 DEFAULT_MAX_COMPOSITE_SPAN_BP = 20000
 
 # How close an upstream IS must be before we are willing to say it could be
@@ -180,7 +180,7 @@ MIN_AMR_FRACTION_INSIDE_ELEMENT = 0.9
 
 # Fraction of the AMR gene that must be overlapped by an IS before we call the
 # coding sequence disrupted (likely inactivated) rather than merely overlapping.
-# Same 0.5 the spec's bedtools recipe uses (`bedtools intersect -f 0.5`).
+# The same test as `bedtools intersect -f 0.5` with the AMR gene as -a.
 MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION = 0.5
 
 # How close an IS must sit to the edge of a PARTIAL AMR hit before we read the
@@ -203,7 +203,7 @@ MIN_COVERAGE_FOR_INTACT_GENE = 90.0
 # to be in the same orientation; this family is exempted from that test entirely
 # so that IS26 structures are called whichever way round the two copies sit.
 # Without this exception the most important architecture in the table is the one
-# we would miss (spec §7, "Pitfalls").
+# we would miss (see the IS26 warning in docs/mobilome/tuning.md).
 ORIENTATION_EXEMPT_IS_FAMILIES = {"IS6", "IS26", "IS6/IS26", "IS26/IS6"}
 
 # ISEScan family values that carry no information about WHICH element this is.
@@ -213,7 +213,7 @@ UNINFORMATIVE_FAMILY_VALUES = {"", "NA", "N/A", "-", ".", "NEW", "UNKNOWN", "ISN
 
 # Plain-language meaning of each rung of the ladder, written into the table so a
 # biologist reading the TSV never has to look the number up. Note tier 6's
-# wording: "predicted", always (spec §2.6 language discipline).
+# wording: "predicted", always (docs/mobilome/mobility-ladder.md explains why).
 MOBILITY_TIER_LABELS = {
     "NA": "not_assessable",
     1: "intrinsic_candidate",
@@ -225,7 +225,7 @@ MOBILITY_TIER_LABELS = {
 }
 
 # The deliverable's columns, in the order they are written. Kept as one list so
-# the header and every row always agree (spec §9).
+# the header and every row always agree. Explained in docs/mobilome/output.md.
 OUTPUT_COLUMNS = [
     "sample",
     "contig",
@@ -259,7 +259,7 @@ OUTPUT_COLUMNS = [
     "is_amr_overlap_bp",
     "plasmid_mobility",          # conjugative | mobilisable | non_mobilisable | unknown | NA
     "mobility_evidence",         # free text passed through from CONJscan, if given
-    # The typed conjugation machinery behind a tier 5/6 call (spec §9). Filled
+    # The typed conjugation machinery behind a tier 5/6 call. Filled
     # from the ICE/IME table — either the element containing the gene, or, for a
     # plasmid, any conjugative system found elsewhere on the same replicon, since
     # that is what makes the whole plasmid transferable.
@@ -375,9 +375,9 @@ OUTPUT_COLUMNS = [
 #
 #   That last one is the catch-all: it copies the element's OWN confidence from
 #   the ICE table onto the gene, so an AMR call can never be reported more
-#   confidently than the element the call rests on. It has never fired in any run
-#   kept on disk (the retained runs' ICE-context genes all sat in high-confidence
-#   elements), but it is live code, not a leftover — checked 2026-08-01.
+#   confidently than the element the call rests on. Expect it to fire rarely —
+#   it is a backstop behind the specific caps above — but it is live code, not a
+#   leftover (checked 2026-08-01).
 AUDIT_COLUMNS = [
     "sample",
     "contig",
@@ -521,7 +521,7 @@ def parse_amrfinder(path):
     Input: the output of the `amrfinderplus` rule, run with `-n` (and
     normally `-p`/`-g`), so every row carries the contig it was found on plus
     1-based inclusive Start/Stop on that contig. Column names are AMRFinderPlus
-    4.2.7's, verified against a real run (see docs/mobilome_wpA_ground_truth.md).
+    4.2.7's, checked against the header that version actually writes.
 
     What it produces: a list of dicts, one per hit, which becomes one row of the
     deliverable. STRESS and VIRULENCE rows are kept alongside AMR rows rather
@@ -602,8 +602,8 @@ def parse_amrfinder(path):
 
 # How the mobile-element table's `element_type` values map onto the vocabulary
 # used in `mge_context`. The keys are lowercase and cover both the tidy names a
-# loader would write and the Sequence-Ontology style names from the spec's §9
-# output schema.
+# loader would write and the Sequence-Ontology style names borrowed from EBI's
+# mobilome pipeline (see docs/about/licensing.md).
 ELEMENT_TYPE_SYNONYMS = {
     "": "insertion_sequence",
     "na": "insertion_sequence",
@@ -617,7 +617,7 @@ ELEMENT_TYPE_SYNONYMS = {
     "ice": "ice",
     "ime": "ime",
     # The two classes conjscan_to_ice.py reports but deliberately does NOT let
-    # raise the tier (spec §8 phase 4: a conjugative region with no integrase is
+    # raise the tier (its Phase 4 rules: a conjugative region with no integrase is
     # unbounded — "report, don't call ICE"; an island has no conjugation machinery
     # at all). They must still be RECOGNISED here. While they were missing from
     # this table they parsed as element_type None, which meant they were dropped
@@ -774,8 +774,8 @@ def parse_mobile_elements(path):
     mobility_label_index = find_column(header, ["mobility"])
     degraded_reason_index = find_column(header, ["degraded_reason"])
 
-    # The conjugation MACHINERY itself, as CONJscan typed it. Spec §9 asks for
-    # relaxase_type / mpf_type / machinery_intact in the deliverable, and these
+    # The conjugation MACHINERY itself, as CONJscan typed it. The deliverable
+    # reports relaxase_type / mpf_type / machinery_intact from these, and they
     # are also what lets a plasmid's mobility be corroborated (or contradicted)
     # against Platon's much cruder gene COUNTS — see
     # find_conjugative_machinery_on_contig.
@@ -980,8 +980,8 @@ def element_quality_caps(element):
     """
     caps = []
 
-    # Spec section 8 phase 6: anything spanning contigs is capped at low, whatever
-    # else is true, because its coordinates are not established by this assembly.
+    # conjscan_to_ice.py's Phase 6 rule: anything spanning contigs is capped at
+    # low whatever else is true, because the assembly cannot establish its extent.
     if element_says_true(element.get("spans_contigs")):
         caps.append((
             "low", "mge_spans_contigs",
@@ -1018,9 +1018,9 @@ def normalise_completeness(value):
     """Turn the many spellings of complete/partial into 'complete'|'partial'|'unknown'.
 
     ISEScan writes 'c' or 'p'; a loader might write True/False or the words. A
-    partial (fragmentary) IS call is kept — the spec says explicitly not to run
-    ISEScan with --removeShortIS, because we tier partials ourselves — but it
-    lowers the confidence of anything built on it.
+    partial (fragmentary) IS call is kept — ISEScan is deliberately run without
+    --removeShortIS, because we tier partials ourselves — but it lowers the
+    confidence of anything built on it.
     """
     text = str(value).strip().lower()
     if text in {"c", "complete", "true", "yes", "1"}:
@@ -1252,7 +1252,7 @@ def find_disrupting_is(gene, insertion_sequences):
     never folded into the mobility tier.
 
     Rule: the IS must overlap at least half of the AMR gene
-    (MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION, the spec's `bedtools intersect
+    (MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION, as in `bedtools intersect
     -f 0.5`). The measured overlap in bp is reported either way, so a smaller
     overlap is still visible in the table.
 
@@ -1481,7 +1481,7 @@ def find_composite_pair(gene, insertion_sequences, max_span_bp):
            left                                       right
         │◄─────────────── span (<= max_span_bp) ──────────────►│
 
-    All of the following must hold (spec §7):
+    All of the following must hold:
       * both IS on the SAME contig as the gene (guaranteed — the caller only
         passes IS from this contig);
       * the gene lies strictly BETWEEN them;
@@ -1853,7 +1853,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         # The IS-into-gene architecture as it actually appears in the data: a
         # PARTIAL AMRFinderPlus hit sitting flush against an IS. Treated exactly
         # like the overlap case — flagged as likely inactivation and deliberately
-        # NOT counted as mobilisation (spec §2.5's special case).
+        # NOT counted as mobilisation (the special case in the module docstring).
         row["is_inside_amr_cds"] = "yes"
         add_audit(
             "evidence_rejected", "is_abuts_partial_amr_hit_likely_inactivation",
@@ -1888,8 +1888,8 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     # reading frame is broken (the strain is probably susceptible), the other says
     # the gene is intact and being over-expressed. Without this exclusion the
     # abutting case above came out as tier 2 "expression modulation" — the
-    # opposite conclusion, from the same coordinates. Spec §2.5 keeps inactivation
-    # out of the mobilisation ladder entirely.
+    # opposite conclusion, from the same coordinates. Inactivation is kept out of
+    # the mobilisation ladder entirely (docs/mobilome/mobility-ladder.md).
     inactivating_is_ids = {element["id"] for element in (disrupting_is, abutting_is)
                            if element is not None}
     promoter_candidates = [element for element in insertion_sequences
@@ -1962,9 +1962,10 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     )
 
     # ── Step 8: the ladder, applied once, from the top down ─────────────────
-    # Highest applicable rung wins. The order below IS the ladder (spec §2.5);
-    # a more specific, interval-level call (ICE) is preferred over a whole-
-    # replicon one (conjugative plasmid) when both would give the same tier.
+    # Highest applicable rung wins. The order below IS the ladder, the same order
+    # docs/mobilome/mobility-ladder.md lists; a more specific, interval-level call
+    # (ICE) is preferred over a whole-replicon one (conjugative plasmid) when both
+    # would give the same tier.
     replicon = row["replicon"]
     plasmid_mobility = row["plasmid_mobility"]
     base_confidence = "medium"
@@ -2132,7 +2133,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         # Tier 4: inside a curated unit transposon or integron cassette. A curated
         # named hit OVERRIDES the pattern-based composite call below, because the
         # curated entry carries the true architecture (and gets IS26 right for
-        # free) — spec §7, "a TnCentral named hit should override".
+        # free) — see the TnCentral section of docs/mobilome/optional-layers.md.
         row["mobility_tier"] = 4
         row["mge_context"] = named_element["element_type"]
         row["mge_id"] = named_element["id"]
@@ -2338,7 +2339,7 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
 
     # ── Step 9: does the winning element itself sit across a contig break? ───
     # Anything spanning contigs is capped at low regardless of everything else
-    # (spec §8 phase 6): the coordinates of such an element are a guess.
+    # (as in Phase 6 of conjscan_to_ice.py): such an element's extent is a guess.
     # "NA" is excluded explicitly: it is our own placeholder for "no element", and
     # a loader that wrote the literal string NA into the id column would otherwise
     # make every unnamed element look like one element spread over the assembly.
@@ -2383,9 +2384,9 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                 ))
 
     # ── Step 9b: name the conjugation machinery behind a tier 5/6 call ──────
-    # Spec §9 asks for relaxase_type / mpf_type / machinery_intact in the
-    # deliverable, so a reader can see WHICH machinery justifies a transferability
-    # claim without opening the ICE table. Two possible sources, in order:
+    # The deliverable reports relaxase_type / mpf_type / machinery_intact, so a
+    # reader can see WHICH machinery justifies a transferability claim without
+    # opening the ICE table. Two possible sources, in order:
     #   1. the element that actually set the context (an ICE or IME containing
     #      the gene) — the most specific answer;
     #   2. otherwise, for a gene on a plasmid, any conjugative system typed
@@ -2520,8 +2521,7 @@ def write_tsv(path, columns, rows):
 
 def main(argv=None):
     # Arguments are supplied by rule amr_mge_colocalisation — see
-    # shared/80_mobilome.smk. (Spec §10 puts the module in
-    # workflow/rules/mobilome.smk; that path predates the v2 rule directories.)
+    # workflow/rules/shared/80_mobilome.smk.
     parser = argparse.ArgumentParser(
         description="Assign each AMR gene its mobile-element context and mobility tier."
     )
@@ -2651,7 +2651,7 @@ def main(argv=None):
     write_tsv(args.out_audit, AUDIT_COLUMNS, startup_audit + audit_rows)
 
     # A short, honest summary for the run log. Never used for filtering, and
-    # deliberately worded as "predicted" for tier 6 (spec §2.6).
+    # deliberately worded as "predicted" for tier 6, never a bare "transmissible".
     tier_counts = {}
     for row in report_rows:
         tier_counts[row["mobility_tier"]] = tier_counts.get(row["mobility_tier"], 0) + 1

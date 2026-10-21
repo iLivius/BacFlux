@@ -142,9 +142,9 @@ def read_genomad_concordance(path):
     error, because it is the direction that HIDES transferability from the reader.
 
     geNomad is opt-in: it is academic/non-commercial licensed and so cannot be
-    BacFlux's default (spec §3.1). When it was not run this file does not exist,
-    the caller gets an empty dict, and Platon decides alone exactly as before —
-    silently, because that is the shipped configuration and not a fault.
+    BacFlux's default (docs/about/licensing.md). When it was not run this file
+    does not exist, the caller gets an empty dict, and Platon decides alone as
+    before — silently, because that is the shipped configuration, not a fault.
 
     Returns: {contig: {"call": ..., "agreement": ..., "score": ...}}, empty when
              the file is absent, empty or header-only.
@@ -203,9 +203,9 @@ def classify_plasmid_mobility(record):
       * neither -> nothing suggests it moves at all.
 
     Conjugation is tested first because a relaxase is PART of a conjugative
-    system, not an alternative to one (spec §8 phase 4 counts relaxase + T4SS
-    together), so testing mobilization first would quietly demote conjugative
-    plasmids to tier 5.
+    system, not an alternative to one (conjscan_to_ice.py's Phase 4 counts
+    relaxase + T4SS together), so testing mobilization first would quietly
+    demote conjugative plasmids to tier 5.
 
     Returns (mobility_class, evidence_text). The evidence text is passed straight
     through to the report so a reader can see WHY, not just WHAT.
@@ -255,7 +255,7 @@ PLATON_MAX_CONTIG_LENGTH = 500000
 #
 # rule mobilome_replicons does not pass --min-chromosome-bp, so this default is
 # what every BacFlux run uses. Changing it means adding the flag to that rule's
-# shell block — see docs/mobilome_tuning_guide.md, which lists it as a layer B
+# shell block — see docs/mobilome/tuning.md, which lists it as a Layer B
 # knob for exactly that reason.
 DEFAULT_MIN_CHROMOSOME_BP = 2000000
 

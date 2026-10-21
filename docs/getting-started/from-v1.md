@@ -119,6 +119,7 @@ cleaned down to results and archived.
 | **GTDB R232 with GTDB-Tk 2.7.2** | download R232; the pinned version rejects older releases |
 | **Bakta database v6.0** with Bakta 1.12.1 | download v6.0 |
 | **The virus caller is selectable.** VirSorter2 stays the default; geNomad is opt-in, and choosing it also produces a Platon + geNomad plasmid concordance table | nothing, unless you want geNomad |
+| **Phage calling now reads the decontaminated genome in every mode.** v1 `BacFlux` (Illumina) scanned the draft before contaminant contigs were removed | nothing; phage calls on contigs that decontamination removes no longer appear |
 | **Six databases can be supplied from a copy you already hold** — `checkv_db`, `vs2_db`, `antismash_db`, `dbcan_db`, `card_db`, `genomad_db` | set the ones you have; the download is then skipped |
 | **The mobilome module is new and off by default** | see [the mobilome module](../mobilome/index.md) |
 | **QUAST now runs in `nanopore` mode**, which never had it, and in `hybrid` it evaluates the delivered genome as well as the Illumina draft | nothing |

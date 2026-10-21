@@ -21,9 +21,10 @@ Why this exists
     Nothing here changes gtdb_amrfinder_organism.py's DECISION LOGIC (the order
     of checks in map_classification is untouched) - only the DATA it reads.
     Re-run this whenever gtdbtk_db is pointed at a new GTDB release; see
-    docs/README_notes.md item 11. Both scripts read the same metadata file, so
-    run check_gtdb_organism_table.py against it first: when it reports every
-    entry OK and no missing candidates, there is nothing here to regenerate.
+    "GTDB to AMRFinderPlus organism" in docs/analysis/amr.md. Both scripts read
+    the same metadata file, so run check_gtdb_organism_table.py against it
+    first: when it reports every entry OK and no missing candidates, there is
+    nothing here to regenerate.
 
 THE RULE, IN ONE PARAGRAPH
     A GTDB species name has the shape "Genus[_suffix] epithet[_suffix]". A

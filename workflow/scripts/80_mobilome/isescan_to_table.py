@@ -6,8 +6,8 @@ Insertion sequences are small mobile elements that copy themselves around a
 genome. They matter here because an AMR gene sitting beside, or between, IS
 copies may be mobilisable, while the same gene with no mobile context is more
 likely intrinsic. So the module needs one clean list of where the IS elements sit
-on this assembly, and that is what this writes — work package C, the IS-detection
-stage, in docs/mobilome_module_SPEC.md §6.
+on this assembly, and that is what this writes: the module's IS-detection stage
+(rule isescan_table; docs/mobilome/index.md shows where it sits).
 
 The located count is a FLOOR, never a count. IS elements are the single biggest
 cause of contig breaks in a short-read assembly: a repeat present in several
@@ -43,16 +43,16 @@ The three tables this writes, and what reads each one next:
   --out-table    one row per IS copy, normalised column names, 1-based inclusive
                  coordinates. This is the IS side of the AMR x MGE
                  co-localisation step: colocalise.py reads it straight in as a
-                 TSV and does its own interval arithmetic. Despite the spec's
-                 bedtools recipe, no BED file and no bedtools are involved
-                 anywhere in this module.
+                 TSV and does its own interval arithmetic. No BED file and no
+                 bedtools are involved anywhere in this module, so every
+                 interval test can be read in the Python itself.
   --out-summary  one row per sample: totals, complete vs partial, how many IS sit
                  within --boundary-bp of a contig end, and that fraction — the QC
-                 metric spec §6 asks for. _downstream_targets() in
-                 shared/00_common.smk lists this file for every sample whenever
-                 the mobilome module runs, so it is always written whether or not
-                 anyone opens it: it is what the headline mobility table has to be
-                 read alongside.
+                 metric to read first (docs/mobilome/output.md).
+                 _downstream_targets() in shared/00_common.smk lists this file for
+                 every sample whenever the mobilome module runs, so it is always
+                 written whether or not anyone opens it: it is what the headline
+                 mobility table has to be read alongside.
   --out-audit    one row per IS record dropped or flagged, with an explicit
                  reason column, plus one sample-level row when there was nothing
                  to report at all. That row says which of two very different
@@ -228,7 +228,7 @@ SUMMARY_COLUMNS = [
     "n_is_with_ir",
     "n_contigs_with_is",
     "n_is_at_contig_boundary",
-    "fraction_at_contig_boundary",   # the key QC metric (spec §6 item 2)
+    "fraction_at_contig_boundary",   # the key QC metric: read it first
     "n_records_dropped",
     "n_records_flagged",
 ]
@@ -682,10 +682,10 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
         length_bp = end - start + 1
 
         # ── 4. Optional minimum length ───────────────────────────────────────
-        # Default 0, i.e. off. The spec's general 500 bp floor for MGE predictions
-        # is deliberately NOT applied to IS here: a short call is usually a
-        # partial IS cut by a contig break, and those are exactly what we want to
-        # keep and tier honestly.
+        # Default 0, i.e. off. The 500 bp floor EBI's mobilome pipeline puts on
+        # every MGE call is deliberately NOT applied to IS here: a short call is
+        # usually a partial IS cut by a contig break, and those are exactly what
+        # we want to keep and tier honestly.
         if min_length_bp > 0 and length_bp < min_length_bp:
             audit(
                 contig, start, end, "dropped", "below_min_length_bp",

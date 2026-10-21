@@ -47,7 +47,7 @@
 # genome. Staged names and report labels both come from the single QC_GENOMES
 # list in 00_common.smk.
 #
-# Two deliberate v1→v2 changes, both still to be written up in the changelog:
+# Two deliberate v1→v2 changes:
 #
 #  1. The trailing `rm -rf {input.checkm_dir}/*.fasta` is DELETED. It removed
 #     files inside another rule's declared output, which broke re-entrancy:

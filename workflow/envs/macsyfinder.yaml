@@ -1,6 +1,6 @@
 # MacSyFinder — the engine CONJscan runs on.
 #
-# Why this tool (mobilome spec §3.1): CONJscan is a MacSyFinder MODEL PACKAGE that
+# Why this tool: CONJscan is a MacSyFinder MODEL PACKAGE that
 # detects the machinery a cell needs to conjugate — relaxase (MOB), coupling
 # protein (T4CP) and the type IV secretion system (T4SS/MPF). That machinery is
 # what separates the top of BacFlux's mobility ladder: an element carrying it is

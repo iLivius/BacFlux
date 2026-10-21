@@ -116,7 +116,7 @@ def test_a_conjugative_region_never_receives_an_ice_name():
     """The single most important restraint here.
 
     A conjugative region has a relaxase and a mating apparatus but NO integrase,
-    so it is deliberately not called an ICE (spec §8 phase 4: "report it, do not
+    so it is deliberately not called an ICE (the Phase 4 rule: "report it, do not
     call it an ICE"). Hanging an ICE name on it would quietly undo the
     classification the module went to some trouble to make.
     """
@@ -176,9 +176,9 @@ def test_a_much_larger_reference_is_reported_as_such():
     short. On the K. pneumoniae positive control (ATCC BAA-2146, CP006659.2) our
     ICE call now spans 54,943 bp against ICEberg's 58,048 bp for the same element,
     ICEKpnATCCBAA-2146-1 — we recover 0.946 of it and stop 3,138 bp inside its far
-    end. The 40 kb below is the wider gap that same element showed before the att
-    search was reworked (2026-07-31), when the interval was only the machinery
-    span; see docs/mobilome_worked_example.md."""
+    end (docs/mobilome/worked-example.md). The 40 kb below is the wider gap that
+    same element showed before the att search was reworked (2026-07-31), when the
+    interval was only the machinery span."""
     row = ice_row(start=100_000, end=140_000)          # 40,001 bp
     hit = iceberg_hit(qstart=100_000, qend=140_000, length=40_000,
                       sstart=1, send=58_000, slen=58_000)

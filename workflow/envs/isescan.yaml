@@ -1,6 +1,6 @@
 # ISEScan — insertion-sequence (IS) detection on assembled contigs.
 #
-# Why this tool (mobilome spec §3.1): IS elements are the workhorse of the
+# Why this tool: IS elements are the workhorse of the
 # bacterial mobilome, and ISEScan finds them with its own bundled profile HMMs —
 # no external database to download or license. It works on draft assemblies and,
 # importantly for us, flags whether each copy is complete or partial, which is

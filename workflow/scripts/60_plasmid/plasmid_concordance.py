@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Join Platon and geNomad plasmid calls into one confidence-tiered table (D9).
 
+D9 is the label of the BacFlux v2 design decision this script implements, the
+Platon/geNomad plasmid concordance; the comments below use it as shorthand.
+
 BacFlux v2 calls plasmids with TWO independent tools and reports where they
 agree, instead of trusting either one alone:
 
@@ -100,9 +103,8 @@ VERIFIED_SUFFIX_NO_HIT = " was not verified by BLAST search."
 # What is deliberately NOT treated as a failure: an empty Platon directory. A
 # completed, exit-0 Platon run legitimately writes almost nothing when every
 # contig is longer than its 500 kb size filter — which is the NORMAL case for a
-# closed genome, and true of several samples in this project's own validation
-# set. Reading "no output files" as "Platon failed" would therefore mislabel
-# exactly the assemblies we most want to be right about.
+# closed genome. Reading "no output files" as "Platon failed" would therefore
+# mislabel exactly the assemblies we most want to be right about.
 PLATON_CRASH_MARKER = "Platon exited with status"
 
 

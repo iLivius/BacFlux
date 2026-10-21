@@ -10,7 +10,7 @@
 #                          deliverable, exactly as in v1.
 #   genomad    (opt-in)  — Platon and geNomad are joined into a per-contig
 #                          concordance table (decision D9, see
-#                          docs/unification_migration_plan.md).
+#                          docs/analysis/plasmids.md).
 #
 # geNomad is opt-in and never the default because Berkeley Lab licenses it for
 # academic / non-commercial use only, and BacFlux is MIT — so the concordance is

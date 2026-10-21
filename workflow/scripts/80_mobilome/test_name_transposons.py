@@ -6,13 +6,10 @@ cargo of that transposon, at tier 4. So an interval that is too WIDE is not a
 cosmetic problem: it silently converts unrelated chromosomal genes into
 "mobilisable, named architecture".
 
-That is not hypothetical. Its first run on the K. pneumoniae positive control
+That is not hypothetical. Its first run on a K. pneumoniae positive control
 produced a single "Tn7246" spanning 942,502 bp — 129x the length of the 7,325 bp
 transposon itself — because two separate copies of it, a megabase apart, were
-merged into one element. Most of the tests below exist because of that. (The
-strain is left unnamed on purpose: this project has used both KPNIH1 and ATCC
-BAA-2146 as K. pneumoniae controls and confused them more than once, and only
-the Tn3000 case at the foot of this file carries an accession that pins it.)
+merged into one element. Most of the tests below exist because of that.
 
 The hits are hand-built BLAST rows, so no TnCentral download and no blastn are
 needed. The layer itself is opt-in: with neither mobilome.tncentral.url nor
@@ -253,7 +250,7 @@ def test_identity_describes_the_whole_copy_not_its_best_fragment():
     assert abs(float(elements[0]["identity"]) - 93.9) < 0.2
 
 
-# ── Regressions from the adversarial review ──────────────────────────────────
+# ── Regressions: failures these guards were added for ────────────────────────
 
 def test_a_neighbours_inverted_repeats_do_not_stretch_the_interval():
     """The Tn3000 failure from the K. pneumoniae control (ATCC BAA-2146), reduced.

@@ -16,7 +16,7 @@
 # The third leg, AMRFinderPlus, is not here. It runs inside the mobilome module
 # (rule amrfinderplus in shared/80_mobilome.smk) and only when mobilome.run is
 # true, because its job there is to feed structured AMR calls into the AMR ×
-# mobile-element co-localisation — see docs/mobilome_module_SPEC.md §4.
+# mobile-element co-localisation — see docs/analysis/amr.md.
 #
 # amr_contigs           : one ABRicate run per (sample, database), at the EFSA
 #                         reporting thresholds. Fanned out over DATABASES by
@@ -297,17 +297,17 @@ if HAS_SHORT_READS:
     # forty lines below uses `i >= 0` with no pairing guard, which is why subfilter
     # bites and idfilter does not.
     #
-    # Measured on a test isolate's reads under the old idfilter=0.99: nearly every
-    # retained alignment fell BELOW 99% identity, some under 50%. Mapping the same
-    # reads single-end filtered them correctly, which isolates the cause to the
-    # pairing guard. So every CARD read-mapping result this workflow produced
-    # from v1 onward was screened at BBMap's default minid=0.76, not at the 0.99
-    # the code and the README both claimed.
+    # Mapping one set of reads both ways under the old idfilter=0.99 shows it: as
+    # pairs, nearly every retained alignment fell BELOW 99% identity, some under
+    # 50%; single-end, the same reads were filtered correctly, which isolates the
+    # cause to the pairing guard. So every CARD read-mapping result this workflow
+    # produced from v1 onward was screened at BBMap's default minid=0.76, not at
+    # the 0.99 the code and the README both claimed.
     #
     # The number below is therefore not a tightening — it states what has always
     # been running, using the flag that actually enforces it. Deliberately NOT
-    # raised to 0.99: at minid=0.99 the same reads keep 2 alignments instead of
-    # 1240, which would gut the one AMR leg that is immune to assembly collapse.
+    # raised to 0.99: at minid=0.99 the same reads keep almost none of their
+    # alignments, which would gut the one AMR leg immune to assembly collapse.
     # Specificity here comes from requiring ≥70% of the reference gene's LENGTH to
     # be covered, not from per-read identity, and that requirement is unchanged.
     #

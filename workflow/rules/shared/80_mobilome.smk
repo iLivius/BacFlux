@@ -9,9 +9,9 @@
 # That is the evidence behind the distinction regulators actually care about:
 # INTRINSIC resistance (species-wide, chromosomal, not transferable) versus
 # ACQUIRED resistance (arrived horizontally on a plasmid or transposon, and may
-# move again). Full design and the reasoning behind every tool choice is in
-# docs/mobilome_module_SPEC.md; the empirically verified tool contracts are in
-# docs/mobilome_wpA_ground_truth.md.
+# move again). What the module does, and why each tool was chosen, is set out in
+# docs/mobilome/index.md and the pages it links to. How each tool actually
+# behaves, checked by running it, is noted at the rule that calls it.
 #
 # OPT-IN, and gated twice on `config.mobilome.run` (default false). Every rule
 # below sits inside `if MOBILOME_RUN:`, so on a default run they are not even
@@ -22,8 +22,8 @@
 #
 # ── Data flow ──
 #
-# (WP-A, WP-C, WP-D below are the spec's "work package" labels — the order the
-# module was built in, kept because docs/mobilome_module_SPEC.md refers to them:
+# (WP-A, WP-C, WP-D below are "work package" labels: the order the module was
+# built in, kept as short names for its parts here and in other files.
 # WP-A = surface the AMR calls, WP-C = find the IS elements, WP-D = intersect the
 # two and award a mobility tier. WP-B is the database layer, WP-E the ICE work.)
 #
@@ -179,7 +179,7 @@
 # TSV as the check on what changed. Nothing measured supports 0.3.
 # (73, not the 68 this comment carried until 2026-07-31: the 68 was stale in the
 # script that builds the table, not in the table. 279 + 73 + 43 = 395. See
-# docs/mobilome_tuning_guide.md §3.2.)
+# docs/mobilome/tuning.md.)
 #
 # The EBI mobilome-annotation-pipeline runs 0.3. That is evidence about a
 # metagenome pipeline's priorities — recall over precision, because a MAG's
@@ -276,7 +276,7 @@ if MOBILOME_RUN:
         "start/end: 'none' means the interval is only the machinery span, a "
         "floor. Low-confidence calls on a draft are expected, not a fault. Each "
         "sample's contig count and N50 head its _ice_discarded.tsv; details in "
-        "docs/mobilome_draft_assemblies.md."
+        "docs/mobilome/draft-assemblies.md."
     )
 
     # ── contig_lengths — how long is every contig? ──
@@ -331,8 +331,8 @@ if MOBILOME_RUN:
     # The catch: AMRFinderPlus curates only 31 organisms under NCBI names, and
     # GTDB-Tk speaks GTDB names, which split genera (Pseudomonas_E) and use
     # placeholder species (sp024807945). So a careful mapping is needed, and for
-    # most environmental isolates there is legitimately NO match — verified: none
-    # of the six isolates screened in this project map to a curated organism.
+    # most environmental isolates there is legitimately NO match: the curated
+    # organisms are nearly all clinical, so a soil or plant isolate matches none.
     # A no-match is therefore the COMMON case and must be silent and graceful.
     #
     # Takes in: the GTDB-Tk output directory for this sample (03.taxonomy, from
@@ -379,11 +379,11 @@ if MOBILOME_RUN:
     #
     # This costs NO new conda env and NO new database: amrfinder ships inside the
     # Bakta env, and its database ships inside the Bakta database. Verified by
-    # running it for real (see docs/mobilome_wpA_ground_truth.md): the 22-column
-    # schema there is the contract the co-localisation parser keys on, and it is
-    # the doc rather than the spec that is right about the column NAMES — 4.2.7
-    # calls them "Element symbol"/"Element name" where older versions said "Gene
-    # symbol", and a parser looking for the old name finds nothing and says so.
+    # running it for real. The 22-column table it writes is the contract the
+    # co-localisation parser keys on, and the column NAMES are where versions
+    # differ: 4.2.7 calls them "Element symbol"/"Element name" where older
+    # versions said "Gene symbol", and a parser looking for the old name finds
+    # nothing and says so.
     #
     # ABRicate is NOT replaced. The three AMR legs are complementary and stay
     # (the first two live in shared/50_amr.smk):
@@ -654,7 +654,7 @@ if MOBILOME_RUN:
     # Consumed by: conjscan_ice.
     #
     # --db-type ordered_replicon is right for one genome's proteome, and Bakta
-    # writes its .faa in genome order. CAVEAT recorded in the ground-truth doc:
+    # writes its .faa in genome order. CAVEAT:
     # on a fragmented assembly MacSyFinder treats the whole proteome as one
     # pseudo-replicon and can cluster hits ACROSS contigs; conjscan_ice therefore
     # flags any system whose hits span contigs and caps it at low confidence.
@@ -961,7 +961,7 @@ if MOBILOME_RUN:
     #   * the IS table, masked out of the att search (see below)         (isescan_table)
     #   * the contig lengths, for the contig-edge flags                  (contig_lengths)
     #   * chromosome-or-plasmid, per contig                       (mobilome_replicons)
-    # Does: spec §8 Phases 0–4 — collect anchors (relaxase, coupling protein,
+    # Does: Phases 0–4 — collect anchors (relaxase, coupling protein,
     #       T4SS, integrase), cluster them on one contig, and classify:
     #         integrase + relaxase + T4SS   → ICE  (predicted self-transmissible)
     #         integrase + relaxase          → IME  (mobilisable, needs a helper)
@@ -971,9 +971,9 @@ if MOBILOME_RUN:
     #       repeats that mark where the element really starts and stops, and
     #       widen the interval to them when they are found.
     #
-    # WHY THE att SEARCH RUNS IN EVERY MODE, not just long-read. The spec scoped
-    # Phase 3 to BacFluxL because of short-read FRAGMENTATION, and that reasoning
-    # is about assembly contiguity, not about the sequencer: a closed genome
+    # WHY THE att SEARCH RUNS IN EVERY MODE, not just long-read. It was first
+    # planned for long reads only, because short-read assemblies are FRAGMENTED,
+    # but fragmentation is about the assembly, not the sequencer: a closed genome
     # arriving through `contigs` mode has exactly the flanking sequence the search
     # needs. So it is attempted always and degrades honestly — when the flanks are
     # missing, or the element runs off the end of a contig, nothing is found and
@@ -985,7 +985,7 @@ if MOBILOME_RUN:
     # flanking sequence before the repeat search runs — all of it, not one half:
     # insertion sequences carry terminal repeats and duplicate their target DNA
     # when they transpose, so an IS-rich neighbourhood is full of direct repeats
-    # that have nothing to do with ICE integration. The spec names this as the
+    # that have nothing to do with ICE integration. Skipping this mask is the
     # most likely way to get Phase 3 wrong.
     #
     # Produces: ICE_TABLE ({sample}_ice_candidates.tsv) and ICE_AUDIT
@@ -1010,7 +1010,7 @@ if MOBILOME_RUN:
             genome = FINAL_CONTIGS,
             is_table = IS_TABLE,
             # Which contigs are plasmids. An ICE is by definition an element that
-            # integrates into the CHROMOSOME (spec section 2.4), so conjugation
+            # integrates into the CHROMOSOME, so conjugation
             # machinery sitting on a plasmid is a conjugative plasmid, not an ICE.
             # Without this the classifier cannot tell the two apart and reports
             # every self-transmissible plasmid as a predicted ICE.
@@ -1020,7 +1020,7 @@ if MOBILOME_RUN:
             audit = ICE_AUDIT,
         params:
             script = CONJSCAN_ICE_SCRIPT,
-            # Empty unless the user opted in to the strict spec §8 Phase 6 rule
+            # Empty unless the user opted in to the stricter Phase 6 confidence rule
             # (mobilome.require_trna_boundary_for_high). Off by default so that a
             # well-evidenced ICE is not capped at medium merely because a
             # short-read assembly could not show us where it ends.
@@ -1077,13 +1077,13 @@ if MOBILOME_RUN:
         #          characterised and named. Matching one is qualitatively different
         #          from inferring a composite from two IS copies: the architecture
         #          is already known, so it gets awkward cases like IS26 right for
-        #          free (spec §7).
+        #          free.
         # Takes in: nothing from the workflow — a URL from the config, or a
         #           directory the user already holds.
         # Does: download, verify, unpack, repair, and index. The ZIP holds
         #       tncentral.fa — a plain FASTA — sitting next to a BLAST v4 index.
         #       That shipped index is deleted and rebuilt as v5 from the repaired
-        #       FASTA, for two reasons: current blast+ wants v5 (spec §5.3), and
+        #       FASTA, for two reasons: current blast+ wants v5, and
         #       the shipped one was built before the repair the shell does below,
         #       so it is missing the same 21 records. PROVENANCE.txt records what
         #       was actually fetched, because the endpoint is unversioned and
@@ -1189,7 +1189,7 @@ if MOBILOME_RUN:
                 fi
 
                 # The archive ships a BLAST v4 index. Rebuild as v5 so it works
-                # with current blast+ (spec §5.3), and drop the shipped index files
+                # with current blast+, and drop the shipped index files
                 # so there is no chance of the old one being picked up instead.
                 # NOTE the shipped index was built from the UNREPAIRED FASTA and is
                 # therefore missing those 21 elements - another reason to rebuild.
@@ -1280,7 +1280,7 @@ if MOBILOME_RUN:
         # The two thresholds are mobilome.tncentral.min_identity (90%) and
         # .min_reference_coverage (0.80): a hit names an element when it is at
         # least 90% identical over at least 80% of the curated sequence. That is
-        # the naming cascade's convention (spec §5.4), not a biological boundary —
+        # a convention (see docs/mobilome/tuning.md), not a biological boundary —
         # anything weaker is refused a name and recorded in the audit, never
         # quietly promoted.
         rule name_elements:
@@ -1519,7 +1519,7 @@ if MOBILOME_RUN:
                   --out-audit {output.audit} > {log} 2>&1
                 """
 
-    # ── How many IS copies did the assembly lose? (spec WP-C) ──
+    # ── How many IS copies did the assembly lose? (WP-C) ──
     # The four rules below exist only when MOBILOME_COPY_NUMBER is true, which
     # needs both an ISOSDB source (mobilome.isosdb.fasta_url or .dir) and a mode
     # that has short reads — illumina or hybrid, since the whole leg is built on
@@ -1814,8 +1814,8 @@ if MOBILOME_RUN:
             # Present only when the user opted in to geNomad: rule
             # plasmid_concordance lives under `if PHAGE_CALLER == "genomad"` in
             # 60_plasmid.smk, because geNomad is academic/non-commercial licensed
-            # and so cannot be BacFlux's default (spec section 3.1). Unpacking a
-            # dict keeps the input list valid in both configurations.
+            # and so cannot be BacFlux's default (see docs/about/licensing.md).
+            # Unpacking a dict keeps the input list valid in both configurations.
             #
             # Why it matters here: Platon decides tiers 5 and 6 on its own, and a
             # plasmid it misses becomes "chromosomal, intrinsic candidate" for
@@ -1909,7 +1909,7 @@ if MOBILOME_RUN:
             # The widest a composite transposon may be called: two IS copies
             # further apart than mobilome.max_composite_span_bp (20 kb) are not
             # treated as bracketing the gene between them. A working limit, not a
-            # biological one (spec §5.1), which is why the measured distance is
+            # biological one, which is why the measured distance is
             # reported on the row beside the tier.
             max_span = MOBILOME_MAX_COMPOSITE_SPAN,
             # Third element table, empty unless the TnCentral naming layer is on.

@@ -18,8 +18,8 @@ than the evidence allows.
 The layer is opt-in, because naming needs the TnCentral database and BacFlux
 never ships it — every rule here lives behind MOBILOME_NAME_ELEMENTS, which needs
 the mobilome module switched on AND mobilome.tncentral.url or .dir set. Worth
-knowing before reading a report: tier 4 has never actually been assigned in a
-retained run — see "What the benchmark does not show" in
+knowing before reading a report: tier 4 is one of the thinnest-tested rungs of
+the ladder — see "What the benchmark does not show" in
 docs/mobilome/validation.md.
 
 Why a curated name is worth a whole tier
@@ -32,8 +32,8 @@ relies on.
 
 A TnCentral hit is not an inference. It is a match to an element somebody
 characterised, named and deposited, whose architecture is already known — so it
-gets IS26 right for free. That is why the spec (§7) says a curated hit should
-OVERRIDE the pattern-based call rather than merely agree with it.
+gets IS26 right for free. That is why a curated hit OVERRIDES the pattern-based
+call rather than merely agreeing with it (docs/mobilome/optional-layers.md).
 
 What it takes in and what it produces
 -------------------------------------
@@ -56,7 +56,7 @@ What it deliberately does not do
 --------------------------------
 TnCentral also contains plain insertion sequences (deflines starting IS...).
 Those are skipped, with an audit line: ISEScan already inventories IS elements on
-these contigs, and an IS by definition carries no passenger genes (spec §2.4), so
+these contigs, and an IS by definition carries no passenger genes, so
 it cannot put an AMR gene inside a named transposon. Emitting them here would
 double-count the same element in two tables.
 """
@@ -84,9 +84,9 @@ BLAST_COLUMNS = [
 
 
 # ── How good a hit must be before it may confer a name ───────────────────────
-# The naming cascade's thresholds (spec §5.4): a hit is only allowed to confer a
-# NAME when it is both highly similar and nearly complete. Both numbers are the
-# cascade's convention, not a biological boundary. Rule name_elements always
+# The naming cascade's thresholds (docs/mobilome/tuning.md): a hit may confer a
+# NAME only when it is both highly similar and nearly complete. Both numbers are
+# the cascade's convention, not a biological boundary. Rule name_elements always
 # passes them explicitly, from mobilome.tncentral.min_identity and
 # .min_reference_coverage, which fall back to these same values in
 # shared/00_common.smk; the defaults here are what a hand-run of the script gets.
@@ -133,7 +133,7 @@ def classify_element(name):
       In...  an integron. A gene-capture platform carrying cassettes, likewise
              a named architecture around a resistance gene -> tier 4.
       IS...  a plain insertion sequence. By definition carries ONLY what it needs
-             to move (spec §2.4), so it never contains a passenger AMR gene.
+             to move, so it never contains a passenger AMR gene.
              ISEScan already inventories these, so naming them here would put the
              same element in two tables.
 
@@ -491,7 +491,7 @@ def audit_row(sample, action, reason, detail, contig="NA", start="NA", end="NA")
 #   strand               always "." — see the note where the row is built
 #   element_type         unit_transposon | integron
 #                        source: classify_element() on the TnCentral name
-#   mge_id               contig|element_type-start:end, the spec §9 ID format
+#   mge_id               contig|element_type-start:end, as in the IS and ICE tables
 #   mge_name             the curated name, e.g. Tn4401b
 #                        source: parse_element_name() on the BLAST sseqid
 #   identity             % identity of the whole copy, length-weighted over HSPs

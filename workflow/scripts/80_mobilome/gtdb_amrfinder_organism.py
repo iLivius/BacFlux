@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Translate a GTDB-Tk species call into the matching AMRFinderPlus
-`--organism` value — or into nothing at all, which is the common case here.
+`--organism` value — or into nothing at all, which is the common case for
+environmental isolates.
 
 Why AMRFinderPlus has to be told which organism it is looking at
 ----------------------------------------------------------------
@@ -40,7 +41,7 @@ answered once per GTDB release rather than guessed.
 
 What goes in, what comes out, and where it sits in the workflow
 ---------------------------------------------------------------
-Runs in the mobilome module's WP-A step, between GTDB-Tk (stage 03.taxonomy) and
+Runs in the mobilome module, between GTDB-Tk (stage 03.taxonomy) and
 AMRFinderPlus. Both the caller and AMRFinderPlus itself live in the mobilome
 stage — rules amrfinder_organism and amrfinderplus in shared/80_mobilome.smk,
 writing into 08.mobilome, not into the 05.amr stage where ABRicate and the CARD
@@ -71,7 +72,7 @@ And it writes two files:
                      `--organism` (plus `--mutation_all`, which is meaningless
                      without it) only when something is left — so an
                      empty file means "run AMRFinderPlus without --organism",
-                     the graceful, silent fallback the spec asks for.
+                     a graceful, silent fallback rather than a failed run.
   --out-audit      : a four-column TSV (sample, gtdb_classification,
                      matched_organism, reason) recording the decision and why it
                      was taken — the BacFlux convention that every
@@ -81,9 +82,9 @@ And it writes two files:
 Why nothing here is ever an error
 ---------------------------------
 The exit status is 0 in every ordinary situation, INCLUDING no match, no row for
-the sample, an unreadable summary and a missing summary file. Environmental
-isolates normally have no curated organism (none of the six isolates screened in
-this project do), so "no match" is the normal path, not an error.
+the sample, an unreadable summary and a missing summary file. Most environmental
+isolates have no curated organism, because AMRFinderPlus curates mainly clinical
+pathogens, so "no match" is the normal path, not an error.
 """
 
 import argparse
@@ -94,7 +95,9 @@ import sys
 
 # ── The 31 curated AMRFinderPlus organisms ───────────────────────────────────
 # Copied verbatim from `amrfinder --list_organisms -d {bakta_db}/amrfinderplus-db/latest`
-# (version 4.2.7, recorded in docs/mobilome_wpA_ground_truth.md §"Spec §12 Q2").
+# (AMRFinderPlus 4.2.7, the version inside the Bakta environment). How the
+# list is used is explained under "GTDB to AMRFinderPlus organism" in
+# docs/analysis/amr.md.
 # This is the ONE hand-verified fact in this whole file — it comes from running
 # the tool, not from GTDB, so no metadata file can tell us this list. Every
 # other set below is DERIVED from it, either by simple string shape (does the
@@ -336,8 +339,9 @@ def read_gtdbtk_summary(summary_path):
             file could not be used.
 
     Nothing here raises: a missing or malformed summary must degrade to "no
-    organism" rather than kill the run (spec §1.4), so the problem message is
-    returned as data and ends up in the audit TSV.
+    organism" rather than kill the run (BacFlux modules degrade gracefully
+    instead of failing), so the problem message is returned as data and ends up
+    in the audit TSV.
     """
     if not os.path.isfile(summary_path):
         return [], "GTDB-Tk summary not found at %s" % summary_path

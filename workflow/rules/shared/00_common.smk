@@ -36,14 +36,14 @@
 # 9b. Wildcard constraint: pins {sample} to the discovered sample names.
 # 10. Rule-all targets   : the list `rule all` asks for.
 #
-# "D1", "D2", "D7" and so on, throughout the workflow's comments: the numbered
-# DECISIONS taken when the four v1 workflows were merged into this one, written
-# up in docs/unification_migration_plan.md. The three that appear most often:
-# D1 = the unified stage-directory numbering, D2 = the single assembly hand-off
-# (FINAL_CONTIGS), D7 = a bucket of small cleanups, of which the two cited here
-# are "gate on a capability flag, never on the mode name" and "define the AMR
-# database list once". A comment tagged (D7) is pointing at that document, not at
-# anything in the code.
+# "D1", "D2" and so on in comments: DECISIONS from merging the four v1 workflows.
+#   D1 = one stage-directory numbering; D2 = one assembly hand-off, FINAL_CONTIGS.
+#   D3 = where decontamination sits in each mode, as in that mode's v1 workflow.
+#   D4 = the phage callers read the decontaminated contigs in every mode.
+#   D5 = rule names unified across modes (v1 named some jobs differently).
+#   D7 = small cleanups: gate on capability flags; list the AMR databases once.
+#   D8 = VirSorter2 is the default phage caller; geNomad is an opt-in.
+#   D9 = the Platon/geNomad plasmid concordance, built only when geNomad runs.
 #
 # House rule for anyone editing this file: every parse-time side effect that
 # depends on the input data (a print, a glob of the input directory, a sys.exit
@@ -138,11 +138,11 @@ else:
 # path off it, the way MetaFlux does, instead of using Snakemake's `workdir:`
 # directive.
 #
-# Why not workdir (v1 BacFlux's approach, and Stage 1's first draft of this
-# file): workdir: changes the process's working directory at PARSE time —
-# before any rule runs, even for a dry run — which caused a real problem during
-# Stage 1 review: a placeholder output_dir that doesn't exist/isn't writable
-# crashed the parse before Snakemake could even build the DAG. It also forces
+# Why not workdir (v1 BacFlux's approach)? workdir: changes the process's
+# working directory at PARSE time — before any rule runs, even for a dry run.
+# So a placeholder output_dir that does not exist, or is not writable, crashes
+# the parse before Snakemake can even build the DAG, and a dry run of a template
+# config with placeholder paths fails outright. It also forces
 # every input directory in the config to be absolute too, since a relative one
 # would silently resolve under output_dir instead of wherever the user launched
 # from. Resolving OUT once here avoids both: the working directory never
@@ -174,9 +174,9 @@ PLATONDB = config["directories"]["platon_db"]
 # dbCAN, CARD and geNomad databases work the same way, just below.
 #
 # Why it exists: the official CheckV database lives on portal.nersc.gov, which goes
-# down often enough to cost real time (it was unreachable for the whole of
-# 2026-07-22, blocking three validation runs). Pointing this key at a copy you
-# already hold on disk removes that dependency completely.
+# down often enough to cost real time, sometimes for a whole day, and a run that
+# has to download the database fails until the host is back. Pointing this key
+# at a copy you already hold on disk removes that dependency completely.
 #
 # When set, it takes PRECEDENCE over links.checkv_link and over CheckV's own
 # downloader: nothing is fetched.
@@ -214,8 +214,8 @@ CHECKVDB = str((config["directories"].get("checkv_db") or "")).strip()
 # otherwise re-download its (multi-GB) database into EVERY run's own output_dir,
 # with no way to point at a copy already on disk. Unlike CheckV, none of these
 # four has a CONFIRMED cross-build binary-format incompatibility (CheckV's
-# DIAMOND index bug was found and fixed the hard way; these four have not shown
-# the same failure in-session), but the corresponding *_db_local rules still
+# DIAMOND index problem is described above; none of these four has shown the
+# same failure so far), but the corresponding *_db_local rules still
 # build any DIAMOND/HMM index locally rather than trust one built elsewhere,
 # out of the same caution rather than a proven need. geNomad uses the same helper
 # and adds two checks of its own — see the GENOMADDB block below.
@@ -286,9 +286,9 @@ GENOMADDB = _resolve_optional_db_dir(
 )
 if GENOMADDB:
     # EXISTING is not enough for this one, because a shared database can be
-    # PARTLY readable. Seen on this machine: of 27 files, 11 were mode 0640 —
-    # version.txt, both hallmark annotation tables, and the whole
-    # genomad_integrase_db set — while the big data files beside them were
+    # PARTLY readable: individual files — version.txt, the hallmark annotation
+    # tables, the genomad_integrase_db set — can be mode 0640, closed to anyone
+    # outside the owner's group, while the big data files beside them are
     # world-readable. os.path.exists() returns True for a file you may stat but
     # not read, so the probe above passes and the run then dies minutes later,
     # first on PermissionError for version.txt, and after that on a buried
@@ -319,7 +319,7 @@ if GENOMADDB:
     # row. An older database has one fewer trailing column, so every field shifts by
     # one and geNomad dies minutes into the run on
     #   ValueError: invalid literal for int() with base 10: '1398618at2'
-    # — a marker accession being read as a hallmark count. Verified here on
+    # — a marker accession being read as a hallmark count. Verified on
     # 2026-07-24 with database v1.7 against geNomad 1.12.0.
     #
     # The check is deliberately on the SCHEMA rather than on a version number: the
@@ -378,8 +378,8 @@ CARD_REPORT_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "50_amr", "card_mappi
 #          shared/50_amr.smk), so every result the leg ever produced was screened
 #          at BBMap's default of 0.76. Writing 0.76 here changes no output; it
 #          stops the code claiming a stringency it never had. It is deliberately
-#          not raised: at a real 0.99 the same reads keep 2 alignments instead of
-#          1240, which would gut the one AMR leg immune to assembly collapse.
+#          not raised: at a real 0.99 the reads keep almost none of their
+#          alignments, which would gut the one AMR leg immune to assembly collapse.
 #
 #   70%  — minimum fraction of the reference gene's LENGTH covered by reads.
 #          Length coverage, not read count: a short conserved domain pulling in
@@ -396,7 +396,7 @@ CARD_MIN_COVERED  = 70
 
 # Mobilome helper scripts (workflow/scripts/80_mobilome/). Each is stdlib-only Python,
 # is invoked by a rule in shared/80_mobilome.smk, and is unit-tested outside
-# Snakemake (`pytest workflow/scripts`) — see docs/mobilome_module_SPEC.md §10.
+# Snakemake (`pytest workflow/scripts`) — see workflow/scripts/README.md.
 # The att-site search, att_search.py, deliberately has no constant here: it is
 # imported by conjscan_to_ice.py rather than run on its own, so no rule names it.
 MOBILOME_SCRIPTS_DIR   = os.path.join(WORKFLOW_DIR, "scripts", "80_mobilome")
@@ -498,7 +498,7 @@ DIR_MOBILOME   = OUT + "/08.mobilome"    # mobilome module, only when config.mob
 # ── Mobilome module paths (08.mobilome), used only when config.mobilome.run ──
 # The module answers one question per sample: for each AMR gene, is it sitting in
 # a mobile genetic element, and how transferable is that element? See
-# docs/mobilome_module_SPEC.md and rules/shared/80_mobilome.smk.
+# docs/mobilome/index.md and rules/shared/80_mobilome.smk.
 #
 # The per-sample DELIVERABLE is a FILE (the mobility table), not a directory. That
 # is deliberate and matches every other stage's terminal product: a directory()
@@ -543,7 +543,7 @@ ICEBERG_BLAST_DB         = ICEBERG_DB_DIR + "/iceberg_v5"        # a PREFIX, not
 ICEBERG_BLAST_HITS       = MOBILOME_DIR + "/{sample}_iceberg_blast.tsv"
 ICE_TABLE_NAMED          = MOBILOME_DIR + "/{sample}_ice_candidates_named.tsv"
 ICE_NAMING_AUDIT         = MOBILOME_DIR + "/{sample}_ice_naming.tsv"
-# The read-based IS copy-number leg (spec WP-C). Reads are immune to assembly
+# The read-based IS copy-number leg. Reads are immune to assembly
 # collapse, so they can say how many IS copies the assembly LOST — which turns the
 # module's standing "the located IS count is a floor" warning into a number.
 # Short-read modes only: there is nothing to map otherwise.
@@ -673,11 +673,11 @@ BLASTOUT = DIR_ASSEMBLY + "/{sample}/contaminants/{sample}_blastout"
 # names. Same anti-drift pattern as FINAL_CONTIGS and COMPOSITION: the file is
 # named ONCE.
 #
-# "Stage-4 contract" below marks the paths a mode's FRONT END owes the rest of the
-# workflow: it must declare that exact string as the `output:` of whichever rule
-# it chooses. (Stage 4 was the migration step that added rules/illumina,
-# rules/nanopore, rules/hybrid and rules/contigs; the label survives because the
-# obligation does.)
+# "Front-end contract" below marks the paths a mode's FRONT END owes the rest of
+# the workflow: it must declare that exact string as the `output:` of whichever
+# rule it chooses. The front ends are the rule files in rules/illumina,
+# rules/nanopore, rules/hybrid and rules/contigs; the shared rules read these
+# paths without needing to know which mode wrote them.
 
 # ── Where the contamination screen keeps its working files ──
 # This is the same directory COMPOSITION and BLASTOUT already live in; naming it
@@ -708,7 +708,7 @@ BLOB_TABLE        = BLOB_TABLE_PREFIX + ".blob.blobDB.table.txt"
 CONTIG_LIST      = DECONTAM_DIR + "/contigs.list"
 CONTIG_DECISIONS = DECONTAM_DIR + "/contig_taxonomy_decisions.tsv"
 
-# ── The two per-mode assembly hand-offs (D3, Stage-4 contract) ──
+# ── The two per-mode assembly hand-offs (D3, front-end contract) ──
 # DRAFT_CONTIGS    — what goes INTO the contamination screen (BLAST + BlobTools +
 #                    selector). The mode's front end declares this exact string as
 #                    an output.
@@ -732,7 +732,7 @@ if MODE == "illumina":
     DECONTAM_CONTIGS = FINAL_CONTIGS                       # decontam IS the last assembly step
 elif MODE == "hybrid":
     DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/contigs_filt.fasta"          # the ILLUMINA draft
-    DECONTAM_CONTIGS = DECONTAM_DIR + "/contigs_sel.fasta"                    # Stage-4 Snippy reference + QC comparator
+    DECONTAM_CONTIGS = DECONTAM_DIR + "/contigs_sel.fasta"                    # Snippy reference + QC comparator
 elif MODE == "nanopore":
     DRAFT_CONTIGS    = DIR_ASSEMBLY + "/{sample}/fix_start/{sample}_fixed.fasta"
     DECONTAM_CONTIGS = DECONTAM_DIR + "/assembly_decontam.fasta"              # → MEDAKA_INPUT (section 8)
@@ -808,7 +808,7 @@ FINAL_BLOB_TABLE_PREFIX = DECONTAM_DIR + "/bestscore_final"
 FINAL_BLOB_TABLE = FINAL_BLOB_TABLE_PREFIX + ".blob_final.blobDB.table.txt"
 FINAL_TAXO_DECISIONS = DECONTAM_DIR + "/{sample}_final_contig_taxonomy_decisions.tsv"
 
-# ── Read hand-offs (Stage-4 contract) ──
+# ── Read hand-offs (front-end contract) ──
 # Gated exactly like the Flye/Medaka block in section 8, so referencing TRIM_R1 in
 # nanopore mode raises a clean NameError instead of silently building a path no
 # rule will ever produce. Each mode's front end declares these strings as the
@@ -831,7 +831,7 @@ if HAS_LONG_READS:
     NANOPLOT_RAW_DIR  = DIR_READS + "/{sample}/ont/raw_qc"
     NANOPLOT_FILT_DIR = DIR_READS + "/{sample}/ont/filt_qc"
 
-# ── Front-end working paths (Stage-4 contract) ──
+# ── Front-end working paths (front-end contract) ──
 # Every file each mode's front end creates on the way from raw input to
 # DRAFT_CONTIGS / FINAL_CONTIGS. They are named HERE, not inside the front-end
 # modules, for two reasons: (a) shared code consumes some of them —
@@ -858,9 +858,9 @@ if HAS_SHORT_READS:
 
     # SPAdes working directory and its raw output.
     #
-    # DELIBERATELY NOT derived from DRAFT_CONTIGS (an earlier draft used
-    # os.path.dirname(DRAFT_CONTIGS) as an anti-drift trick). That only worked
-    # because DRAFT_CONTIGS then lived INSIDE this directory — and that nesting is
+    # DELIBERATELY NOT derived from DRAFT_CONTIGS (for example with
+    # os.path.dirname(DRAFT_CONTIGS) as an anti-drift trick). That only works
+    # if DRAFT_CONTIGS lives INSIDE this directory — and that nesting is
     # a data-loss bug: illumina_assembly declares directory(SPADES_DIR) as an
     # output, and Snakemake removes a directory() output before re-running its
     # rule, so any re-run of the assembler would silently delete DRAFT_CONTIGS,
@@ -1150,8 +1150,8 @@ def _config_bool(value, default=False):
 # ── Mobilome / AMR-mobility module (stage 08), opt-in and default OFF ──
 # What it is for: for every AMR gene the pipeline found, say whether it sits in a
 # mobile genetic element and how transferable that element is — the evidence
-# behind the intrinsic-vs-acquired distinction. Full design in
-# docs/mobilome_module_SPEC.md; the rules live in rules/shared/80_mobilome.smk.
+# behind the intrinsic-vs-acquired distinction. Documented in
+# docs/mobilome/index.md; the rules live in rules/shared/80_mobilome.smk.
 #
 # Default OFF because it adds two new tools (ISEScan and CONJscan/MacSyFinder),
 # plus a BLAST database fetch when either naming layer is switched on. Resolved
@@ -1180,7 +1180,7 @@ _mobilome_cfg = config.get("mobilome", {}) or {}
 # WHICH KEY ACTUALLY COSTS A PLASMID. Measured on K. pneumoniae TUM24772
 # (BioProject PRJNA1168299, closed genome GCA_043950115.1, chromosome
 # CP171785.1) — a clinical test isolate, NOT one of the BAA-2146 / KPNIH1
-# mobilome positive controls; this project has confused those before. Its 5,596 bp
+# mobilome positive controls. Its 5,596 bp
 # Col2 plasmid (pMTY24772_Col2, CP171790.1) is missing from our assembly and
 # complete in the Illumina data. Of the 603 raw ONT reads mapping to it
 # (minimap2 -x map-ont vs CP171790.1, alignment block >= 1 kb), the number that
@@ -1269,7 +1269,8 @@ MOBILOME_MAX_COMPOSITE_SPAN = int(_mobilome_cfg.get("max_composite_span_bp", 200
 MOBILOME_BOUNDARY_BP = int(_mobilome_cfg.get("contig_boundary_bp", 100))
 
 # Whether an ICE/IME candidate must have tRNA-anchored att boundaries before it may
-# be called HIGH confidence (the strict reading of spec §8 Phase 6).
+# be called HIGH confidence (a stricter form of the confidence rule in
+# conjscan_to_ice.py).
 #
 # Default FALSE, and the reasoning is worth keeping next to the switch: confidence
 # and boundary resolution answer two different questions. "Is this an ICE?" rests
@@ -1289,14 +1290,14 @@ MOBILOME_REQUIRE_TRNA_BOUNDARY = _config_bool(
 # the mobilome module that fetches a third-party sequence database at run time.
 # BacFlux never ships the data: the workflow distributes a URL, and the user
 # downloads under their own agreement with the licensor — the same pattern as
-# bakta_db, gtdbtk_db and the CARD link (spec §5.2, §11).
+# bakta_db, gtdbtk_db and the CARD link (see docs/about/licensing.md).
 _tncentral_cfg = _mobilome_cfg.get("tncentral") or {}
 TNCENTRAL_URL = str(_tncentral_cfg.get("url") or "").strip()
 TNCENTRAL_SHA256 = str(_tncentral_cfg.get("sha256") or "").strip()
 # A local copy the user already holds takes precedence over downloading, exactly
 # as directories.* beats links.* everywhere else in this config.
 TNCENTRAL_LOCAL = str(_tncentral_cfg.get("dir") or "").strip()
-# The naming cascade's thresholds (spec §5.4). Exposed because they are
+# The naming thresholds (see docs/mobilome/tuning.md). Exposed because they are
 # conventions, not biology, and the measured values are reported alongside the call.
 TNCENTRAL_MIN_IDENTITY = float(_tncentral_cfg.get("min_identity", 90.0))
 TNCENTRAL_MIN_COVERAGE = float(_tncentral_cfg.get("min_reference_coverage", 0.80))
@@ -1326,7 +1327,7 @@ MOBILOME_NAME_ICE = MOBILOME_RUN and bool(ICEBERG_URLS or ICEBERG_LOCAL)
 # not have to branch.
 ICE_TABLE_FOR_COLOCALISE = ICE_TABLE_NAMED if MOBILOME_NAME_ICE else ICE_TABLE
 
-# ── The IS copy-number leg (spec WP-C) ──
+# ── The IS copy-number leg ──
 # Needs READS, so it is confined to the modes that have them. Unlike the naming
 # layers this changes no AMR gene's tier: it is a quality metric on the IS
 # inventory, quantifying how many copies the assembler collapsed.
@@ -1800,7 +1801,7 @@ else:
 # input directory) and only it can exit on "no input" / "bad sample name". The
 # other three modes' discovery never fires — which is what lets one Snakefile
 # serve four kinds of input without an illumina run tripping over an empty
-# nanopore_dir (see docs/unification_migration_plan.md).
+# nanopore_dir.
 FASTQ_SUFFIXES = ("fastq", "fq", "fastq.gz", "fq.gz")
 FASTA_SUFFIXES = ("fasta", "fa", "fna")
 
@@ -2050,9 +2051,8 @@ def _downstream_targets():
     # The guard below checks 80_mobilome.smk is genuinely on disk before asking
     # for anything it builds. Without it, a checkout missing that file aborts with
     # a MissingInputException naming a directory, rather than naming the config key
-    # that caused it. The module ships with v2.0.0, so the guard never fires in a
-    # complete checkout — its message still reads "not implemented yet", from when
-    # that was the reason.
+    # that caused it. The module ships with BacFlux v2, so the guard only fires on
+    # an incomplete copy of the repository, and its message says so.
     if MOBILOME_RUN:
         if not glob.glob(os.path.join(WORKFLOW_DIR, "rules", "shared", "80_mobilome.smk")):
             sys.exit(

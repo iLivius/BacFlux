@@ -111,8 +111,9 @@ NAMEABLE_ELEMENT_TYPES = {"ice", "ime", "aice", "genomic_island"}
 NOT_NAMEABLE_ELEMENT_TYPES = {
     "conjugative_region":
         "a conjugative region has a relaxase and a mating apparatus but no "
-        "integrase, so it is deliberately not called an ICE (spec §8 phase 4, "
-        "\"report it, do not call it an ICE\") and an ICE name would undo that",
+        "integrase, so it is deliberately not called an ICE (the class table in "
+        "docs/mobilome/output.md: \"report it, do not call it an ICE\") and an ICE "
+        "name would undo that",
 }
 
 

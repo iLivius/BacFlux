@@ -20,12 +20,11 @@ There briefly were two. Between 2026-08-14 and 2026-08-15 the rule mapped twice,
 at read identity 0.99 and 0.95, and this script reported a gene found only at the
 looser setting as `divergent`. That could never have worked. BBMap's `idfilter`
 does not filter the primary alignment of a properly-paired read, so both passes
-in fact ran at BBMap's default minid of 0.76: across a validation batch the strict
-collection the two coverage tables differed on eight rows, none of them within
-fifty points of the calling threshold. The rule now makes ONE pass, with `minid=`,
-which does apply, at the 0.76 that had been in force since v1 regardless of what
-the code said. See the long note above rule map_amr_db for the source reference
-and the measurement.
+in fact ran at BBMap's default minid of 0.76, and their two coverage tables came
+out almost identical: the few rows that differed were nowhere near the calling
+threshold. The rule now makes ONE pass, with `minid=`, which does apply, at the
+0.76 that had been in force since v1 regardless of what the code said. See the
+long note above rule map_amr_db for the source reference and the measurement.
 
 Why a raw CARD hit list overstates the resistome
 ------------------------------------------------
@@ -142,10 +141,10 @@ STRUCTURAL_EFFLUX_FAMILIES = (
 # efflux, and that guard is not cosmetic. CARD's regulator entries are almost all
 # efflux-pump regulators (MexR, MexZ, AcrR, MarR, RamR, SoxR, CpxR, BltR), filed
 # under "antibiotic efflux". Without the guard the suffix rule misfires on real
-# determinants that merely end in R: measured on a Bacillus isolate from this
-# project's own test set, vmlR — an ABC-F ribosomal protection protein, CARD
-# mechanism "antibiotic target protection", a genuine resistance gene — was
-# demoted to `regulator`, which is exactly the wrong direction to be wrong in.
+# determinants that merely end in R. vmlR, for example, found in Bacillus, is an
+# ABC-F ribosomal protection protein, CARD mechanism "antibiotic target
+# protection", a genuine resistance gene; the bare suffix rule would demote it to
+# `regulator`, which is exactly the wrong direction to be wrong in.
 REGULATOR_SUFFIX_PATTERN = re.compile(r"(?:^|\s)([A-Za-z][A-Za-z0-9]*R)$")
 
 

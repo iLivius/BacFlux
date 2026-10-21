@@ -206,8 +206,8 @@ if USE_MEDAKA:
     # Same body as rules/nanopore/30_polish.smk, with three deliberate differences
     # — two you can see here, one hidden inside a constant:
     #   1. threads: capped_cpus(8) here rather than capped_cpus(24). Both are the
-    #      v1 values for their own mode and are kept as-is for now; unify after
-    #      the end-to-end gate if the timings say so.
+    #      v1 values for their own mode and are kept as-is; unify them if
+    #      timings ever show a reason to.
     #   2. the failure hint names parameters.hybrid.medaka_model, where nanopore
     #      names parameters.nanopore.medaka_model.
     #   3. MEDAKA_INPUT resolves to DNAAPLER_FIXED here — the PRE-decontamination
@@ -219,7 +219,7 @@ if USE_MEDAKA:
     # v1 → v2 change worth remembering: v1 hybrid auto-inference read the RAW ONT
     # FASTQ, on the worry that filtlong might drop a tag-carrying read. The shared
     # check resolves from FILT_LONG instead (uncompressed, headers preserved — the
-    # same reasoning the Stage-4 review used to put nanopore on filtlong). In every
+    # same reasoning that puts nanopore mode on FILT_LONG). In every
     # realistic case the tag is identical in both, so the resolved model is
     # unchanged; the two modes are now aligned, and a bad model fails before
     # assembly rather than after it.

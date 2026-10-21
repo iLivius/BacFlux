@@ -144,7 +144,7 @@ def test_a_noisy_single_copy_still_counts():
 # ── Reporting the delta, and saying so when there is no delta ────────────────
 
 def test_a_family_absent_from_isosdb_reports_NA_not_a_negative_delta():
-    """The failure the first real run exposed, and the most important test here.
+    """The most important test here: a database gap must not read as a result.
 
     ISEScan finds IS elements by profile HMM, which recognises a FAMILY. This leg
     needs nucleotide identity to a specific catalogued element. For an organism
@@ -152,10 +152,9 @@ def test_a_family_absent_from_isosdb_reports_NA_not_a_negative_delta():
     entry attracts reads, the estimate is zero and the delta goes NEGATIVE.
 
     Read naively that says "the assembly collapsed nothing, we over-called", when
-    the truth is "this database has nothing to say about this organism". Measured
-    on a hybrid validation isolate: 17 IS located, 1 of 22,713 ISOSDB
-    entries covered end to end. Absence of a nucleotide match is not evidence of
-    absence of copies, so it must report NA.
+    the truth is "this database has nothing to say about this organism". Absence
+    of a nucleotide match is not evidence of absence of copies, so it must report
+    NA.
     """
     summary, audit = run(
         [], [contig(50, 5_000_000)], families={}, located={"IS110": 3})

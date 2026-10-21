@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Turn CONJscan machinery hits + Bakta annotation into ICE / IME candidates.
 
-This is work package E of the mobilome spec (`docs/mobilome_module_SPEC.md` §8).
-All of the spec's phases are here except the cargo intersection, which is
-colocalise.py's job:
+The work runs in numbered phases, and the comments below cite them by number.
+Two of them are not in this file: Phase 5, the cargo step (which AMR genes sit
+inside an element), is colocalise.py's job, and Phase 7 is the validation
+benchmark the comments quote (docs/mobilome/validation.md). The rest are here:
 
     Phase 0  data contract   -> every input becomes the same tidy shape
                                 (contig, start, end, strand, type, label)
@@ -65,10 +66,9 @@ Three pieces of machinery decide what an element can actually do:
 
     ** The coupling protein is NOT counted as a T4SS/MPF component here. **
     That distinction is the whole difference between "can move itself" and
-    "can be moved by someone else's machinery" (spec §2.5, ladder tiers 5 vs 6),
-    and it is exactly what a validation isolate showed: it has a
-    relaxase plus a coupling protein on the chromosome and NO mating-pair
-    apparatus, so it is mobilisable, not self-transmissible.
+    "can be moved by someone else's machinery" (mobility ladder tiers 6 and 5,
+    docs/mobilome/mobility-ladder.md). A relaxase and a coupling protein with NO
+    mating-pair apparatus is the typical IME case: mobilisable, not self-transmissible.
 
     ** A mating-pair hit only counts as an APPARATUS when CONJscan called a
     typed T4SS system (`T4SS_type*` / `dCONJ_type*`). ** The `MOB` model is
@@ -135,9 +135,9 @@ integrase is PASSIVE; a conjugative region with no integrase has no established
 boundaries; an AICE conjugates, but not by the relaxase + type IV secretion
 route, which is the only route the ladder's top two rungs are defined by, so
 neither rung measures anything about it. None of the three may raise a
-resistance gene's tier. They are still written to the table — the spec says
-"report it, do not call it an ICE" — and the true class is always available in
-the `mge_class` column.
+resistance gene's tier. They are still written to the table — "report it, do
+not call it an ICE", as docs/mobilome/output.md puts it — and the true class is
+always available in the `mge_class` column.
 
 Context only is not the same as ignored. All three names sit in colocalise.py's
 CONTEXT_ONLY_ELEMENT_TYPES: an AMR gene inside one of them stays at tier 1 when
@@ -149,13 +149,13 @@ as an "intrinsic candidate" at HIGH confidence with a contradicting audit line
 beside it, the one error direction this module exists to prevent. So a class
 added here has to be added there in the same breath.
 
-Why the output always says "PREDICTED" (spec §2.6)
---------------------------------------------------
+Why the output always says "PREDICTED"
+--------------------------------------
 Everything here is a PREDICTION from sequence. The output always says "predicted
 self-transmissible", never "transmissible"; the confirmatory experiment is a
 filter or broth mating assay, not software. Nothing in this file may be labelled
 "EFSA-compliant" — it is supporting evidence for the intrinsic/acquired
-judgement, not the judgement.
+judgement, not the judgement. See docs/mobilome/mobility-ladder.md.
 
 Coordinates are 1-BASED AND INCLUSIVE throughout, which is what GFF3 uses, so no
 conversion happens anywhere. Distances are the number of bases strictly BETWEEN
@@ -165,12 +165,12 @@ ever compared against a 50 kb window, and the docstring there says so.)
 
 Licensing note: an independent implementation. No code was taken from EBI's
 mobilome-annotation-pipeline or from ICEfinder (parts of which are CC BY-NC-SA
-and incompatible with BacFlux's MIT licence, spec §11). Only conventions are
-reused — the `contig|type-start:end` identifier format and the discard-with-
-reason file — and conventions are facts, not expression.
+and incompatible with BacFlux's MIT licence; see docs/about/licensing.md). Only
+conventions are reused — the `contig|type-start:end` identifier format and the
+discard-with-reason file — and conventions are facts, not expression.
 
 Standalone CLI, Python standard library only, exercised by test_conjscan_to_ice.py
-with small hand-built fixtures plus the real CONJscan output of a validation isolate.
+with small hand-built fixtures plus a saved, invented CONJscan output file.
 """
 
 import argparse
@@ -397,8 +397,8 @@ def hit_is_virb4(hit):
 
     Why this needs two columns rather than one string test: MacSyFinder writes
     the profile that ACTUALLY matched in `gene_name` and keeps the model's own
-    gene in `hit_gene_ref`. The real output of a validation isolate shows exactly that —
-    `gene_name = T4SS_MOBM` for a hit found under the model gene `T4SS_MOBB`. So
+    gene in `hit_gene_ref`. A relaxase found through an exchangeable profile, for
+    example, is written `gene_name = T4SS_MOBF` under the model gene `T4SS_MOBB`. So
     a truncated VirB4 that matched the exchangeable traU profile is written as
     `T4SS_I_traU`, and a check that only looked at `gene_name` for the string
     'virb4' would miss it and leave the element reported as intact.
@@ -429,7 +429,7 @@ def mpf_type_from_model(model_fqn):
         under it tells us there is machinery but not which family;
       * the `dCONJ_type*` models describe DECAYED (degenerate) systems. A hit
         under one of those is the tool telling us the machinery is broken, which
-        is exactly the overcalling trap the spec warns about (§8 Phase 4), so we
+        is exactly where naive tools overcall (decayed ICEs are common), so we
         pass that straight through to the degradation check.
     """
     model_name = model_fqn.split("/")[-1] if model_fqn else ""
@@ -467,28 +467,23 @@ def icescan_model_class(model_fqn):
 
 # ── Which Bakta product text counts as an integrase ──────────────────────────
 # CONJscan has no integrase model, so the other anchor class comes from the
-# annotation text. The pattern is the one the spec fixes at §8 Phase 1.
+# annotation text, matched against the pattern below.
 #
 # What is NOT in it: a bare "recombinase". Bakta annotates RecA as
 # "recombinase RecA" and it appears in every genome; RecA is the homologous-
 # recombination protein and has nothing to do with site-specific integration, so
 # only the "tyrosine recombinase" / "serine recombinase" phrasings match.
 #
-# Why the list is longer than the spec's: the spec (§8 Phase 1) gives the pattern
-# in terms of protein FAMILY names, but Bakta writes UniRef product text, which
-# says the same thing several other ways. Checked against every distinct
-# integrase-like product in the K. pneumoniae positive control; the two that the
-# spec-literal pattern missed are marked below, and missing them is not cosmetic
-# — "DNA integration/recombination/inversion protein" is how Bakta annotated
-# locus KPNIH1_04511, the integrase 5.7 kb from that genome's conjugative region.
-# Without it that element scored as a bare "conjugative_region" (report, do not
-# call an ICE) instead of the ICE it is, so the positive control silently
-# under-called its own headline result.
-#
-# (The locus tag reads KPNIH1_* because that is the sample name a human typed for
-# the run, not the strain: the genome is CP006659.2, which is ATCC BAA-2146.
-# KPNIH1 is a different isolate, CP008827.1. See docs/validation/README.md — the
-# tag is quoted verbatim here because it is what is actually in the file.)
+# Why the pattern is longer than the four family names it started from (tyrosine
+# recombinase, phage integrase, XerC/D, serine recombinase): Bakta writes UniRef
+# product text, which says the same thing several other ways. Checked against
+# every distinct integrase-like product in the K. pneumoniae positive control
+# ATCC BAA-2146 (GenBank CP006659.2); the two the family names missed are marked
+# below, and missing them is not cosmetic — "DNA integration/recombination/
+# inversion protein" is how Bakta annotated the integrase 5.7 kb from that
+# genome's conjugative region. Without it that element scored as a bare
+# "conjugative_region" (report, do not call an ICE) instead of the ICE it is, so
+# the positive control silently under-called its own headline result.
 INTEGRASE_PRODUCT_PATTERN = re.compile(
     r"tyr(osine)? recombinase"          # "tyrosine recombinase XerC"; MISSED "Tyr recombinase domain-containing protein"
     r"|phage[_ ]integrase"
@@ -569,7 +564,7 @@ def read_replicon_calls(path):
     return calls
 
 
-# ── Classification (spec §8 Phase 4) ─────────────────────────────────────────
+# ── Phase 4: classification ──────────────────────────────────────────────────
 # The five classes, the element_type each is written as, and the mobility
 # wording. Only the first two may raise an AMR gene's mobility tier downstream;
 # the other three are context only — see the module docstring for the whole
@@ -599,7 +594,7 @@ ELEMENT_TYPE_FOR_CLASS = {
 
 # The mobility sentence for an AICE, and the reason it has no tier.
 #
-# THE BIOLOGY, because this is the one class the spec's ladder does not cover.
+# THE BIOLOGY, because this is the one class the mobility ladder does not cover.
 # An AICE DOES conjugate, and it reaches another cell. What it does not use is
 # the relaxase + type IV secretion route: a translocase of the FtsK/SpoIIIE
 # family — TraB generically, TraSA in pSAM2 — carries the element across as
@@ -660,15 +655,15 @@ DEGRADED_MOBILITY_SUFFIX = " - machinery incomplete"
 
 # A system whose completeness (`sys_wholeness`, the fraction of the model's genes
 # that were actually found) is below this is treated as degraded. Convention,
-# not biology: 0.7 is the same threshold the spec uses for a truncated profile
-# alignment at §8 Phase 4. Changing it changes how loudly we hedge, never which
-# genes were found.
+# not biology: 0.7 is the same threshold used just below for a truncated profile
+# alignment (PROFILE_COVERAGE_INTACT_MIN). Changing it changes how loudly we
+# hedge, never which genes were found.
 WHOLENESS_INTACT_MIN = 0.7
 
 # The same 0.7, applied to a single hit instead of a whole system: a relaxase or
 # VirB4 whose HMM alignment covers less than this much of the profile is a
-# fragment, and a fragment does not nick DNA or build a pilus (spec §8 Phase 4,
-# "truncation check").
+# fragment, and a fragment does not nick DNA or build a pilus (the "truncation
+# check" in build_conjscan_anchors).
 PROFILE_COVERAGE_INTACT_MIN = 0.7
 
 # How many DISTINCT anchor classes a candidate needs before it may be called
@@ -685,8 +680,8 @@ MIN_ANCHOR_CLASSES_FOR_HIGH = 3
 def classify_cluster(has_integrase, has_relaxase, has_mpf_apparatus):
     """Turn "which anchors are present" into a class and a mobility statement.
 
-    This is the whole of spec §8 Phase 4, written as a pure function so it can be
-    read — and tested — on its own, without building a cluster first.
+    This is the whole of Phase 4, written as a pure function so it can be read —
+    and tested — on its own, without building a cluster first.
 
     Input:  three booleans, from the anchors of ONE candidate cluster. The
             coupling protein is deliberately not one of them: it is recorded
@@ -700,7 +695,7 @@ def classify_cluster(has_integrase, has_relaxase, has_mpf_apparatus):
             accessory VirB4 inside a relaxase-only MOB system does not count.
     Output: (mge_class, mobility_wording).
 
-    The spec's table, verbatim:
+    The class table (docs/mobilome/output.md prints the same one):
 
         integrase + relaxase + T4SS  -> ICE, self-transmissible. The element can
             excise, build a bridge and integrate in the recipient: chromosomal
@@ -713,10 +708,10 @@ def classify_cluster(has_integrase, has_relaxase, has_mpf_apparatus):
         no integrase, relaxase + T4SS -> a conjugative REGION. Machinery is
             present but nothing says it is a discrete integrating element, and
             without an integrase we have no reason to believe there are element
-            boundaries at all. The spec is explicit: report it, do not call it
+            boundaries at all. The rule is explicit: report it, do not call it
             an ICE.
 
-    Two combinations the spec's table does not list, decided here and documented
+    Two combinations the table does not list, decided here and documented
     so the fallback is never a surprise:
       * integrase + T4SS but NO relaxase — grouped with the island, because
         without a relaxase the DNA cannot be mobilised whatever else is present.
@@ -756,7 +751,7 @@ def classify_cluster(has_integrase, has_relaxase, has_mpf_apparatus):
 # those as ISEScan fields and would misinterpret them.
 OUTPUT_COLUMNS = [
     "sample",
-    "mge_id",                     # contig|class-start:end  (spec §9 ID format)
+    "mge_id",                     # contig|class-start:end (EBI pipeline ID format)
     # Curated element name. ALWAYS 'NA' in this file — naming is a separate,
     # opt-in step (rule name_ice_elements → name_ice_elements.py) that BLASTs
     # these intervals against ICEberg and writes the name into a copy of this
@@ -899,7 +894,7 @@ AUDIT_COLUMNS = [
     "detail",     # human-readable explanation, with the numbers behind it
 ]
 
-# The two thresholds the spec leaves configurable, plus the clustering window.
+# The minimum and maximum element size, plus the clustering window.
 # All three are CONVENTION, not biology — a real ICE can be 200 kb or 15 kb —
 # so the measured span is always reported next to the decision.
 DEFAULT_WINDOW_BP = 15000
@@ -1079,17 +1074,17 @@ def parse_bakta_gff(path):
     What we take from it:
       * every CDS, indexed under BOTH its `ID` and its `locus_tag`. CONJscan
         reports the protein identifier from the .faa it was given, and in a real
-        Bakta GFF3 those two attributes carry the same value, e.g.
+        Bakta GFF3 those two attributes carry the same value, as in this made-up row:
 
-            contig_2  Pyrodigal  CDS  37327  38967  .  +  0
-            ID=386_00040;Name=Relaxase/mobilization nuclease family protein;
-            locus_tag=386_00040;product=Relaxase/mobilization nuclease family protein
+            contig_1  Pyrodigal  CDS  12001  13239  .  +  0
+            ID=SAMPLE_00001;Name=conjugal transfer relaxase TraI;
+            locus_tag=SAMPLE_00001;product=conjugal transfer relaxase TraI
 
-        so CONJscan's `hit_id` 386_00040 finds contig_2:37327-38967(+). Indexing
+        so CONJscan's `hit_id` SAMPLE_00001 finds contig_1:12001-13239(+). Indexing
         both keys means a future Bakta that changes which one it puts in the
         FASTA header still joins.
       * the CDS list in file order, which the integrase search walks.
-      * the contig lengths from the `##sequence-region contig_1 1 4177018`
+      * the contig lengths from the `##sequence-region contig_1 1 2500000`
         header lines, so the contig-end flags work even when no separate
         contig-length table was supplied.
 
@@ -1109,7 +1104,7 @@ def parse_bakta_gff(path):
                 break
 
             if line.startswith("##sequence-region"):
-                # '##sequence-region contig_1 1 4177018' → contig_1 is 4177018 bp
+                # '##sequence-region contig_1 1 2500000' → contig_1 is 2500000 bp
                 parts = line.split()
                 if len(parts) >= 4:
                     try:
@@ -1330,7 +1325,7 @@ def read_conjscan_hits(path, source=SOURCE_CONJSCAN):
     """Read CONJscan's best_solution.tsv into one dict per machinery hit.
 
     Input: the file written by `macsyfinder --models CONJScan/Chromosome all`.
-    Its real shape (verified on a validation isolate, MacSyFinder 2.1.6 / CONJScan 2.1.0):
+    Its real shape (checked against MacSyFinder 2.1.6 / CONJScan 2.1.0 output):
     three '#' banner lines, then a 22-column header, then one row per gene, with
     BLANK LINES separating systems.
 
@@ -1531,7 +1526,7 @@ def missing_components_for(cluster):
 # ── Phase 1: anchors ─────────────────────────────────────────────────────────
 
 def make_anchor(feature, anchor_class, label, hit=None):
-    """Put one piece of evidence into the module's common shape (spec §8 Phase 0).
+    """Put one piece of evidence into the module's common shape (Phase 0).
 
     Every anchor — whether it came from CONJscan or from a Bakta product string —
     looks the same from here on: where it is, what class of evidence it is, and
@@ -1676,7 +1671,7 @@ def build_conjscan_anchors(sample, hits, features_by_id):
             unused_icescan_apparatus += 1
             continue
 
-        # Truncation check (spec §8 Phase 4): only the two components that have
+        # Truncation check (part of Phase 4): only the two components that have
         # to WORK for transfer are tested — the relaxase, and VirB4, the ATPase
         # that powers the mating bridge. A short alignment to a structural
         # accessory gene is much less informative.
@@ -1746,7 +1741,7 @@ def build_conjscan_anchors(sample, hits, features_by_id):
 
 
 def find_integrase_anchors(sample, cds_features):
-    """Find the integrase anchors in the Bakta annotation (spec §8 Phase 1).
+    """Find the integrase anchors in the Bakta annotation (Phase 1).
 
     Input:  every CDS from the GFF3, in file order.
     Does:   matches the CDS product text against INTEGRASE_PRODUCT_PATTERN, and
@@ -1848,9 +1843,7 @@ def attach_nearby_integrases(clusters, integrase_anchors, integrase_window_bp,
     attaching every integrase within 50 kb would manufacture anchor classes on a
     chromosome that is full of prophage integrases.
 
-    How the best one is chosen. (The comments and tests call this "FIX 4" — that
-    is only this project's working label for the change, not the name of anything
-    outside the repo.)
+    How the best one is chosen — the "integrase tie-break" the tests refer to.
     The old rule was "closest, and first-seen wins a tie". That is fine while
     there is only one source of integrases, but once ICEscan's profile hits join
     the pool the candidates routinely sit INSIDE the machinery cluster, where
@@ -1983,7 +1976,7 @@ def cluster_anchors(anchors, window_bp):
     Does:   sorts them per contig and starts a new cluster whenever the gap to
             the previous anchor is larger than `window_bp`. Because the anchors
             are CDS features, the resulting interval is already snapped to coding
-            boundaries, which is what the spec asks for.
+            boundaries: it starts and ends at the edge of an anchor gene.
     Output: a list of lists of anchors, contig by contig, left to right.
 
     The biology behind clustering at all: the genes of a conjugative element are
@@ -2033,7 +2026,7 @@ def merge_clusters_sharing_a_system(clusters, max_element_bp):
     Phase 7 benchmark that was not an edge case: R391 was split into an 'ice' of
     56.6 kb plus a stray 'conjugative_region', because the gap between the two
     halves measured 15,010 bp against a 15,000 bp window — a TEN base pair
-    margin on a threshold the spec itself calls convention rather than biology.
+    margin on a threshold that is itself convention rather than biology.
     Five of the eight genomes with calls showed the same signature: two rows,
     one sys_id.
 
@@ -2335,8 +2328,8 @@ def keep_or_drop_cluster(cluster, min_element_bp, max_element_bp,
     Returns (keep, reason, detail). The three rejections, in the order they are
     tested:
 
-    1. no relaxase and no T4SS component (spec §8 Phase 2, "keep clusters with
-       >= relaxase or T4SS"). A cluster of integrases with no conjugation
+    1. no relaxase and no T4SS component (Phase 2 keeps only clusters with at
+       least one of the two). A cluster of integrases with no conjugation
        machinery is just a genome's normal complement of recombinases — every
        bacterium has several — and reporting each one as a mobile element would
        be pure noise.
@@ -2444,7 +2437,7 @@ def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_cont
         from a tRNA-anchored att pair.
 
     Why the boundary rule is optional and off by default
-        The spec (§8 Phase 6) writes the rule as "high = 4 anchor classes +
+        The strict form of the rule is "high = 4 anchor classes +
         tRNA-anchored + single contig + intact", which folds two different
         questions into one number:
 
@@ -2460,7 +2453,7 @@ def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_cont
 
         So by default the boundary only informs, and the two facts are read side
         by side — confidence for the classification, boundary_method for the
-        extent. Set require_trna_boundary to get the strict spec reading, which
+        extent. Set require_trna_boundary to get the strict reading, which
         is the right choice on closed long-read assemblies where an unresolved
         boundary really is a warning sign rather than the norm.
 
@@ -2469,8 +2462,8 @@ def assess_confidence(n_anchor_classes, machinery_intact, spans_contigs, at_cont
         refine_candidate_boundaries), so an unresolved boundary always means the
         interval is the machinery span — a floor, never an invention.
 
-    The contig rule is absolute, exactly as the spec requires: anything spanning
-    contigs is capped at LOW no matter how good the rest of the evidence looks.
+    The contig rule is absolute, with no exceptions: anything spanning contigs
+    is capped at LOW no matter how good the rest of the evidence looks.
     MacSyFinder is run over the whole draft as one pseudo-replicon, so genes it
     joined across a contig break may simply be unrelated genes that happen to be
     adjacent in the file.
@@ -2701,7 +2694,7 @@ def build_candidates(sample, clusters, systems, contig_lengths,
         # genomes' coordinates into contigs while holding CONJscan's output
         # fixed: without this exemption, at 20 kb contigs two of the eighteen
         # ICE-pilot elements drop from `ice` to `ime` — one of them
-        # ICE(Tn4371)6061, a spec section 8 Phase 7 named positive control. With
+        # ICE(Tn4371)6061, one of the Phase 7 classic positive controls. With
         # it, nothing changes under fragmentation and closed genomes are
         # unaffected. BacFlux's main input is short-read drafts, so this matters
         # more here than the closed-genome benchmark can show.
@@ -2958,8 +2951,8 @@ def build_candidates(sample, clusters, systems, contig_lengths,
 
         rows.append({
             "sample": sample,
-            # Spec §9 identifier format: contig|type-start:end. Stable across
-            # runs, and it is the join key a report can use.
+            # Identifier format contig|type-start:end, borrowed from the EBI
+            # pipeline. Stable across runs, and it is the join key a report can use.
             "mge_id": f"{contig}|{mge_class}-{start}:{end}",
             # Never named here. The optional rule name_ice_elements fills this in
             # on a copy of the table, by BLASTing the interval against ICEberg.
@@ -3058,7 +3051,7 @@ def read_is_intervals(is_table_path):
     repeats and duplicate a few bases of target DNA when they transpose, so an
     IS-rich neighbourhood is full of direct repeats that have nothing to do with
     ICE integration. Blanking them first is what stops those decoys outranking a
-    real att site — the spec names it the most likely way to get Phase 3 wrong.
+    real att site — skipping it is the most likely way to get Phase 3 wrong.
     """
     intervals_by_contig = {}
     if not is_table_path or not os.path.isfile(is_table_path):
@@ -3230,8 +3223,8 @@ def refine_candidate_boundaries(sample, rows, genome_path, gff3_path,
         # is specific enough to act on.
         #
         # The de novo columns stay in the output because they are a real lead for
-        # a human to follow — which is what the spec's boundary_method column is
-        # for. They just do not move the element.
+        # a human to follow — which is what the boundary_method column is for.
+        # They just do not move the element.
         if result["boundary_method"] == "denovo":
             # ── The repeat-family guard, widened from contig to assembly ─────
             #
@@ -3406,7 +3399,7 @@ def resolve_nested_calls(sample, rows):
          second finding. This follows the EBI Mobilome Annotation Pipeline, which
          suppresses an IME nested inside an ICE for the same reason. (Adopting
          their convention is fine — it is a design decision, not their code; see
-         spec §11.)
+         docs/about/licensing.md.)
 
     Two calls with IDENTICAL intervals are handled separately and first, before
     the same-class test, because they are one locus reported twice rather than
@@ -3524,8 +3517,8 @@ def resolve_nested_calls(sample, rows):
             # the 37 `ice` calls — 54% — have an anchor-free hole wider than the
             # 15 kb window, and they are not marginal cases: R391 28,354 bp,
             # ICEEc2 20,667, SPI-7 42,039, ICEKpnQD23-1 39,788, ICEKpn16 37,169,
-            # Tn4371 15,120. Those are the spec's own named positive controls, all
-            # at high confidence. Large ICEs carry cargo BETWEEN their machinery
+            # Tn4371 15,120. Those are curated elements of the Phase 7 ICE pilot,
+            # all at high confidence. Large ICEs carry cargo BETWEEN their machinery
             # genes; that is what makes them interesting.
             #
             # So the rule was a systematic vote against big elements. On a
@@ -3643,9 +3636,9 @@ def build_parser():
         description=(
             "Turn CONJscan machinery hits plus Bakta annotation into ICE/IME "
             "candidate rows for the mobilome co-localisation step. Implements "
-            "spec section 8 phases 0, 1, 2, 3, 4 and 6. The att-site search "
-            "(phase 3) runs in every mode - the constraint is assembly "
-            "contiguity, not the sequencer - and degrades to "
+            "phases 0, 1, 2, 3, 4 and 6, as listed at the top of this script. "
+            "The att-site search (phase 3) runs in every mode - the constraint "
+            "is assembly contiguity, not the sequencer - and degrades to "
             "boundary_method=none when the flanks are absent. Only a "
             "tRNA-anchored boundary is applied to the element interval; a de "
             "novo repeat is reported but not acted on."
@@ -3728,7 +3721,7 @@ def build_parser():
                         help="how far beyond the machinery span to look for the "
                              "element's real ends")
     parser.add_argument("--require-trna-boundary-for-high", action="store_true",
-                        help="Apply the spec's strict §8 Phase 6 rule: an element "
+                        help="Apply the strict Phase 6 confidence rule: an element "
                              "may only reach HIGH confidence if a tRNA-anchored "
                              "att pair fixed its ends. OFF by default, because on "
                              "a fragmented short-read assembly the flanks are "
@@ -3883,7 +3876,7 @@ def main(argv=None):
     # opening the element table has no way to tell a closed genome from a
     # 300-contig draft, and every honest caveat in this module depends on that
     # difference. See assembly_contiguity / contiguity_verdict above and
-    # docs/mobilome_draft_assemblies.md.
+    # docs/mobilome/draft-assemblies.md.
     contiguity = assembly_contiguity(contig_lengths)
     if contiguity is not None:
         audit_rows.append(audit_row(
@@ -4072,14 +4065,13 @@ def main(argv=None):
     for row in merge_audit:
         row["sample"] = args.sample
     audit_rows.extend(merge_audit)
-    # The att probe for the integrase tie-break. ("FIX 4" in the comments here and
-    # in attach_nearby_integrases is just this project's working label for that
-    # change; it names no external thing.) When two or more integrases are in the
-    # running for one cluster — which is the normal case once ICEscan's hits join
-    # the pool — the one that actually produces a flanking attL/attR pair is the
-    # one that put this element here. This closure answers "would including an
-    # integrase at this span yield an att pair?" by running the same Phase 3
-    # search that will later fix the boundaries.
+    # The att probe for the integrase tie-break (see attach_nearby_integrases).
+    # When two or more integrases are in the running for one cluster — which is
+    # the normal case once ICEscan's hits join the pool — the one that actually
+    # produces a flanking attL/attR pair is the one that put this element here.
+    # This closure answers "would including an integrase at this span yield an
+    # att pair?" by running the same Phase 3 search that will later fix the
+    # boundaries.
     #
     # Only a tRNA-ANCHORED pair counts, exactly as in refine_candidate_boundaries:
     # a de novo repeat turns up in ~16% of arbitrary chromosomal spans by chance,
@@ -4152,8 +4144,9 @@ def main(argv=None):
     audit_rows.extend(boundary_audit)
 
     # ── Phase 4b: an ICE cannot live on a plasmid ────────────────────────────
-    # Spec §2.4 is definitional: an ICE INTEGRATES INTO THE CHROMOSOME and encodes
-    # conjugation machinery. A plasmid is already its own replicon — it has
+    # This is definitional: an ICE INTEGRATES INTO THE CHROMOSOME and encodes
+    # conjugation machinery (docs/mobilome/output.md, "An ICE cannot sit on a
+    # plasmid"). A plasmid is already its own replicon — it has
     # nothing to integrate into — so a plasmid carrying an integrase, a relaxase
     # and a mating apparatus is a CONJUGATIVE PLASMID that happens to have an
     # integrase, not an ICE.
@@ -4180,7 +4173,7 @@ def main(argv=None):
                     args.sample, "kept_flagged", "ice_demoted_on_plasmid_replicon",
                     f"{row['mge_id']}: integrase, relaxase and mating apparatus are "
                     "all present, but this contig is called a PLASMID. An ICE "
-                    "integrates into the chromosome (spec §2.4); a plasmid has "
+                    "integrates into the chromosome by definition; a plasmid has "
                     "nothing to integrate into, so this is a conjugative plasmid "
                     "carrying an integrase, not an ICE. The anchors are unchanged - "
                     "only the class.",

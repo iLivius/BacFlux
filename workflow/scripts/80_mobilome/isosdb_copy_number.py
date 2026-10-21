@@ -383,7 +383,7 @@ def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
         # ISEScan finds IS elements by profile HMM, which recognises a FAMILY.
         # This leg maps reads to ISOSDB, which needs nucleotide identity to one
         # specific catalogued element. Those are not the same sensitivity, and the
-        # spec (§2.2) quantifies the gap from the ISOSDB paper itself: 97.5% of
+        # ISOSDB paper itself (Kirsch et al. 2024) quantifies the gap: 97.5% of
         # its transposases have protein homologs in ISfinder but only 37.9% have
         # nucleotide ones.
         #
@@ -392,14 +392,14 @@ def estimate_copies(sample, isosdb_covstats, assembly_covstats, family_map,
         # estimate comes out at zero, and the delta goes NEGATIVE. Read naively
         # that says "the assembly collapsed nothing, we over-called", when the
         # truth is "this database has nothing to say about this organism".
-        # Measured on a hybrid validation isolate: 17 IS located by
-        # ISEScan, 1 of 22,713 ISOSDB entries covered end to end, delta -7.3 on
-        # the IS3 family alone.
+        # Coverage can also be partial: the database may hold a close match for
+        # only one of a family's elements, so that one entry catches reads and
+        # the rest of the family catches none.
         #
         # Hence both halves of the test below. `entries > 0` alone is not enough:
-        # on that same sample the IS3 family had 9 elements located and exactly
-        # ONE ISOSDB entry detected, which passes `entries > 0` and would have
-        # published a delta of -7.3 that measures the database, not the assembly.
+        # a family with several elements located and exactly ONE ISOSDB entry
+        # detected passes `entries > 0`, and would publish a negative delta that
+        # measures the database, not the assembly.
         # Requiring `estimated >= located` as well is what stops it.
         #
         # Absence of a nucleotide match is not evidence of absence of copies, so

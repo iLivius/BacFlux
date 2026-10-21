@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Unit tests for workflow/scripts/60_plasmid/plasmid_concordance.py (D9).
 
+D9 is the label of the BacFlux v2 design decision that script implements: the
+Platon/geNomad plasmid concordance.
+
 These tests need no tools and no databases — they feed tiny in-memory fixtures
 (Platon TSV, Platon chromosome FASTA, verified_plasmids.txt, geNomad plasmid
 summary) through the parsers and the join, and assert the resulting rows and
-confidence tiers. This is the one Stage-2b deliverable that is fully verifiable
-in a plain Python environment.
+confidence tiers. Unlike the Platon and geNomad steps around it, the script can
+therefore be verified completely in a plain Python environment.
 
 What the script decides is how much a plasmid call is worth: Platon and geNomad
 reach it by different routes, so where they agree the evidence is genuinely
@@ -262,10 +265,10 @@ if __name__ == "__main__":
 class TestPlatonFailureIsNotASecondOpinion(unittest.TestCase):
     """A crashed Platon must not be scored as a genuine second opinion.
 
-    The distinction that matters, and that an earlier attempt at this fix got
-    wrong: an EMPTY Platon directory is NOT a failure. A completed, exit-0 Platon
-    run writes almost nothing when every contig exceeds its 500 kb size filter,
-    which is the ordinary outcome for a closed genome. Only the explicit
+    The distinction that matters, and the easy one to get wrong: an EMPTY
+    Platon directory is NOT a failure. A completed, exit-0 Platon run writes
+    almost nothing when every contig exceeds its 500 kb size filter, which is
+    the ordinary outcome for a closed genome. Only the explicit
     "Platon exited with status N" line that the plasmid_search rule writes means
     the tool actually crashed.
     """

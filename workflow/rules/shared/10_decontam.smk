@@ -764,8 +764,8 @@ if LONGREAD_SCREEN:
     #           BlobTools identifies outliers within a cloud of contigs, and a
     #           long-read assembly has two to five. A false positive there deletes a
     #           whole replicon — usually the plasmid — rather than trimming a
-    #           fragment, and this project has twice seen BLAST bestsum follow
-    #           database composition instead of biology on exactly that call.
+    #           fragment, and BLAST bestsum can follow database composition
+    #           instead of biology on exactly that call.
     # Produces: FINAL_TAXO_DECISIONS, one audited row per contig. The FASTA it writes
     #           is a byproduct; FINAL_CONTIGS remains what every later stage reads.
     rule screen_final_contigs:

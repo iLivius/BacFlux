@@ -11,9 +11,9 @@ away a real one, which is why the assertions below are on exact coordinates.
 
 Every test builds a small SYNTHETIC contig with repeats planted at coordinates
 the test itself chose, so the expected answer is known exactly and the assertions
-can be on the numbers, not on "something was found". That is what spec §8 Phase 7
-asks for: "unit tests on synthetic contigs with planted att repeats at known
-offsets".
+can be on the numbers, not on "something was found". These tests check the code,
+not the biology; the biology is checked on real benchmark genomes, and both are
+written up in docs/mobilome/validation.md.
 
 No genome, no Bakta, no database — pure sequence handling.
 
@@ -147,7 +147,7 @@ def test_denovo_prefers_the_longest_repeat():
 # ── The masking guard: IS repeats must not flood the search ─────────────────
 
 def test_masked_is_repeats_do_not_produce_a_false_boundary():
-    """The failure mode the spec calls the most likely one.
+    """The most likely way to get the att search wrong.
 
     Insertion sequences carry terminal repeats, so a region with IS copies is
     full of direct repeats that have nothing to do with ICE integration. Here two

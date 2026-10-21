@@ -5,7 +5,7 @@
 #
 # Two callers are wired in and exactly one of them is defined per run, chosen by
 # config phage.caller (resolved into PHAGE_CALLER in 00_common.smk; the choice
-# itself is decision D8 in docs/unification_migration_plan.md):
+# itself is decision D8, explained in docs/analysis/phages.md):
 #   virsorter2 (DEFAULT) — permissively licensed (GPLv2, commercial use OK), so it
 #                          is what an out-of-the-box run gets. Its conda env is the
 #                          fragile part — the whole story is at the VirSorter2
@@ -14,7 +14,7 @@
 #                          single run, but Berkeley Lab licenses it for academic /
 #                          non-commercial use only. BacFlux is MIT and must not
 #                          push that restriction onto its users, so geNomad is
-#                          never the default — see README Licensing. Opting in also
+#                          never the default — see docs/about/licensing.md. Opting in also
 #                          switches on the plasmid concordance in
 #                          shared/60_plasmid.smk (decision D9).
 #   CheckV     (ALWAYS)  — neither caller reports completeness or contamination, so
@@ -211,7 +211,7 @@ if PHAGE_CALLER == "genomad":
     #
     # A database that is present can still fail in two ways, and 00_common.smk
     # catches both at parse time rather than an hour into the run: a copy that is
-    # only partly readable (11 of 27 files mode 0640, seen for real here), and a
+    # only partly readable (some files closed to other users, mode 0640), and a
     # copy too old for the installed geNomad (which parses its marker metadata
     # positionally and dies on "invalid literal for int()").
     #
@@ -258,7 +258,7 @@ if PHAGE_CALLER == "genomad":
     #
     # Input is FINAL_CONTIGS, the decontaminated assembly (D4: all four modes scan
     # decontaminated contigs, where v1 illumina scanned the pre-decontam
-    # contigs_filt.fasta — flagged in the changelog).
+    # contigs_filt.fasta — noted in docs/getting-started/from-v1.md).
     #
     # The output is declared a DIRECTORY so a failed or rerun job is wiped clean and
     # geNomad cannot resume on stale intermediates. geNomad names every output after
@@ -270,7 +270,7 @@ if PHAGE_CALLER == "genomad":
     #
     # The CLI contract — positional INPUT OUTPUT DATABASE, that summary layout, and
     # a clean run into the directory Snakemake pre-creates — was checked against the
-    # real tool on the first geNomad run, 2026-07-25, and matches.
+    # real tool on 2026-07-25, and matches.
     rule genomad_end_to_end:
         input:
             contigs = FINAL_CONTIGS,
@@ -314,7 +314,7 @@ if PHAGE_CALLER == "genomad":
 #   3. `virsorter run --use-conda-off`, plus exporting the env's own bin onto PATH,
 #      makes VS2 subprocesses resolve OUR in-env binaries instead of nested envs.
 #
-# VERIFIED 2026-07-22 on the v2 illumina validation run, and the answer was NOT the
+# VERIFIED 2026-07-22 in a real illumina run, and the answer was NOT the
 # comfortable one: the bioconda `virsorter=2.2.4` package does NOT pin the runtime
 # tool closure. With only `virsorter` in the env, screed, hmmer, prodigal, last,
 # pandas, scikit-learn, numpy, seaborn, imbalanced-learn and ncbi-genome-download
@@ -402,7 +402,7 @@ if PHAGE_CALLER == "virsorter2":
     # illumina used the pre-decontam contigs_filt.fasta) plus the VS2 database.
     #
     # min_score 0.5 and the five viral groups come from the VirSorter2 SOP the
-    # workflow follows (protocols.io, linked from README 07.phages): a deliberately
+    # workflow follows (protocols.io, linked from docs/analysis/phages.md): a deliberately
     # loose cutoff, taken for maximal sensitivity — CheckV downstream is what grades
     # the result. --keep-original-seq preserves the original sequence of
     # circular and near-fully-viral contigs instead of VS2's trimmed version, so

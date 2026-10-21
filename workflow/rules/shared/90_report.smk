@@ -7,8 +7,8 @@
 # What gets aggregated depends on what the mode actually produced, so the input
 # set is assembled from the capability flags (HAS_SHORT_READS / HAS_LONG_READS /
 # HAS_READS, defined in 00_common.smk) rather than from the mode name. That is
-# decision D7 of the unification — gate on what a mode produces, not on what it is
-# called — see docs/unification_migration_plan.md:
+# decision D7 of the unification (legend at the top of 00_common.smk) — gate on
+# what a mode produces, not on what it is called:
 #
 #   input                        illumina  nanopore  hybrid  contigs
 #   ───────────────────────────  ────────  ────────  ──────  ───────
@@ -37,8 +37,8 @@
 # numbering: all technology-specific work is grouped under 01.reads and
 # 02.assembly, so every shared stage lands on the same number in every mode
 # (03.taxonomy, 04.annotation, …). That is why v1's rename regexes needed only
-# their path components changed, not their form — see
-# docs/unification_migration_plan.md.
+# their path components changed, not their form. The old and new stage numbers
+# are tabulated in docs/getting-started/from-v1.md.
 #
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
 # "../../envs/multiqc.yaml" climbs shared/ → rules/ → workflow/ → workflow/envs/multiqc.yaml.

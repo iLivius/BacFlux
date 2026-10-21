@@ -53,8 +53,8 @@
 # back to linear written as a COMPARISON instead of an assignment
 # (`topology == TOPOLOGY_LINEAR`), so it does nothing. If a future Bakta fixes
 # that typo, every "contig" row becomes linear and the entire benefit of this
-# table disappears silently, with no error. This is on the end-to-end gate
-# checklist.
+# table disappears silently, with no error. Check that line again whenever the
+# Bakta version in envs/bakta.yaml changes.
 #
 # The script never crashes on a bad join: if the contig IDs do not line up it
 # warns loudly into {log} and still writes an all-neutral table. That warning is

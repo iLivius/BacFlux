@@ -308,17 +308,18 @@ def classify_type(marker_record, min_coverage, min_identity):
     with the defaults 80.0 and 40.0.
 
       * Coverage is the alignment length as a percentage of the reference
-        protein, so it can exceed 100 when the alignment carries gaps. On real
-        data a genuine chromosomal dnaA covers essentially the whole reference
-        (observed 100.6 and 101.3 on this project's isolates) while marginal
-        repA/terL hits cover 14–61%. Coverage is what separates them.
-      * Identity does NOT separate them on its own — an 18%-coverage terminase
-        fragment scored 57.5% identity while a real DnaA scored 68.3%. The 40%
+        protein, so it can exceed 100 when the alignment carries gaps. A
+        genuine chromosomal DnaA covers about 100% of the reference, sometimes
+        slightly above, while a marginal repA or terL hit covers only part of
+        its reference, well below the 80% floor. Coverage is what separates
+        them.
+      * Identity does NOT separate them on its own: a short terminase fragment
+        can align at an identity not far below that of a real DnaA. The 40%
         floor is only there to exclude the protein-alignment "twilight zone"
         (~20–35%), where alignment-based homology inference stops being reliable.
-        It is deliberately NOT set near the observed 68–79%: dnaapler's reference
-        proteins routinely come from another genus, and a high cutoff would
-        demote real chromosomes.
+        It is deliberately kept low: dnaapler's reference proteins routinely
+        come from another genus, so even a genuine DnaA can align at modest
+        identity, and a high cutoff would demote real chromosomes.
 
     KNOWN WEAKNESS: one threshold pair covers both DnaA and RepA, and plasmid
     replication initiators are far more diverse than chromosomal ones, so the
