@@ -38,10 +38,25 @@ methylation leaves in canonical basecalls. That is a different job from
 Dorado's modified-base calling, and it is still the right model for reads
 basecalled without one. It does assume native, unamplified DNA: on an
 amplified library pin the matching standard model explicitly instead — see
-docs/about/medaka-model.md.
+docs/methods_medaka_model.md.
+
+Downloading the weights here
+----------------------------
+Medaka ships the weights of only a few models; for any other it downloads them
+from GitHub the first time they are needed. Without this step that would
+happen in rule long_read_consensus, at polishing time, which on a cluster runs
+on a compute node, and compute nodes often have no internet. So the weights are
+fetched here instead: in auto mode, working out the model already stores them;
+for a named model, download_model() asks Medaka to store them. Rule
+check_medaka_model is a local rule, so it runs on the computer that runs
+Snakemake, which normally has internet. Medaka keeps the weights inside its
+own conda environment (or in ~/.medaka/data when that folder cannot be
+written), and the polishing job reads them from there. When the weights
+cannot be fetched, the check stops the run with Medaka's own message, before
+the assembler starts.
 
 Runs inside the Medaka conda env, so `medaka` is on PATH. Only
-list_available_models() and resolve_from_reads() call the tool; the parsing,
+list_available_models(), resolve_from_reads() and download_model() call the tool; the parsing,
 tokenising and suggesting are kept free of it so they can be unit-tested with
 no Medaka installed (test_medaka_model_check.py).
 """
@@ -78,18 +93,51 @@ def list_available_models():
 
 def resolve_from_reads(reads):
     """Ask Medaka to infer the consensus model from the basecaller tag in the
-    reads, requesting the bacterial variant. Returns whatever Medaka prints — a
-    PATH to the model file rather than a bare name, which is a valid `-m`
-    argument all the same — or None when Medaka cannot infer one (no tag, or a
-    tag its lookup does not know), which is a result and not an error."""
+    reads, requesting the bacterial variant. Working the model out also makes
+    Medaka store its weights.
+
+    Returns a pair (model, problem):
+      model    what Medaka prints, a PATH to the model file rather than a bare
+               name (a valid `-m` argument all the same), or None when Medaka
+               could not give one;
+      problem  None on success, otherwise the last lines of Medaka's own message,
+               which say why: no basecaller tag in the reads, a tag this Medaka
+               does not know, a model the bacterial variant does not cover, or
+               weights that could not be downloaded."""
     proc = subprocess.run(
         ["medaka", "tools", "resolve_model", "--auto_model", "consensus_bacteria", reads],
         capture_output=True, text=True,
     )
-    if proc.returncode != 0:
-        return None
     model = proc.stdout.strip()
-    return model or None
+    if proc.returncode == 0 and model:
+        return model, None
+    return None, last_lines(proc.stderr)
+
+
+def download_model(model):
+    """Make Medaka store the weights of the NAMED model on this computer, so that
+    the polishing step finds them without the internet (see "Downloading the
+    weights here" at the top of this file). Runs
+    `medaka tools download_models --models <model>`, which downloads the weights
+    from GitHub only when they are not stored yet. The --models list matters:
+    without it Medaka downloads every model it knows.
+
+    Returns None on success, or the last lines of Medaka's message when the
+    download failed (for example: no internet, or no folder Medaka may write to)."""
+    proc = subprocess.run(
+        ["medaka", "tools", "download_models", "--models", model],
+        capture_output=True, text=True,
+    )
+    if proc.returncode == 0:
+        return None
+    return last_lines(proc.stderr)
+
+
+def last_lines(text, n=3):
+    """The last n non-empty lines of a tool's error output. Medaka ends a failure
+    with a Python traceback whose last line says what went wrong."""
+    lines = [line for line in text.strip().splitlines() if line.strip()]
+    return "\n".join(lines[-n:]) if lines else "(Medaka gave no message)"
 
 
 # ── Reading a model name: pure logic, unit-tested without Medaka ─────────────
@@ -187,13 +235,18 @@ def suggest(bad_model, available):
     )
 
 
-def auto_failure_message(available):
-    """Guidance when AUTO inference fails — the reads carry no basecaller tag, or
-    one Medaka's lookup does not know. Point the user at setting an explicit
-    model and show the menu."""
+def auto_failure_message(available, medaka_said):
+    """Guidance when AUTO inference fails. Medaka's own last lines say which of
+    the causes it was, so they are shown first; then the user is pointed at
+    setting an explicit model, with the menu."""
     return (
-        "Medaka could not infer a model from the reads: their FASTQ headers carry "
-        "no basecaller tag, or one this Medaka version does not recognise. Set "
+        "Medaka could not work out a model from the reads. Medaka said:\n"
+        f"{medaka_said}\n\n"
+        "The usual causes: the FASTQ headers carry no basecaller tag, or one this "
+        "Medaka version does not know; the reads come from a basecaller model the "
+        "bacterial model does not cover; or the model's weights could not be "
+        "downloaded, because this computer cannot reach GitHub. In the last case, "
+        "run Snakemake on a computer that can. Otherwise, set "
         "parameters.<mode>.medaka_model to one of the consensus models below (pick "
         "by your flowcell / device / accuracy), or to FALSE to skip Medaka.\n\n"
         + _fmt_table(consensus_models(available))
@@ -235,16 +288,16 @@ def main(argv=None):
     available = list_available_models()
 
     # ── AUTO mode ────────────────────────────────────────────────────────────
-    # resolve_model returns a PATH to the model file (e.g. .../r941_min_hac_g507_
-    # model_pt.tar.gz), NOT a bare name, and only on success — a non-zero exit
-    # means it could not infer. So a truthy result is already a valid, usable
-    # `-m` argument; trust it exactly as v1 did. Do NOT cross-check it against the
-    # bare-name list (a path can never match, which would fail every auto run).
+    # resolve_model returns a PATH to the model file (e.g. .../r1041_e82_400bps_
+    # bacterial_methylation_model_pt.tar.gz), NOT a bare name, and only on
+    # success. So a returned model is already a valid, usable `-m` argument;
+    # trust it exactly as v1 did. Do NOT cross-check it against the bare-name
+    # list (a path can never match, which would fail every auto run).
     if not model:
-        resolved = resolve_from_reads(args.reads)
+        resolved, problem = resolve_from_reads(args.reads)
         if resolved:
             return succeed(resolved)
-        return fail(auto_failure_message(available))
+        return fail(auto_failure_message(available, problem))
 
     # ── EXPLICIT model ───────────────────────────────────────────────────────
     # A path to a local model file on disk is accepted as-is: Medaka's -m accepts
@@ -253,12 +306,24 @@ def main(argv=None):
     if os.path.exists(model):
         return succeed(model)
     if model in available:
+        # The name is right; now make sure its weights are on this computer, so
+        # that the polishing step needs no internet.
+        download_problem = download_model(model)
+        if download_problem is not None:
+            return fail(
+                f"Medaka model '{model}' exists, but its weights are not stored on "
+                f"this computer and could not be downloaded (Medaka downloads them "
+                f"from GitHub). Start Snakemake on a computer that can reach the "
+                f"internet (on a cluster this check runs where Snakemake runs, not on "
+                f"a compute node), or set parameters.<mode>.medaka_model to false to "
+                f"skip Medaka. Medaka said:\n{download_problem}"
+            )
         return succeed(model)
 
     # Invalid explicit model. The opt-in middle option: try auto before failing.
     # As in AUTO mode above, resolve_from_reads returns a usable path on success.
     if fallback:
-        resolved = resolve_from_reads(args.reads)
+        resolved, problem = resolve_from_reads(args.reads)
         if resolved:
             return succeed(
                 resolved,
@@ -272,7 +337,8 @@ def main(argv=None):
         # Fall-through: fallback was requested but auto could not help either.
         return fail(
             f"Configured medaka_model '{model}' is not available, and fallback "
-            f"auto-inference could not infer a usable model from the reads.\n\n"
+            f"auto-inference could not infer a usable model from the reads. "
+            f"Medaka said:\n{problem}\n\n"
             + suggest(model, available)
         )
 

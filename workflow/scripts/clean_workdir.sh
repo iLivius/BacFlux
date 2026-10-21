@@ -255,12 +255,9 @@ case "$WORKFLOW" in
       "02.assembly/*/fix_start/logs"
 
       # The same pair of Medaka indexes on the nanopore-mode reference,
-      # contaminants/assembly_decontam.fasta. These are NOT declared Snakemake
-      # outputs, so nothing invalidates them between reruns automatically — and
-      # they are, concretely, the exact files that let Medaka silently reuse a
-      # stale alignment index after the decontamination step is rerun, polishing
-      # the OLD contig set while reporting success (observed in practice, not
-      # hypothetical). Routine cleanup removes the trap, not just the disk usage.
+      # contaminants/assembly_decontam.fasta. They are not declared Snakemake
+      # outputs, and Medaka rebuilds them on every run (medaka_consensus -x), so
+      # removing them only saves disk space.
       "02.assembly/*/contaminants/*.fai"
       "02.assembly/*/contaminants/*.mmi"
 

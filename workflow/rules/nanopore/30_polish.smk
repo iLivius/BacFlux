@@ -65,6 +65,12 @@ if USE_MEDAKA:
     #                                   inline note on the input below.
     # Does:     medaka_consensus aligns those reads back to that draft and rewrites
     #           the consensus with the network trained on the matching basecaller.
+    #           -x makes it rebuild its two index files of the draft (<draft>.fai
+    #           and <draft>.map-ont.mmi) on every run. Medaka writes them next to
+    #           the draft and would otherwise reuse them; here the draft is a plain
+    #           file that select_contigs rewrites whenever it runs again, so old
+    #           index files would describe the old contig set. Rebuilding takes
+    #           seconds.
     # Produces:
     #   consensus_dir     = MEDAKA_DIR, 02.assembly/{sample}/medaka/
     #   consensus_contigs = MEDAKA_CONSENSUS, consensus.fasta — the filename is
@@ -110,13 +116,14 @@ if USE_MEDAKA:
             medaka_consensus \
               -i {input.reads} \
               -d {input.contigs} \
+              -x \
               -t {threads} \
               -m "$model" \
               -o {output.consensus_dir} >> {log} 2>&1 || {{
                 cat {log} >&2
                 echo "" >&2
                 echo "Medaka failed at polishing with the pre-validated model '$model'." >&2
-                echo "The name was accepted by check_medaka_model, so this is a RUNTIME failure: the model weights may not be installed locally (no network to fetch them), or a legacy model may be broken under Medaka v2." >&2
+                echo "The name was accepted by check_medaka_model, which also fetches the model weights, so this is a RUNTIME failure: the weights may be missing (for example, the Medaka environment was rebuilt after the check ran), or a legacy model may be broken under Medaka v2." >&2
                 echo "Set 'parameters.nanopore.medaka_model' to a supported model, or to FALSE to skip Medaka." >&2
                 exit 1
               }}

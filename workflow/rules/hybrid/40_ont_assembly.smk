@@ -192,7 +192,11 @@ if USE_MEDAKA:
     #   model   = MEDAKA_MODEL_RESOLVED, a one-line file holding the confirmed
     #             model name, from check_medaka_model (shared/12_medaka_check.smk)
     # Does:     medaka_consensus, re-calling the consensus base by base from the
-    #           long reads with the basecaller-matched model.
+    #           long reads with the basecaller-matched model. -x makes it rebuild
+    #           its index files of the draft on every run, as in nanopore mode.
+    #           Here the draft sits in fix_start/, which Snakemake empties before
+    #           rebuilding, so the flag is a safeguard that keeps the twin rules
+    #           identical.
     # Produces:
     #   consensus_dir     = MEDAKA_DIR, Medaka's own output tree
     #   consensus_contigs = MEDAKA_CONSENSUS, the polished assembly
@@ -249,13 +253,14 @@ if USE_MEDAKA:
             medaka_consensus \
               -i {input.reads} \
               -d {input.contigs} \
+              -x \
               -t {threads} \
               -m "$model" \
               -o {output.consensus_dir} >> {log} 2>&1 || {{
                 cat {log} >&2
                 echo "" >&2
                 echo "Medaka failed at polishing with the pre-validated model '$model'." >&2
-                echo "The name was accepted by check_medaka_model, so this is a RUNTIME failure: the model weights may not be installed locally (no network to fetch them), or a legacy model may be broken under Medaka v2." >&2
+                echo "The name was accepted by check_medaka_model, which also fetches the model weights, so this is a RUNTIME failure: the weights may be missing (for example, the Medaka environment was rebuilt after the check ran), or a legacy model may be broken under Medaka v2." >&2
                 echo "Set 'parameters.hybrid.medaka_model' to a supported model, or to FALSE to skip Medaka." >&2
                 exit 1
               }}

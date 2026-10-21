@@ -1,9 +1,9 @@
 """Unit tests for medaka_model_check.py — the pure name-handling logic, plus
-main()'s branching with the two Medaka helpers monkeypatched.
+main()'s branching with the three Medaka helpers monkeypatched.
 
-Only list_available_models() and resolve_from_reads() shell out to the tool, and
-every test that reaches one of them swaps in a stub, so this file runs with no
-Medaka install, no basecalled reads and no model download.
+Only list_available_models(), resolve_from_reads() and download_model() shell out
+to the tool, and every test that reaches one of them swaps in a stub, so this
+file runs with no Medaka install, no basecalled reads and no model download.
 
 Why the branching is worth pinning down: rule check_medaka_model runs the script
 right after read filtering and the assembler waits on its output, so what main()
@@ -118,11 +118,76 @@ def test_suggest_narrows_on_flowcell_only():
 
 def test_main_explicit_valid(tmp_path, monkeypatch):
     monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
+    monkeypatch.setattr(mc, "download_model", lambda model: None)
     out = tmp_path / "model.txt"
     rc = mc.main(["--model", "r941_min_hac_g507", "--reads", "x.fastq",
                   "--out", str(out)])
     assert rc == 0
     assert out.read_text().strip() == "r941_min_hac_g507"
+
+
+# ── main(): a named model's weights are fetched by the check ────────────────
+# Medaka ships the weights of only a few models and downloads the rest the first
+# time they are used. The check, a local rule, fetches them, so the polishing
+# job on a compute node never needs the internet. A model that cannot be fetched
+# must stop the run here, before the assembler, with Medaka's own message.
+
+def test_main_explicit_valid_asks_for_its_weights(tmp_path, monkeypatch):
+    asked = []
+    monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
+    monkeypatch.setattr(mc, "download_model", lambda model: asked.append(model))
+    out = tmp_path / "model.txt"
+    rc = mc.main(["--model", "r941_min_hac_g507", "--reads", "x.fastq",
+                  "--out", str(out)])
+    assert rc == 0
+    assert asked == ["r941_min_hac_g507"]
+
+
+def test_main_explicit_valid_but_weights_unreachable_fails(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
+    monkeypatch.setattr(mc, "download_model",
+                        lambda model: "ConnectionError: could not reach github.com")
+    out = tmp_path / "model.txt"
+    rc = mc.main(["--model", "r941_min_hac_g507", "--reads", "x.fastq",
+                  "--out", str(out)])
+    assert rc == 1
+    assert not out.exists()
+    err = capsys.readouterr().err
+    assert "could not be downloaded" in err
+    assert "could not reach github.com" in err
+
+
+def test_main_local_model_file_is_not_downloaded(tmp_path, monkeypatch):
+    # A model FILE the user points at needs no download.
+    monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
+
+    def must_not_download(model):
+        raise AssertionError("download_model must not run for a model file")
+
+    monkeypatch.setattr(mc, "download_model", must_not_download)
+    model_file = tmp_path / "custom_model.tar.gz"
+    model_file.write_text("x")
+    out = tmp_path / "model.txt"
+    rc = mc.main(["--model", str(model_file), "--reads", "x.fastq", "--out", str(out)])
+    assert rc == 0
+
+
+def test_download_model_asks_for_that_model_only(monkeypatch):
+    # Without --models, Medaka would download every model it knows.
+    seen = {}
+
+    class Done:
+        returncode = 0
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        seen["command"] = command
+        return Done()
+
+    monkeypatch.setattr(mc.subprocess, "run", fake_run)
+    assert mc.download_model("r941_min_hac_g507") is None
+    assert seen["command"] == ["medaka", "tools", "download_models", "--models",
+                               "r941_min_hac_g507"]
 
 
 def test_main_explicit_local_file_accepted_as_is(tmp_path, monkeypatch):
@@ -153,15 +218,15 @@ def test_main_explicit_invalid_fails_with_suggestion(tmp_path, monkeypatch, caps
 #
 # The realistic thing `medaka tools resolve_model` prints: a PATH to the model
 # file, NOT a bare name — so it is NEVER a member of the (bare-name) AVAILABLE
-# list. Auto mode must accept it anyway (it is a valid `-m` argument). This is
-# the regression the adversarial review caught: an earlier version required the
-# resolved value to be in AVAILABLE, which failed every real auto run.
-RESOLVED_PATH = "/opt/medaka/data/r941_min_hac_g507_model_pt.tar.gz"
+# list. Auto mode must accept it anyway (it is a valid `-m` argument). An earlier
+# version required the resolved value to be in AVAILABLE, which failed every
+# real auto run.
+RESOLVED_PATH = "/opt/medaka/data/r1041_e82_400bps_bacterial_methylation_model_pt.tar.gz"
 
 
 def test_main_auto_success_accepts_a_path_not_in_the_name_list(tmp_path, monkeypatch):
     monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
-    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: RESOLVED_PATH)
+    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: (RESOLVED_PATH, None))
     assert RESOLVED_PATH not in AVAILABLE          # guard: it is a path, not a name
     out = tmp_path / "model.txt"
     rc = mc.main(["--model", "", "--reads", "x.fastq", "--out", str(out)])
@@ -169,15 +234,19 @@ def test_main_auto_success_accepts_a_path_not_in_the_name_list(tmp_path, monkeyp
     assert out.read_text().strip() == RESOLVED_PATH
 
 
-def test_main_auto_failure_shows_menu(tmp_path, monkeypatch, capsys):
+def test_main_auto_failure_shows_medakas_reason_and_the_menu(tmp_path, monkeypatch, capsys):
+    # Medaka's own last lines say WHY auto failed (no tag, unknown tag, or no
+    # internet for the weights), so they come first in the message.
     monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
-    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: None)
+    monkeypatch.setattr(mc, "resolve_from_reads",
+                        lambda reads: (None, "ValueError: Model could not be downloaded."))
     out = tmp_path / "model.txt"
     rc = mc.main(["--model", "", "--reads", "x.fastq", "--out", str(out)])
     assert rc == 1
     assert not out.exists()
     err = capsys.readouterr().err
-    assert "could not infer" in err
+    assert "could not work out a model" in err
+    assert "Model could not be downloaded." in err
     assert "r941_min_hac_g507" in err
 
 
@@ -192,7 +261,7 @@ def test_main_middle_option_falls_back_to_auto(tmp_path, monkeypatch, capsys):
     # Invalid explicit model, fallback on, auto succeeds — use auto and warn.
     # Auto returns a PATH (as real medaka does), which must be accepted.
     monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
-    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: RESOLVED_PATH)
+    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: (RESOLVED_PATH, None))
     out = tmp_path / "model.txt"
     rc = mc.main(["--model", "r941_min_hac_g999", "--reads", "x.fastq",
                   "--fallback-to-auto", "true", "--out", str(out)])
@@ -204,7 +273,7 @@ def test_main_middle_option_falls_back_to_auto(tmp_path, monkeypatch, capsys):
 def test_main_middle_option_but_auto_also_fails(tmp_path, monkeypatch):
     # Invalid explicit, fallback on, but auto can't help either — still fail.
     monkeypatch.setattr(mc, "list_available_models", lambda: AVAILABLE)
-    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: None)
+    monkeypatch.setattr(mc, "resolve_from_reads", lambda reads: (None, "no tag"))
     out = tmp_path / "model.txt"
     rc = mc.main(["--model", "r941_min_hac_g999", "--reads", "x.fastq",
                   "--fallback-to-auto", "true", "--out", str(out)])

@@ -16,10 +16,12 @@
 #           against. Auto-inference reads the basecaller tag out of their FASTQ
 #           headers, so pointing this at FILT_LONG rather than the raw input
 #           gives exactly the model the polish step would infer for itself.
-# Does:     runs scripts/12_medaka_check/medaka_model_check.py — for an explicit model, confirm it
-#           appears in `medaka tools list_models` (or is a local model file); for
-#           auto, infer it from the reads; on failure, print a filtered suggestion
-#           table and exit non-zero so the run stops here, before assembly.
+# Does:     runs scripts/12_medaka_check/medaka_model_check.py — for an explicit
+#           model, confirm it appears in `medaka tools list_models` (or is a local
+#           model file) and fetch its weights; for auto, infer it from the reads,
+#           which fetches the weights too; on failure, print Medaka's own message
+#           and a filtered suggestion table and exit non-zero so the run stops
+#           here, before assembly.
 # Produces: MEDAKA_MODEL_RESOLVED — a one-line file holding the confirmed or
 #           resolved model NAME. A plain file, deliberately not a directory(),
 #           because Snakemake wipes a directory() output before re-running its
@@ -39,7 +41,16 @@
 # MEDAKA_MODEL_RESOLVED, MEDAKA_MODEL_FALLBACK_AUTO, MEDAKA_CHECK_SCRIPT and LOGS.
 if HAS_LONG_READS and USE_MEDAKA:
 
+    # Where it runs: on the computer that runs Snakemake (localrule: True), never
+    # as a cluster job. Medaka ships the weights of only a few models and
+    # downloads the rest from GitHub the first time they are needed; this check
+    # makes that download happen here, where there is normally internet, rather
+    # than in the polishing job on a compute node, which often has none. The
+    # weights are stored in the Medaka conda environment (or in ~/.medaka/data
+    # when that folder cannot be written), and the polishing job reads them from
+    # there. On a single computer this changes nothing.
     rule check_medaka_model:
+        localrule: True
         input:
             reads = FILT_LONG,
         output:
