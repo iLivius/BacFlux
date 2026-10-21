@@ -18,6 +18,7 @@
 
 import glob
 import os
+import sys
 
 from snakemake.utils import min_version
 
@@ -40,6 +41,20 @@ min_version("9.14.6")
 # process that launches every job, means every rule inherits it without touching
 # the rules themselves. Conda activation does not unset it.
 os.environ["PYTHONNOUSERSITE"] = "1"
+
+# Write BacFlux's own messages at the moment they are printed.
+#
+# The banner below, and the notes the rule files print while Snakemake reads
+# them (the mode, the phage caller and its licence, the mobilome settings), go to
+# standard output. Snakemake's own messages go to standard error. When a run's
+# output is saved to a file, for example piped through `tee` or written to a
+# cluster job's log, Python holds standard output back and writes it only when
+# its buffer is full or the program ends, so those notes would land at the END of
+# the log, after every job. Line buffering writes each line as it is printed, so
+# the log reads in the order things happened. The hasattr check skips this in the
+# rare case where standard output has been replaced by something that cannot do it.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
 
 print(r'''
 ________             _______________
