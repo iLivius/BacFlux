@@ -195,7 +195,8 @@ elif HAS_LONG_READS:
     # Same purpose as the short-read version: a per-contig depth track for
     # BlobTools. minimap2's map-ont preset handles the higher error rate of raw
     # ONT reads, which bowtie2 cannot. No Bowtie2 index rule here — minimap2
-    # indexes the reference on the fly.
+    # indexes the reference on the fly. -t {threads} gives minimap2 the CPUs the
+    # rule reserves; without it minimap2 uses its default of 3.
     #
     # Takes in: FILT_LONG (filtlong-filtered ONT reads, from nanopore/10_reads.smk)
     #           and DRAFT_CONTIGS (the dnaapler-reoriented Flye assembly, from
@@ -225,7 +226,7 @@ elif HAS_LONG_READS:
         shell:
             """
             minimap2 \
-              -ax map-ont {input.contigs} \
+              -ax map-ont -t {threads} {input.contigs} \
               {input.reads} 2> {log} | \
             samtools view \
               -S \
@@ -663,7 +664,8 @@ if LONGREAD_SCREEN:
 
     # ── map_final_contigs — ONT reads onto the delivered genome ──
     # Takes in: FILT_LONG (the filtered ONT reads) and FINAL_CONTIGS.
-    # Does:     minimap2 -ax map-ont, exactly as the nanopore screen maps its draft.
+    # Does:     minimap2 -ax map-ont -t {threads}, exactly as the nanopore screen
+    #           maps its draft.
     #           The ONT reads are used rather than the Illumina ones on purpose: the
     #           whole reason this screen exists is that the short reads may no longer
     #           be involved in the ONT leg, and a coverage track derived from them
@@ -688,7 +690,7 @@ if LONGREAD_SCREEN:
         shell:
             """
             minimap2 \
-              -ax map-ont {input.contigs} \
+              -ax map-ont -t {threads} {input.contigs} \
               {input.reads} 2> {log} | \
             samtools view -S -b -u -@ {threads} | \
             samtools sort -o {output.bam} -@ {threads} 2>> {log}
