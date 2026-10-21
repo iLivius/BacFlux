@@ -2,9 +2,10 @@
 
 An isolate assembly is not guaranteed to be one organism. Culture contaminants, index
 hopping, carry-over from a neighbouring library and adapter or vector debris all
-arrive as extra contigs. BacFlux asks two questions about every contig — what does it
-look like taxonomically, and how deeply is it covered by this sample's own reads — and
-uses the answers to keep the isolate and discard the rest.
+arrive as extra contigs. BacFlux records two things about every contig — what it looks
+like taxonomically, and how deeply this sample's own reads cover it — and keeps or
+discards each contig by its taxonomy. The depth sits beside the genus in the same table,
+for you to read; it does not enter the decision.
 
 The step runs **before** annotation. A contaminant contig
 left in inflates CheckM's contamination estimate, can pull GTDB-Tk off the right
@@ -76,8 +77,9 @@ mode's front end, and hard-coding the final name here would make `nanopore` circ
 
 Mapping a sample's own reads onto its own assembly gives per-contig read depth. A
 contig from a minor contaminant is usually covered at a very different depth from the
-isolate's chromosome, and that depth is the second axis — alongside taxonomy — that
-BlobTools separates organisms on.
+isolate's chromosome, so the depth is worth reading beside the genus. BlobTools puts
+both in one table; the selector decides on the genus alone and does not read the
+depth.
 
 The rule produces the same two files in every mode but gets there differently. The
 branch is decided while Snakemake parses the workflow, before any job runs, so exactly
