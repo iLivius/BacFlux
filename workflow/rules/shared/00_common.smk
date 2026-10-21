@@ -1463,7 +1463,15 @@ def _decontam_settings(default_mode):
         else:
             settings = {"mode": default_mode}
 
-    mode = str(settings.get("mode", default_mode) or default_mode).strip().lower()
+    # YAML 1.1, which Snakemake reads the config with, turns a bare off, no or
+    # false into the boolean False. So `mode: off` written without quotes arrives
+    # here as False, and the `or default_mode` below would quietly make it auto.
+    # Read False as the "off" the user wrote. True names no mode, so it reaches
+    # the check below and stops the run like any other wrong value.
+    raw_mode = settings.get("mode", default_mode)
+    if raw_mode is False:
+        raw_mode = "off"
+    mode = str(raw_mode or default_mode).strip().lower()
     if mode not in {"auto", "include", "exclude", "off"}:
         sys.exit(
             "[BacFlux] parameters.decontamination.mode must be auto, include, exclude or off "
@@ -1555,6 +1563,24 @@ print(
     f"{DECONTAMINATION['mode']} (auto_vote={DECONTAMINATION['auto_vote']}, "
     f"discard_no_hit={DECONTAMINATION['discard_no_hit']})."
 )
+
+# An include policy with no genus anywhere is a config mistake, not a result: the
+# selector would stop with "Mode 'include' requires at least one genus" only when a
+# sample reaches it, after the whole assembly. Stop here instead. A sample_overrides
+# or include_genera_by_sample file can give genera per sample, so the check only
+# fires when none of the three places names any. It covers the first screen and,
+# in hybrid, the second (long_read_mode), which is a check but needs a list too.
+if not (DECONTAMINATION["include_genera"]
+        or DECONTAMINATION["include_genera_by_sample"]
+        or DECONTAMINATION["sample_overrides"]):
+    for _key, _mode in (("mode", DECONTAMINATION["mode"]),
+                        ("long_read_mode", LONGREAD_SCREEN_MODE if LONGREAD_SCREEN else "")):
+        if _mode == "include":
+            sys.exit(
+                f"[BacFlux] parameters.decontamination.{_key} is include, but no genus "
+                "is given to include: set include_genera, or include_genera_by_sample, "
+                "or a sample_overrides file."
+            )
 
 
 # ───────────── 7. Reference-database download links ────────────

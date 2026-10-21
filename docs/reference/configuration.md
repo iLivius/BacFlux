@@ -154,6 +154,7 @@ lists the keys:
 | `parameters.spades_kmers` | `auto`, or odd ascending integers below 128 | Stops, naming the offending value |
 | `parameters.decontamination.mode` | one of `auto`, `include`, `exclude`, `off` | Stops |
 | `parameters.decontamination.auto_vote` | `bp` or `contigs` | Stops |
+| `parameters.decontamination.mode` or `long_read_mode` set to `include` | a genus to include: `include_genera`, `include_genera_by_sample` or a `sample_overrides` file | Stops |
 | `parameters.<mode>.flye_input_mode` | one of `auto`, `nano-raw`, `nano-hq` | Stops |
 | `phage.caller` | `virsorter2` or `genomad` | Stops |
 | `mobilome.coverage_profile` | a fraction in `(0, 1]` | Stops, and says it is a fraction, not a percentage |
