@@ -1,10 +1,10 @@
 # Stage 04 annotation: the four tools that turn a finished genome into gene calls
 # and functional labels, plus the two database fetches they need. Shared by all
 # four entry points — every front end has already converged on one canonical
-# assembly (FINAL_CONTIGS, D2) and one genus-composition file, so nothing here
+# assembly (FINAL_CONTIGS, D2) and one kept-genus file, so nothing here
 # branches on the sequencing technology.
 #
-# Chain: contigs_final.fasta + {sample}_composition.txt → Bakta → a DIRECTORY of
+# Chain: contigs_final.fasta + {sample}_kept_genus.txt → Bakta → a DIRECTORY of
 # {sample}.faa/.gff3/.gbff/.tsv, which the three analysis rules each reach into
 # for the one file they need.
 #
@@ -27,7 +27,7 @@
 #                                  the clusters they form, and each cluster's
 #                                  predicted substrate.
 #
-# Every name used here — DIR_ANNOTATION, FINAL_CONTIGS, COMPOSITION,
+# Every name used here — DIR_ANNOTATION, FINAL_CONTIGS, KEPT_GENUS,
 # BAKTA_REPLICON_INPUT, BAKTADB, DMNDDB, EGGNOG_DBMEM, EGGNOG_DBMEM_GB,
 # ANTISMASHDB, ANTISMASH_DB_DIR, DBCANDB, DBCAN_DB_DIR, DBCAN_SENTINEL,
 # DBCAN_LINK, DBCAN_SHA_URL, LOGS, capped_cpus, bakta_locus_tag — is defined once
@@ -49,16 +49,16 @@
 
 # ──────────────────────── Genome annotation (Bakta) ────────────
 # Bakta calls genes (CDS, tRNA, rRNA, ncRNA, CRISPR arrays, …) on the finished
-# genome and writes the whole standard annotation set. Telling it which genus the
-# isolate belongs to sharpens the call, so the shell derives one from the
-# decontamination composition table. Do not trust that genus without reading the
-# shell preface: the line it picks is NOT the most abundant genus.
+# genome and writes the whole standard annotation set. It is also given the
+# isolate's genus, which it writes as the organism name in its GenBank, EMBL and
+# GFF3 files and on its genome plot. The genus does not change which genes are
+# called or how they are annotated.
 #
 # Takes in: FINAL_CONTIGS, the one decontaminated assembly every front end
-#           produces (02.assembly/{sample}/contigs_final.fasta); COMPOSITION, the
-#           per-genus abundance table select_contigs wrote in
-#           shared/10_decontam.smk; and, in the long-read modes only, the replicon
-#           table from build_replicons (shared/15_replicons.smk).
+#           produces (02.assembly/{sample}/contigs_final.fasta); KEPT_GENUS, the
+#           one-line genus file select_contigs wrote in shared/10_decontam.smk;
+#           and, in the long-read modes only, the replicon table from
+#           build_replicons (shared/15_replicons.smk).
 # Produces: 04.annotation/bakta/{sample}/, declared as a DIRECTORY (faithful to
 #           v1) because Bakta names the files inside it — {sample}.faa, .gff3,
 #           .gbff, .tsv and more. Every downstream rule therefore takes its DAG
@@ -72,11 +72,12 @@ rule annotation:
     input:
         # The finished genome — one canonical hand-off from any front end (D2).
         contigs = FINAL_CONTIGS,
-        # Per-genus abundance table, a CROSS-STAGE edge: select_contigs writes it
-        # in shared/10_decontam.smk. Consumer and producer both name the single
-        # COMPOSITION constant in 00_common.smk (alongside FINAL_CONTIGS), so the
-        # two can never drift onto different paths.
-        abund = COMPOSITION,
+        # The genus to name the genome after, a CROSS-STAGE edge: select_contigs
+        # writes it in shared/10_decontam.smk as the genus holding most of the
+        # KEPT contigs. Consumer and producer both name the single KEPT_GENUS
+        # constant in 00_common.smk, so the two can never drift onto different
+        # paths.
+        genus = KEPT_GENUS,
         # Replicon table, LONG-READ MODES ONLY. It tells Bakta which contigs are
         # circular, and that matters because Pyrodigal is then allowed to call
         # genes across the origin of a closed replicon — typically a handful of
@@ -105,48 +106,21 @@ rule annotation:
     log:
         LOGS + "/annotation_{sample}.log"
     shell:
-        # Genus hint for Bakta: drop the "no-hit" line from the composition table,
-        # sort what is left, and pass the surviving genus name as --genus.
-        #
-        # Read that sort carefully: it does NOT rank by abundance any more. It did
-        # while the table held one bare number per genus ("Bacillus: 0.30").
-        # write_composition() in scripts/10_decontam/select_contigs_by_taxonomy.py now writes
-        # two labelled figures instead — "Bacillus: bases 0.29  contigs 0.30" — so
-        # the key after the ':' starts with the word "bases", `-n` scores every
-        # line 0, and GNU sort breaks the resulting all-way tie on the whole line,
-        # reversed. What survives is the alphabetically LAST genus. Worked through
-        # on a four-genus composition file — 0.40 of the DNA on the first genus,
-        # then 0.29, 0.16 and 0.11 — where the name handed to Bakta is the third
-        # of them, not the genus holding most of the genome.
-        #
-        # It stays a hint, not a filter: a wrong genus costs annotation accuracy,
-        # never contigs or reads, and nothing in the run announces it.
-        #
-        # Two deliberate v2 changes over the plain v1 illumina form:
-        #
-        # 1. Skip "no-hit". The composition table counts EVERY contig in the
-        #    BlobTools table, and contigs with no informative BLAST assignment are
-        #    counted under the literal genus "no-hit". Without the grep, a
-        #    poorly-placed or heavily-contaminated sample can put "no-hit" on the
-        #    winning line and Bakta runs with `--genus no-hit`.
-        # 2. Run Bakta EXACTLY ONCE, with the genus hint only if one was found.
-        #    v1 wrapped the bakta call in a `for` loop over that single genus, so
-        #    if no genus survived the filter the loop body never ran and Bakta was
-        #    never invoked — the rule then failed on missing output. Here the genus
-        #    is resolved first and the hint added conditionally, so a sample with
-        #    no usable genus is still annotated, just without the hint. (This
-        #    matches v1 BacFluxL+, which likewise passed no --genus/--species when
-        #    it had no clear winner. Reconciling all four modes onto L+'s stricter
-        #    kept-contigs-only rule is logged as a follow-up.)
+        # The organism name for Bakta: the genus in the one-line KEPT_GENUS file,
+        # i.e. the genus holding most of the contigs decontamination kept. The
+        # file is empty when no kept contig has a genus (for example, every kept
+        # contig is one BLAST could not place); Bakta then runs without a genus,
+        # so the sample is still annotated. Either way the first line of the log
+        # says which genus was used.
         """
-        genus=$(grep -v '^no-hit:' {input.abund} | sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p')
+        genus=$(head -n 1 {input.genus})
 
         if [ -n "$genus" ]; then
             taxon_args="--genus $genus --species sp."
-            echo "Annotating {wildcards.sample} with genus hint: $genus" > {log}
+            echo "Annotating {wildcards.sample} as genus: $genus" > {log}
         else
             taxon_args=""
-            echo "No usable genus for {wildcards.sample} (composition empty or all no-hit); annotating without a genus hint." > {log}
+            echo "No genus for {wildcards.sample}: no kept contig has a genus, so Bakta runs without one." > {log}
         fi
 
         # Replicon table, same idiom as the genus hint above. The -s test ("exists

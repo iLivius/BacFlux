@@ -16,12 +16,13 @@ What it reads
 -------------
   --bestscore  BLOB_TABLE, written by rule blob_table — one row per contig with
                its best-scoring taxon at every rank. The genus is column 22.
-  --contigs    DRAFT_CONTIGS, the same contigs BlobTools judged.
-  the policy   seven flags carrying parameters.decontamination from
+  --contigs    DRAFT_CONTIGS, the same contigs BlobTools judged. Their lengths
+               are what auto mode adds up per genus (see below).
+  the policy   eight flags carrying parameters.decontamination from
                config/config.yaml, resolved once by _decontam_settings() in
                shared/00_common.smk so a whole batch follows one policy: mode
-               (auto | include | exclude | off), discard_no_hit, and the five
-               genus-list and override paths.
+               (auto | include | exclude | off), auto_vote (bp | contigs),
+               discard_no_hit, and the five genus-list and override paths.
 
 What it writes
 --------------
@@ -29,9 +30,13 @@ What it writes
                   Which rule consumes them depends on the mode; the per-mode
                   table in shared/10_decontam.smk's header says which.
   --output-list   the kept contig IDs, one per line. No other rule reads it.
-  --composition   COMPOSITION — each genus's share of the assembly. Read back by
-                  rule annotation in shared/40_annotation.smk to pick Bakta's
-                  --genus hint, so its shape is a contract; see write_composition.
+  --composition   COMPOSITION — each genus's share of the assembly, for people to
+                  read; see write_composition.
+  --kept-genus    KEPT_GENUS — one line naming the genus that holds most of the
+                  KEPT contigs, measured the same way as the auto vote, or an
+                  empty file when no kept contig has a genus. Rule annotation in
+                  shared/40_annotation.smk gives it to Bakta as the organism
+                  name. Optional: the long-read final screen does not ask for it.
   --decisions     CONTIG_DECISIONS — the audit trail the project convention asks
                   for, four columns:
                     contig          first whitespace token of the contig name
@@ -45,17 +50,25 @@ What it writes
                                     full vocabulary
                                     source: decide()
 
-Before trusting auto mode
--------------------------
-Auto mode votes on the NUMBER OF CONTIGS per genus, not on how much DNA each
-genus holds, so a genus can win on many short contigs while another genus holds
-most of the genome. That matters because BLAST regularly spreads ONE organism
-across several related genus names whenever the isolate is thinly represented in
-nt: the vote then lands on the wrong half and the other half leaves as
-contamination. Three things push back, none of them a cure — the curated aliases
-in GENUS_EQUIVALENCE_ALIASES fold the commonest splits back into one target,
-while the two advisory warnings in warn_if_selection_looks_wrong() and the DNA
-column of the composition report only make the damage visible.
+How auto mode picks the genus
+-----------------------------
+Auto mode keeps one genus, plus its aliases (GENUS_EQUIVALENCE_ALIASES), and
+removes the rest. Which genus is set by parameters.decontamination.auto_vote:
+
+  bp       (the default) the genus whose contigs add up to the most base pairs.
+  contigs  the genus with the most contigs.
+
+On a clean isolate the two give the same answer. They differ when one genus
+sits in a few long contigs and another in many short ones. That is the normal
+shape of a long-read assembly: a chromosome and a few plasmids, where plasmids
+that BLAST assigns to a different genus would outnumber the chromosome in a
+contig count. Counting base pairs keeps the genus that holds most of the
+assembly.
+
+BLAST can also spread ONE organism across several related genus names when the
+isolate is thinly represented in nt, and either vote then keeps only part of it.
+The aliases fold the commonest of these splits back into one target, and the two
+warnings in warn_if_selection_looks_wrong() flag the rest for a human to check.
 
 In HYBRID mode a dropped contig can take its ONT reads with it and disappear from
 the assembly, not merely from the taxonomy table. The worked case and the fixes
@@ -72,11 +85,17 @@ from collections import Counter, OrderedDict
 
 
 # The four values parameters.decontamination.mode accepts:
-#   auto     keep the most abundant genus BlobTools reports for this sample
+#   auto     keep the genus that wins the vote set by auto_vote (below)
 #   include  keep only the genera the user listed
 #   exclude  drop only the genera the user listed
 #   off      keep everything (the audit files are still written)
 VALID_MODES = {"auto", "include", "exclude", "off"}
+
+# The two values parameters.decontamination.auto_vote accepts: what auto mode
+# counts per genus before keeping the genus with the largest number.
+#   bp       the total length of the genus's contigs, in base pairs (default)
+#   contigs  the number of contigs assigned to the genus
+VALID_AUTO_VOTES = {"bp", "contigs"}
 
 # Booleans reach this script as text — a YAML value Snakemake stringified, a TSV
 # cell, or a word on the command line. The accepted spellings are listed here
@@ -89,12 +108,10 @@ TRUE_VALUES = {"true", "1", "yes", "on"}
 # as a contaminant.
 #
 # Peribacillus and Priestia are 2020 splits of Bacillus sensu lato, so hits for a
-# single genome come back under either name. One isolate lost its entire 4.5 Mb
-# chromosome to exactly this: the contig count tied 2-2 between Bacillus and
-# Peribacillus, the alphabetical tiebreak in choose_auto_genus() handed the vote
-# to Bacillus, and the chromosome left as contamination. A later reassembly of the
-# same reads called that small contig Priestia instead — which is why both names
-# are here; patching only one would have hit the same bug from the other side.
+# single genome can come back under any of the three names, and which name a
+# given contig gets can change between two assemblies of the same reads. Without
+# these aliases, whichever part of the genome lost the vote would be removed as
+# contamination — possibly the chromosome.
 #
 # Pseudoarthrobacter (with the 'o') is deliberately absent: it is not a validly
 # published name. LPSN lists only Pseudarthrobacter (Busse 2016) — the extra 'o'
@@ -387,25 +404,25 @@ def is_no_hit(genus):
     return "no-hit" in normalize_genus(genus)
 
 
-def choose_auto_genus(counts, discard_no_hit):
-    """Pick the genus auto mode keeps: the one carried by the most contigs.
+def choose_auto_genus(votes, discard_no_hit):
+    """Pick the genus auto mode keeps: the one with the largest vote.
 
-    Counts CONTIGS, not bases. A genus can win here on many short contigs while
-    another genus holds most of the assembly's DNA — write_composition() prints
-    both figures side by side precisely so that disagreement is visible.
+    votes maps each genus to one number: the total length of its contigs in base
+    pairs (auto_vote: bp, the default) or its number of contigs (auto_vote:
+    contigs). main() builds both from the BlobTools table and the FASTA.
 
     With discard_no_hit true, "no-hit" is dropped from the vote so unclassified
     contigs can never become the target.
 
-    Ties are broken alphabetically so the answer is the same on every run, and
-    that tiebreak is not harmless: a 2-2 tie between Bacillus and Peribacillus
-    once handed the vote to Bacillus and sent a 4.5 Mb chromosome out as
-    contamination. The aliases in GENUS_EQUIVALENCE_ALIASES exist so that tie
-    never has to be broken in the first place.
+    When two genera have exactly the same vote, the one first in alphabetical
+    order wins, so the same input always gives the same answer. With base-pair
+    votes an exact tie practically never happens.
+
+    Returns None when there is no genus left to vote for.
     """
     candidates = [
-        (genus, count)
-        for genus, count in counts.items()
+        (genus, vote)
+        for genus, vote in votes.items()
         if not discard_no_hit or not is_no_hit(genus)
     ]
     if not candidates:
@@ -413,6 +430,21 @@ def choose_auto_genus(counts, discard_no_hit):
 
     candidates.sort(key=lambda item: (-item[1], normalize_genus(item[0])))
     return candidates[0][0]
+
+
+def choose_label_genus(kept_votes):
+    """Pick the genus the kept assembly is named after, for Bakta.
+
+    kept_votes is built like the auto vote, but only from the contigs that were
+    KEPT, so a genus that was filtered out can never name the genome. Contigs
+    BLAST could not place ("no-hit") never count. In auto mode the answer is the
+    genus that won the vote; in include, exclude and off mode it is the kept
+    genus holding most of the assembly.
+
+    Returns None when no kept contig has a genus, for example when every kept
+    contig is no-hit. Bakta then runs without an organism name.
+    """
+    return choose_auto_genus(kept_votes, discard_no_hit=True)
 
 
 def decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus):
@@ -488,63 +520,51 @@ def decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus):
 
 # ── Write the composition report and warn when the call looks wrong ──────────
 
-def write_composition(path, counts, total, bases=None, total_bases=0):
-    """Write genus composition as relative frequencies for quick inspection.
+def write_composition(path, counts, total, bp_by_genus=None, total_bp=0):
+    """Write each genus's share of the assembly, for a person to read.
 
-    The output is not used for filtering. It is a human-readable summary that
-    helps decide whether auto/include/exclude settings make biological sense.
+    One line per genus, with two figures:
 
-    Two figures are given per genus, and the difference between them matters:
+      bp       the share of the assembly's base pairs in that genus's contigs
+      contigs  the share of the contigs assigned to that genus
 
-      bases   - the share of the assembly's DNA carried by that genus
-      contigs - the share of the contig COUNT assigned to that genus
-
-    Auto mode picks its target genus on the contig count, so a genus can win the
-    vote on many short contigs while another genus holds far more of the actual
-    genome. When that happens the two columns disagree and the file says so at a
-    glance — a case seen in testing had the winning genus ahead on contig share
-    (0.30 vs 0.26) while a related genus held more DNA (0.40 vs 0.29), so the
-    wrong half of a single genome was kept and a count-only report gave no hint.
-
-    Sorted by DNA, because that is the more honest ranking of "what is this
-    sample mostly made of".
-
-    The line SHAPE is a contract, not just a report: rule annotation in
-    shared/40_annotation.smk parses this file to pick Bakta's --genus hint, and
-    adding the second figure changed what that parse returns. Read the comment on
-    its genus= line before changing the format again.
+    e.g. "Bacillus: bp 0.97  contigs 0.90". Both figures cover EVERY contig in
+    the BlobTools table, kept or dropped, so the file shows what the policy chose
+    from. On a clean isolate one genus is close to 1.00 in both columns. When
+    the two columns rank the genera differently, the auto_vote setting decides
+    which genus is kept, and the decisions file is worth a look. Lines are sorted
+    by bp. No rule reads this file; the genus Bakta is given comes from
+    --kept-genus.
     """
     with open(path, "w", encoding="utf-8") as handle:
-        if bases and total_bases:
-            for genus, bp in sorted(bases.items(), key=lambda item: (-item[1], item[0])):
+        if bp_by_genus and total_bp:
+            for genus, bp in sorted(bp_by_genus.items(), key=lambda item: (-item[1], item[0])):
                 handle.write(
-                    f"{genus}: bases {bp / total_bases:.2f}  "
+                    f"{genus}: bp {bp / total_bp:.2f}  "
                     f"contigs {counts.get(genus, 0) / total:.2f}\n"
                 )
         else:
-            # The v1 one-figure form, kept as the fallback for when no contig in
-            # the BlobTools table was found in the FASTA and there are no lengths
-            # to divide by. Same "Genus: 0.87" shape, ranked by contig count.
+            # No contig of the BlobTools table was found in the FASTA, so there
+            # are no lengths to share out. The contig shares are still written,
+            # and main() then stops the run because nothing can be kept.
             for genus, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
-                handle.write(f"{genus}: {count / total:.2f}\n")
+                handle.write(f"{genus}: contigs {count / total:.2f}\n")
 
 
-# A genus must hold at least this share of the assembly's DNA before it counts
-# as a "major" assignment, and at least this many major genera make the sample
-# worth a second look. Both are REPORTING thresholds — they change no keep/remove
-# decision, they only decide whether a warning is printed.
+# A genus must hold at least this share of the assembly's base pairs before it
+# counts as a "major" assignment, and at least this many major genera make the
+# sample worth a second look. Both are REPORTING thresholds: they change no
+# keep/remove decision, they only decide whether a warning is printed.
 #
-# Two is deliberate, and empirical. A clean isolate has ONE genus holding
-# essentially all of its DNA, so a second genus above the threshold is already
-# abnormal. Calibrated against a validation batch in which the only samples to trip
-# it were the only genuinely problematic ones, and they failed in OPPOSITE
-# directions — which is why the warning names both causes:
-#   - one genome scattered across several related genera by BLAST, where filtering
-#     then discarded half of it (CheckM: complete assembly 99%, filtered 28%)
-#   - a genuine two-organism culture, where CheckM reported the assembly 100%
-#     complete and over 100% CONTAMINATED, i.e. two genomes in one bin
-# No false positives in that batch, but it is one batch: treat these as a
-# well-supported starting point rather than a universal constant.
+# Two is deliberate. A clean isolate has ONE genus holding essentially all of its
+# base pairs, so a second genus above the threshold is already abnormal. The
+# warning names two possible causes, and CheckM tells them apart:
+#   - one genome scattered across several related genera by BLAST, where the
+#     filter then discards part of it: the kept assembly looks incomplete but not
+#     contaminated;
+#   - a genuine two-organism culture where both genomes are kept: the kept
+#     assembly looks complete and heavily contaminated, i.e. two genomes in one.
+# Treat these numbers as a starting point, not a calibrated cutoff.
 MAJOR_GENUS_BASE_FRACTION = 0.05
 CONFUSED_GENUS_COUNT = 2
 
@@ -555,40 +575,32 @@ CONFUSED_GENUS_COUNT = 2
 LARGE_REMOVAL_BASE_FRACTION = 0.20
 
 
-def warn_if_selection_looks_wrong(bases, total_bases, removed_bases):
+def warn_if_selection_looks_wrong(bp_by_genus, total_bp, removed_bp):
     """Print a warning when the genus assignment, or the amount being discarded,
     suggests the keep/remove call should be checked by a human.
 
     Why this exists. Auto mode assumes one genus dominates and everything else is
     contamination. That assumption breaks when BLAST spreads ONE genome across
-    several related genera — which happens when the organism is thinly
+    several related genera, which happens when the organism is thinly
     represented in the nucleotide database, so different contigs match different
     relatives. The selector cannot tell that apart from real contamination, and
     without this warning it proceeds silently either way.
 
-    Calibrated on a validation batch: almost every sample had a single genus
-    holding essentially all the DNA and discarded under 3% of the assembly. The
-    one failure had FOUR genera above 5% and discarded 52% — half of a single
-    genome that BLAST had scattered across more than a dozen genus labels because
-    the species is thinly represented in the nucleotide database. The separation
-    was total, but it rests on one bad sample, so treat these numbers as a first
-    cut rather than a calibrated cutoff.
-
-    Input:  per-genus base counts, the assembly total, and how much is being
+    Input:  base pairs per genus, the assembly total, and how much is being
             removed (all in bp).
     Output: nothing; prints to stdout, which the Snakemake rule captures into
             logs/select_contigs_{sample}.log.
     """
-    if not total_bases:
+    if not total_bp:
         return
 
-    major = [g for g, bp in bases.items() if bp / total_bases >= MAJOR_GENUS_BASE_FRACTION]
-    removed_fraction = removed_bases / total_bases
+    major = [g for g, bp in bp_by_genus.items() if bp / total_bp >= MAJOR_GENUS_BASE_FRACTION]
+    removed_fraction = removed_bp / total_bp
 
     if len(major) >= CONFUSED_GENUS_COUNT:
         listed = ", ".join(
-            f"{g} {bases[g] / total_bases:.0%}"
-            for g in sorted(major, key=lambda g: -bases[g])
+            f"{g} {bp_by_genus[g] / total_bp:.0%}"
+            for g in sorted(major, key=lambda g: -bp_by_genus[g])
         )
         print(
             f"WARNING: {len(major)} genera each hold at least "
@@ -601,7 +613,7 @@ def warn_if_selection_looks_wrong(bases, total_bases, removed_bases):
     if removed_fraction > LARGE_REMOVAL_BASE_FRACTION:
         print(
             f"WARNING: decontamination is discarding {removed_fraction:.0%} of the "
-            f"assembly ({removed_bases:,} of {total_bases:,} bp). If the kept "
+            f"assembly ({removed_bp:,} of {total_bp:,} bp). If the kept "
             "assembly then looks incomplete but NOT contaminated, the filter has "
             "most likely removed genome rather than contamination."
         )
@@ -613,7 +625,7 @@ def main():
     # Every flag is filled in by rule select_contigs in shared/10_decontam.smk
     # from parameters.decontamination.
     #
-    # The six optional flags use nargs="?" with a const value (empty string, or
+    # The seven optional flags use nargs="?" with a const value (empty string, or
     # "false" for --discard-no-hit): an unset YAML key reaches the shell as an
     # empty word, and without const argparse would stop the run with "expected one
     # argument" instead of reading it as "not configured". This is why leaving
@@ -623,6 +635,7 @@ def main():
     parser.add_argument("--contigs", required=True)
     parser.add_argument("--sample", required=True)
     parser.add_argument("--mode", choices=sorted(VALID_MODES), default="auto")
+    parser.add_argument("--auto-vote", choices=sorted(VALID_AUTO_VOTES), default="bp")
     parser.add_argument("--include-genera", nargs="?", const="", default="")
     parser.add_argument("--include-genera-by-sample", nargs="?", const="", default="")
     parser.add_argument("--exclude-genera", nargs="?", const="", default="")
@@ -632,6 +645,7 @@ def main():
     parser.add_argument("--output-list", required=True)
     parser.add_argument("--output-fasta", required=True)
     parser.add_argument("--composition", required=True)
+    parser.add_argument("--kept-genus", nargs="?", const="", default="")
     parser.add_argument("--decisions", required=True)
     args = parser.parse_args()
 
@@ -669,51 +683,77 @@ def main():
     # length/coverage metadata the assembler wrote into it.
     fasta_by_id = {fasta_key(header): (header, sequence) for header, sequence in fasta_records.items()}
     total = sum(counts.values())
-    auto_genus = choose_auto_genus(counts, discard_no_hit) if mode == "auto" else None
 
-    # One pass over the BlobTools rows: decide, write the audit line, tally the
-    # sequence, and collect the survivors.
+    # How many base pairs each genus holds, over every contig BlobTools judged.
+    # The lengths come from the FASTA already in memory. A contig missing from
+    # the FASTA adds nothing here; the warning at the end reports those.
+    bp_by_genus = Counter()
+    for contig, genus in records:
+        if contig in fasta_by_id:
+            bp_by_genus[genus] += len(fasta_by_id[contig][1])
+    total_bp = sum(bp_by_genus.values())
+
+    # The auto vote, on base pairs or on contig counts as configured. Only auto
+    # mode has a vote; the other modes keep or remove by the genus lists.
+    if args.auto_vote == "bp":
+        votes = bp_by_genus
+    else:
+        votes = counts
+    auto_genus = choose_auto_genus(votes, discard_no_hit) if mode == "auto" else None
+
+    # One pass over the BlobTools rows: decide, write the audit line, and collect
+    # the survivors. Alongside, count what is leaving (for the warnings) and
+    # what is staying (for the genus Bakta is given).
     kept = []
     seen = set()
-    # How much SEQUENCE each genus holds, and how much of it is leaving. These
-    # totals feed the composition report and the two warnings only — the
-    # keep/remove decision above is still made on contig counts. The lengths come
-    # from the FASTA already in memory, so nothing extra is read from disk.
-    bases_by_genus = Counter()
-    total_bases = 0
-    removed_bases = 0
+    removed_bp = 0
+    kept_bp_by_genus = Counter()
+    kept_contigs_by_genus = Counter()
     with open(args.decisions, "w", encoding="utf-8") as decisions:
         decisions.write("contig\tassigned_genus\taction\treason\n")
         for contig, genus in records:
             action, reason = decide(contig, genus, mode, include, exclude, discard_no_hit, auto_genus)
             decisions.write(f"{contig}\t{genus}\t{action}\t{reason}\n")
 
-            # A contig with no FASTA record contributes no sequence, so it is
-            # skipped here; the missing-contig warning further down reports those.
-            if contig in fasta_by_id:
-                length = len(fasta_by_id[contig][1])
-                bases_by_genus[genus] += length
-                total_bases += length
-                if action != "keep":
-                    removed_bases += length
+            # A contig with no FASTA record has no sequence to count or keep;
+            # the missing-contig warning further down reports those.
+            if contig not in fasta_by_id:
+                continue
+            length = len(fasta_by_id[contig][1])
+            if action != "keep":
+                removed_bp += length
 
-            # Kept, present in the FASTA, and not already collected. The `seen`
-            # test guards against a BlobTools table that lists the same contig on
-            # more than one row: writing it twice would hand Bakta and CheckM a
-            # duplicated sequence.
-            if action == "keep" and contig in fasta_by_id and contig not in seen:
+            # Kept, and not already collected. The `seen` test guards against a
+            # BlobTools table that lists the same contig on more than one row:
+            # writing it twice would hand Bakta and CheckM a duplicated sequence.
+            if action == "keep" and contig not in seen:
                 kept.append(contig)
                 seen.add(contig)
+                kept_bp_by_genus[genus] += length
+                kept_contigs_by_genus[genus] += 1
 
     # The composition report describes the assembly BlobTools saw, kept and
-    # dropped contigs alike — that is what makes it useful for judging whether
+    # dropped contigs alike, which is what makes it useful for judging whether
     # the policy was right. Written here, after the loop, so it exists even when
     # almost nothing survived.
-    write_composition(args.composition, counts, total, bases_by_genus, total_bases)
+    write_composition(args.composition, counts, total, bp_by_genus, total_bp)
 
     # Announce a taxonomically confused sample, or an unusually large removal,
     # before the run moves on. Purely advisory: no decision above depends on it.
-    warn_if_selection_looks_wrong(bases_by_genus, total_bases, removed_bases)
+    warn_if_selection_looks_wrong(bp_by_genus, total_bp, removed_bp)
+
+    # The genus Bakta is given as the organism name: the kept genus that wins
+    # the same vote, counted over the kept contigs only. One line, or an empty
+    # file when no kept contig has a genus. Only rule select_contigs asks for it.
+    label_genus = None
+    if args.kept_genus:
+        if args.auto_vote == "bp":
+            label_genus = choose_label_genus(kept_bp_by_genus)
+        else:
+            label_genus = choose_label_genus(kept_contigs_by_genus)
+        with open(args.kept_genus, "w", encoding="utf-8") as handle:
+            if label_genus:
+                handle.write(f"{label_genus}\n")
 
     # The kept IDs as plain text. It is a declared output of rule select_contigs,
     # but no other rule reads it — the filtered FASTA written next is what
@@ -755,7 +795,11 @@ def main():
             "Check taxonomy assignments and decontamination settings."
         )
     print(f"Sample {args.sample} decontamination mode: {mode}")
+    if mode == "auto":
+        print(f"Auto vote by {args.auto_vote}: kept genus {auto_genus or 'none'}.")
     print(f"Kept {len(kept)} of {len(records)} contig assignments.")
+    if args.kept_genus:
+        print(f"Genus given to Bakta: {label_genus or 'none'}.")
 
 
 if __name__ == "__main__":

@@ -504,10 +504,12 @@ rule blob_table:
 # select_contigs — where contigs are actually kept or dropped. The helper script
 # reads the BlobTools table, resolves each contig to a genus, and applies the
 # policy the user configured in parameters.decontamination.mode:
-#   auto     — keep the genus carried by the most CONTIGS. A count, not base
-#              pairs: many short contigs can outvote the genus that holds the
-#              genome, and choose_auto_genus() records a case where that sent a
-#              4.5 Mb chromosome out as contamination.
+#   auto     — keep the genus that wins a vote, set by
+#              parameters.decontamination.auto_vote: the genus whose contigs add
+#              up to the most base pairs ("bp", the default) or the genus with the
+#              most contigs ("contigs"). Counting base pairs keeps the genus that
+#              holds most of the assembly, even when it sits in a few long contigs
+#              and another genus in many short ones.
 #   include  — keep only the listed genera
 #   exclude  — drop only the listed genera
 #   off      — keep everything (still writes the audit files)
@@ -534,16 +536,17 @@ rule blob_table:
 # Takes in:
 #   bestscore = BLOB_TABLE    (the per-contig taxonomy + coverage table)
 #   contigs   = DRAFT_CONTIGS (the sequences themselves)
-# Produces (all four paths are the same in every mode except the last):
-#   abund     = COMPOSITION       one line per genus, with its share of the DNA
-#                                 and its share of the contig count —
-#                                 "Bacillus: bases 0.29  contigs 0.30" — over
-#                                 EVERY contig in the BlobTools table, kept or
-#                                 dropped → read by rule annotation in
-#                                 shared/40_annotation.smk as Bakta's --genus
-#                                 hint. Read that rule's shell preface before
-#                                 trusting the hint: the two labelled figures
-#                                 broke its numeric sort.
+# Produces (all five paths are the same in every mode except the last):
+#   abund     = COMPOSITION       one line per genus, with its share of the base
+#                                 pairs and its share of the contigs —
+#                                 "Bacillus: bp 0.97  contigs 0.90" — over EVERY
+#                                 contig in the BlobTools table, kept or dropped.
+#                                 For people to read; no rule takes it as input.
+#   genus     = KEPT_GENUS        one line naming the genus that holds most of the
+#                                 KEPT contigs, counted like the auto vote (empty
+#                                 when no kept contig has a genus) → read by rule
+#                                 annotation in shared/40_annotation.smk, which
+#                                 gives it to Bakta as the organism name
 #   list      = CONTIG_LIST       the kept contig IDs, one per line
 #   decisions = CONTIG_DECISIONS  the audit TSV: every contig, its genus, and the
 #                                 REASON it was kept or dropped. Required by the
@@ -557,13 +560,14 @@ rule blob_table:
 # would be new behaviour; it is the same deferred decision as cazyme_db_download
 # (see docs/README_notes.md item 3).
 #
-# The seven policy values — mode, discard_no_hit and the five genus/override
-# fields — come verbatim from the DECONTAMINATION dict that _decontam_settings()
-# resolves once in 00_common.smk. Two of them are the per-sample escape hatch:
-# include_genera_by_sample and sample_overrides are FILE PATHS keyed by sample
-# name, which is how one awkward isolate deviates without changing the batch
-# policy. All 14 flags are passed with {...:q} quoting, so a genus list containing
-# spaces or a path with odd characters survives the shell intact.
+# The eight policy values — mode, auto_vote, discard_no_hit and the five
+# genus/override fields — come verbatim from the DECONTAMINATION dict that
+# _decontam_settings() resolves once in 00_common.smk. Two of them are the
+# per-sample escape hatch: include_genera_by_sample and sample_overrides are FILE
+# PATHS keyed by sample name, which is how one awkward isolate deviates without
+# changing the batch policy. All 16 flags are passed with {...:q} quoting, so a
+# genus list containing spaces or a path with odd characters survives the shell
+# intact.
 #
 # v1→v2 (additive): v1 had no log:, so the selector's warnings — notably
 # "WARNING: N contigs from the BlobTools table were not found in the FASTA" and
@@ -583,12 +587,14 @@ rule select_contigs:
         contigs = DRAFT_CONTIGS,
     output:
         abund = COMPOSITION,
+        genus = KEPT_GENUS,
         list = CONTIG_LIST,
         decisions = CONTIG_DECISIONS,
         contigs = DECONTAM_CONTIGS,
     params:
         selector = SELECT_TAXONOMY_SCRIPT,
         mode = DECONTAMINATION["mode"],
+        auto_vote = DECONTAMINATION["auto_vote"],
         include_genera = DECONTAMINATION["include_genera"],
         include_genera_by_sample = DECONTAMINATION["include_genera_by_sample"],
         exclude_genera = DECONTAMINATION["exclude_genera"],
@@ -604,6 +610,7 @@ rule select_contigs:
           --contigs {input.contigs:q} \
           --sample {wildcards.sample:q} \
           --mode {params.mode:q} \
+          --auto-vote {params.auto_vote:q} \
           --include-genera {params.include_genera:q} \
           --include-genera-by-sample {params.include_genera_by_sample:q} \
           --exclude-genera {params.exclude_genera:q} \
@@ -613,6 +620,7 @@ rule select_contigs:
           --output-list {output.list:q} \
           --output-fasta {output.contigs:q} \
           --composition {output.abund:q} \
+          --kept-genus {output.genus:q} \
           --decisions {output.decisions:q} > {log} 2>&1
         """
 
@@ -747,6 +755,7 @@ if LONGREAD_SCREEN:
         params:
             selector = SELECT_TAXONOMY_SCRIPT,
             mode = LONGREAD_SCREEN_MODE,
+            auto_vote = DECONTAMINATION["auto_vote"],
             include_genera = DECONTAMINATION["include_genera"],
             include_genera_by_sample = DECONTAMINATION["include_genera_by_sample"],
             exclude_genera = DECONTAMINATION["exclude_genera"],
@@ -762,6 +771,7 @@ if LONGREAD_SCREEN:
               --contigs {input.contigs:q} \
               --sample {wildcards.sample:q} \
               --mode {params.mode:q} \
+              --auto-vote {params.auto_vote:q} \
               --include-genera {params.include_genera:q} \
               --include-genera-by-sample {params.include_genera_by_sample:q} \
               --exclude-genera {params.exclude_genera:q} \

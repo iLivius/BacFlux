@@ -545,24 +545,22 @@ BENCH = OUT + "/benchmarks"
 # it. Built from DIR_ASSEMBLY so the stage number lives in exactly one place.
 FINAL_CONTIGS = DIR_ASSEMBLY + "/{sample}/contigs_final.fasta"
 
-# Second cross-stage hand-off, same single-source philosophy as FINAL_CONTIGS:
-# the genus-composition table. It is WRITTEN by the decontamination selector
-# (select_contigs, in shared/10_decontam.smk) and READ by the Bakta annotation
-# rule to pick the isolate's most likely genus. Defining the one canonical path
-# here means producer and consumer can never drift onto different strings (the
-# failure the Stage-2a review flagged). Lives under 02.assembly/ next to the
-# contaminant-screening outputs, per the D1 layout.
+# Two files the decontamination selector (select_contigs, in shared/10_decontam.smk)
+# writes next to its other outputs under 02.assembly/{sample}/contaminants/.
 #
-# CONTENT (verified against workflow/scripts/10_decontam/select_contigs_by_taxonomy.py, not
-# inferred): one line per genus, written as
-#     Genus: <relative frequency>
-# i.e. a COLON followed by a SPACE, then a fraction in 0.00-1.00 with 2 decimals
-# — NOT a percentage. Lines are sorted by descending contig count then genus
-# name; counts cover ALL contigs in the BlobTools table (not only the kept ones);
-# contigs with no taxonomic hit appear under the literal genus name "no-hit".
-# The Bakta rule's `sort -t':' -k2 -nr | cut -d':' -f1 | sed -n '1p'` idiom reads
-# exactly this shape (numeric sort tolerates the leading space).
+# COMPOSITION: each genus's share of the assembly, one line per genus, e.g.
+#     Bacillus: bp 0.97  contigs 0.90
+# the share of the base pairs and the share of the contigs BLAST assigned to that
+# genus, over EVERY contig in the BlobTools table, kept or dropped. Written for
+# people to read; no rule takes it as input.
+#
+# KEPT_GENUS: one line naming the genus that holds most of the KEPT contigs,
+# counted the same way as the auto vote (parameters.decontamination.auto_vote), or
+# an empty file when no kept contig has a genus. Read by rule annotation in
+# shared/40_annotation.smk, which gives it to Bakta as the organism name. Defined
+# here once so that the producer and the consumer can never use different paths.
 COMPOSITION = DIR_ASSEMBLY + "/{sample}/contaminants/{sample}_composition.txt"
+KEPT_GENUS = DIR_ASSEMBLY + "/{sample}/contaminants/{sample}_kept_genus.txt"
 
 # Shared antiSMASH reference-database directory: downloaded once by
 # secondary_metabolites_db and read by every per-sample secondary_metabolites_
@@ -1404,9 +1402,9 @@ def _decontam_settings(default_mode):
     #
     # Takes in: config["parameters"]["decontamination"] (the v2 schema) OR, for
     #           backwards compatibility, an old top-level parameters["genus"].
-    # Produces: a normalised dict with a validated mode, five text fields, and a
-    #           lowercased "true"/"false" string for discard_no_hit (it is passed
-    #           as a CLI argument, hence a string not a bool).
+    # Produces: a normalised dict with a validated mode and auto_vote, five text
+    #           fields, and a lowercased "true"/"false" string for discard_no_hit
+    #           (it is passed as a CLI argument, hence a string not a bool).
     #
     # This block is mode-INDEPENDENT (decontamination policy is the same for all
     # four modes), so it runs unconditionally.
@@ -1429,6 +1427,18 @@ def _decontam_settings(default_mode):
     if mode not in {"auto", "include", "exclude", "off"}:
         raise ValueError("Invalid decontamination.mode. Expected one of: auto, include, exclude, off.")
     settings["mode"] = mode
+
+    # What auto mode counts per genus before keeping the one with the largest
+    # number: base pairs ("bp", the default) or contigs ("contigs"). Read in every
+    # mode, because the hybrid final screen can be set to auto as well, and the
+    # genus Bakta is given is counted the same way.
+    auto_vote = str(settings.get("auto_vote", "bp") or "bp").strip().lower()
+    if auto_vote not in {"bp", "contigs"}:
+        sys.exit(
+            f"[BacFlux] parameters.decontamination.auto_vote must be bp or contigs "
+            f"(got: {settings.get('auto_vote')!r})."
+        )
+    settings["auto_vote"] = auto_vote
 
     # include_genera / exclude_genera are inline genus lists; the *_by_sample,
     # *_file and sample_overrides fields are file paths — all normalised to text.
@@ -1494,7 +1504,8 @@ def has_explicit_medaka_model(value):
 DECONTAMINATION = _decontam_settings("auto")
 print(
     "Decontamination mode: "
-    f"{DECONTAMINATION['mode']} (discard_no_hit={DECONTAMINATION['discard_no_hit']})."
+    f"{DECONTAMINATION['mode']} (auto_vote={DECONTAMINATION['auto_vote']}, "
+    f"discard_no_hit={DECONTAMINATION['discard_no_hit']})."
 )
 
 

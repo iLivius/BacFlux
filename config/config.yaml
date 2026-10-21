@@ -296,6 +296,23 @@ parameters:
     # This is INDEPENDENT of parameters.long_read_qc above. Both can delete a
     # plasmid's ONT reads, for different reasons, and both must be ruled out.
     mode: auto                 # Options: auto | include | exclude | off
+    auto_vote: bp              # [auto] Options: bp (default) | contigs
+                               #   How auto mode picks the ONE genus it keeps:
+                               #   bp      = the genus whose contigs add up to the
+                               #             most base pairs, i.e. the genus that
+                               #             makes up most of the assembly;
+                               #   contigs = the genus with the most contigs.
+                               #   They agree on a clean isolate. They differ when
+                               #   one genus sits in a few long contigs and another
+                               #   in many short ones, which is the normal shape of
+                               #   a long-read assembly: a chromosome plus a few
+                               #   plasmids that BLAST assigns to another genus
+                               #   would outvote the chromosome on a contig count.
+                               #   If two genera tie exactly, the alphabetically
+                               #   first is kept, so the answer never changes
+                               #   between runs. The genus Bakta writes as the
+                               #   organism name is counted the same way, over the
+                               #   kept contigs.
     discard_no_hit: true       # discard contigs with no taxonomic hit
     long_read_mode: "off"      # [hybrid] Options: off (default) | auto | include | exclude
                                #   A SECOND screen, of the genome hybrid actually
