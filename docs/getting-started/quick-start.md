@@ -287,8 +287,8 @@ short reads). `08.mobilome` appears only when the module is switched on — see
 Intermediates are declared temporary and deleted as soon as the last rule needing
 them has finished, which is why `01.reads` ends up holding only reports and the
 PhiX genome; the PhiX index is rebuilt whenever it is needed. CARD's extracted copy
-under `05.amr/card_db/` is temporary too and is fetched again on a fresh run; set
-`directories.card_db` to a copy you hold to avoid that.
+under `05.amr/card_db/` is kept, so it is downloaded once per output folder; set
+`directories.card_db` to a copy you hold to skip even that.
 
 The files most runs end at:
 

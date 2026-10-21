@@ -162,7 +162,7 @@ same output directory across runs of a project and they are downloaded once.
 | Database | Where it lands | Link key | Read in |
 |---|---|---|---|
 | PhiX | `01.reads/phix/` | `links.phix_link` | `illumina`, `hybrid` — **required** |
-| CARD | `05.amr/card_db/` (temporary) | `links.card_link` | `illumina`, `hybrid` — **required** |
+| CARD | `05.amr/card_db/` (kept, about 50 MB) | `links.card_link` | `illumina`, `hybrid` — **required** |
 | dbCAN | `04.annotation/dbcan/<version>/` | `links.dbcan_link` | all |
 | antiSMASH | `04.annotation/antismash/databases/` | — (its own downloader) | all |
 | CheckV | `07.phages/checkv_db/` | `links.checkv_link` | all |
@@ -230,12 +230,20 @@ Set any of these and the corresponding download is skipped entirely.
 | `directories.vs2_db` | what `virsorter setup` produced (~10 GB) | only read when `phage.caller: virsorter2` |
 | `directories.antismash_db` | what `download-antismash-databases` produced | large |
 | `directories.dbcan_db` | a dbCAN database matching the version in `links.dbcan_link` | avoids a repeat download per project |
-| `directories.card_db` | an extracted CARD database | CARD is temporary and re-fetched every run otherwise |
+| `directories.card_db` | an extracted CARD database | otherwise CARD is downloaded once into each output folder and kept there |
 | `directories.genomad_db` | the **inner** `genomad_db/` directory — the one holding `version.txt` and `genomad_db.dbtype` | its downloader hard-codes one host with no mirror option, so a local copy is the only fallback |
 
 Each of these gets a harder check than the five required paths: BacFlux confirms the
 directory exists **and** holds a file only that database has, so a path aimed at the
 wrong copy is caught at parse time rather than by the tool.
+
+**Switching to another release in an existing output folder.** A database the workflow
+downloaded, or linked from your copy, is kept in the output folder. Under
+`--rerun-triggers mtime`, a changed link or `directories.*_db` path does not replace
+it, and new samples are then analysed against the old copy. To switch, delete that
+database's folder in the output folder first, or start a new output folder. Deleting it
+re-runs every step that read it; for CARD in `illumina` and `hybrid` that reaches back
+to the read trimming and the assembly.
 
 !!! warning "`version.txt` must be readable, not merely present"
 

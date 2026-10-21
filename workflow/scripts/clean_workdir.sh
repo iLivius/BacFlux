@@ -280,12 +280,12 @@ case "$WORKFLOW" in
       # checking where classify_wf's own output actually lives for the GTDB-Tk
       # version pinned in workflow/envs/gtdbtk.yaml.
 
-      # 05.amr also has no targets, for a different reason: in v2 the CARD
-      # database and BBMap's per-sample ref/ index are declared temp() outputs
-      # (shared/50_amr.smk), so Snakemake removes them itself once the mapping
-      # rule finishes and there is nothing left here to clean. v1 kept them, which
-      # is why the retired BacFluxL+ list further down still carries 11.AMR/AMR_db
-      # and 11.AMR/AMR_mapping/*/ref.
+      # CARD, fetched into the output tree (links.card_link) and kept, like the
+      # PhiX genome above: a database, not a result. With directories.card_db
+      # set it is a folder of symlinks to your own copy, and rm -rf removes only
+      # the links. BBMap's per-sample ref/ index is a temp() output
+      # (shared/50_amr.smk) that Snakemake removes itself, so it needs no target.
+      "05.amr/card_db"
 
       # antiSMASH's bundled reference database, fetched into the output tree
       # per project rather than pointed at a shared path. Reliably the single

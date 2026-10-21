@@ -174,10 +174,19 @@ if HAS_SHORT_READS:
     # wget the .tar.bz2 named by links.card_link, then extract it. Every sample
     # waits on this one download.
     #
-    # Produces card_tarball and card_dir, both temp(): nothing downstream needs
-    # the raw database, so Snakemake deletes them once every job that reads them
-    # is done. Consumed by map_amr_db (the reference sequences) and by
-    # card_mapping_report (aro_index.tsv), so the delete waits for both.
+    # Produces card_tarball, temp(), and card_dir, which is KEPT, like the PhiX
+    # genome. Consumed by map_amr_db (the reference sequences) and by
+    # card_mapping_report (aro_index.tsv).
+    #
+    # Why card_dir is kept: the trimmed reads map_amr_db reads are temp(). If CARD
+    # were deleted at the end of a run and fetched again later, for example by
+    # `download_all`, every finished sample's map_amr_db would see a newer input,
+    # need its trimmed reads again, and re-run from the read trimming onwards,
+    # the assembly included. Kept, CARD is fetched once per output folder, and
+    # download_all can prepare it ahead of an offline run. It takes about 50 MB.
+    # The flip side: a kept copy is not replaced when links.card_link or
+    # directories.card_db changes under --rerun-triggers mtime; delete
+    # 05.amr/card_db (or start a new output folder) to switch CARD releases.
     #
     # The tarball is a SIBLING of the extraction directory, not a file inside it.
     # v1 declared it inside the same rule's directory() output; the house rule
@@ -202,7 +211,7 @@ if HAS_SHORT_READS:
             localrule: True
             output:
                 card_tarball = temp(CARD_TARBALL),
-                card_dir = temp(directory(CARD_DB_DIR)),
+                card_dir = directory(CARD_DB_DIR),
             params:
                 # Resolved and validated once in 00_common.smk §7: a short-read
                 # config that omits links.card_link is rejected at parse time, by
@@ -241,7 +250,8 @@ if HAS_SHORT_READS:
             input:
                 src = CARDDB,
             output:
-                card_dir = temp(directory(CARD_DB_DIR)),
+                # Kept, not temp(), for the same reason as in download_amr_db.
+                card_dir = directory(CARD_DB_DIR),
             log:
                 LOGS + "/download_amr_db_local.log"
             shell:

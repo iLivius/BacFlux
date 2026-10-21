@@ -268,8 +268,8 @@ destroyed.
     gene's length** (`CARD_MIN_COVERED`, same file), not from per-read identity.
 
 `05.amr/card_db/` holds the CARD database this run used — downloaded there, or a
-symlink view of the copy at `directories.card_db`. Either way it is temporary, and
-goes once the mapping and the report have both read it. See
+symlink view of the copy at `directories.card_db`. Either way it is kept, so CARD is
+fetched once per output folder. See
 [Antimicrobial resistance](../analysis/amr.md).
 
 ---
@@ -399,7 +399,7 @@ not a failure.
 | `02.assembly/{sample}/eval/genomes/` | Staging copies of the assemblies under their bin ids, for QUAST, CheckM and GTDB-Tk. |
 | `02.assembly/{sample}/polypolish/` contents | Alignments and the pre-correction draft. |
 | `04.annotation/eggnog/{sample}_tmp/` | emapper's scratch space. |
-| `05.amr/card_db/`, and `05.amr/card.tar.bz2` on the download path | The CARD database, needed only until the mapping and the report have read it. |
+| `05.amr/card.tar.bz2`, on the download path | The downloaded CARD archive, removed once it is unpacked into `05.amr/card_db/`, which is kept. |
 | `08.mobilome/{sample}/assembly_depth_ref/`, `isosdb_ref/` | BBMap indexes for the copy-number leg. |
 | `09.report/multiqc_inputs/` | Relabelled CheckM and GTDB-Tk copies staged for MultiQC. |
 

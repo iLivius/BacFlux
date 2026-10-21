@@ -321,12 +321,14 @@ whole batch stopping. Fix the one sample, then resume with `--rerun-incomplete`.
 |---|---|---|
 | `.snakemake/conda/` in the launch directory, or the `--conda-prefix` folder | the per-rule environments, and the Medaka model weights stored inside the medaka one | rebuilt from scratch, needs network |
 | `.snakemake/` metadata | what is up to date, and the lock | the next run recomputes more than it needs to |
-| under `output_dir` | the databases the workflow fetches and keeps — the PhiX genome, antiSMASH, dbCAN, CheckV, the phage caller's own database, and the optional mobilome databases | re-downloaded |
+| under `output_dir` | the databases the workflow fetches and keeps — the PhiX genome, CARD, antiSMASH, dbCAN, CheckV, the phage caller's own database, and the optional mobilome databases | re-downloaded |
 | `output_dir/logs/` | one log per rule and sample (`LOGS` in `00_common.smk`) | nothing recomputes; you lose the record |
 
-CARD is the one download that does not persist: rule `download_amr_db` declares it
-`temp()`, so Snakemake deletes it as soon as the last rule reading it finishes,
-and the next run that needs it fetches it again.
+CARD is kept for a reason beyond saving a download. The CARD step reads the trimmed
+reads, which are temporary. A CARD folder fetched again after a run would be newer
+than every finished sample's CARD result, so the next run would redo that step for
+each sample, and with it the read trimming and everything after it, the assembly
+included. Kept, CARD is fetched once per output folder.
 
 Reusing the same launch directory and the same `output_dir` is what keeps the
 rest from being rebuilt. Databases you already hold elsewhere can be pointed at
@@ -413,7 +415,7 @@ What `download_all` fetches, according to the configuration:
 | Download | Rule | When | Where it lands, under `output_dir` |
 |---|---|---|---|
 | PhiX genome | `download_phix` | `illumina`, `hybrid` | `01.reads/phix/` |
-| CARD | `download_amr_db` | `illumina`, `hybrid`, unless `directories.card_db` names your copy | `05.amr/card_db/`; temporary, so the run deletes it after its last reader |
+| CARD | `download_amr_db` | `illumina`, `hybrid`, unless `directories.card_db` names your copy | `05.amr/card_db/` |
 | dbCAN database | `cazyme_db_download` | unless `directories.dbcan_db` names your copy | `04.annotation/dbcan/<release>/` |
 | antiSMASH databases | `secondary_metabolites_db` | unless `directories.antismash_db` names your copy | `04.annotation/antismash/databases/` |
 | VirSorter2 database | `virsorter2_db` | `phage.caller: virsorter2`, unless `directories.vs2_db` names your copy | `07.phages/vs2_db/` |
