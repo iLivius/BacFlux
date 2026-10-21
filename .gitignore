@@ -34,3 +34,12 @@ site/
 # Local working notes. They stay on the maintainer's disk and are not part of the
 # repository; the rules for contributors are in CONTRIBUTING.md.
 /CLAUDE.md
+
+# The same for the internal working documents kept beside the manual in docs/:
+# design notes, the plan for merging the four v1 workflows, and validation
+# records. mkdocs.yml leaves the same files out of the website (exclude_docs);
+# keep the two lists alike.
+/docs/README_notes.md
+/docs/mobilome_*.md
+/docs/unification_migration_plan.md
+/docs/validation/

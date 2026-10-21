@@ -63,8 +63,6 @@ jobs:
       # leaves the previous version live) if the build itself errors outright.
       #
       # The `paths:` filter above means this job does not fire on a rule-file or
-      # script change. That matters here in a way it does not for the sibling
-      # workflows: docs/ also holds BacFlux's internal working documents, which
-      # mkdocs.yml excludes from the site (see exclude_docs there). Editing one of
-      # those does trigger this job, and correctly rebuilds nothing new.
+      # script change, only when the manual (docs/, mkdocs.yml) or this file
+      # changes.
       - run: mkdocs gh-deploy --force
