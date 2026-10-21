@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Unit tests for workflow/scripts/50_amr/card_mapping_report.py.
 
-No tools, no CARD download: the fixtures below are a handful of real BBMap
-covstats lines (copied verbatim from a finished run, trailing space and all) and
-a cut-down aro_index.tsv holding only the accessions those lines mention.
+No tools, no CARD download: the fixtures below are a handful of covstats lines
+in BBMap's exact layout (trailing space and all, with invented coverage
+figures) and a cut-down aro_index.tsv holding only the accessions those lines
+mention.
 
 The script joins TWO BBMap passes over the same sample — one at a near-exact read
 identity — and attaches CARD's own
@@ -31,16 +32,19 @@ import unittest
 import card_mapping_report as cmr  # noqa: E402
 
 
-# ── Real covstats rows at two identity filters, and a cut-down aro_index ────
-# Real covstats rows from a Pseudomonas isolate, plus two invented ones so the
-# fixture covers the categories that isolate happens not to carry. Note the
-# trailing space after the closing bracket of the organism: BBMap keeps whatever
-# whitespace CARD's FASTA defline had, and the parser must survive it.
+# ── Covstats rows in BBMap's own layout, and a cut-down aro_index ───────────
+# Every coverage figure here is invented. The first three rows are of the kind a
+# Pseudomonas isolate gives (two RND efflux subunits and an efflux regulator),
+# with the same coverages as the illustrative table in docs/analysis/amr.md; the
+# rest add the categories such an isolate would not carry, plus one row below
+# the threshold. Note the trailing space after the closing bracket of the
+# organism: BBMap keeps whatever whitespace CARD's FASTA defline had, and the
+# parser must survive it.
 COVSTATS_STRICT = "\n".join([
     "#ID\tAvg_fold\tLength\tRef_GC\tCovered_percent\tCovered_bases\tPlus_reads\tMinus_reads\tRead_GC\tMedian_fold\tStd_Dev",
-    "gb|AE004091.2|+|2810008-2813197|ARO:3000804|MexF [Pseudomonas aeruginosa PAO1] \t39.57\t3189\t0.65\t100.0000\t3189\t448\t448\t0.67\t44\t15.72",
-    "gb|AE004091.2|+|179521-182569|ARO:3003681|TriC [Pseudomonas aeruginosa PAO1] \t18.11\t3048\t0.65\t95.7677\t2919\t195\t193\t0.65\t10\t17.56",
-    "gb|AE004091.2|+|4292297-4292998|ARO:3000829|CpxR [Escherichia coli] \t12.00\t702\t0.53\t99.0000\t695\t60\t60\t0.53\t12\t4.00",
+    "gb|AE004091.2|+|2810008-2813197|ARO:3000804|MexF [Pseudomonas aeruginosa PAO1] \t31.42\t3189\t0.65\t91.8156\t2928\t336\t331\t0.66\t33\t14.08",
+    "gb|AE004091.2|+|179521-182569|ARO:3003681|TriC [Pseudomonas aeruginosa PAO1] \t21.37\t3048\t0.65\t84.2520\t2568\t218\t216\t0.64\t19\t16.83",
+    "gb|AE004091.2|+|4292297-4292998|ARO:3000829|CpxR [Escherichia coli] \t14.86\t702\t0.53\t96.4387\t677\t35\t34\t0.55\t15\t3.71",
     # An acquired beta-lactamase: the category the report exists to keep visible.
     "gb|FJ234049.1|+|0-861|ARO:3001864|OXA-58 [Acinetobacter baumannii] \t25.00\t861\t0.40\t98.0000\t844\t70\t70\t0.40\t25\t6.00",
     # An outer-membrane porin whose LOSS confers resistance. Present here, which
@@ -105,7 +109,7 @@ class TestParsers(unittest.TestCase):
         coverage = cmr.parse_covstats(write_temp(COVSTATS_STRICT))
         key = "gb|AE004091.2|+|2810008-2813197|ARO:3000804|MexF [Pseudomonas aeruginosa PAO1]"
         self.assertIn(key, coverage)
-        self.assertEqual(coverage[key], 100.0)
+        self.assertEqual(coverage[key], 91.8156)
 
     def test_header_and_blank_lines_are_not_rows(self):
         coverage = cmr.parse_covstats(write_temp(COVSTATS_STRICT))
@@ -189,10 +193,10 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(category, "regulator")
 
     def test_a_determinant_whose_name_ends_in_R_is_not_demoted(self):
-        # Found on a real Bacillus from this project's test set: vmlR is an ABC-F
-        # ribosomal protection protein and a genuine resistance gene, and the bare
-        # -R convention filed it as a regulator. CARD's mechanism is what settles
-        # it — target protection, not efflux, so the convention does not apply.
+        # vmlR, found in Bacillus, is an ABC-F ribosomal protection protein and a
+        # genuine resistance gene, yet the bare -R convention would file it as a
+        # regulator. CARD's mechanism is what settles it — target protection, not
+        # efflux, so the convention does not apply.
         category, notes = cmr.classify(
             "vmlR",
             "Miscellaneous ABC-F subfamily ATP-binding cassette ribosomal "
@@ -324,6 +328,10 @@ class TestBuildRows(unittest.TestCase):
         lines = self.run_main()
         names = [line.split("\t")[1] for line in lines[1:]]
         self.assertEqual(names[:2], ["OXA-58", "CTX-M-15"])
+        # Category first, coverage second: CpxR (96.44%) sits BELOW TriC
+        # (84.25%) because regulators come after efflux subunits. This is the
+        # order docs/analysis/amr.md shows for these three rows.
+        self.assertEqual(names[2:5], ["MexF", "TriC", "CpxR"])
         self.assertEqual(names[-1], "OmpK36")
 
     def test_an_isolate_with_no_hits_writes_a_header_only_file(self):

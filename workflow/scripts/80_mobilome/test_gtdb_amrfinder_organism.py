@@ -29,8 +29,8 @@ import gtdb_amrfinder_organism as gao
 
 # ── Fixtures: build realistic GTDB-Tk summary files ──────────────────────────
 
-# The real GTDB-Tk 2.x bac120 summary header, copied from
-# 03.taxonomy/{sample}/gtdbtk.bac120.summary.tsv of a v2 validation run.
+# The real GTDB-Tk 2.x bac120 summary header, exactly as GTDB-Tk writes it into
+# 03.taxonomy/{sample}/gtdbtk.bac120.summary.tsv.
 GTDBTK_HEADER = [
     "user_genome", "classification", "closest_genome_reference",
     "closest_genome_reference_radius", "closest_genome_taxonomy",
@@ -87,7 +87,7 @@ def read_audit(path):
 
 def test_curated_list_has_31_organisms():
     # AMRFinderPlus 4.2.7 curates exactly 31 organisms (verified with
-    # `amrfinder --list_organisms`, docs/mobilome_wpA_ground_truth.md).
+    # `amrfinder --list_organisms`).
     assert len(gao.ALL_ORGANISMS) == 31
     assert len(gao.SPECIES_ORGANISMS) == 28
     # Two of the three genus-level organisms may be picked FROM THE GENUS alone.
@@ -188,8 +188,8 @@ def test_every_returned_organism_is_a_real_amrfinder_value():
 # ── Refusing to match: the GTDB-vs-NCBI mismatches ───────────────────────────
 
 def test_gtdb_suffixed_genus_does_not_match_the_unsuffixed_organism():
-    # The headline case for this project: Pseudomonas_E is a lineage GTDB split
-    # off from Pseudomonas. It is NOT P. aeruginosa, so no --organism.
+    # The headline case: Pseudomonas_E is a lineage GTDB split off from
+    # Pseudomonas. It is NOT P. aeruginosa, so no --organism.
     organism, reason = gao.map_classification(
         lineage("Pseudomonas_E", "Pseudomonas_E sp010095445"))
     assert organism == ""
@@ -352,7 +352,7 @@ def test_placeholder_species_in_a_curated_genus():
 
 
 def test_placeholder_species_in_an_uncurated_genus_gets_the_plain_reason():
-    # Arthrobacter (a real isolate in this project) has nothing curated at all;
+    # Arthrobacter, a common environmental genus, has nothing curated at all;
     # blaming the placeholder epithet would be a red herring.
     organism, reason = gao.map_classification(
         lineage("Arthrobacter", "Arthrobacter sp026393275"))
@@ -397,7 +397,7 @@ def test_unclassified_and_empty_classifications():
 
 
 def test_uncurated_environmental_genus():
-    # Paenibacillus: the third genus in this project's screening set.
+    # Paenibacillus: another environmental genus with nothing curated.
     organism, reason = gao.map_classification(
         lineage("Paenibacillus", "Paenibacillus sp012647845"))
     assert organism == ""
@@ -408,9 +408,9 @@ def test_uncurated_environmental_genus():
 
 def test_single_row_summary(tmp_path):
     summary = write_summary(tmp_path, [
-        ("006", lineage("Pseudomonas", "Pseudomonas aeruginosa")),
+        ("SAMPLE1", lineage("Pseudomonas", "Pseudomonas aeruginosa")),
     ])
-    organism, classification, reason = gao.decide_organism(summary, "006")
+    organism, classification, reason = gao.decide_organism(summary, "SAMPLE1")
     assert organism == "Pseudomonas_aeruginosa"
     assert "s__Pseudomonas aeruginosa" in classification
     assert reason.startswith("exact species match")
@@ -420,24 +420,25 @@ def test_multi_row_summary_from_hybrid_mode(tmp_path):
     # Hybrid mode classifies both assemblies of one isolate; they agree, so the
     # single shared answer is used and the audit records that they agreed.
     summary = write_summary(tmp_path, [
-        ("006_illumina", lineage("Klebsiella", "Klebsiella pneumoniae")),
-        ("006_ont", lineage("Klebsiella", "Klebsiella pneumoniae")),
+        ("SAMPLE1_illumina", lineage("Klebsiella", "Klebsiella pneumoniae")),
+        ("SAMPLE1_ont", lineage("Klebsiella", "Klebsiella pneumoniae")),
     ])
-    organism, classification, reason = gao.decide_organism(summary, "006")
+    organism, classification, reason = gao.decide_organism(summary, "SAMPLE1")
     assert organism == "Klebsiella_pneumoniae"
     assert "2 assemblies of this sample agree" in reason
-    assert "006_illumina" in reason and "006_ont" in reason
+    assert "SAMPLE1_illumina" in reason and "SAMPLE1_ont" in reason
     # Identical classifications are reported once, not twice.
     assert classification.count("d__Bacteria") == 1
 
 
 def test_multi_row_summary_agreeing_on_no_organism(tmp_path):
-    # The common case in this project: both assemblies say Pseudomonas_E.
+    # The usual outcome for an environmental isolate: both assemblies agree on a
+    # lineage with no curated organism, here Pseudomonas_E.
     summary = write_summary(tmp_path, [
-        ("015_illumina", lineage("Pseudomonas_E", "Pseudomonas_E sp024807945")),
-        ("015_ont", lineage("Pseudomonas_E", "Pseudomonas_E sp024807945")),
+        ("SAMPLE2_illumina", lineage("Pseudomonas_E", "Pseudomonas_E sp024807945")),
+        ("SAMPLE2_ont", lineage("Pseudomonas_E", "Pseudomonas_E sp024807945")),
     ])
-    organism, _, reason = gao.decide_organism(summary, "015")
+    organism, _, reason = gao.decide_organism(summary, "SAMPLE2")
     assert organism == ""
     assert "Pseudomonas_E" in reason
 
@@ -446,49 +447,49 @@ def test_multi_row_summary_that_disagrees_emits_no_organism(tmp_path):
     # Two assemblies of one isolate landing on different organisms means the
     # taxonomy is not solid enough to pick a point-mutation list.
     summary = write_summary(tmp_path, [
-        ("006_illumina", lineage("Klebsiella", "Klebsiella pneumoniae")),
-        ("006_ont", lineage("Klebsiella", "Klebsiella oxytoca")),
+        ("SAMPLE1_illumina", lineage("Klebsiella", "Klebsiella pneumoniae")),
+        ("SAMPLE1_ont", lineage("Klebsiella", "Klebsiella oxytoca")),
     ])
-    organism, classification, reason = gao.decide_organism(summary, "006")
+    organism, classification, reason = gao.decide_organism(summary, "SAMPLE1")
     assert organism == ""
     assert "classified differently" in reason
-    assert "006_illumina=Klebsiella_pneumoniae" in reason
-    assert "006_ont=Klebsiella_oxytoca" in reason
+    assert "SAMPLE1_illumina=Klebsiella_pneumoniae" in reason
+    assert "SAMPLE1_ont=Klebsiella_oxytoca" in reason
     # Both lineages are kept in the audit so the disagreement is visible.
     assert classification.count("d__Bacteria") == 2
 
 
 def test_disagreement_between_a_match_and_no_match(tmp_path):
     summary = write_summary(tmp_path, [
-        ("386_illumina", lineage("Pseudomonas", "Pseudomonas aeruginosa")),
-        ("386_ont", lineage("Pseudomonas_E", "Pseudomonas_E sp010095445")),
+        ("SAMPLE3_illumina", lineage("Pseudomonas", "Pseudomonas aeruginosa")),
+        ("SAMPLE3_ont", lineage("Pseudomonas_E", "Pseudomonas_E sp010095445")),
     ])
-    organism, _, reason = gao.decide_organism(summary, "386")
+    organism, _, reason = gao.decide_organism(summary, "SAMPLE3")
     assert organism == ""
-    assert "386_ont=none" in reason
+    assert "SAMPLE3_ont=none" in reason
 
 
 def test_rows_of_other_genomes_are_ignored(tmp_path):
     # Belt and braces: if a summary ever held more than one isolate, only the
     # requested sample's rows may drive the decision.
     summary = write_summary(tmp_path, [
-        ("015_illumina", lineage("Klebsiella", "Klebsiella oxytoca")),
-        ("006_illumina", lineage("Klebsiella", "Klebsiella pneumoniae")),
-        ("006_ont", lineage("Klebsiella", "Klebsiella pneumoniae")),
+        ("SAMPLE2_illumina", lineage("Klebsiella", "Klebsiella oxytoca")),
+        ("SAMPLE1_illumina", lineage("Klebsiella", "Klebsiella pneumoniae")),
+        ("SAMPLE1_ont", lineage("Klebsiella", "Klebsiella pneumoniae")),
     ])
-    organism, _, reason = gao.decide_organism(summary, "006")
+    organism, _, reason = gao.decide_organism(summary, "SAMPLE1")
     assert organism == "Klebsiella_pneumoniae"
-    assert "015_illumina" not in reason
+    assert "SAMPLE2_illumina" not in reason
 
 
 def test_sample_name_prefix_does_not_leak_into_another_sample(tmp_path):
-    # "006" must not swallow a row named "0061": matching is on the exact name
-    # or the name plus an underscore.
+    # "SAMPLE1" must not swallow a row named "SAMPLE10": matching is on the
+    # exact name or the name plus an underscore.
     summary = write_summary(tmp_path, [
-        ("0061", lineage("Klebsiella", "Klebsiella oxytoca")),
-        ("006", lineage("Klebsiella", "Klebsiella pneumoniae")),
+        ("SAMPLE10", lineage("Klebsiella", "Klebsiella oxytoca")),
+        ("SAMPLE1", lineage("Klebsiella", "Klebsiella pneumoniae")),
     ])
-    organism, _, _ = gao.decide_organism(summary, "006")
+    organism, _, _ = gao.decide_organism(summary, "SAMPLE1")
     assert organism == "Klebsiella_pneumoniae"
 
 
@@ -499,7 +500,7 @@ def test_row_not_named_after_the_sample_is_still_used(tmp_path):
     summary = write_summary(tmp_path, [
         ("contigs_final", lineage("Vibrio", "Vibrio cholerae")),
     ])
-    organism, _, reason = gao.decide_organism(summary, "006")
+    organism, _, reason = gao.decide_organism(summary, "SAMPLE1")
     assert organism == "Vibrio_cholerae"
     assert "used every row" in reason
 
@@ -507,25 +508,25 @@ def test_row_not_named_after_the_sample_is_still_used(tmp_path):
 def test_truncated_line_is_skipped_not_fatal(tmp_path):
     summary = tmp_path / "gtdbtk.bac120.summary.tsv"
     good = [""] * len(GTDBTK_HEADER)
-    good[0] = "006"
+    good[0] = "SAMPLE1"
     good[1] = lineage("Vibrio", "Vibrio vulnificus")
     summary.write_text("\n".join([
         "\t".join(GTDBTK_HEADER),
-        "006_broken",              # a single field: an interrupted GTDB-Tk write
+        "SAMPLE1_broken",              # a single field: an interrupted GTDB-Tk write
         "\t".join(good),
     ]) + "\n")
-    organism, _, _ = gao.decide_organism(str(summary), "006")
+    organism, _, _ = gao.decide_organism(str(summary), "SAMPLE1")
     assert organism == "Vibrio_vulnificus"
 
 
 def test_windows_line_endings_are_handled(tmp_path):
     summary = tmp_path / "gtdbtk.bac120.summary.tsv"
     row = [""] * len(GTDBTK_HEADER)
-    row[0] = "006"
+    row[0] = "SAMPLE1"
     row[1] = lineage("Helicobacter", "Helicobacter pylori")
     summary.write_text("\r\n".join([
         "\t".join(GTDBTK_HEADER), "\t".join(row)]) + "\r\n")
-    organism, _, _ = gao.decide_organism(str(summary), "006")
+    organism, _, _ = gao.decide_organism(str(summary), "SAMPLE1")
     assert organism == "Helicobacter_pylori"
 
 
@@ -533,7 +534,7 @@ def test_windows_line_endings_are_handled(tmp_path):
 
 def test_missing_summary_file(tmp_path):
     organism, classification, reason = gao.decide_organism(
-        str(tmp_path / "does_not_exist.tsv"), "006")
+        str(tmp_path / "does_not_exist.tsv"), "SAMPLE1")
     assert organism == ""
     assert classification == ""
     assert "not found" in reason
@@ -542,14 +543,14 @@ def test_missing_summary_file(tmp_path):
 def test_empty_summary_file(tmp_path):
     summary = tmp_path / "gtdbtk.bac120.summary.tsv"
     summary.write_text("")
-    organism, _, reason = gao.decide_organism(str(summary), "006")
+    organism, _, reason = gao.decide_organism(str(summary), "SAMPLE1")
     assert organism == ""
     assert "empty" in reason
 
 
 def test_header_only_summary_file(tmp_path):
     summary = write_summary(tmp_path, [])
-    organism, _, reason = gao.decide_organism(summary, "006")
+    organism, _, reason = gao.decide_organism(summary, "SAMPLE1")
     assert organism == ""
     assert "no usable rows" in reason
 
@@ -557,7 +558,7 @@ def test_header_only_summary_file(tmp_path):
 def test_summary_without_the_expected_columns(tmp_path):
     summary = tmp_path / "gtdbtk.bac120.summary.tsv"
     summary.write_text("genome\tlineage\nfoo\tbar\n")
-    organism, _, reason = gao.decide_organism(str(summary), "006")
+    organism, _, reason = gao.decide_organism(str(summary), "SAMPLE1")
     assert organism == ""
     assert "no user_genome/classification columns" in reason
 
@@ -566,7 +567,7 @@ def test_summary_without_the_expected_columns(tmp_path):
 
 def test_find_summary_at_the_top_level(tmp_path):
     # classify_wf leaves a copy/symlink of the summary at the top level.
-    write_summary(tmp_path, [("006", lineage("Vibrio", "Vibrio cholerae"))])
+    write_summary(tmp_path, [("SAMPLE1", lineage("Vibrio", "Vibrio cholerae"))])
     found, problem = gao.find_summary_in_dir(str(tmp_path))
     assert problem == ""
     assert found.endswith("gtdbtk.bac120.summary.tsv")
@@ -577,7 +578,7 @@ def test_find_summary_in_the_classify_subdirectory(tmp_path):
     # and a rule may be pointed at a directory where it was never made.
     classify = tmp_path / "classify"
     classify.mkdir()
-    write_summary(classify, [("006", lineage("Vibrio", "Vibrio cholerae"))])
+    write_summary(classify, [("SAMPLE1", lineage("Vibrio", "Vibrio cholerae"))])
     found, problem = gao.find_summary_in_dir(str(tmp_path))
     assert problem == ""
     assert found.endswith(os.path.join("classify", "gtdbtk.bac120.summary.tsv"))
@@ -585,15 +586,15 @@ def test_find_summary_in_the_classify_subdirectory(tmp_path):
 
 def test_bacterial_summary_wins_over_the_archaeal_one(tmp_path):
     # BacFlux is a bacterial workflow; when GTDB-Tk wrote both, read bac120.
-    write_summary(tmp_path, [("006", lineage("Vibrio", "Vibrio cholerae"))],
+    write_summary(tmp_path, [("SAMPLE1", lineage("Vibrio", "Vibrio cholerae"))],
                   name="gtdbtk.ar53.summary.tsv")
-    write_summary(tmp_path, [("006", lineage("Klebsiella", "Klebsiella oxytoca"))])
+    write_summary(tmp_path, [("SAMPLE1", lineage("Klebsiella", "Klebsiella oxytoca"))])
     found, _ = gao.find_summary_in_dir(str(tmp_path))
     assert found.endswith("gtdbtk.bac120.summary.tsv")
 
 
 def test_directory_without_a_summary_is_not_fatal(tmp_path):
-    empty_dir = tmp_path / "03.taxonomy" / "006"
+    empty_dir = tmp_path / "03.taxonomy" / "SAMPLE1"
     empty_dir.mkdir(parents=True)
     found, problem = gao.find_summary_in_dir(str(empty_dir))
     assert found == ""
@@ -609,19 +610,19 @@ def test_missing_directory_is_not_fatal(tmp_path):
 def test_cli_accepts_the_directory_form(tmp_path):
     # The Snakemake rule declares the whole 03.taxonomy/{sample} directory as
     # its input, so it passes --gtdbtk-dir instead of --gtdbtk-summary.
-    taxonomy_dir = tmp_path / "03.taxonomy" / "006"
+    taxonomy_dir = tmp_path / "03.taxonomy" / "SAMPLE1"
     classify = taxonomy_dir / "classify"
     classify.mkdir(parents=True)
     write_summary(classify, [
-        ("006_illumina", lineage("Escherichia", "Escherichia coli")),
-        ("006_ont", lineage("Escherichia", "Escherichia coli")),
+        ("SAMPLE1_illumina", lineage("Escherichia", "Escherichia coli")),
+        ("SAMPLE1_ont", lineage("Escherichia", "Escherichia coli")),
     ])
     organism_file = tmp_path / "org.txt"
     audit_file = tmp_path / "audit.tsv"
 
     exit_code = gao.main([
         "--gtdbtk-dir", str(taxonomy_dir),
-        "--sample", "006",
+        "--sample", "SAMPLE1",
         "--out-organism", str(organism_file),
         "--out-audit", str(audit_file),
     ])
@@ -635,7 +636,7 @@ def test_cli_requires_exactly_one_input_form(tmp_path):
     # error, not a silent "no organism" that looks like a real result.
     import pytest
 
-    base = ["--sample", "006",
+    base = ["--sample", "SAMPLE1",
             "--out-organism", str(tmp_path / "org.txt"),
             "--out-audit", str(tmp_path / "audit.tsv")]
     with pytest.raises(SystemExit):
@@ -645,14 +646,14 @@ def test_cli_requires_exactly_one_input_form(tmp_path):
 
 
 def test_cli_directory_form_degrades_gracefully(tmp_path):
-    taxonomy_dir = tmp_path / "03.taxonomy" / "006"
+    taxonomy_dir = tmp_path / "03.taxonomy" / "SAMPLE1"
     taxonomy_dir.mkdir(parents=True)
     organism_file = tmp_path / "org.txt"
     audit_file = tmp_path / "audit.tsv"
 
     exit_code = gao.main([
         "--gtdbtk-dir", str(taxonomy_dir),
-        "--sample", "006",
+        "--sample", "SAMPLE1",
         "--out-organism", str(organism_file),
         "--out-audit", str(audit_file),
     ])
@@ -667,14 +668,14 @@ def test_cli_directory_form_degrades_gracefully(tmp_path):
 
 def test_cli_writes_the_organism_and_the_audit_on_a_match(tmp_path):
     summary = write_summary(tmp_path, [
-        ("006", lineage("Pseudomonas", "Pseudomonas aeruginosa")),
+        ("SAMPLE1", lineage("Pseudomonas", "Pseudomonas aeruginosa")),
     ])
-    organism_file = tmp_path / "out" / "006_amrfinder_organism.txt"
-    audit_file = tmp_path / "out" / "006_amrfinder_organism_decision.tsv"
+    organism_file = tmp_path / "out" / "SAMPLE1_amrfinder_organism.txt"
+    audit_file = tmp_path / "out" / "SAMPLE1_amrfinder_organism_decision.tsv"
 
     exit_code = gao.main([
         "--gtdbtk-summary", summary,
-        "--sample", "006",
+        "--sample", "SAMPLE1",
         "--out-organism", str(organism_file),
         "--out-audit", str(audit_file),
     ])
@@ -685,7 +686,7 @@ def test_cli_writes_the_organism_and_the_audit_on_a_match(tmp_path):
 
     header, row = read_audit(str(audit_file))
     assert header == ["sample", "gtdb_classification", "matched_organism", "reason"]
-    assert row["sample"] == "006"
+    assert row["sample"] == "SAMPLE1"
     assert row["matched_organism"] == "Pseudomonas_aeruginosa"
     assert "s__Pseudomonas aeruginosa" in row["gtdb_classification"]
     assert row["reason"].startswith("exact species match")
@@ -724,15 +725,15 @@ def test_cli_writes_an_empty_file_and_exits_zero_on_no_match(tmp_path):
     # empty so `[ -n "$(cat ...)" ]` in the rule is false and AMRFinderPlus runs
     # without --organism.
     summary = write_summary(tmp_path, [
-        ("015_illumina", lineage("Pseudomonas_E", "Pseudomonas_E sp024807945")),
-        ("015_ont", lineage("Pseudomonas_E", "Pseudomonas_E sp024807945")),
+        ("SAMPLE2_illumina", lineage("Pseudomonas_E", "Pseudomonas_E sp024807945")),
+        ("SAMPLE2_ont", lineage("Pseudomonas_E", "Pseudomonas_E sp024807945")),
     ])
-    organism_file = tmp_path / "015_amrfinder_organism.txt"
-    audit_file = tmp_path / "015_amrfinder_organism_decision.tsv"
+    organism_file = tmp_path / "SAMPLE2_amrfinder_organism.txt"
+    audit_file = tmp_path / "SAMPLE2_amrfinder_organism_decision.tsv"
 
     exit_code = gao.main([
         "--gtdbtk-summary", summary,
-        "--sample", "015",
+        "--sample", "SAMPLE2",
         "--out-organism", str(organism_file),
         "--out-audit", str(audit_file),
     ])
@@ -753,7 +754,7 @@ def test_cli_still_succeeds_when_the_summary_is_missing(tmp_path):
 
     exit_code = gao.main([
         "--gtdbtk-summary", str(tmp_path / "nope.tsv"),
-        "--sample", "006",
+        "--sample", "SAMPLE1",
         "--out-organism", str(organism_file),
         "--out-audit", str(audit_file),
     ])
@@ -770,13 +771,13 @@ def test_audit_stays_a_valid_four_column_tsv(tmp_path):
     # A reason string with a stray tab or newline would break every downstream
     # reader of the audit, so check the shape rather than the wording.
     summary = write_summary(tmp_path, [
-        ("006_illumina", lineage("Klebsiella", "Klebsiella pneumoniae")),
-        ("006_ont", lineage("Klebsiella", "Klebsiella oxytoca")),
+        ("SAMPLE1_illumina", lineage("Klebsiella", "Klebsiella pneumoniae")),
+        ("SAMPLE1_ont", lineage("Klebsiella", "Klebsiella oxytoca")),
     ])
     audit_file = tmp_path / "audit.tsv"
     gao.main([
         "--gtdbtk-summary", summary,
-        "--sample", "006",
+        "--sample", "SAMPLE1",
         "--out-organism", str(tmp_path / "org.txt"),
         "--out-audit", str(audit_file),
     ])
@@ -791,13 +792,13 @@ def test_output_directories_are_created(tmp_path):
     # Snakemake normally makes them, but the script must not fall over if a
     # nested output path is handed to it directly.
     summary = write_summary(tmp_path, [
-        ("006", lineage("Salmonella", "Salmonella enterica")),
+        ("SAMPLE1", lineage("Salmonella", "Salmonella enterica")),
     ])
-    organism_file = tmp_path / "08.mobilome" / "006" / "organism.txt"
-    audit_file = tmp_path / "08.mobilome" / "006" / "audit.tsv"
+    organism_file = tmp_path / "08.mobilome" / "SAMPLE1" / "organism.txt"
+    audit_file = tmp_path / "08.mobilome" / "SAMPLE1" / "audit.tsv"
     gao.main([
         "--gtdbtk-summary", summary,
-        "--sample", "006",
+        "--sample", "SAMPLE1",
         "--out-organism", str(organism_file),
         "--out-audit", str(audit_file),
     ])
@@ -806,50 +807,54 @@ def test_output_directories_are_created(tmp_path):
 
 # ── Regression anchor against a real GTDB-Tk file ────────────────────────────
 
-# A real v2 validation run: a validation isolate, classified from both the Illumina and the
-# ONT assembly into the genus GTDB called Pseudomonas_E in R226 and calls
-# that genus in R232. The expected answer either way is "no organism".
+# Every test above builds its summary on the fly. This one reads a summary that
+# GTDB-Tk really wrote, to prove the mapper copes with the genuine file. Give it
+# a summary from a hybrid run (two rows, <sample>_illumina and <sample>_ont) of
+# an isolate in a genus AMRFinderPlus does not curate, together with that
+# sample's name and the genus the summary reports (the g__ value, without the
+# "g__" prefix):
 #
-# The file itself is a local validation artefact and is deliberately NOT in the
-# repository, so point the test at your own copy through the environment:
+#     BACFLUX_TEST_GTDBTK_SUMMARY=/your/path/gtdbtk.bac120.summary.tsv \
+#     BACFLUX_TEST_GTDBTK_SAMPLE=<sample> \
+#     BACFLUX_TEST_GTDBTK_GENUS=<genus> pytest ...
 #
-#     BACFLUX_TEST_GTDBTK_SUMMARY=/your/path/gtdbtk.bac120.summary.tsv pytest ...
-#
-# Unset, the test skips. It used to carry an absolute path from one machine, which
-# meant it silently never ran anywhere else.
+# No such file ships with the repository, so the test skips unless all three
+# variables are set.
 REAL_SUMMARY = os.environ.get("BACFLUX_TEST_GTDBTK_SUMMARY", "")
+REAL_SAMPLE = os.environ.get("BACFLUX_TEST_GTDBTK_SAMPLE", "")
+REAL_GENUS = os.environ.get("BACFLUX_TEST_GTDBTK_GENUS", "")
 
 
 def test_real_gtdbtk_summary_gives_no_organism(tmp_path):
-    if not os.path.isfile(REAL_SUMMARY):
+    if not os.path.isfile(REAL_SUMMARY) or not REAL_SAMPLE or not REAL_GENUS:
         import pytest
-        pytest.skip("set BACFLUX_TEST_GTDBTK_SUMMARY to run this")
+        pytest.skip("set BACFLUX_TEST_GTDBTK_SUMMARY, BACFLUX_TEST_GTDBTK_SAMPLE "
+                    "and BACFLUX_TEST_GTDBTK_GENUS to run this")
 
-    organism, classification, reason = gao.decide_organism(REAL_SUMMARY, "006")
+    organism, classification, reason = gao.decide_organism(REAL_SUMMARY, REAL_SAMPLE)
     assert organism == ""
-    # GTDB R232 (2026-07-27 move from R226) graduated this placeholder genus to
-    # a real published name: g__Pseudomonas_E in R226 is g__Aquipseudomonas in
-    # R232, the same genus GTDB simply renamed once it had a proper description
-    # — exactly the kind of release-to-release rename GTDB's own FAQ warns
-    # suffix letters are not guaranteed to survive. Either way there is nothing
-    # curated for this genus, so the organism stays empty.
-    assert "g__Aquipseudomonas" in classification
-    assert "that genus" in reason
+    # The genus to expect is passed in rather than written here because GTDB
+    # renames genera between releases: a split-off lineage with a placeholder
+    # suffix (the _E of Pseudomonas_E) can receive a validly published genus
+    # name in a later release, and GTDB's own FAQ warns that suffix letters are
+    # not guaranteed to survive. So the right genus is whatever the release that
+    # wrote this summary calls it. Nothing is curated for it, so the organism
+    # stays empty, and the reason must name the genus that was refused.
+    assert "g__" + REAL_GENUS in classification
+    assert REAL_GENUS in reason
     # Both hybrid rows were seen and agreed.
-    assert "006_illumina" in reason and "006_ont" in reason
+    assert REAL_SAMPLE + "_illumina" in reason and REAL_SAMPLE + "_ont" in reason
 
 
 # ── Regression anchor against the real GTDB taxonomy ─────────────────────────
 
 # The exception table is only correct for as long as GTDB keeps these names, so
 # this checks it against the taxonomy file that ships inside the GTDB release
-# (the directory config key `gtdbtk_db` points at, R232 on this machine since
-# the 2026-07-27 move from R226). If a future release renames things, this test
-# fails and the table gets revisited instead of quietly mapping the wrong taxon.
-# Skipped where the DB is absent.
-# GTDB's own taxonomy file, from the database directory config.gtdbtk_db points
-# at. Like the summary above it is far too large to vendor, so it comes from the
-# environment and the test skips without it:
+# (the directory the config key directories.gtdbtk_db points at). If a future
+# release renames things, this test fails and the table gets revisited instead
+# of quietly mapping the wrong taxon. The file is far too large to vendor, so,
+# like the summary above, it comes from the environment and the test skips
+# without it:
 #
 #     BACFLUX_TEST_GTDB_TAXONOMY=$GTDBTK_DB/taxonomy/gtdb_taxonomy.tsv pytest ...
 GTDB_TAXONOMY = os.environ.get("BACFLUX_TEST_GTDB_TAXONOMY", "")

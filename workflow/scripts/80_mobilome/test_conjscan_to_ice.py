@@ -25,10 +25,12 @@ come back with boundary_method='none' and the machinery span as their interval �
 that is the expected result there, not a gap. The tests that ARE about Phase 3
 plant a repeat pair in a synthetic contig and hand it over with --genome.
 
-Two tests go further and use the REAL output of the synthetic fixture (an Arthrobacter
-isolate): the saved fixture testdata/conjscan_synthetic_best_solution.tsv, and
-the five CDS lines quoted verbatim out of that sample's Bakta GFF3. Passing
-those means the parser agrees with the tools, not just with itself.
+Four tests go further and read a saved MacSyFinder output file,
+testdata/conjscan_synthetic_best_solution.tsv, and the end-to-end one pairs it
+with five CDS lines written in Bakta's full GFF3 attribute layout. Both copy the
+tools' real file formats column for column, but their identifiers, positions and
+scores are invented; none of it comes from a real genome. Passing them means the
+parser agrees with the tools' formats, not just with itself.
 
 There is also a contract test that feeds this script's output table straight into
 colocalise.py's own parser, which is what consumes it in the workflow.
@@ -66,8 +68,9 @@ CONJSCAN_COLUMNS = [
     "counterpart", "used_in",
 ]
 
-# One realistic machinery row, used as the base for every fixture row: the
-# relaxase of a chromosomal MOB system, with a near-full profile alignment.
+# One realistic but invented machinery row, used as the base for every fixture
+# row: the relaxase of a chromosomal MOB system, with a near-full profile
+# alignment. The numbers are made up; only their shape matches the tool's.
 CONJSCAN_DEFAULTS = {
     "replicon": "S1",
     "hit_id": "S1_00010",
@@ -82,13 +85,13 @@ CONJSCAN_DEFAULTS = {
     "sys_occ": "1",
     "hit_gene_ref": "T4SS_MOBB",
     "hit_status": "mandatory",
-    "hit_seq_len": "546",
-    "hit_i_eval": "1.9e-43",
-    "hit_score": "146.900",
-    "hit_profile_cov": "0.991",
-    "hit_seq_cov": "0.498",
-    "hit_begin_match": "1",
-    "hit_end_match": "272",
+    "hit_seq_len": "478",
+    "hit_i_eval": "2.6e-40",
+    "hit_score": "138.400",
+    "hit_profile_cov": "0.974",
+    "hit_seq_cov": "0.521",
+    "hit_begin_match": "11",
+    "hit_end_match": "259",
     "counterpart": "",
     "used_in": "",
 }
@@ -232,21 +235,23 @@ T4CP_HIT = "S1_00016"
 VIRB4_HIT = "S1_00017"
 
 
-# ── The real CONJscan fixture ────────────────────────────────────────────────
+# ── The saved CONJscan fixture (invented values) ─────────────────────────────
 
 def test_conjscan_best_solution_layout_parses():
-    """The saved real output of the synthetic fixture parses into its four machinery hits.
+    """The saved fixture parses into its four machinery hits.
 
-    This is the ground-truth check: two MOB systems on the chromosome, each
-    incomplete (sys_wholeness 0.667), each made of a relaxase plus a coupling
-    protein. If MacSyFinder ever changes its column names this test is what
-    fails, rather than the workflow quietly reporting "no conjugation machinery".
+    The file is invented, but it copies MacSyFinder 2.1.6's best_solution.tsv
+    layout: '#' banner lines, the 22-column header, and a blank line between
+    systems. It holds two MOB systems, each made of a relaxase plus a coupling
+    protein and each incomplete (sys_wholeness 0.667: two of the MOB model's
+    three genes). A parser change that stops matching those column names fails
+    here, rather than the workflow quietly reporting "no conjugation machinery".
     """
     hits = ci.read_conjscan_hits(SYNTHETIC_CONJSCAN_FIXTURE)
 
     assert len(hits) == 4
     assert [hit["hit_id"] for hit in hits] == [
-        "SAMPLE_00040", "SAMPLE_00044", "SAMPLE_01146", "SAMPLE_01151"
+        "SAMPLE_00022", "SAMPLE_00025", "SAMPLE_01781", "SAMPLE_01787"
     ]
     assert [hit["gene_name"] for hit in hits] == [
         "T4SS_MOBP1", "T4SS_t4cp2", "T4SS_t4cp2", "T4SS_MOBF"
@@ -256,10 +261,10 @@ def test_conjscan_best_solution_layout_parses():
     assert all(hit["model_fqn"] == "CONJScan/Chromosome/MOB" for hit in hits)
 
 
-def test_real_fixture_classifies_the_two_relaxases_and_two_coupling_proteins():
+def test_fixture_classifies_the_two_relaxases_and_two_coupling_proteins():
     """The two relaxase families are relaxases, the two t4cp2 hits are coupling
-    proteins — and NOT mating-pair components, which is what keeps the synthetic fixture at
-    'mobilisable' rather than 'self-transmissible'."""
+    proteins — and NOT mating-pair components, which is what keeps the fixture's
+    systems at 'mobilisable' rather than 'self-transmissible'."""
     hits = ci.read_conjscan_hits(SYNTHETIC_CONJSCAN_FIXTURE)
     classes = [ci.anchor_class_for_gene_name(hit["gene_name"]) for hit in hits]
     assert classes == [
@@ -267,47 +272,53 @@ def test_real_fixture_classifies_the_two_relaxases_and_two_coupling_proteins():
     ]
 
 
-# Five CDS lines in Bakta's real GFF3 attribute layout — percent-encoded commas,
-# Dbxref, the optional gene= — so the coordinate join is tested against the shape
-# Bakta actually emits rather than a tidied-up invention. Coordinates, contig
-# lengths and locus tags are made up.
+# Five invented CDS lines written in Bakta's full GFF3 attribute layout —
+# percent-encoded commas, a Dbxref holding two values, the optional gene= — so
+# the coordinate join is tested against the shape Bakta actually emits rather
+# than a simplified one. Every value is made up: locus tags, coordinates,
+# strands, products and contig lengths.
+#
+# Four lines are the genes behind the saved fixture's four CONJscan hits, and
+# each is (hit_seq_len + 1) x 3 bp long — the protein plus its stop codon — so
+# the two files agree. The fifth is an integrase, which CONJscan has no model
+# for: the script finds it from the product text instead.
 BAKTA_LAYOUT_CDS_LINES = [
-    "contig_2\tPyrodigal\tCDS\t37000\t38640\t.\t+\t0\t"
-    "ID=SAMPLE_00040;Name=Relaxase/mobilization nuclease family protein;"
-    "locus_tag=SAMPLE_00040;product=Relaxase/mobilization nuclease family protein;"
-    "Dbxref=SO:0001217,UniRef:UniRef50_Q8GAN1",
-    "contig_2\tPyrodigal\tCDS\t42000\t43769\t.\t-\t0\t"
-    "ID=SAMPLE_00044;Name=Type IV secretory pathway%2C VirD4 component%2C TraG/TraD family ATPase;"
-    "locus_tag=SAMPLE_00044;"
+    "contig_2\tPyrodigal\tCDS\t21450\t22688\t.\t-\t0\t"
+    "ID=SAMPLE_00022;Name=conjugal transfer relaxase TraI;"
+    "locus_tag=SAMPLE_00022;product=conjugal transfer relaxase TraI;"
+    "Dbxref=GO:0003677,SO:0001217;gene=traI",
+    "contig_2\tPyrodigal\tCDS\t25310\t27214\t.\t-\t0\t"
+    "ID=SAMPLE_00025;Name=conjugal transfer protein TraG;locus_tag=SAMPLE_00025;"
+    "product=conjugal transfer protein TraG;Dbxref=SO:0001217;gene=traG",
+    "contig_1\tPyrodigal\tCDS\t1742380\t1743585\t.\t+\t0\t"
+    "ID=SAMPLE_01772;Name=tyrosine-type recombinase/integrase;locus_tag=SAMPLE_01772;"
+    "product=tyrosine-type recombinase/integrase;Dbxref=SO:0001217",
+    "contig_1\tPyrodigal\tCDS\t1751020\t1752735\t.\t-\t0\t"
+    "ID=SAMPLE_01781;Name=Type IV secretory pathway%2C VirD4 component%2C TraG/TraD family ATPase;"
+    "locus_tag=SAMPLE_01781;"
     "product=Type IV secretory pathway%2C VirD4 component%2C TraG/TraD family ATPase;"
     "Dbxref=SO:0001217;gene=virD4",
-    "contig_1\tPyrodigal\tCDS\t1160000\t1161112\t.\t-\t0\t"
-    "ID=SAMPLE_01130;Name=Phage integrase family protein;locus_tag=SAMPLE_01130;"
-    "product=Phage integrase family protein;Dbxref=SO:0001217",
-    "contig_1\tPyrodigal\tCDS\t1173000\t1174811\t.\t+\t0\t"
-    "ID=SAMPLE_01146;Name=type IV secretory system conjugative DNA transfer family protein;"
-    "locus_tag=SAMPLE_01146;"
-    "product=type IV secretory system conjugative DNA transfer family protein;"
-    "Dbxref=SO:0001217",
-    "contig_1\tPyrodigal\tCDS\t1180000\t1183575\t.\t-\t0\t"
-    "ID=SAMPLE_01151;Name=TrwC relaxase domain-containing protein;locus_tag=SAMPLE_01151;"
-    "product=TrwC relaxase domain-containing protein;Dbxref=SO:0001217;gene=trwC",
+    "contig_1\tPyrodigal\tCDS\t1757400\t1760486\t.\t+\t0\t"
+    "ID=SAMPLE_01787;Name=MobF family relaxase;locus_tag=SAMPLE_01787;"
+    "product=MobF family relaxase;Dbxref=SO:0001217",
 ]
 
-FIXTURE_CONTIGS = {"contig_2": 58000, "contig_1": 4200000}
+# Invented contig lengths: a small contig and a large, chromosome-sized one.
+FIXTURE_CONTIGS = {"contig_2": 73400, "contig_1": 3315700}
 
 
 def test_conjscan_to_ice_end_to_end():
-    """The real sample, end to end: one degraded IME, one cluster too short.
+    """The saved fixture, end to end: one degraded IME, one cluster too short.
 
-    This reproduces the finding recorded in docs/mobilome_wpA_ground_truth.md:
+    The invented scene exercises three behaviours at once:
 
-      * contig_1 carries a phage integrase, a coupling protein and a MOBF
-        relaxase within the clustering window, and NO mating-pair apparatus, so
-        it is an IME — mobilisable with a helper, not self-transmissible;
+      * contig_1 carries an integrase, a coupling protein and a MOBF relaxase
+        within the clustering window, and NO mating-pair apparatus, so it is an
+        IME — mobilisable with a helper, not self-transmissible (the class
+        table is in docs/mobilome/output.md);
       * sys_wholeness is 0.667, so the machinery is flagged incomplete and the
         mobility sentence says so;
-      * contig_2's relaxase + coupling protein span only 6765 bp, below the 8 kb
+      * contig_2's relaxase + coupling protein span only 5765 bp, below the 8 kb
         minimum, so it is dropped with its measured span in the audit file.
     """
     import tempfile
@@ -334,8 +345,9 @@ def test_conjscan_to_ice_end_to_end():
     assert element["contig"] == "contig_1"
     assert element["mge_class"] == "ime"
     assert element["element_type"] == "ime"
-    assert element["start"] == "1160000"
-    assert element["end"] == "1183575"
+    # From the integrase's first base to the relaxase's last.
+    assert element["start"] == "1742380"
+    assert element["end"] == "1760486"
     assert element["has_integrase"] == "TRUE"
     assert element["has_relaxase"] == "TRUE"
     assert element["has_t4cp"] == "TRUE"
@@ -356,14 +368,15 @@ def test_conjscan_to_ice_end_to_end():
     dropped = [row for row in audit if row["action"] == "dropped"]
     assert len(dropped) == 1
     assert dropped[0]["reason"] == "cluster_shorter_than_min"
-    assert "6770 bp" in dropped[0]["detail"]
+    assert "5765 bp" in dropped[0]["detail"]          # 27214 - 21450 + 1
     assert "machinery_degraded" in audit_reasons(audit)
 
 
 # ── Phase 4: the classification table, tested as a pure function ─────────────
 
-def test_classification_table_matches_the_spec():
-    """Spec section 8 Phase 4, row by row."""
+def test_classification_table_matches_the_documented_classes():
+    """The Phase 4 class table, row by row — the same table docs/mobilome/output.md
+    gives under "An ICE cannot sit on a plasmid"."""
     assert ci.classify_cluster(True, True, True) == (
         "ice", "predicted self-transmissible")
     assert ci.classify_cluster(True, True, False) == (
@@ -375,14 +388,16 @@ def test_classification_table_matches_the_spec():
 
 
 def test_classification_never_says_transmissible_without_predicted():
-    """Language discipline (spec section 2.6): an ICE is always 'predicted'."""
+    """Language discipline: an ICE is always 'predicted'. A call rests on finding
+    machinery that looks complete, not on watching a transfer happen (see
+    "Language discipline" in docs/mobilome/mobility-ladder.md)."""
     _, mobility = ci.classify_cluster(True, True, True)
     assert mobility.startswith("predicted ")
     assert "predicted self-transmissible" in mobility
 
 
-def test_classification_fallbacks_for_combinations_the_spec_omits():
-    """The two combinations the spec's table does not list.
+def test_classification_fallbacks_for_combinations_the_table_omits():
+    """The two combinations the class table does not list.
 
     Integrase + T4SS but no relaxase cannot mobilise anything, so it is grouped
     with the passive island; machinery without an integrase is always reported as
@@ -559,7 +574,7 @@ def test_integrase_only_cluster_is_dropped_not_reported(tmp_path):
     contig_2 here is dropped with a stated reason instead of being reported as a
     passive island — which would put a meaningless row in the table for every
     recombinase in the genome. The classifier's island branch is still exercised
-    directly in test_classification_table_matches_the_spec.
+    directly in test_classification_table_matches_the_documented_classes.
     """
     contigs = {"contig_1": 200000, "contig_2": 200000}
     cds = SCENE_CDS + [
@@ -592,7 +607,7 @@ def test_integrase_only_cluster_is_dropped_not_reported(tmp_path):
 def test_machinery_without_an_integrase_is_not_called_an_ice(tmp_path):
     """Relaxase + mating-pair component, no integrase → conjugative region.
 
-    The spec is explicit: report it, do not call it an ICE. Nothing here says
+    The class table is explicit: report it, do not call it an ICE. Nothing here says
     the machinery sits in a discrete element with boundaries, so the row must not
     reach colocalise.py as an ICE either.
     """
@@ -749,14 +764,14 @@ def test_hit_is_virb4_knows_the_exchangeable_name_but_not_the_f_type_traU():
     assert not ci.hit_is_virb4({"gene_name": "T4SS_MOBF", "hit_gene_ref": "T4SS_MOBB"})
 
 
-def test_real_output_shows_gene_name_differing_from_the_model_gene():
-    """Ground truth for why `hit_gene_ref` is read at all.
+def test_fixture_shows_gene_name_differing_from_the_model_gene():
+    """Why `hit_gene_ref` is read at all.
 
-    In the synthetic fixture's real best_solution.tsv the relaxases are reported as
-    T4SS_MOBP1 / T4SS_MOBF while the model's own gene is T4SS_MOBB: MacSyFinder
-    writes the profile that ACTUALLY matched in gene_name. The same mechanism
-    turns a VirB4 into a `T4SS_I_traU` row, which is what the truncation check
-    has to survive.
+    MacSyFinder writes the profile that ACTUALLY matched in gene_name and the
+    model's own gene in hit_gene_ref, and the saved fixture copies that layout:
+    its relaxases are reported as T4SS_MOBP1 / T4SS_MOBF while the model's own
+    gene is T4SS_MOBB. The same mechanism turns a VirB4 into a `T4SS_I_traU`
+    row, which is what the truncation check has to survive.
     """
     hits = ci.read_conjscan_hits(SYNTHETIC_CONJSCAN_FIXTURE)
     assert [hit["hit_gene_ref"] for hit in hits] == [
@@ -991,8 +1006,8 @@ def test_system_spanning_two_contigs_is_capped_at_low_confidence(tmp_path):
 
     So it can join genes on either side of a contig break into one 'system' that
     does not exist. Anything spanning contigs is capped at LOW regardless of how
-    good the rest of the evidence looks — the spec's rule, applied without
-    exception.
+    good the rest of the evidence looks — an absolute rule, applied without
+    exception (see docs/mobilome/draft-assemblies.md).
     """
     contigs = {"contig_1": 200000, "contig_2": 200000}
     cds = SCENE_CDS + [
@@ -2015,10 +2030,10 @@ def test_widening_that_stays_clear_of_the_contig_ends_keeps_its_confidence(tmp_p
     assert "confidence_settled_after_boundary_search" not in audit_reasons(audit)
 
 
-# ── The strict spec §8 Phase 6 rule, as an opt-in ────────────────────────────
+# ── The strict Phase 6 confidence rule, as an opt-in ─────────────────────────
 
 def test_strict_mode_requires_a_trna_boundary_for_high(tmp_path):
-    """--require-trna-boundary-for-high applies the spec's literal Phase 6 rule.
+    """--require-trna-boundary-for-high applies the strict Phase 6 rule.
 
     Same evidence as test_ice_needs_all_three_anchor_classes — all four anchor
     classes, intact machinery, one contig — but no genome, so the element's ends
@@ -2134,7 +2149,7 @@ def test_the_four_trusted_icescan_integrase_profiles_are_integrases():
 
 
 def test_the_four_untrusted_integrase_profiles_anchor_nothing():
-    """FIX 1-3, and a deliberate divergence from ICEscan's own IME.xml.
+    """A deliberate divergence from ICEscan's own IME.xml.
 
     Upstream lists all four as exchangeables of Phage_integrase. None of them is
     an element integrase:
@@ -2214,7 +2229,7 @@ def test_without_icescan_the_result_is_byte_for_byte_what_it_always_was(tmp_path
 
 
 def test_an_icescan_integron_integrase_cannot_anchor_an_element(tmp_path):
-    """FIX 1 end to end, as the CP042858.1 regression would have arrived.
+    """The IntI1 exclusion end to end, as the CP042858.1 regression would have arrived.
 
     A TIGR02249 hit sits 45 kb from the machinery, well inside the 50 kb
     integrase window. Trusting it would attach it, stretch the element to cover
@@ -2226,8 +2241,8 @@ def test_an_icescan_integron_integrase_cannot_anchor_an_element(tmp_path):
     what this test is about. Bakta usually annotates IntI1 as "class 1 integron
     integrase IntI1", and INTEGRASE_PRODUCT_PATTERN matches that on purpose (see
     its comment) — so the product-text path has its own, separate exposure to
-    integron integrases, which the FIX-4 tie-break rather than this rule is what
-    keeps in check.
+    integron integrases, which the integrase tie-break in
+    attach_nearby_integrases, rather than this rule, keeps in check.
     """
     cds = list(SCENE_CDS)
     # Replace the real integrase with a CDS only ICEscan could call an integrase.
@@ -2258,7 +2273,7 @@ def test_an_icescan_integron_integrase_cannot_anchor_an_element(tmp_path):
 
 
 def test_an_icescan_rve_hit_cannot_anchor_an_element(tmp_path):
-    """FIX 3. `rve` is the transposase catalytic domain; find_integrase_anchors
+    """`rve` is the transposase catalytic domain; find_integrase_anchors
     already refuses these on the product-text side, and admitting them as an HMM
     hit would let an insertion sequence next to a relaxase become an ICE."""
     # Annotated as a transposase, which is what these really are: 66 of rve's 71
@@ -2457,10 +2472,10 @@ def test_loose_ftsk_hits_do_not_manufacture_an_aice(tmp_path):
     assert "no_conjugation_anchor" in audit_reasons(audit)
 
 
-# ── FIX 4: which integrase belongs to the element ────────────────────────────
+# ── The integrase tie-break: which integrase belongs to the element ──────────
 
 def test_the_tie_break_prefers_the_integrase_that_yields_an_att_pair(tmp_path):
-    """FIX 4, and the reason the CP042858.1 regression was possible.
+    """The integrase tie-break, and the reason the CP042858.1 regression was possible.
 
     Two integrases are in the running for one cluster. The old rule was
     "closest, first-seen wins a tie", so when both sat inside the machinery span
@@ -2542,10 +2557,10 @@ def test_the_tie_break_prefers_the_integrase_that_yields_an_att_pair(tmp_path):
 
 
 def test_at_equal_distance_an_hmm_hit_does_not_displace_the_annotation(tmp_path):
-    """The last clause of FIX 4. When two integrase candidates are the same
-    distance away and neither yields an att pair, the Bakta product text wins:
-    it names the protein in words a reader can check, and it is the source that
-    found the integrase for 12 of the 30 curated pilot elements."""
+    """The source key of the integrase tie-break. When two integrase candidates
+    are the same distance away and neither yields an att pair, the Bakta product
+    text wins: it names the protein in words a reader can check, and it is the
+    source that found the integrase for 12 of the 30 curated pilot elements."""
     assert (ci.INTEGRASE_SOURCE_RANK[ci.SOURCE_BAKTA_PRODUCT]
             < ci.INTEGRASE_SOURCE_RANK[ci.SOURCE_ICESCAN])
 
@@ -2757,7 +2772,8 @@ def test_machinery_coherence_is_reported_but_never_decides():
     the benchmark that premise is false for exactly the elements we care about:
     20 of 37 ice calls (54%) have an anchor-free hole wider than the 15 kb
     window, among them R391 (28,354 bp), SPI-7 (42,039) and Tn4371 (15,120) —
-    the spec's own positive controls. Large ICEs carry cargo BETWEEN their
+    curated elements of the benchmark's ICE pilot, listed in
+    docs/mobilome/validation.md. Large ICEs carry cargo BETWEEN their
     machinery genes. The rule deleted a 193 kb ICE in favour of a 7 kb element
     inside it, so it was removed; machinery_gap_bp is still reported for a reader
     to judge by eye.
@@ -2777,7 +2793,8 @@ def test_nested_calls_with_nothing_to_separate_them_keep_the_outer_one():
     It already contains every base and every anchor the inner call had, so the
     inner one is cargo of it rather than a second finding. This is the EBI
     Mobilome Annotation Pipeline's convention, adopted here as a design decision
-    (their code is CC BY-NC-SA and is never copied — see spec §11).
+    (none of their code is copied, since parts of it are CC BY-NC-SA — see
+    docs/about/licensing.md).
     """
     outer = nesting_row("c1|ime-1000:90000", "c1", 1000, 90000, machinery_gap_bp=200)
     inner = nesting_row("c1|ime-40000:50000", "c1", 40000, 50000, machinery_gap_bp=100)
@@ -2921,7 +2938,7 @@ def test_an_ime_genuinely_inside_an_ice_is_not_collapsed():
 # fragmented-assembly validation cut 40 benchmark genomes to three contiguities
 # (~150 kb, ~50 kb and ~20 kb N50), re-annotated all 120 assemblies and re-ran
 # the whole chain; the numbers quoted in these tests come from it.
-# Full write-up: docs/mobilome_draft_assemblies.md.
+# Full write-up: docs/mobilome/draft-assemblies.md.
 
 
 def test_assembly_contiguity_reports_n50_and_contig_count():

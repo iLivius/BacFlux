@@ -65,7 +65,8 @@ FASTA = (
     "ACGTACGTACGT\n"
 )
 
-# Real Flye 2.9 header, verified against an assembly_info.txt on disk.
+# The header line exactly as Flye 2.9 writes it in assembly_info.txt; the rows
+# below it are invented.
 FLYE_INFO = (
     "#seq_name\tlength\tcov.\tcirc.\trepeat\tmult.\talt_group\tgraph_path\n"
     "contig_1\t5000000\t96\tY\tN\t1\t*\t1\n"
@@ -80,13 +81,16 @@ DNAAPLER_HEADER = (
     "Overlapping_Contig_End\n"
 )
 
-# The numbers are the ones observed on this project's real isolates:
-# a genuine DnaA covers ~100% of the reference; the marginal repA/terL hits do not.
+# The numbers are invented but realistic: a genuine DnaA covers about 100% of
+# the reference, sometimes slightly above; the marginal repA/terL hits do not.
+# Within each row they add up the way dnaapler computes them: Coverage is
+# Covered_Length / Top_Hit_Length, and Identity_Percentage is Identical_AAs /
+# Covered_Length, both as percentages.
 DNAAPLER_SUMMARY = DNAAPLER_HEADER + (
-    "contig_1 length=5000000\tdnaA\t1024681\treverse\tsp~P21173~DNAA_MICLU\t515\t518\t100.58\t354\t68.34\tFalse\n"
-    "contig_2\trepA\t120\tforward\tUniRef90_Q4K3U4\t300\t43\t14.35\t22\t51.04\tFalse\n"
-    "contig_3\tdnaA\t900\tforward\tsp~A5CLT3~DNAA_CLAM3\t477\t483\t101.26\t383\t79.30\tFalse\n"
-    "contig_4\tterL\t77\tforward\tphrog_2\t600\t108\t17.98\t62\t57.53\tFalse\n"
+    "contig_1 length=5000000\tdnaA\t1187342\treverse\tsp~P21173~DNAA_MICLU\t515\t519\t100.78\t358\t68.98\tFalse\n"
+    "contig_2\trepA\t120\tforward\tUniRef90_Q4K3U4\t300\t47\t15.67\t25\t53.19\tFalse\n"
+    "contig_3\tdnaA\t900\tforward\tsp~A5CLT3~DNAA_CLAM3\t477\t482\t101.05\t380\t78.84\tFalse\n"
+    "contig_4\tterL\t77\tforward\tphrog_2\t600\t114\t19.00\t64\t56.14\tFalse\n"
 )
 
 
@@ -121,7 +125,7 @@ class TestTypeAndTopology(unittest.TestCase):
         self.assertIn("strong_dnaA", rows["contig_1"]["reason"])
 
     def test_circular_plus_weak_repa_falls_back_to_contig(self):
-        # 14.35% coverage is far below the 80% floor, so the plasmid call is not
+        # 15.67% coverage is far below the 80% floor, so the plasmid call is not
         # made — but the circularity, which is a measurement, is still reported.
         rows, _ = build()
         self.assertEqual(rows["contig_2"]["type"], "contig")
