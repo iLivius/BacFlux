@@ -19,6 +19,14 @@
 import glob
 import os
 
+from snakemake.utils import min_version
+
+# The oldest Snakemake BacFlux runs with, checked before any rule file is read.
+# On an older version min_version stops the run at once with a message naming
+# the version it needs. Keep this number the same as the README badge and the
+# installation page.
+min_version("9.14.6")
+
 # Keep a user's personal pip packages out of every conda environment.
 #
 # Python adds ~/.local/lib/python3.X/site-packages to its import path by default,

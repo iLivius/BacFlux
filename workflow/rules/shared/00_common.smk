@@ -81,7 +81,7 @@ if not config:
 MODE = config["mode"].lower()
 if MODE not in ("illumina", "nanopore", "hybrid", "contigs"):
     sys.exit(
-        "config.mode must be one of illumina | nanopore | hybrid | contigs "
+        "[BacFlux] config.mode must be one of illumina | nanopore | hybrid | contigs "
         f"(got: {config['mode']!r})"
     )
 
@@ -118,7 +118,7 @@ print(f"Mode: {MODE} — {MODE_TAGLINE[MODE]}.")
 # block that is present but null.
 PHAGE_CALLER = str((config.get("phage", {}) or {}).get("caller") or "virsorter2").strip().lower()
 if PHAGE_CALLER not in ("genomad", "virsorter2"):
-    sys.exit(f"config.phage.caller must be genomad | virsorter2 (got: {PHAGE_CALLER!r})")
+    sys.exit(f"[BacFlux] config.phage.caller must be genomad | virsorter2 (got: {PHAGE_CALLER!r})")
 if PHAGE_CALLER == "genomad":
     print(
         "Phage caller: geNomad (opt-in). NOTE: geNomad is licensed for ACADEMIC / "
@@ -1425,7 +1425,10 @@ def _decontam_settings(default_mode):
 
     mode = str(settings.get("mode", default_mode) or default_mode).strip().lower()
     if mode not in {"auto", "include", "exclude", "off"}:
-        raise ValueError("Invalid decontamination.mode. Expected one of: auto, include, exclude, off.")
+        sys.exit(
+            "[BacFlux] parameters.decontamination.mode must be auto, include, exclude or off "
+            f"(got: {settings.get('mode')!r})."
+        )
     settings["mode"] = mode
 
     # What auto mode counts per genus before keeping the one with the largest
@@ -1460,19 +1463,24 @@ def validate_extensions(label, extensions, allowed_suffixes):
     # inputs (fasta/fa/fna).
     #   Takes in: a label for messages, the list of extensions glob_wildcards
     #             found, and the tuple of acceptable suffixes.
-    #   Produces: the single validated extension string (or a clean exit on error).
+    #   Produces: the single validated extension. On a problem it stops the run
+    #             with a [BacFlux] message and exit status 1, so a wrapper script,
+    #             a CI job or a cluster job sees the failure.
     if not extensions:
-        sys.stderr.write(f"No suitable {label} input files found.\n")
-        sys.exit(0)
-    if len(set(extensions)) != 1:
-        sys.stderr.write(f"More than one {label} file extension detected:\n\t")
-        sys.stderr.write("\n\t".join(sorted(set(extensions))))
-        sys.stderr.write("\n")
-        sys.exit(0)
+        sys.exit(f"[BacFlux] No suitable {label} input files found.")
+    found = sorted(set(extensions))
+    if len(found) != 1:
+        sys.exit(
+            f"[BacFlux] More than one {label} file extension detected: {', '.join(found)}. "
+            "Every sample in one run must use the same extension: rename the odd ones out, "
+            "or split the batch into separate runs."
+        )
     extension = extensions[0]
     if not extension.endswith(allowed_suffixes):
-        sys.stderr.write(f"{label.capitalize()} file format '{extension}' not recognized.\n")
-        sys.exit(0)
+        sys.exit(
+            f"[BacFlux] {label.capitalize()} file format '{extension}' not recognized "
+            f"(expected one of: {', '.join(allowed_suffixes)})."
+        )
     return extension
 
 
@@ -1779,11 +1787,17 @@ def _require_input_dir(config_key):
 
 def _check_sample_names(samples):
     # Reject sample names that would break wildcards or paths, and echo each
-    # accepted sample so the user can confirm the batch before it runs.
+    # accepted sample so the user can confirm the batch before it runs. The stop
+    # message lists the characters that are not allowed, each in quotes (repr),
+    # so a space shows as ' ' instead of being invisible.
     for sample in sorted(samples):
-        if any(char in sample for char in BAD_CHARS):
-            sys.stderr.write(f"Sample name '{sample}' contains unsupported characters.\n")
-            sys.exit(0)
+        bad_chars = sorted(set(char for char in sample if char in BAD_CHARS))
+        if bad_chars:
+            shown = " ".join(repr(char) for char in bad_chars)
+            sys.exit(
+                f"[BacFlux] Sample name '{sample}' contains characters that are not "
+                f"allowed ({shown}). Rename the input files."
+            )
         print(f"Sample {sample} will be processed.")
 
 
@@ -1796,8 +1810,7 @@ def _require_r2_mates(samples, illumina_dir, short_extn):
     for sample in samples:
         r2_path = os.path.join(illumina_dir, f"{sample}_R2.{short_extn}")
         if not os.path.exists(r2_path):
-            sys.stderr.write(f"Missing Illumina mate pair for sample '{sample}': {r2_path}\n")
-            sys.exit(0)
+            sys.exit(f"[BacFlux] Missing Illumina mate pair for sample '{sample}': {r2_path}")
 
 
 if MODE == "illumina":
@@ -1839,13 +1852,14 @@ elif MODE == "hybrid":
     _missing_long = sorted(set(_short_samples) - set(_long_samples))
     _missing_short = sorted(set(_long_samples) - set(_short_samples))
     if _missing_long or _missing_short:
+        _message = ["[BacFlux] hybrid mode needs Illumina and ONT reads for every sample."]
         if _missing_long:
-            sys.stderr.write("Missing ONT files for the following samples:\n")
-            sys.stderr.write("\n".join(f"  - {s}" for s in _missing_long) + "\n")
+            _message.append("Missing ONT files for the following samples:")
+            _message += [f"  - {s}" for s in _missing_long]
         if _missing_short:
-            sys.stderr.write("Missing Illumina R1 files for the following samples:\n")
-            sys.stderr.write("\n".join(f"  - {s}" for s in _missing_short) + "\n")
-        sys.exit(0)
+            _message.append("Missing Illumina R1 files for the following samples:")
+            _message += [f"  - {s}" for s in _missing_short]
+        sys.exit("\n".join(_message))
 
     SAMPLES = sorted(set(_short_samples) & set(_long_samples))
     _check_sample_names(SAMPLES)
