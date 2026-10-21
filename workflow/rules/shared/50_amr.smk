@@ -216,7 +216,9 @@ if HAS_SHORT_READS:
                 """
                 mkdir -p {output.card_dir}
 
-                wget {params.link} -O {output.card_tarball} > {log} 2>&1
+                # --progress=dot:giga prints one dot per megabyte, so the log stays
+                # a few lines long instead of a thousand lines of dots.
+                wget --progress=dot:giga {params.link} -O {output.card_tarball} > {log} 2>&1
                 tar -xjvf {output.card_tarball} -C {output.card_dir} >> {log} 2>&1
                 """
 

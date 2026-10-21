@@ -412,8 +412,10 @@ if not DBCANDB:
             TAR="{output.dbcan_db}/$(basename "{params.dbcan_db_url}")"
             SHA="{output.dbcan_db}/$(basename "{params.sha_url}")"
 
-            wget -O "$TAR" "{params.dbcan_db_url}" > "{log}" 2>&1
-            wget -O "$SHA" "{params.sha_url}" >> "{log}" 2>&1
+            # --progress=dot:giga prints one dot per megabyte, so the log gets a
+            # few dozen lines for the whole database instead of tens of thousands.
+            wget --progress=dot:giga -O "$TAR" "{params.dbcan_db_url}" > "{log}" 2>&1
+            wget --progress=dot:giga -O "$SHA" "{params.sha_url}" >> "{log}" 2>&1
 
             # verify checksum
             expected="$(awk 'NR==1{{print $1}}' "$SHA")"

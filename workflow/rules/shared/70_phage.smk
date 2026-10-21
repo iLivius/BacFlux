@@ -166,7 +166,9 @@ if PHAGE_CALLER == "genomad":
                     TAR="{params.parent}/$(basename '{params.link}')"
                     echo "Fetching the geNomad database from the configured mirror:" > {log}
                     echo "  {params.link}" >> {log}
-                    wget --tries={params.tries} -c "{params.link}" -O "$TAR" >> {log} 2>&1
+                    # --progress=dot:giga prints one dot per megabyte, so the log
+                    # gets a few dozen lines instead of tens of thousands.
+                    wget --tries={params.tries} --progress=dot:giga -c "{params.link}" -O "$TAR" >> {log} 2>&1
 
                     if [ -n "{params.md5}" ]; then
                         actual="$(md5sum "$TAR" | awk '{{print $1}}')"
@@ -571,8 +573,10 @@ if not CHECKVDB:
                 TAR="{output.checkv_db}/{params.db_id}.tar.gz"
                 SHA="{output.checkv_db}/{params.db_id}.sha256"
 
-                wget --tries={params.tries} -c {params.checkv_link} -P {output.checkv_db} > {log} 2>&1
-                wget --tries={params.tries} -c {params.sha_url} -O "$SHA" >> {log} 2>&1
+                # --progress=dot:giga prints one dot per megabyte, so the log gets
+                # a few dozen lines instead of tens of thousands.
+                wget --tries={params.tries} --progress=dot:giga -c {params.checkv_link} -P {output.checkv_db} > {log} 2>&1
+                wget --tries={params.tries} --progress=dot:giga -c {params.sha_url} -O "$SHA" >> {log} 2>&1
 
                 # Hard-fail on a mismatch, exactly like dbCAN's cazyme_db_download:
                 # a truncated or tampered archive must never reach `tar`/`diamond`.
