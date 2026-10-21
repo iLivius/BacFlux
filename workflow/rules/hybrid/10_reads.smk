@@ -55,18 +55,21 @@ _READS_DIR = os.path.dirname(TRIM_R1)
 #           once from config links.phix_link in shared/00_common.smk.
 # Does:     wget the PhiX genome. Runs once per RUN, not once per sample: there
 #           is no {sample} anywhere in the path.
-# Produces: phix = PHIX_FASTA, the gzipped PhiX genome. temp(), so it goes as
-#           soon as the index below has been built from it.
+# Produces: phix = PHIX_FASTA, the gzipped PhiX genome. It is kept after the run
+#           (a few kilobytes), so `snakemake download_all` can fetch it ahead of a
+#           run whose jobs have no internet.
 # Consumed by: build_phix.
 #
-# Identical to rules/illumina/10_reads.smk — keep in sync.
-# No conda environment: system wget, kept for v1 parity (the same deferred
-# decision as cazyme_db_download in shared/40_annotation.smk).
+# Identical to rules/illumina/10_reads.smk — keep in sync, including the
+# environment (envs/download.yaml, for wget) and localrule: True.
 rule download_phix:
+    localrule: True
     output:
-        phix = temp(PHIX_FASTA),
+        phix = PHIX_FASTA,
     params:
         link = PHIX_LINK,
+    conda:
+        "../../envs/download.yaml"
     log:
         LOGS + "/download_phix.log"
     shell:

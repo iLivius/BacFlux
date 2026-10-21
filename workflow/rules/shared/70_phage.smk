@@ -136,7 +136,12 @@ if PHAGE_CALLER == "genomad":
     # genomad_db_local, same reasoning as checkv_db / virsorter2_db.
     if not GENOMADDB:
 
+        # Where it runs: on the computer that runs Snakemake (localrule: True), so on
+        # a cluster the download never lands on a compute node without internet.
+        # Its download tools (wget, tar and gzip) come from genomad.yaml, not the
+        # computer.
         rule genomad_db:
+            localrule: True
             output:
                 genomad_db = directory(GENOMAD_DB_DIR),
             params:
@@ -331,7 +336,12 @@ if PHAGE_CALLER == "virsorter2":
     # a database someone else shares.
     if not VS2DB:
 
+        # Where it runs: on the computer that runs Snakemake (localrule: True), so on
+        # a cluster the download never lands on a compute node without internet.
+        # `virsorter setup` runs wget, tar and gzip itself; they come from
+        # virsorter.yaml, not the computer.
         rule virsorter2_db:
+            localrule: True
             output:
                 vs2_db = directory(VS2_DB_DIR),
             conda:
@@ -534,7 +544,13 @@ if CHECKVDB:
 # checkv_db_local, which does the identical makedb step.
 if not CHECKVDB:
 
+    # Where it runs: on the computer that runs Snakemake (localrule: True), so on
+    # a cluster the download never lands on a compute node without internet. That
+    # includes the DIAMOND index build (up to 8 threads); cap it on a login node
+    # with Snakemake's --local-cores. Its download tools (wget, tar and gzip) come
+    # from checkv.yaml, not the computer.
     rule checkv_db:
+        localrule: True
         output:
             checkv_db = directory(CHECKV_DB_DIR),
         params:

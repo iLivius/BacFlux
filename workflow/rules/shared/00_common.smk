@@ -2101,3 +2101,47 @@ def all_targets():
     if not _rule_modules_present():
         return []
     return _frontend_targets_for(MODE) + _downstream_targets()
+
+def download_targets():
+    # Everything this run would download, as the input list of rule download_all
+    # in the Snakefile. `snakemake download_all ...` fetches it all in one go, on
+    # the computer that runs Snakemake, so that a run whose jobs have no internet
+    # (for example the whole run inside one cluster batch job) finds every
+    # database already in place. Each `if` below is the same switch that defines
+    # the matching download rule, so nothing is asked for that this run would not
+    # download anyway, and nothing a local copy (directories.*) replaces.
+    #
+    # Called when Snakemake reads rule download_all, after every rule file has
+    # been included, so MOBILOME_ICESCAN and ICESCAN_MODELS_DIR, which
+    # 80_mobilome.smk defines, exist by then.
+    #
+    # Not covered: the Medaka model weights. The model check that fetches them
+    # reads the filtered long reads, so it cannot run ahead of the reads being
+    # filtered. A long-read run whose jobs have no internet needs one model check
+    # done with internet first, or parameters.<mode>.medaka_model: false.
+    targets = []
+    if HAS_SHORT_READS:
+        targets.append(PHIX_FASTA)
+        if not CARDDB:
+            targets.append(CARD_DB_DIR)
+    if not DBCANDB:
+        targets.append(DBCAN_SENTINEL)
+    if not ANTISMASHDB:
+        targets.append(ANTISMASH_DB_DIR)
+    if PHAGE_CALLER == "virsorter2" and not VS2DB:
+        targets.append(VS2_DB_DIR)
+    if PHAGE_CALLER == "genomad" and not GENOMADDB:
+        targets.append(GENOMAD_DB_DIR)
+    if not CHECKVDB:
+        targets.append(CHECKV_DB_DIR)
+    if MOBILOME_RUN:
+        targets.append(CONJSCAN_MODELS_DIR)
+        if MOBILOME_ICESCAN:
+            targets.append(ICESCAN_MODELS_DIR)
+        if MOBILOME_NAME_ELEMENTS:
+            targets.append(TNCENTRAL_DB_DIR)
+        if MOBILOME_NAME_ICE:
+            targets.append(ICEBERG_DB_DIR)
+        if MOBILOME_COPY_NUMBER:
+            targets.append(ISOSDB_DB_DIR)
+    return targets

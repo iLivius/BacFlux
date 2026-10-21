@@ -50,23 +50,28 @@ _READS_DIR = os.path.dirname(TRIM_R1)
 # Takes in: nothing on disk. The address is PHIX_LINK, which 00_common.smk reads
 #           from the config key links.phix_link and validates at parse time.
 # Does:     one wget of the PhiX control genome into 01.reads/phix/.
-# Produces: phix = PHIX_FASTA (01.reads/phix/phix.fna.gz), temp() — the FASTA is
-#           wanted only until build_phix has indexed it.
+# Produces: phix = PHIX_FASTA (01.reads/phix/phix.fna.gz). It is kept after the
+#           run (a few kilobytes), so `snakemake download_all` can fetch it ahead
+#           of a run whose jobs have no internet.
 # Consumed by: build_phix, below.
 #
 # Runs once per RUN, not once per sample — there is no {sample} in the path, so
 # every sample in the batch screens against this one download.
 #
-# conda: NONE — deliberately inherited from v1, which used the system `wget`. Same
-# deferred decision as cazyme_db_download in shared/40_annotation.smk: if the
-# download rules ever get an env, they should all get one together.
+# Environment: envs/download.yaml, for wget, so the computer's own tools do not
+# matter (a minimal Linux system often has no wget).
+# Where it runs: on the computer that runs Snakemake (localrule: True), so on a
+# cluster the download never lands on a compute node without internet.
 #
 # (v1 message: "--- Download PhiX genome from NCBI. ---")
 rule download_phix:
+    localrule: True
     output:
-        phix = temp(PHIX_FASTA),
+        phix = PHIX_FASTA,
     params:
         link = PHIX_LINK,
+    conda:
+        "../../envs/download.yaml"
     log:
         LOGS + "/download_phix.log"
     shell:

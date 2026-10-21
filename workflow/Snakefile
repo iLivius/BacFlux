@@ -125,3 +125,24 @@ if os.path.exists(_report_smk):
 rule all:
     input:
         all_targets()
+
+
+# Optional target: fetch every database and model set this run would download,
+# and nothing else. Name it right after `snakemake`, because --configfile and
+# --sdm each take several values:
+#
+#   snakemake download_all --sdm conda --cores 4 --configfile <your config>
+#
+# The download rules are local rules, so on a cluster they run on the computer
+# that runs Snakemake anyway. This target is for a run whose jobs have no
+# internet at all, such as the whole run inside one batch job: run it first on a
+# computer with internet, from the same folder, with the same config and the
+# same --conda-prefix. download_targets() in 00_common.smk lists what it fetches
+# and what it leaves out.
+#
+# Must stay below `rule all`: Snakemake runs the first rule of the Snakefile when
+# no target is named, and that must be the whole workflow.
+rule download_all:
+    localrule: True
+    input:
+        download_targets()

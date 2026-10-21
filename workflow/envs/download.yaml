@@ -1,0 +1,35 @@
+# The download tools: wget, tar, and the gzip and bzip2 that tar calls to unpack
+# .tar.gz and .tar.bz2 archives. The exact builds are fixed by
+# download.linux-64.pin.txt next to this file.
+#
+# What it is for. Four download rules fetch and unpack a file with no other tool
+# around them: download_phix (illumina/ and hybrid/10_reads.smk),
+# download_amr_db (shared/50_amr.smk), cazyme_db_download
+# (shared/40_annotation.smk) and icescan_models (shared/80_mobilome.smk). Taking
+# these tools from this environment instead of the computer matters because a
+# minimal Debian or Ubuntu system has no wget, and a minimal Red Hat-family system
+# no tar. sha256sum, md5sum, awk, grep, head, cut, find and wc still come from the
+# computer: they are part of every Linux base system.
+#
+# Certificates. This wget checks HTTPS servers against the certificate list in
+# this environment, not the computer's. Behind a proxy that re-signs HTTPS
+# traffic, point SSL_CERT_FILE at your site's certificate file before starting
+# Snakemake.
+#
+# Edit this file (a comment included) or its pin list only for a good reason:
+# Snakemake compares their text with that of the last run, so in an existing
+# output folder the four rules above run again, and their downloads with them.
+#
+# The pin list was made on 2026-10-21 (conda 26.7.2) with
+#   CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY=false conda create -p <env> --override-channels \
+#       -c conda-forge wget=1.25.0 tar=1.35 gzip=1.14 bzip2=1.0.8
+# followed by conda list -p <env> --explicit. The same four builds are already
+# pinned in other BacFlux environments.
+name: download
+channels:
+  - conda-forge
+dependencies:
+  - wget=1.25.0
+  - tar=1.35
+  - gzip=1.14
+  - bzip2=1.0.8

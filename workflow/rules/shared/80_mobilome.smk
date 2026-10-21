@@ -590,7 +590,10 @@ if MOBILOME_RUN:
     # GOTCHA: `macsydata` is DEPRECATED in MacSyFinder 2.1.6 and prints a rename
     # warning; the current command is `msf_data`. The shell prefers msf_data and
     # falls back, so the rule works across both spellings.
+    # Where it runs: on the computer that runs Snakemake (localrule: True), so on
+    # a cluster the download never lands on a compute node without internet.
     rule conjscan_models:
+        localrule: True
         output:
             models = directory(CONJSCAN_MODELS_DIR),
         conda:
@@ -744,15 +747,20 @@ if MOBILOME_RUN:
         # distributed inside ICEfinder2's database bundle, so it has to be
         # downloaded and unpacked by hand.
         #
-        # conda: NONE — wget and tar from the launch environment, the same
-        # arrangement as rule download_amr_db in 50_amr.smk.
+        # Environment: envs/download.yaml, for wget and tar, as rule
+        # download_amr_db in 50_amr.smk.
+        # Where it runs: on the computer that runs Snakemake (localrule: True), so
+        # on a cluster the download never lands on a compute node without internet.
         rule icescan_models:
+            localrule: True
             output:
                 models = directory(ICESCAN_MODELS_DIR),
             params:
                 url = ICESCAN_URL,
                 sha256 = ICESCAN_SHA256,
                 local_dir = ICESCAN_LOCAL,
+            conda:
+                "../../envs/download.yaml"
             log:
                 LOGS + "/mobilome_icescan_models.log"
             shell:
@@ -1088,7 +1096,10 @@ if MOBILOME_RUN:
         #           one another rule needs is the tncentral_v5 prefix, which
         #           tncentral_blast rebuilds from input.db_dir.
         # Consumed by: tncentral_blast. Fetched once and shared by all samples.
+        # Where it runs: on the computer that runs Snakemake (localrule: True), so on
+        # a cluster the download never lands on a compute node without internet.
         rule tncentral_db:
+            localrule: True
             output:
                 db_dir = directory(TNCENTRAL_DB_DIR),
             params:
@@ -1327,7 +1338,10 @@ if MOBILOME_RUN:
         # resume — so a single pinned digest is not the right instrument here.
         # PROVENANCE.txt records the observed sha256 of the concatenated FASTA
         # and the fetch date, which is what a methods section needs.
+        # Where it runs: on the computer that runs Snakemake (localrule: True), so on
+        # a cluster the download never lands on a compute node without internet.
         rule iceberg_db:
+            localrule: True
             output:
                 db_dir = directory(ICEBERG_DB_DIR),
             params:
@@ -1555,7 +1569,10 @@ if MOBILOME_RUN:
         #           IS_fam_annot.txt and PROVENANCE.txt.
         # Consumed by: isosdb_map (the sequences) and is_copy_number (the family
         #           map). Fetched once and shared by all samples.
+        # Where it runs: on the computer that runs Snakemake (localrule: True), so on
+        # a cluster the download never lands on a compute node without internet.
         rule isosdb_db:
+            localrule: True
             output:
                 db_dir = directory(ISOSDB_DB_DIR),
             params:

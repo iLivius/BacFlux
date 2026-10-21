@@ -5,4 +5,11 @@ channels:
 dependencies:
   - python=3.13
   - checkv=1.1.1
+  # Download tools for rule checkv_db (shared/70_phage.smk), which fetches the
+  # database with wget and unpacks it with tar and gzip. Taken from here so that
+  # a minimal Linux system without them still works. tar and gzip were added on
+  # 2026-10-21 with --freeze-installed, which left every other package of the pin
+  # list as it was.
   - wget
+  - tar=1.35
+  - gzip=1.14

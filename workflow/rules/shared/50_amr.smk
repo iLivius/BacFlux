@@ -185,8 +185,10 @@ if HAS_SHORT_READS:
     # a directory() output. That is why the extraction directory has to be created
     # explicitly here — v1 got it for free as the tarball's parent.
     #
-    # No conda: — wget and tar come from the launch environment, as in v1. Same
-    # deferred decision as cazyme_db_download; see docs/README_notes.md item 3.
+    # Environment: envs/download.yaml, for wget, and for tar with the bzip2 it
+    # calls to unpack CARD's .tar.bz2.
+    # Where it runs: on the computer that runs Snakemake (localrule: True), so on
+    # a cluster the download never lands on a compute node without internet.
     #
     # Defined only when directories.card_db is empty, i.e. when BacFlux is the one
     # doing the downloading. Mutually exclusive with download_amr_db_local below,
@@ -197,6 +199,7 @@ if HAS_SHORT_READS:
     if not CARDDB:
 
         rule download_amr_db:
+            localrule: True
             output:
                 card_tarball = temp(CARD_TARBALL),
                 card_dir = temp(directory(CARD_DB_DIR)),
@@ -205,6 +208,8 @@ if HAS_SHORT_READS:
                 # config that omits links.card_link is rejected at parse time, by
                 # key name, instead of dying inside wget here.
                 link = CARD_LINK,
+            conda:
+                "../../envs/download.yaml"
             log:
                 LOGS + "/download_amr.log"
             shell:

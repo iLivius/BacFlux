@@ -254,7 +254,10 @@ rule functional_annotation:
 # (v1 message: "--- antiSMASH: database download. ---")
 if not ANTISMASHDB:
 
+    # Where it runs: on the computer that runs Snakemake (localrule: True), so on
+    # a cluster the download never lands on a compute node without internet.
     rule secondary_metabolites_db:
+        localrule: True
         output:
             antismash_db = directory(ANTISMASH_DB_DIR),
         conda:
@@ -380,9 +383,10 @@ rule secondary_metabolites_analysis:
 # cazyme_db_local below instead. Mutually exclusive for the directory()-wipe
 # reason given under secondary_metabolites_db.
 #
-# conda: NONE, inherited from v1. It runs in the environment Snakemake was
-# launched from and needs wget, tar, sha256sum and awk to be available there.
-# Adding a small wget/coreutils env would be new behaviour, so it is left alone.
+# Environment: envs/download.yaml, for wget and tar (with the gzip tar calls);
+# sha256sum and awk are part of every Linux base system.
+# Where it runs: on the computer that runs Snakemake (localrule: True), so on a
+# cluster the download never lands on a compute node without internet.
 #
 # The doubled braces in the shell are not a typo: Snakemake reads {…} as one of
 # its own placeholders, so a literal brace for awk has to be written {{…}} to
@@ -390,12 +394,15 @@ rule secondary_metabolites_analysis:
 if not DBCANDB:
 
     rule cazyme_db_download:
+        localrule: True
         output:
             dbcan_db = directory(DBCAN_DB_DIR),
             dbcan_verified = DBCAN_SENTINEL,
         params:
             dbcan_db_url = DBCAN_LINK,
             sha_url = DBCAN_SHA_URL,
+        conda:
+            "../../envs/download.yaml"
         log:
             LOGS + "/cazyme_db_download.log"
         shell:

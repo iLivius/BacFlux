@@ -22,7 +22,8 @@
 # `ModuleNotFoundError: No module named 'screed'`.
 #
 # The dependency block below is therefore a faithful copy of VirSorter2's OWN
-# internal env spec, which ships inside the installed package at:
+# internal env spec, plus three download tools at the end of the list. That spec
+# ships inside the installed package at:
 #     <env>/lib/python3.*/site-packages/virsorter/envs/vs2.yaml
 # If VirSorter2 is ever unpinned from 2.2.4, re-read that file and re-sync this
 # one — that is the single maintenance obligation this approach creates.
@@ -56,3 +57,12 @@ dependencies:
   - pandas=1.2
   - seaborn
   - numpy<1.24
+
+  # Download tools, NOT from vs2.yaml: `virsorter setup` (rule virsorter2_db in
+  # shared/70_phage.smk) runs wget, gunzip and tar itself to fetch and unpack its
+  # database. Taken from here so that a minimal Linux system without them still
+  # works. Added on 2026-10-21 with --freeze-installed, which left every other
+  # package of the pin list as it was.
+  - wget=1.25.0
+  - tar=1.35
+  - gzip=1.14
