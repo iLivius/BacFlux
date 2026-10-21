@@ -181,10 +181,13 @@ ISESCAN_TYPE_PARTIAL = "p"
 # elements carry a helper protein, IstB, that belongs to the same family of
 # ATP-binding proteins as DnaA, so ISEScan's IS21 profile matches DnaA itself.
 #
-# Such a call is dropped when at least this share of its length lies inside a
-# CDS that Bakta calls dnaA. The calls in question lie almost entirely inside the
-# gene, so half is a safe line; an IS that merely sits next to dnaA overlaps it
-# by far less and is kept.
+# Such a call is dropped when it and a CDS that Bakta calls dnaA overlap by at
+# least this share of the SHORTER of the two: at least half of the call lies
+# inside dnaA, or at least half of dnaA lies inside the call. Both shapes occur.
+# The call can sit inside the gene, or run past its end into the next gene,
+# dnaN, when ISEScan's own gene finder has joined the two into one reading
+# frame; such a call covers nearly all of dnaA but is mostly outside it. An IS
+# that merely sits next to dnaA overlaps it by far less, and is kept.
 DNAA_OVERLAP_FRACTION = 0.5
 
 # How Bakta names dnaA. Either is enough: the gene symbol is the usual signal,
@@ -295,7 +298,8 @@ AUDIT_COLUMNS = [
 #     invalid_coordinate_range        start > end, or a zero/negative coordinate
 #     below_min_length_bp             shorter than --min-length-bp
 #     overlaps_dnaA                   at least half of the call lies inside dnaA,
-#                                     an essential gene, so it is not an
+#                                     or at least half of dnaA inside the call;
+#                                     dnaA is essential, so it is not an
 #                                     insertion (see DNAA_OVERLAP_FRACTION)
 #  ** contig_not_in_contig_lengths    the contig is missing from the lengths file,
 #                                     so distance-to-contig-end cannot be computed
@@ -571,17 +575,21 @@ def read_dnaa_genes(path):
 def overlapping_dnaa_gene(contig, start, end, dnaa_genes):
     """Return (gene, overlap_bp) for the dnaA gene this IS call lies over, or None.
 
-    "Lies over" means at least DNAA_OVERLAP_FRACTION of the call's length is
-    inside the gene. Both intervals are 1-based and inclusive, so the overlap
-    counts its first and last base; with no overlap at all the number comes out
-    zero or negative and fails the test.
+    "Lies over" means the call and the gene overlap by at least
+    DNAA_OVERLAP_FRACTION of the shorter of the two lengths, which covers both a
+    call sitting inside dnaA and a call that contains most of it. Both intervals
+    are 1-based and inclusive, so the overlap counts its first and last base;
+    with no overlap at all the number comes out zero or negative and fails the
+    test.
     """
     call_length_bp = end - start + 1
     for gene in dnaa_genes or []:
         if gene["contig"] != contig:
             continue
+        gene_length_bp = gene["end"] - gene["start"] + 1
         overlap_bp = min(end, gene["end"]) - max(start, gene["start"]) + 1
-        if overlap_bp >= DNAA_OVERLAP_FRACTION * call_length_bp:
+        shorter_length_bp = min(call_length_bp, gene_length_bp)
+        if overlap_bp >= DNAA_OVERLAP_FRACTION * shorter_length_bp:
             return gene, overlap_bp
     return None
 
@@ -747,8 +755,9 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
                                    distances — the whole honesty mechanism — could
                                    not be computed for this IS.
       coordinates_beyond_contig_length  same mismatch, seen from the other side.
-      overlaps_dnaA                at least half of the call lies inside dnaA.
-                                   The gene is essential, so this is ISEScan's
+      overlaps_dnaA                at least half of the call lies inside dnaA, or
+                                   at least half of dnaA inside the call. The
+                                   gene is essential, so this is ISEScan's
                                    profile matching DnaA, not an insertion.
 
     The one FLAG (kept, not dropped) is an unrecognised completeness letter: we
@@ -850,11 +859,15 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
         dnaa_match = overlapping_dnaa_gene(contig, start, end, dnaa_genes)
         if dnaa_match is not None:
             gene, overlap_bp = dnaa_match
+            gene_length_bp = gene["end"] - gene["start"] + 1
+            share_of_call = round(100 * overlap_bp / length_bp)
+            share_of_gene = round(100 * overlap_bp / gene_length_bp)
             audit(
                 contig, start, end, "dropped", "overlaps_dnaA",
-                f"{overlap_bp} of {length_bp} bp lie inside dnaA "
-                f"({gene['locus_tag']}, {gene['start']}..{gene['end']}). dnaA is "
-                "essential, so this is a profile match to DnaA, not an insertion",
+                f"{overlap_bp} bp shared with dnaA ({gene['locus_tag']}, "
+                f"{gene['start']}..{gene['end']}): {share_of_call}% of the call, "
+                f"{share_of_gene}% of the gene. dnaA is essential, so this is a "
+                "profile match to DnaA, not an insertion",
             )
             continue
 

@@ -690,13 +690,34 @@ def test_call_over_dnaa_is_dropped_with_a_reason(tmp_path):
     assert [row["start"] for row in table] == ["5000"]
     assert audit[0]["action"] == "dropped"
     assert audit[0]["reason"] == "overlaps_dnaA"
-    assert "1411 of 1571 bp" in audit[0]["detail"]
+    assert "1411 bp shared with dnaA" in audit[0]["detail"]
+    assert "90% of the call, 98% of the gene" in audit[0]["detail"]
     assert "S1_00001" in audit[0]["detail"]
     # The call sat 29 bp from the contig start. Dropped, it no longer counts as
     # an IS, nor as an IS at a contig end.
     assert summary["n_is_total"] == "1"
     assert summary["n_is_at_contig_boundary"] == "0"
     assert summary["n_records_dropped"] == "1"
+
+
+def test_call_running_past_dnaa_into_the_next_gene_is_dropped(tmp_path):
+    # When ISEScan's gene finder joins dnaA and dnaN into one reading frame, the
+    # call runs past the end of dnaA: 72..2949 against dnaA at 1..1404. Under
+    # half of the call is inside dnaA, but almost all of dnaA is inside the call.
+    results = write_isescan_tsv(tmp_path / "r.tsv",
+                                [dnaa_call(isBegin="72", isEnd="2949")])
+    bakta = write_bakta_tsv(tmp_path / "bakta.tsv", [
+        bakta_row(start=1, stop=1404),
+        bakta_row(start=1409, stop=2509, locus_tag="S1_00002", gene="dnaN",
+                  product="DNA polymerase III subunit beta"),
+    ])
+    code, table, _, audit = run_main(
+        tmp_path, results, {"contig_1": 50000}, extra=["--bakta-tsv", bakta]
+    )
+    assert code == 0
+    assert table == []
+    assert audit[0]["reason"] == "overlaps_dnaA"
+    assert "46% of the call, 95% of the gene" in audit[0]["detail"]
 
 
 def test_without_a_bakta_table_the_dnaa_call_is_kept(tmp_path):
