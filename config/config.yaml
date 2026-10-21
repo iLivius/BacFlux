@@ -329,24 +329,24 @@ parameters:
     long_read_mode: "off"      # [hybrid] Options: off (default) | auto | include | exclude
                                #   A SECOND screen, of the genome hybrid actually
                                #   delivers. `mode:` above screens the Illumina SPAdes
-                               #   draft; the delivered genome comes from the ONT side
-                               #   (Flye, Medaka, dnaapler, Polypolish) and is not
-                               #   covered by it.
+                               #   draft; the delivered genome is built afterwards from
+                               #   the ONT reads (Flye, Medaka, dnaapler, Polypolish),
+                               #   and with parameters.hybrid.short_read_guidance: false
+                               #   (the default) no step removes contaminant long reads
+                               #   before Flye.
                                #
-                               #   It used to be covered indirectly: filtlong scored
-                               #   long reads against the decontaminated short reads,
-                               #   removing contaminant reads before Flye. With
-                               #   parameters.hybrid.short_read_guidance now false by
-                               #   default, nothing does that, so this screen exists.
-                               #
-                               #   `off` still runs the screen and writes
+                               #   A CHECK, NOT A FILTER. Whatever this is set to,
+                               #   contigs_final.fasta is not changed. The screen writes
                                #   {sample}_final_contig_taxonomy_decisions.tsv with a
-                               #   verdict per contig — it just discards nothing. That
-                               #   is the default because BlobTools finds outliers in a
-                               #   cloud of contigs and a long-read assembly has two to
-                               #   five: a false positive deletes a whole replicon,
-                               #   usually the plasmid, not a fragment. Read the audit
-                               #   before setting this to anything else.
+                               #   verdict per delivered contig, and this key decides the
+                               #   verdicts: `off` marks every contig keep; auto, include
+                               #   and exclude apply the same rules as `mode:` and show
+                               #   which contigs that policy would remove.
+                               #
+                               #   `off` is the default because BlobTools finds outliers
+                               #   in a cloud of contigs and a long-read assembly has two
+                               #   to five: a verdict concerns a whole replicon, usually
+                               #   the plasmid. Read a `remove` as a prompt to look.
                                #
                                #   The genus lists below are shared with `mode:` — the
                                #   organism does not change because the assembler did.

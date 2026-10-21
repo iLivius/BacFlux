@@ -779,10 +779,12 @@ PLASMID_BLASTOUT = (DECONTAM_DIR + "/{sample}_final_blastout") if NEEDS_FINAL_BL
 # against nt for plasmid_search, and PLASMID_BLASTOUT carries the same 15 columns
 # BlobTools reads. Only a coverage track and the BlobTools join are added.
 #
-# Default is "off": every contig is screened and gets an audited verdict, and none
-# is discarded. On a 2-5 contig long-read assembly a false positive removes a whole
-# replicon rather than trimming a fragment, and BlobTools finds outliers in a cloud
-# of contigs -- with three, there is no cloud. Opt in per run if you want removal.
+# The screen is a CHECK, not a filter: every contig gets an audited verdict and
+# FINAL_CONTIGS is never changed, whatever long_read_mode says. The mode only
+# decides the verdicts. Default is "off" (every contig "keep"): on a 2-5 contig
+# long-read assembly a wrong verdict concerns a whole replicon rather than a
+# fragment, and BlobTools finds outliers in a cloud of contigs -- with three, there
+# is no cloud. auto/include/exclude show what that policy would remove.
 LONGREAD_SCREEN = MODE == "hybrid"
 _dec = (config.get("parameters", {}) or {}).get("decontamination", {}) or {}
 _lrm = _dec.get("long_read_mode", "off")
