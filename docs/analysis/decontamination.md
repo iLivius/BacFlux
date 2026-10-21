@@ -588,7 +588,9 @@ different species cannot be caught by a genus-level rule at all.
 
 ### Route 2 — in `hybrid`, a dropped contig takes its long reads with it
 
-This one is worse, because the sequence disappears from the **assembly** rather than
+This route exists only with `parameters.hybrid.short_read_guidance: true`. By default
+Filtlong does not use the short reads, and it cannot happen. When guidance is on, it is
+the worse of the two, because the sequence disappears from the **assembly** rather than
 merely from the taxonomy table. The chain:
 
 ```text

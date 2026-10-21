@@ -70,22 +70,26 @@ scores every ONT read by how much of it those pairs support.
     |---|---|
     | **ONT** | Oxford Nanopore Technologies, the long-read sequencing platform |
 
-## The Illumina leg is the ONT leg's contamination filter
+## How the Illumina leg filters contamination
 
-This is the design that makes the mode hybrid.
+The contamination screen runs on the **Illumina draft**, and the Illumina reads that map
+as proper pairs back to the *decontaminated* draft are pulled out (`map_sel_contigs`,
+keeping SAM flag `0x2`). That read set is, by construction, reads from the organism the
+screen decided to keep — a contamination-filtered read set obtained without classifying
+a single read. Polypolish corrects the long-read assembly with it.
 
-There is no BLAST/BlobTools screen on the long-read assembly. Instead the screen runs
-on the **Illumina draft**, and the Illumina reads that map as proper pairs back to the
-*decontaminated* assembly are pulled out (`map_sel_contigs`, keeping SAM flag `0x2`).
-That read set is, by construction, reads from the organism the screen decided to keep
-— a contamination-filtered read set obtained without classifying a single read.
+Whether it also filters the long reads is a setting, `parameters.hybrid.short_read_guidance`:
 
-Those pairs are then handed to Filtlong as `-1/-2`. Given short reads, Filtlong stops
-scoring by quality alone and asks how much of each long read is supported by k-mers
-from the trusted short reads. A long read from a contaminant has no such support, so
-one step does the quality filtering and the decontamination together.
+- **`false`, the default.** Filtlong selects the long reads on length and quality alone,
+  as in `nanopore` mode, so nothing removes contaminant long reads before Flye. The
+  delivered genome is screened again afterwards instead, as a check that changes no
+  contig: see [the second screen in `hybrid`](../analysis/decontamination.md#the-second-screen-in-hybrid).
+- **`true`.** The pairs are handed to Filtlong as `-1/-2`. Filtlong then also asks how
+  much of each long read is supported by k-mers from these trusted short reads. A long
+  read from a contaminant has no such support, so one step does the quality filtering
+  and the decontamination together.
 
-!!! warning "A contig dropped by the screen takes its long reads with it"
+!!! warning "With short-read guidance on, a contig dropped by the screen takes its long reads with it"
 
     The consequence runs further than the taxonomy table. If the contamination screen
     removes a genuine contig — a small broad-host-range plasmid is the case that
@@ -104,8 +108,8 @@ The Filtlong flags differ from `nanopore` mode on purpose:
 | `--min_length` | `parameters.long_read_qc.min_length` | 1000 | same as `nanopore` |
 | `--keep_percent` | `parameters.long_read_qc.keep_percent` | 95 | same key, same effect on small plasmids ([Nanopore mode](nanopore.md)) |
 | `--length_weight` | `parameters.long_read_qc.length_weight` | 1 | **only reaches Filtlong here.** At 10 the 1–3 kb read band is emptied whatever `keep_percent` says |
-| `--trim`, `--split 1000` | fixed | — | cut unsupported read ends, and break a read at any unsupported 1 kb stretch — how a chimeric read is separated |
-| `--target_bases` | not passed | — | the short reads define what is worth keeping, so no coverage cap is needed |
+| `--trim`, `--split 1000` | `short_read_guidance: true` only | — | cut unsupported read ends, and break a read at any unsupported 1 kb stretch — how a chimeric read is separated |
+| `--target_bases` | `short_read_guidance: false` only | 500 Mbp | the coverage cap `nanopore` mode applies; with guidance on, the short reads define what is worth keeping, so no cap is passed |
 
 ## Two genomes, and which one is delivered
 

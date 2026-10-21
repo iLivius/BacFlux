@@ -195,9 +195,9 @@ plasmid Platon missed does not silently become "chromosomal, intrinsic candidate
     of the control genome above, dropped as *Escherichia*
     ([Decontamination](decontamination.md#route-1-bestsum-follows-database-composition-not-biology)).
     Check `02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv` before trusting an
-    absence. In `hybrid` mode there is a second route, worse than the first: a contig dropped
-    there takes its long reads with it, so the sequence is missing from the assembly and not
-    merely from the plasmid call
+    absence. In `hybrid` mode with short-read guidance on there is a second route, worse than
+    the first: a contig dropped there takes its long reads with it, so the sequence is missing
+    from the assembly and not merely from the plasmid call
     ([Route 2](decontamination.md#route-2-in-hybrid-a-dropped-contig-takes-its-long-reads-with-it)).
 
 Small plasmids are also lost upstream of that, at read filtering and assembly. The settings
