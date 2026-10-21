@@ -63,7 +63,7 @@ Where it runs: imported by conjscan_to_ice.py, which already holds the candidate
 machinery spans, the Bakta GFF3 (for tRNAs) and the genome. Standard library
 only — a plain dict of k-mers is quick enough at these window sizes, which is why
 no suffix-array tool (vmatch and friends) has to be installed, and why the rule
-that drives it needs no conda environment. Testable with no tool or database
+that drives it needs nothing beyond Python. Testable with no tool or database
 present: workflow/scripts/80_mobilome/test_att_search.py.
 
 Coordinates: everything crossing this module's boundary is 1-based inclusive,
@@ -470,10 +470,10 @@ def count_repeat_copies(sequence, kmer):
 #
 #     BLAST (the DEPhT route) would additionally tolerate mismatches and gaps,
 #     which is strictly more sensitive. It was not chosen because att_search.py
-#     is stdlib-only and the rule that calls it has no conda environment, so
-#     shelling out to blastn would make the module depend on whatever happens to
-#     be on PATH. Exact maximal repeats is not a compromise invented here: it is
-#     precisely what ICEfinder2, the reference ICE tool, uses.
+#     is stdlib-only and the rule that calls it (conjscan_ice) runs in an
+#     environment holding only Python, so calling blastn would add BLAST to it.
+#     Exact maximal repeats is not a compromise invented here: it is precisely
+#     what ICEfinder2, the reference ICE tool, uses.
 #
 # Floor of 15 bp, matching ICEfinder2 and icefinder-opt. DBSCAN-SWA uses 12; 15
 # is the more conservative of the two published choices.

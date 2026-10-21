@@ -96,8 +96,9 @@ Two ways to run it, called from two different rules:
      isescan_to_table.py --genome-fasta 02.assembly/S/contigs_final.fasta \
          --out-contig-lengths 08.mobilome/S/S_contig_lengths.tsv
 
-Standard library only — this runs inside the ISEScan conda env, which carries no
-pandas. Unit tests: workflow/scripts/80_mobilome/test_isescan_to_table.py
+Standard library only. Rules isescan_table and contig_lengths run it in
+workflow/envs/python.yaml, a pinned Python with nothing else in it. Unit tests:
+workflow/scripts/80_mobilome/test_isescan_to_table.py
 """
 
 import argparse

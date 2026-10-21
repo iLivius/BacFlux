@@ -571,10 +571,11 @@ rule blob_table:
 #   contigs   = DECONTAM_CONTIGS  the kept sequences — the per-mode table in this
 #                                 file's header says who consumes them next
 #
-# conda: NONE — inherited from all four v1 modes. The selector is stdlib-only
-# Python and runs in the environment Snakemake was launched from. Adding an env
-# would be new behaviour; it is the same deferred decision as cazyme_db_download
-# (see docs/README_notes.md item 3).
+# conda: envs/python.yaml, a pinned Python and nothing else. The selector uses
+# only the standard library, but without an environment the job would run
+# whatever `python` comes first on the computer's PATH (none where only python3
+# is installed, Python 2 on some old cluster nodes). The environment makes
+# `python` the same everywhere.
 #
 # The eight policy values — mode, auto_vote, discard_no_hit and the five
 # genus/override fields — come verbatim from the DECONTAMINATION dict that
@@ -617,6 +618,8 @@ rule select_contigs:
         exclude_genera_file = DECONTAMINATION["exclude_genera_file"],
         sample_overrides = DECONTAMINATION["sample_overrides"],
         discard_no_hit = DECONTAMINATION["discard_no_hit"],
+    conda:
+        "../../envs/python.yaml"
     log:
         LOGS + "/select_contigs_{sample}.log"
     shell:
@@ -782,6 +785,8 @@ if LONGREAD_SCREEN:
             exclude_genera_file = DECONTAMINATION["exclude_genera_file"],
             sample_overrides = DECONTAMINATION["sample_overrides"],
             discard_no_hit = DECONTAMINATION["discard_no_hit"],
+        conda:
+            "../../envs/python.yaml"
         log:
             LOGS + "/screen_final_contigs_{sample}.log"
         shell:

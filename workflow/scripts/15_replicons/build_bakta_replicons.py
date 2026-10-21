@@ -65,8 +65,8 @@ What it writes
                    (the project convention: every filtering decision gets an
                    audit TSV with a reason column)
 
-Stdlib only; runs in the environment Snakemake was launched from, like
-select_contigs_by_taxonomy.py and plasmid_concordance.py. Exercised by
+Standard library only. Rule build_replicons runs it in workflow/envs/python.yaml,
+a pinned Python with nothing else in it. Exercised by
 scripts/15_replicons/test_build_bakta_replicons.py with no tools or databases.
 """
 

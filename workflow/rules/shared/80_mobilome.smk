@@ -300,8 +300,8 @@ if MOBILOME_RUN:
     # scanner, one set of tests, and no way for the two rules to disagree about
     # how long a contig is.
     #
-    # conda: NONE — plain Python from the launch environment, like the other
-    # small helper steps in this workflow.
+    # conda: envs/python.yaml, the pinned Python that every helper rule in this
+    # file uses.
     rule contig_lengths:
         input:
             contigs = FINAL_CONTIGS,
@@ -309,6 +309,8 @@ if MOBILOME_RUN:
             lengths = CONTIG_LENGTHS,
         params:
             script = ISESCAN_TABLE_SCRIPT,
+        conda:
+            "../../envs/python.yaml"
         log:
             LOGS + "/mobilome_contig_lengths_{sample}.log"
         shell:
@@ -351,6 +353,8 @@ if MOBILOME_RUN:
             audit = AMRFINDER_ORGANISM_AUDIT,
         params:
             script = ORGANISM_SCRIPT,
+        conda:
+            "../../envs/python.yaml"
         log:
             LOGS + "/mobilome_amrfinder_organism_{sample}.log"
         shell:
@@ -548,6 +552,8 @@ if MOBILOME_RUN:
         params:
             script = ISESCAN_TABLE_SCRIPT,
             boundary_bp = MOBILOME_BOUNDARY_BP,
+        conda:
+            "../../envs/python.yaml"
         log:
             LOGS + "/mobilome_isescan_table_{sample}.log"
         shell:
@@ -1024,6 +1030,8 @@ if MOBILOME_RUN:
                 "--icescan-tsv " + ICESCAN_DIR.format(sample=w.sample) + "/best_solution.tsv"
                 if MOBILOME_ICESCAN else ""
             ),
+        conda:
+            "../../envs/python.yaml"
         log:
             LOGS + "/mobilome_conjscan_ice_{sample}.log"
         shell:
@@ -1274,6 +1282,8 @@ if MOBILOME_RUN:
                 script = NAME_TRANSPOSONS_SCRIPT,
                 min_identity = TNCENTRAL_MIN_IDENTITY,
                 min_coverage = TNCENTRAL_MIN_COVERAGE,
+            conda:
+                "../../envs/python.yaml"
             log:
                 LOGS + "/mobilome_name_elements_{sample}.log"
             shell:
@@ -1479,6 +1489,8 @@ if MOBILOME_RUN:
                 script = NAME_ICE_SCRIPT,
                 min_identity = ICEBERG_MIN_IDENTITY,
                 min_overlap = ICEBERG_MIN_OVERLAP,
+            conda:
+                "../../envs/python.yaml"
             log:
                 LOGS + "/mobilome_name_ice_{sample}.log"
             shell:
@@ -1740,6 +1752,8 @@ if MOBILOME_RUN:
                 family_map = lambda w, input: os.path.join(input.db_dir, "IS_fam_annot.txt"),
                 min_covered = ISOSDB_MIN_COVERED,
                 min_copies = ISOSDB_MIN_COPIES,
+            conda:
+                "../../envs/python.yaml"
             log:
                 LOGS + "/mobilome_is_copy_number_{sample}.log"
             shell:
@@ -1809,6 +1823,8 @@ if MOBILOME_RUN:
                 "--genomad-concordance " + PLASMID_CONCORDANCE.format(sample=w.sample)
                 if PHAGE_CALLER == "genomad" else ""
             ),
+        conda:
+            "../../envs/python.yaml"
         log:
             LOGS + "/mobilome_replicons_{sample}.log"
         shell:
@@ -1885,6 +1901,8 @@ if MOBILOME_RUN:
                 "--is-table " + NAMED_ELEMENTS_TABLE.format(sample=w.sample)
                 if MOBILOME_NAME_ELEMENTS else ""
             ),
+        conda:
+            "../../envs/python.yaml"
         log:
             LOGS + "/mobilome_colocalisation_{sample}.log"
         shell:

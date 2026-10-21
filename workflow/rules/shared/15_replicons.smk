@@ -62,9 +62,8 @@
 # nanopore mode would otherwise produce a perfectly-formatted table that says
 # nothing.
 #
-# conda: NONE — the helper is stdlib-only Python and runs in the environment
-# Snakemake was launched from, exactly like select_contigs_by_taxonomy.py and
-# plasmid_concordance.py. No new dependency.
+# conda: envs/python.yaml, like select_contigs; the helper uses only the
+# standard library.
 #
 # Why this file is shared-and-gated rather than one copy in rules/nanopore/ and
 # one in rules/hybrid/: 00_common.smk pins FLYE_INFO, DNAAPLER_SUMMARY,
@@ -109,6 +108,8 @@ if HAS_LONG_READS:
             # scripts/15_replicons/build_bakta_replicons.py.
             min_cov = 80.0,
             min_id = 40.0,
+        conda:
+            "../../envs/python.yaml"
         log:
             LOGS + "/build_replicons_{sample}.log"
         shell:

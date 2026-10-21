@@ -74,8 +74,8 @@ In HYBRID mode a dropped contig can take its ONT reads with it and disappear fro
 the assembly, not merely from the taxonomy table. The worked case and the fixes
 are in the decontamination block of config/config.yaml.
 
-Stdlib only and no conda environment: it runs in the environment Snakemake was
-launched from, like build_bakta_replicons.py and plasmid_concordance.py.
+Standard library only. Rule select_contigs runs it in workflow/envs/python.yaml,
+a pinned Python with nothing else in it.
 """
 
 import argparse

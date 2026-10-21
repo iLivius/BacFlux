@@ -1,0 +1,36 @@
+# Python 3.12 and nothing else. The exact package builds are fixed by
+# python.linux-64.pin.txt next to this file; Snakemake creates the environment
+# from that list.
+#
+# What it is for. Several BacFlux steps are small Python scripts that use only
+# Python's standard library and call no other program. Their rules have no tool
+# environment that could bring a Python, so they run in this one:
+#   select_contigs and screen_final_contigs (shared/10_decontam.smk),
+#   build_replicons (shared/15_replicons.smk), and the mobilome helpers
+#   contig_lengths, amrfinder_organism, isescan_table, conjscan_ice,
+#   name_elements, name_ice_elements, is_copy_number, mobilome_replicons and
+#   amr_mge_colocalisation (shared/80_mobilome.smk).
+#
+# Why a pinned environment instead of the computer's own `python`. Without an
+# environment, a rule runs whichever `python` comes first on the PATH of the
+# computer that runs the job. That can be missing (Ubuntu 22.04 and later,
+# Debian 12 and RHEL 9 install only `python3`), a Python 2.7 or 3.6 on an old
+# cluster, or a different Python on each cluster node; and a PYTHONPATH set by a
+# cluster module would leak into it. Activating this environment makes `python`
+# the same Python 3.12 everywhere, and Snakemake clears PYTHONPATH for it.
+#
+# Edit this file (a comment included) or its pin list only for a good reason:
+# Snakemake compares their text with that of the last run, so in an existing
+# output folder every rule above runs again, and with it everything after the
+# contig selection.
+#
+# The pin list was made on 2026-10-12 (conda 26.7.2) with
+#   CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY=false conda create -p <env> --override-channels \
+#       -c conda-forge python=3.12
+# followed by conda list -p <env> --explicit. The setting leaves out pip, which
+# nothing here uses; --override-channels makes conda use only conda-forge.
+name: python
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
