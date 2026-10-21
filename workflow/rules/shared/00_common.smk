@@ -442,8 +442,10 @@ RUNTIME_HOURS = _whole_number("runtime_hours", 24)
 # as its time limit in minutes (Slurm -t). A rule that declares neither asks for
 # nothing and gets the scheduler's defaults, often far too little for an
 # assembler or GTDB-Tk, unless the user passes --default-resources. On a single
-# computer both are ignored. Snakemake does not compare them when deciding what
-# to re-run, so changing ram_gb or runtime_hours re-runs nothing.
+# computer both are ignored. Snakemake does not compare resources when deciding
+# what to re-run, so these two requests never cause a re-run by themselves.
+# ram_gb also reaches the BBMap rules another way: they pass min(ram_gb, 32) as
+# a parameter, and a changed parameter does re-run them.
 HEAVY_MEM_MB = RAM * 1024                  # MB, the unit of mem_mb
 LONG_RUNTIME_MINUTES = RUNTIME_HOURS * 60  # minutes, the unit of runtime
 

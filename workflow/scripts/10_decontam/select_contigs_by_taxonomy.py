@@ -439,7 +439,7 @@ def choose_label_genus(kept_votes):
     KEPT, so a genus that was filtered out can never name the genome. Contigs
     BLAST could not place ("no-hit") never count. In auto mode the answer is the
     genus that won the vote; in include, exclude and off mode it is the kept
-    genus holding most of the assembly.
+    genus that wins the same count (most kept bp with the default auto_vote: bp).
 
     Returns None when no kept contig has a genus, for example when every kept
     contig is no-hit. Bakta then runs without an organism name.
