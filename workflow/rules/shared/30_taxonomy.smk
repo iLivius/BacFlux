@@ -105,6 +105,10 @@ rule taxonomic_assignment:
     conda:
         "../../envs/gtdbtk.yaml"
     threads: capped_cpus(24)
+    resources:
+        # Cluster requests (00_common.smk §3a); a single computer ignores them.
+        mem_mb = HEAVY_MEM_MB,
+        runtime = LONG_RUNTIME_MINUTES,
     log:
         LOGS + "/taxonomic_assignment_{sample}.log"
     shell:

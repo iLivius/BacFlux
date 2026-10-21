@@ -109,18 +109,30 @@ links:
   genomad_md5:  "67244b528bb8bed464d1ca147136d33e"   # MD5 of the file above, as published on that Zenodo record. Zenodo gives an MD5 rather than the .sha256 sidecar the CheckV/dbCAN mirrors carry, so it is set here instead of derived from the URL. CHANGE THIS WHENEVER YOU CHANGE genomad_link — a mismatch stops the run. Empty = download without verification.
 
 # Compute limits — what each rule ASKS for, not what the machine sets aside.
-# Snakemake enforces only the CPU side: `--cores N` caps every rule's request at
-# N (pass --cores on its own, never --jobs alongside it). ram_gb is just handed to
-# the tools, so two big jobs running at once can each take it. eggNOG is the one
-# rule Snakemake will schedule on memory, and only if you add --resources mem_gb=N.
+# On a single computer Snakemake enforces only the CPU side: `--cores N` caps every
+# rule's request at N (pass --cores on its own, never --jobs alongside it). ram_gb
+# is just handed to the tools, so two big jobs running at once can each take it.
+# eggNOG is the one rule Snakemake will schedule on memory there, and only if you
+# add --resources mem_gb=N. On a cluster, ram_gb and runtime_hours are also what
+# every long or memory-hungry step asks the scheduler for.
+# All three must be whole numbers, 1 or more.
 resources:
   threads: 16                  # [all modes] default 16 if omitted. Rules whose tool stops
                                #   scaling ask for fewer (capped_cpus, defined in
-                               #   shared/00_common.smk).
+                               #   shared/00_common.smk). On a cluster, at most the CPUs
+                               #   of one node: the assemblers ask for all of it.
   ram_gb:  64                  # [all modes] default 64 if omitted. SPAdes takes it as a
                                #   hard ceiling [illumina|hybrid]; Qualimap and the BBMap
                                #   read-mapping legs cap themselves against it; and it is
                                #   the budget parameters.eggnog.dbmem is checked against.
+                               #   On a cluster it is also the memory each heavy step
+                               #   asks for: at most one node's memory, and at least
+                               #   about 60, because GTDB-Tk alone needs 55 GB.
+  runtime_hours: 24            # [all modes] default 24 if omitted. Cluster only: the time
+                               #   limit each long step asks for. Use at most your queue's
+                               #   limit. A step that runs over is stopped by the
+                               #   scheduler; raise the value and run again. Ignored on a
+                               #   single computer. Changing it re-runs nothing.
 
 # Analysis parameters.
 parameters:

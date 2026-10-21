@@ -163,6 +163,10 @@ if HAS_SHORT_READS:
             # Uncapped, as in v1: bowtie2 and samtools sort both scale well, and
             # this is one of the few rules where the full budget is worth giving.
         threads: CPUS
+        resources:
+            # Cluster requests (00_common.smk §3a); a single computer ignores them.
+            mem_mb = HEAVY_MEM_MB,
+            runtime = LONG_RUNTIME_MINUTES,
         log:
             LOGS + "/map_contigs_{sample}.log"
         shell:
@@ -212,6 +216,10 @@ elif HAS_LONG_READS:
         conda:
             "../../envs/minimap.yaml"
         threads: CPUS
+        resources:
+            # Cluster requests (00_common.smk §3a); a single computer ignores them.
+            mem_mb = HEAVY_MEM_MB,
+            runtime = LONG_RUNTIME_MINUTES,
         log:
             LOGS + "/map_contigs_{sample}.log"
         shell:
@@ -326,6 +334,10 @@ rule blast_contigs:
     conda:
         "../../envs/blast.yaml"
     threads: capped_cpus(24)
+    resources:
+        # Cluster requests (00_common.smk §3a); a single computer ignores them.
+        mem_mb = HEAVY_MEM_MB,
+        runtime = LONG_RUNTIME_MINUTES,
     log:
         LOGS + "/blast_contigs_{sample}.log"
     shell:
@@ -388,6 +400,10 @@ if NEEDS_FINAL_BLAST:
         conda:
             "../../envs/blast.yaml"
         threads: capped_cpus(24)
+        resources:
+            # Cluster requests (00_common.smk §3a); a single computer ignores them.
+            mem_mb = HEAVY_MEM_MB,
+            runtime = LONG_RUNTIME_MINUTES,
         log:
             LOGS + "/blast_final_contigs_{sample}.log"
         shell:
@@ -660,6 +676,10 @@ if LONGREAD_SCREEN:
         conda:
             "../../envs/minimap.yaml"
         threads: CPUS
+        resources:
+            # Cluster requests (00_common.smk §3a); a single computer ignores them.
+            mem_mb = HEAVY_MEM_MB,
+            runtime = LONG_RUNTIME_MINUTES,
         log:
             LOGS + "/map_final_contigs_{sample}.log"
         shell:

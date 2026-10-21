@@ -1633,6 +1633,10 @@ if MOBILOME_RUN:
             conda:
                 "../../envs/bbmap.yaml"
             threads: capped_cpus(16)
+            resources:
+                # Cluster requests (00_common.smk §3a); a single computer ignores them.
+                mem_mb = HEAVY_MEM_MB,
+                runtime = LONG_RUNTIME_MINUTES,
             log:
                 LOGS + "/mobilome_assembly_depth_{sample}.log"
             shell:
@@ -1675,6 +1679,10 @@ if MOBILOME_RUN:
             conda:
                 "../../envs/bbmap.yaml"
             threads: capped_cpus(16)
+            resources:
+                # Cluster requests (00_common.smk §3a); a single computer ignores them.
+                mem_mb = HEAVY_MEM_MB,
+                runtime = LONG_RUNTIME_MINUTES,
             log:
                 LOGS + "/mobilome_isosdb_map_{sample}.log"
             shell:

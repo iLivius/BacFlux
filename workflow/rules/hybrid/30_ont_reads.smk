@@ -120,6 +120,9 @@ rule map_sel_contigs:
     conda:
         "../../envs/bowtie.yaml"
     threads: CPUS
+    resources:
+        # Cluster requests (00_common.smk §3a); a single computer ignores them.
+        runtime = LONG_RUNTIME_MINUTES,
     log:
         LOGS + "/map_sel_contigs_{sample}.log"
     shell:

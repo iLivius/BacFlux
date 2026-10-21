@@ -418,8 +418,41 @@ ISOSDB_COPY_SCRIPT        = os.path.join(MOBILOME_SCRIPTS_DIR, "isosdb_copy_numb
 # that omits a key still parses (nanopore/contigs configs legitimately omit
 # ram_gb, since only SPAdes and the JVM tools actually consume large RAM).
 _resources = config.get("resources", {}) or {}
-CPUS = int(_resources.get("threads", 16))
-RAM  = int(_resources.get("ram_gb", 64))
+
+
+def _whole_number(key, default):
+    # Read resources.<key> as a whole number of 1 or more. A missing or blank key
+    # takes the default. Anything else (2.5, "abc", true, 0) stops the run with a
+    # [BacFlux] message instead of being silently truncated or misread.
+    value = _resources.get(key)
+    if value is None:
+        value = default
+    text = str(value).strip()
+    if isinstance(value, bool) or not text.isdigit() or int(text) < 1:
+        sys.exit(f"[BacFlux] resources.{key} must be a whole number, 1 or more (got: {value!r}).")
+    return int(text)
+
+
+CPUS = _whole_number("threads", 16)
+RAM = _whole_number("ram_gb", 64)
+RUNTIME_HOURS = _whole_number("runtime_hours", 24)
+
+# What a long or memory-hungry step asks a cluster scheduler for. Under a cluster
+# executor, Snakemake passes mem_mb as the job's memory (Slurm --mem) and runtime
+# as its time limit in minutes (Slurm -t). A rule that declares neither asks for
+# nothing and gets the scheduler's defaults, often far too little for an
+# assembler or GTDB-Tk, unless the user passes --default-resources. On a single
+# computer both are ignored. Snakemake does not compare them when deciding what
+# to re-run, so changing ram_gb or runtime_hours re-runs nothing.
+HEAVY_MEM_MB = RAM * 1024                  # MB, the unit of mem_mb
+LONG_RUNTIME_MINUTES = RUNTIME_HOURS * 60  # minutes, the unit of runtime
+
+# Qualimap's Java heap (the most memory Java may use), in GB, and the job that
+# holds it, in MB. Java needs some memory beyond its heap, so the heap stays 4 GB
+# below the job: a 60 GB heap in a 64 GB job at the default ram_gb, and at most a
+# 64 GB heap in a 68 GB job.
+QUALIMAP_HEAP_GB = max(1, min(RAM - 4, 64))
+QUALIMAP_JOB_MB = min(QUALIMAP_HEAP_GB + 4, RAM) * 1024
 
 
 def capped_cpus(n):

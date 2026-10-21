@@ -97,6 +97,10 @@ rule ont_assembly:
     conda:
         "../../envs/flye.yaml"
     threads: CPUS
+    resources:
+        # Cluster requests (00_common.smk §3a); a single computer ignores them.
+        mem_mb = HEAVY_MEM_MB,
+        runtime = LONG_RUNTIME_MINUTES,
     log:
         LOGS + "/ont_assembly_{sample}.log"
     shell:

@@ -216,6 +216,10 @@ rule completeness_and_contamination:
     conda:
         "../../envs/checkm.yaml"
     threads: capped_cpus(24)
+    resources:
+        # Cluster requests (00_common.smk §3a); a single computer ignores them.
+        mem_mb = HEAVY_MEM_MB,
+        runtime = LONG_RUNTIME_MINUTES,
     log:
         LOGS + "/completeness_and_contamination_{sample}.log"
     shell:
@@ -265,15 +269,17 @@ if HAS_READS:
     #           ONT genome — see multiqc_replace_block() in shared/90_report.smk.
     #
     # v1→v2 unification: illumina passed neither --java-mem-size nor -nt, so it ran
-    # single-threaded on the JVM's default heap and ran out of memory on large
-    # BAMs; nanopore hard-coded 24G; hybrid used the config-aware min(RAM, 64) plus
+    # single-threaded on Qualimap's built-in 1,200 MB heap and ran out of memory on
+    # large BAMs; nanopore hard-coded 24G; hybrid passed a config-aware heap plus
     # -nt. v2 uses the hybrid form everywhere. The RESULTS are unchanged — this
     # only makes the rule faster and stops it dying on heap.
     #
-    # java_mem is a GIGABYTE figure, not a core count, which is why it sits in
-    # `resources:` and not `threads:`. It is handed straight to the JVM, and
-    # Snakemake schedules against it only if the launch line passes
-    # `--resources java_mem=N`.
+    # java_mem is the most memory Java may use (its heap), in GB: up to 64, and
+    # always 4 GB below ram_gb so that Java's own overhead fits too
+    # (QUALIMAP_HEAP_GB in 00_common.smk). mem_mb is what a cluster job asks for:
+    # the heap plus those 4 GB. On a single computer mem_mb is ignored, and
+    # Snakemake schedules on java_mem only if the launch line passes
+    # `--resources java_mem=N`, which then also lowers each heap to N.
     #
     # (v1 message: "--- Qualimap: Mapping evaluation. ---"; the nanopore v1 rule
     #  was named map_qc — D5 unifies on map_evaluation.)
@@ -286,20 +292,36 @@ if HAS_READS:
             "../../envs/qualimap.yaml"
         threads: capped_cpus(24)
         resources:
-            java_mem = min(RAM, 64)
+            java_mem = QUALIMAP_HEAP_GB,
+            # Cluster requests (00_common.smk §3a); a single computer ignores them.
+            mem_mb = QUALIMAP_JOB_MB,
+            runtime = LONG_RUNTIME_MINUTES,
         log:
             LOGS + "/map_evaluation_{sample}.log"
         shell:
             # Qualimap reports on the read mapping; nothing downstream reads it. Same guard
             # as QUAST: make the output directory, tolerate the tool, note the log.
             """
-            # Qualimap renders its charts with JFreeChart, which reaches into Swing
-            # for theme colours. With DISPLAY set -- an SSH session with X11
-            # forwarding, say -- it tries to open that display and dies with
-            # "AWTError: Can't connect to X11 window server" AFTER the analysis has
-            # finished, at the report-writing step. Nothing here needs a display.
+            # Qualimap draws its charts with Java's graphics library. If DISPLAY is
+            # set -- an SSH session with X11 forwarding, say -- Java tries to open
+            # that screen and dies with "AWTError: Can't connect to X11 window
+            # server" after the analysis has finished, at the report-writing step.
+            # Nothing here needs a screen, so DISPLAY is removed.
             unset DISPLAY
-            export JAVA_OPTS="-Djava.awt.headless=true ${{JAVA_OPTS:-}}"
+
+            # Qualimap's start script uses JAVA_OPTS, when it is set, as the whole
+            # list of Java options and then ignores --java-mem-size, so Java would
+            # run on its own default memory instead of the one asked for below. A
+            # JAVA_OPTS left by a login script or a cluster module does exactly
+            # that, so it is removed for this step.
+            unset JAVA_OPTS
+
+            # Tell Java there is no screen. Java reads JAVA_TOOL_OPTIONS itself
+            # and adds it to the start script's options, so the memory from
+            # --java-mem-size is kept, and so is any value the user already set.
+            # Java notes it in the log with one line, "Picked up
+            # JAVA_TOOL_OPTIONS: ...".
+            export JAVA_TOOL_OPTIONS="-Djava.awt.headless=true ${{JAVA_TOOL_OPTIONS:-}}"
 
             mkdir -p {output.qualimap_dir}
             qualimap bamqc \

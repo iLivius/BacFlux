@@ -275,6 +275,10 @@ if PHAGE_CALLER == "genomad":
         conda:
             "../../envs/genomad.yaml"
         threads: capped_cpus(24)
+        resources:
+            # Cluster requests (00_common.smk §3a); a single computer ignores them.
+            mem_mb = HEAVY_MEM_MB,
+            runtime = LONG_RUNTIME_MINUTES,
         log:
             LOGS + "/genomad_{sample}.log"
         shell:
@@ -408,6 +412,10 @@ if PHAGE_CALLER == "virsorter2":
         conda:
             "../../envs/virsorter.yaml"
         threads: capped_cpus(24)
+        resources:
+            # Cluster requests (00_common.smk §3a); a single computer ignores them.
+            mem_mb = HEAVY_MEM_MB,
+            runtime = LONG_RUNTIME_MINUTES,
         log:
             LOGS + "/viral_identification_{sample}.log"
         shell:
