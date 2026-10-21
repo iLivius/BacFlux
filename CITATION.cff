@@ -39,8 +39,8 @@ abstract: >-
   genetic element and how transferable that element is predicted to be. Every
   tool runs in its own conda environment.
 type: software
-version: 2.0.1
-date-released: 2026-09-10
+version: 2.1.0
+date-released: 2026-10-22
 license: MIT
 repository-code: "https://github.com/iLivius/BacFlux"
 url: "https://github.com/iLivius/BacFlux"
@@ -54,9 +54,6 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.11143917
     description: "Concept DOI — always resolves to the latest BacFlux release."
-  - type: doi
-    value: 10.5281/zenodo.22687288
-    description: "Version DOI for v2.0.1 — cite this when the exact code matters."
 
 keywords:
   - bacterial genomics
