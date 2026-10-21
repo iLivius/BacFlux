@@ -5,3 +5,13 @@ channels:
 dependencies:
   - python=3.10
   - checkm-genome=1.2.5
+  # Download tools for CheckM's own install step. While conda builds this
+  # environment, the checkm-genome package fetches CheckM's reference data
+  # (about 275 MB, from Zenodo) with wget and unpacks it with tar and gzip, and
+  # conda looks for them in this environment first. Taken from here so that a
+  # minimal Linux system without them can still build it. Added on 2026-10-21
+  # with --freeze-installed, which left every other package of the pin list as
+  # it was.
+  - wget=1.25.0
+  - tar=1.35
+  - gzip=1.14

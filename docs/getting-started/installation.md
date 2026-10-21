@@ -133,6 +133,10 @@ small jobs:
   CheckV). A minimal Linux system without `wget` runs them as they are. The small
   utilities those commands call alongside, such as `sha256sum`, `awk` and `grep`,
   come from the system, as they do for every rule.
+- **CheckM's reference data.** The CheckM package downloads its reference data
+  (about 275 MB) while conda builds its environment, so building that environment
+  needs internet. It uses the `wget`, `tar` and `gzip` in `workflow/envs/checkm.yaml`,
+  so here too nothing has to be installed on the computer.
 
 The helper scripts' unit tests need nothing but Python and `pytest`, so they run
 from the launcher environment. `pytest` is not in the environment created above, so
