@@ -231,8 +231,9 @@ rule trim_adapters:
 #           been filtered out of it yet.
 # Does:     NanoPlot, with --loglength so the read-length distribution is plotted
 #           on a log axis — ONT lengths span orders of magnitude.
-# Produces: nanoplot_raw_dir = NANOPLOT_RAW_DIR, a directory of plots plus
-#           {sample}_NanoStats.txt.
+# Produces: nanoplot_raw_dir = NANOPLOT_RAW_DIR, a directory of HTML plots, the
+#           HTML report and {sample}_NanoStats.txt, with no PNG images
+#           (--no_static: see raw_long_read_qc in rules/nanopore/10_reads.smk).
 # Consumed by: multiqc (shared/90_report.smk).
 #
 # Identical to rules/nanopore/10_reads.smk — keep in sync.
@@ -262,6 +263,7 @@ rule raw_long_read_qc:
           --fastq {input.fastq} \
           --threads {threads} \
           --loglength \
+          --no_static \
           --prefix "{wildcards.sample}_" \
           --outdir {output.nanoplot_raw_dir} > {log} 2>&1 || {{
             echo "" >> {log}

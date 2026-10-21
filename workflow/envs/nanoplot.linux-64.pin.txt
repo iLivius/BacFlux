@@ -1,7 +1,7 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: linux-64
-# created-by: conda 26.7.0
+# created-by: conda 26.7.2
 @EXPLICIT
 https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.7.22-hbd8a1cb_0.conda
 https://conda.anaconda.org/conda-forge/linux-64/libgomp-16.2.0-he0feb66_4.conda
@@ -118,4 +118,4 @@ https://conda.anaconda.org/conda-forge/linux-64/pyarrow-core-25.0.0-py313h98bfbe
 https://conda.anaconda.org/conda-forge/linux-64/libarrow-dataset-25.0.0-h635bf11_4_cpu.conda
 https://conda.anaconda.org/conda-forge/linux-64/libarrow-substrait-25.0.0-h66fbfdd_4_cpu.conda
 https://conda.anaconda.org/conda-forge/linux-64/pyarrow-25.0.0-py313h78bf25f_0.conda
-https://conda.anaconda.org/bioconda/noarch/nanoplot-1.47.1-pyhdfd78af_0.conda
+https://conda.anaconda.org/bioconda/noarch/nanoplot-1.47.4-pyhdfd78af_0.conda

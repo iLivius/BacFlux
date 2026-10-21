@@ -4,7 +4,10 @@ channels:
   - bioconda
 dependencies:
   - python=3.13
-  - nanoplot=1.47.1
+  # 1.47.4, not 1.47.1: from 1.47.2 on, NanoPlot fetches a Chrome browser only when
+  # it draws PNG images. 1.47.1 fetched it into the user's home folder every time
+  # it started, even with --no_static, which the NanoPlot rules pass.
+  - nanoplot=1.47.4
   # plotly 7.0 removed figure_factory.create_2d_density, which NanoPlot calls for
   # its length-vs-quality density plot. Unpinned, a fresh install pulls plotly 7 and
   # NanoPlot exits 1 after writing NanoStats.txt, failing the rule. The last plotly

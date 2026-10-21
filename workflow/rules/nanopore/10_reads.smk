@@ -31,8 +31,16 @@
 # Does:     NanoPlot summarises read length, quality and yield for that FASTQ.
 #           --loglength adds log-scaled length plots, because ONT read lengths span
 #           orders of magnitude and collapse into one spike on a linear axis.
+#           --no_static writes the plots only as interactive HTML pages, never as
+#           PNG images. NanoPlot draws PNGs with a headless Chrome browser, which
+#           no conda environment provides and which needs desktop libraries that
+#           minimal Linux systems, cluster nodes and containers often lack, so the
+#           PNGs appeared on some computers and not on others. Nothing in the
+#           workflow reads them: MultiQC reads only {sample}_NanoStats.txt. The
+#           HTML plots load their plotting library from the internet when opened.
 # Produces: nanoplot_raw_dir = NANOPLOT_RAW_DIR, 01.reads/{sample}/ont/raw_qc — a
-#           DIRECTORY of plots plus {sample}_NanoStats.txt.
+#           DIRECTORY holding NanoPlot's interactive HTML plots, its HTML report
+#           and {sample}_NanoStats.txt (no PNG images).
 # Consumed by: multiqc (shared/90_report.smk), and nothing else.
 #
 # --prefix "{sample}_" IS LOAD-BEARING, not cosmetic. MultiQC names a sample after
@@ -66,6 +74,7 @@ rule raw_long_read_qc:
           --fastq {input.fastq} \
           --threads {threads} \
           --loglength \
+          --no_static \
           --prefix "{wildcards.sample}_" \
           --outdir {output.nanoplot_raw_dir} > {log} 2>&1 || {{
             echo "" >> {log}
@@ -145,7 +154,9 @@ rule filter_long_reads:
 # Does:     the same NanoPlot profile again, same flags, this time over the subset
 #           that survived the filter.
 # Produces: nanoplot_filt_dir = NANOPLOT_FILT_DIR, 01.reads/{sample}/ont/filt_qc —
-#           the same directory of plots plus {sample}_NanoStats.txt.
+#           the same kind of directory: HTML plots, the HTML report and
+#           {sample}_NanoStats.txt, with no PNG images (--no_static, see
+#           raw_long_read_qc above).
 # Consumed by: multiqc (shared/90_report.smk) only. Side by side with the raw plot
 #              it shows exactly what filtlong removed, which is the honest way to
 #              report a filter.
@@ -173,6 +184,7 @@ rule filtered_long_read_qc:
           --fastq {input.fastq} \
           --threads {threads} \
           --loglength \
+          --no_static \
           --prefix "{wildcards.sample}_" \
           --outdir {output.nanoplot_filt_dir} > {log} 2>&1 || {{
             echo "" >> {log}

@@ -244,8 +244,9 @@ rule filter_long_reads:
 # Takes in: fastq = FILT_LONG, from filter_long_reads above.
 # Does:     the same NanoPlot run as the raw profile in hybrid/10_reads.smk, this
 #           time over the reads that survived filtering.
-# Produces: nanoplot_filt_dir = NANOPLOT_FILT_DIR, a directory of plots plus
-#           {sample}_NanoStats.txt.
+# Produces: nanoplot_filt_dir = NANOPLOT_FILT_DIR, a directory of HTML plots, the
+#           HTML report and {sample}_NanoStats.txt, with no PNG images
+#           (--no_static: see raw_long_read_qc in rules/nanopore/10_reads.smk).
 # Consumed by: multiqc (shared/90_report.smk). Read side by side with
 #              NANOPLOT_RAW_DIR from hybrid/10_reads.smk it shows exactly what
 #              the short-read-guided filter removed.
@@ -275,6 +276,7 @@ rule filtered_long_read_qc:
           --fastq {input.fastq} \
           --threads {threads} \
           --loglength \
+          --no_static \
           --prefix "{wildcards.sample}_" \
           --outdir {output.nanoplot_filt_dir} > {log} 2>&1 || {{
             echo "" >> {log}
