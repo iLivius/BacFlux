@@ -67,6 +67,9 @@ delivered genome: in `nanopore` and `hybrid` the genome is produced later by the
 mode's front end, and hard-coding the final name here would make `nanopore` circular
 (select → final → Medaka → select).
 
+`hybrid` also screens the genome it delivers, a second time and as a check only: see
+[the second screen in `hybrid`](#the-second-screen-in-hybrid).
+
 ## 1. Coverage — the reads mapped back onto the draft
 
 *Rule `map_contigs`, plus `index_contigs` in the short-read modes.*
@@ -159,9 +162,10 @@ the long-read modes it was not:
   post-Medaka consensus, and nothing guarantees Medaka preserves contig headers.
 
 So both long-read modes run the identical megablast a second time over the delivered
-genome, writing `contaminants/{sample}_final_blastout`. BlobTools always uses the draft
-table; only the plasmid stage reads this one. In `illumina` and `contigs` mode the
-second rule does not exist and the two paths are the same file.
+genome, writing `contaminants/{sample}_final_blastout`. The plasmid stage reads it, and
+in `hybrid` so does [the second screen](#the-second-screen-in-hybrid); the first screen
+always uses the draft table. In `illumina` and `contigs` mode the second rule does not
+exist and the two paths are the same file.
 
 ## 3. BlobTools joins coverage and taxonomy
 
@@ -516,6 +520,44 @@ annotation onwards would run on no sequence. The decisions file is written first
 is there to read: the `reason` column separates a policy naming the wrong genus from a
 sample the taxonomy screen could not place at all.
 
+### The second screen in `hybrid`
+
+*Rules `map_final_contigs`, `blob_json_final`, `blob_table_final` and
+`screen_final_contigs`, defined only in `hybrid`.*
+
+The screen above runs on the Illumina draft, but the genome `hybrid` delivers is built
+from the Oxford Nanopore reads (Flye, Medaka, dnaapler, Polypolish). With
+`parameters.hybrid.short_read_guidance: false`, the default, no step removes
+contaminant long reads before Flye assembles them. So the delivered genome gets a
+screen of its own, built the same way:
+
+- **coverage** from the long reads mapped back onto `contigs_final.fasta` (minimap2);
+- **taxonomy** from the second megablast table, `{sample}_final_blastout`, which the
+  plasmid stage needs anyway;
+- **the same selector**, with the same genus lists, aliases, `auto_vote` and
+  `discard_no_hit` as the first screen, but its own mode, set by
+  `parameters.decontamination.long_read_mode` (`off`, `auto`, `include` or `exclude`;
+  default `off`).
+
+It writes `contaminants/{sample}_final_contig_taxonomy_decisions.tsv`, one row per
+delivered contig with its genus, a verdict and the reason, and
+`{sample}_final_composition.tsv`, the same two-figure report as the first screen.
+Every `hybrid` run produces both.
+
+**It is a check, not a filter.** Whatever `long_read_mode` is set to,
+`contigs_final.fasta` is not changed, and every later stage reads it as it is. The
+mode decides only which verdict each contig gets: with `off` every contig reads
+`keep` / `mode_off`; with `auto`, `include` or `exclude` the verdicts follow the same
+rules as the first screen, so you can see which contigs that policy would remove.
+
+`off` is the default because this screen judges very few contigs. BlobTools finds a
+contaminant as an outlier among many contigs, and a long-read genome has two to five:
+a chromosome and its plasmids. A wrong call here concerns a whole replicon, most
+often a plasmid, whose best BLAST neighbours can sit in another genus for the
+reasons in [Route 1](#route-1-bestsum-follows-database-composition-not-biology).
+Read the decisions file, and the composition report beside it, before acting on a
+verdict.
+
 ## 5. Two ways this step deletes a real plasmid
 
 Both have happened, they have different causes, and both are worth ruling out.
@@ -583,6 +625,9 @@ All under `02.assembly/{sample}/contaminants/`, except the delivered assembly.
 | `bestscore.blob.blobDB.table.txt` | yes | BlobTools' per-contig table — the evidence behind every decision |
 | `{sample}_composition.txt` | yes | per-genus share of DNA and of contig count |
 | `{sample}_kept_genus.txt` | yes | one line: the kept genus Bakta receives; empty when no kept contig has a genus |
+| `{sample}_final_contig_taxonomy_decisions.tsv` | yes | `hybrid` only: [the second screen's](#the-second-screen-in-hybrid) verdict on every delivered contig |
+| `{sample}_final_composition.tsv` | yes | `hybrid` only: the second screen's composition report |
+| `bestscore_final.blob_final.blobDB.table.txt` | yes | `hybrid` only: BlobTools' table for the delivered genome |
 | `contig_taxonomy_decisions.tsv` | yes | **the audit trail** — every contig, its genus, kept or removed, and why |
 | `contigs.list` | yes | the kept contig IDs; no rule reads it |
 | `contigs_sel.fasta` / `assembly_decontam.fasta` | yes | the kept sequences in `hybrid` / `nanopore` |

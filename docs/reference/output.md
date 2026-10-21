@@ -171,6 +171,7 @@ The contamination screen and its audit trail, all under
 | `contigs.list` | The kept contig IDs, one per line. |
 | `{sample}_composition.txt` | One line per genus with its share of the DNA (`bp`) and of the contig count (`contigs`), over *every* contig in the BlobTools table — kept or dropped. A report to read; no later step reads it. |
 | `{sample}_kept_genus.txt` | One line: the genus of the **kept** contigs, by default the kept genus holding the most DNA. The annotation step gives it to Bakta as the organism's genus. Empty when no kept contig has a genus. |
+| `{sample}_final_contig_taxonomy_decisions.tsv`, `{sample}_final_composition.tsv`, `bestscore_final.blob_final.blobDB.table.txt` | `[hybrid]` The second screen, of the delivered genome: a verdict per contig under `parameters.decontamination.long_read_mode`, its composition report, and its BlobTools table. A check only; `contigs_final.fasta` is not changed by it. |
 
 `blob.blobDB.json`, the coverage file beside it, and the alignment BAM are all
 temporary. Full reasoning, and the two routes by which this step can delete a real

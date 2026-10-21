@@ -552,6 +552,7 @@ replicons for chromosome contiguity; say so in your methods. Full treatment:
     mode: auto                 # auto | include | exclude | off
     auto_vote: bp              # bp | contigs
     discard_no_hit: true
+    long_read_mode: "off"      # hybrid only: off | auto | include | exclude
     include_genera:
     include_genera_by_sample:
     exclude_genera:
@@ -562,7 +563,8 @@ replicons for chromosome contiguity; say so in your methods. Full treatment:
 After BlobTools assigns every contig a genus, the selector keeps or discards
 contigs by this policy and writes an audit row for every decision. One policy
 covers all four modes, and it runs on the draft assembly, before annotation, so a
-contaminant never reaches CheckM or Bakta.
+contaminant never reaches CheckM or Bakta. `hybrid` also judges its delivered
+genome a second time with `long_read_mode`, as a check that changes no contig.
 
 !!! note "`mode` here is the filtering policy, not the pipeline mode"
 
@@ -573,6 +575,7 @@ contaminant never reaches CheckM or Bakta.
 |---|---|---|---|
 | `mode` | `auto` keeps the one genus that wins the vote set by `auto_vote`; `include` keeps only the genera you list; `exclude` removes the ones you list; `off` keeps everything | `auto` | |
 | `auto_vote` | How `auto` picks its genus: `bp` adds up the length of each genus's contigs and keeps the genus with the most base pairs, the one most of the assembly belongs to; `contigs` keeps the genus with the most contigs | `bp` | The two agree on a clean isolate. They differ when one genus sits in a few long contigs and another in many short ones — the normal shape of a long-read assembly, where a chromosome plus a few plasmids that BLAST assigns to another genus would outvote the chromosome on a contig count. An exact tie goes to the genus first in alphabetical order, so the answer never changes between runs. The genus Bakta writes as the organism name is counted the same way, over the kept contigs. See [how `auto` picks the genus](../analysis/decontamination.md#how-auto-picks-the-genus). |
+| `long_read_mode` | `hybrid` only: the policy of the second screen, which judges the delivered genome (`off`, `auto`, `include`, `exclude`) | `off` | A check, not a filter: it sets the verdict written for each delivered contig in `{sample}_final_contig_taxonomy_decisions.tsv`, and `contigs_final.fasta` is never changed. Uses the same genus lists and `auto_vote` as `mode`. See [the second screen in `hybrid`](../analysis/decontamination.md#the-second-screen-in-hybrid). |
 | `discard_no_hit` | Removes contigs BLAST could not place | `true` in the shipped template | Omitting the key entirely resolves to `false`, so keep the line. Applied *before* the mode logic. In `auto` it also drops "no-hit" from the vote that picks the dominant genus. |
 | `include_genera` | Genera to keep, for every sample | unset | An inline list: `"GenusA;GenusB"` or `[GenusA, GenusB]`. Commas and semicolons both separate. |
 | `include_genera_by_sample` | **A file path** to a two-column TSV (`sample`, `genus`) | unset | The compact form when many samples each need their own include list. A sample may appear on several rows. |
