@@ -1413,6 +1413,22 @@ if MOBILOME_RUN:
                   {output.db_dir}/iceberg.fa > {output.db_dir}/iceberg.repaired.fa
                 mv {output.db_dir}/iceberg.repaired.fa {output.db_dir}/iceberg.fa
 
+                # makeblastdb accepts only plain ASCII text in a defline and reports
+                # anything else as an error ("Bad char [0xE2] in string"). The
+                # release checked writes two element names, ICESpsH35-1 and -2,
+                # with an en dash where the hyphen is shown here. So, before
+                # indexing, turn en and em dashes into hyphens and any other
+                # non-ASCII byte into '_'. Only deflines are changed; sequence
+                # lines are plain ASCII already.
+                # LC_ALL=C makes sed read the file byte by byte, which is what the
+                # byte codes below describe (E2 80 93 is the en dash, E2 80 94
+                # the em dash). The backslashes are doubled because this text is
+                # a Python string first, which turns each pair into the single
+                # backslash sed needs.
+                LC_ALL=C sed -i \
+                  -e '/^>/ s/\\xe2\\x80[\\x93\\x94]/-/g' \
+                  -e '/^>/ s/[\\x80-\\xff]/_/g' \
+                  {output.db_dir}/iceberg.fa
 
                 N_SEQ=$(grep -c '^>' {output.db_dir}/iceberg.fa)
                 N_MARK=$(grep -o '>' {output.db_dir}/iceberg.fa | wc -l)
