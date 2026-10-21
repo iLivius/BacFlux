@@ -112,6 +112,12 @@ HISTORICAL_MARKERS = re.compile(
 SNAKEMAKE_DIRECTIVES = {"input", "output", "params", "wildcards", "log",
                         "resources", "threads", "config", "rules"}
 
+# Files a user creates, so a fresh clone does not have them, but comments rightly
+# name them. config/config_custom.yaml is each user's own copy of config/config.yaml
+# (it is in .gitignore): without this entry the check would fail on every fresh
+# clone.
+USER_CREATED_FILES = {"config/config_custom.yaml"}
+
 # Dotted things that are not config keys: filenames, module paths, tool invocations.
 CONFIG_SKIP_SUFFIXES = (
     ".py", ".sh", ".smk", ".tsv", ".txt", ".fasta", ".fa", ".fna", ".faa", ".gff",
@@ -282,6 +288,8 @@ def check():
                     continue                                    # the stand-in used to
                                                                 # explain how the
                                                                 # ../../envs/ hop works
+                if candidate in USER_CREATED_FILES:
+                    continue                                    # each user makes it
                 if not os.path.exists(os.path.join(REPO_ROOT, candidate)):
                     problems.append(f"{where}: path does not exist: {candidate}")
 
