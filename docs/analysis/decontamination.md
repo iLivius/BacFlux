@@ -210,8 +210,9 @@ with nothing else in it.
 parameters:
   decontamination:
     mode: auto                 # auto | include | exclude | off
-    auto_vote: bp              # auto mode only: bp | contigs
+    auto_vote: bp              # bp | contigs (auto's vote; also names Bakta's genus)
     discard_no_hit: true       # drop contigs with no taxonomic hit
+    long_read_mode: "off"      # hybrid only: the second screen, a check
     include_genera:            # inline list to KEEP, e.g. "Bacillus;Priestia"
     include_genera_by_sample:  # PATH to a 2-column TSV (sample, genus)
     exclude_genera:            # inline list to DISCARD
@@ -386,12 +387,14 @@ run-wide `include_genera`. `isolate5` stays on `auto` but keeps its unplaced con
 
 ### Which keys apply to every sample, and which to one
 
-The names do not tell you which. **Two** of the seven keys are per-sample, not one:
+The names do not tell you which. **Two** of the nine keys are per-sample, not one:
 
 | key | applies to | how it combines |
 |---|---|---|
 | `mode` | every sample | — |
+| `auto_vote` | every sample | — |
 | `discard_no_hit` | every sample | — |
+| `long_read_mode` | every sample (`hybrid` only) | — |
 | `include_genera` | every sample | the base list to keep |
 | `exclude_genera` | every sample | the base list to discard |
 | `exclude_genera_file` | every sample | **adds to** `exclude_genera` |

@@ -19,7 +19,7 @@ orthologous group all sit on the same coordinates.
 
 Three of the four are terminal products — you read them, nothing downstream does.
 Bakta is the exception: MultiQC summarises it, and the optional mobilome module reads
-its proteins and its GFF3.
+its proteins, its GFF3 and its annotation table.
 
 !!! abstract "Terms used on this page"
 
@@ -42,7 +42,7 @@ its dependency on the directory and reaches in for the one file it wants.
 |---|---|
 | **In** | `02.assembly/{sample}/contigs_final.fasta`; the kept genus, `{sample}_kept_genus.txt`, from [decontamination](decontamination.md); the replicon table in the long-read modes |
 | **Out** | `04.annotation/bakta/{sample}/` — `{sample}.faa`, `.gff3`, `.gbff`, `.tsv` and the rest |
-| **Next** | eggNOG-mapper (`.faa`), antiSMASH (`.gbff`), dbCAN (`.faa` + `.gff3`), MultiQC, and the [mobilome module](../mobilome/index.md) (`.faa` + `.gff3`) |
+| **Next** | eggNOG-mapper (`.faa`), antiSMASH (`.gbff`), dbCAN (`.faa` + `.gff3`), MultiQC, and the [mobilome module](../mobilome/index.md) (`.faa` + `.gff3` + `.tsv`) |
 
 The settings that are worth knowing:
 
@@ -59,9 +59,8 @@ older one. See [Reference databases](../getting-started/databases.md).
 
 ### The genus hint
 
-Bakta annotates more accurately when it knows roughly what it is looking at, and it
-writes the organism name into the GFF3, GenBank and EMBL files and the title of its
-plot. The rule therefore passes it a genus, as `--genus X --species sp.`, where X is
+Bakta writes an organism name into its GFF3, GenBank, EMBL and JSON files and into the
+title of its plot. The rule therefore passes it a genus, as `--genus X --species sp.`, where X is
 the one line of `02.assembly/{sample}/contaminants/{sample}_kept_genus.txt`.
 
 Decontamination writes that file. It holds the genus of the contigs that were
@@ -71,8 +70,8 @@ the delivered genome, and in `auto` mode it is the genus the vote kept (see
 [how `auto` picks the genus](decontamination.md#how-auto-picks-the-genus)). Contigs
 BLAST could not place never count, so the genus is never `no-hit`.
 
-It is a hint and nothing more: a wrong genus costs annotation accuracy, never contigs
-or reads. When no kept contig has a genus, the file is empty and Bakta runs without
+It is a label and nothing more: Bakta's gene calls and annotations do not depend on it,
+so a wrong genus mislabels the files and changes no result. When no kept contig has a genus, the file is empty and Bakta runs without
 one. That happens only when every kept contig is unplaced, which needs
 `discard_no_hit: false` or `mode: off`.
 

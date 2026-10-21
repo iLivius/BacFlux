@@ -283,7 +283,8 @@ if PHAGE_CALLER == "genomad":
             "../../envs/genomad.yaml"
         threads: capped_cpus(24)
         resources:
-            # Cluster requests (00_common.smk §3a); a single computer ignores them.
+            # Cluster requests (00_common.smk §3a). A single computer reads mem_mb
+            # only when the launch line passes --resources mem_mb=N.
             mem_mb = HEAVY_MEM_MB,
             runtime = LONG_RUNTIME_MINUTES,
         log:
@@ -425,7 +426,8 @@ if PHAGE_CALLER == "virsorter2":
             "../../envs/virsorter.yaml"
         threads: capped_cpus(24)
         resources:
-            # Cluster requests (00_common.smk §3a); a single computer ignores them.
+            # Cluster requests (00_common.smk §3a). A single computer reads mem_mb
+            # only when the launch line passes --resources mem_mb=N.
             mem_mb = HEAVY_MEM_MB,
             runtime = LONG_RUNTIME_MINUTES,
         log:
@@ -548,9 +550,10 @@ if not CHECKVDB:
 
     # Where it runs: on the computer that runs Snakemake (localrule: True), so on
     # a cluster the download never lands on a compute node without internet. That
-    # includes the DIAMOND index build (up to 8 threads); cap it on a login node
-    # with Snakemake's --local-cores. Its download tools (wget, tar and gzip) come
-    # from checkv.yaml, not the computer.
+    # includes the DIAMOND index build (up to 8 threads), which Snakemake 9.14.6
+    # cannot cap there: run download_all beforehand so it is done before the run.
+    # Its download tools (wget, tar and gzip) come from checkv.yaml, not the
+    # computer.
     rule checkv_db:
         localrule: True
         output:

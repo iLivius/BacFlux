@@ -202,9 +202,11 @@ It asks for exactly what this config would download. The same switches decide, s
 nothing that a `directories.*_db` copy replaces, and nothing for a layer that is off,
 is fetched. Run it from the directory you will launch the real run from, with the
 same config (and the same `--conda-prefix`, if you use one), so the run finds the
-databases and the download environments already in place. That is how to prepare a
-run whose jobs have no internet at all, for example a whole run inside one cluster
-batch job.
+databases and the download environments already in place. A run whose jobs have no
+internet at all, for example a whole run inside one cluster batch job, also needs
+every other environment built beforehand, with `--conda-create-envs-only`:
+`download_all` builds only the environments of the download steps. Both steps are in
+[Preparation, on a computer with internet](../reference/running.md#cluster-preparation).
 
 Two things it does not fetch:
 

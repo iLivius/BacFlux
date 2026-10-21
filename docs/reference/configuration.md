@@ -425,12 +425,14 @@ makes a plain `--cores N` a real ceiling.
     the exact flag to add. `java_mem=N` also lowers each Qualimap heap to N GB,
     the way to give Qualimap less without lowering `ram_gb` for everything else.
 
-    The three BBMap legs (`map_amr_db`, `assembly_depth`, `isosdb_map`) are not
-    schedulable at all on a single computer: their figure is a `params:` value
-    handed straight to `-Xmx`, not a declared resource.
+    The three BBMap legs (`map_amr_db`, `assembly_depth`, `isosdb_map`) take their
+    `-Xmx` from a `params:` value rather than a resource, so `--resources` does not
+    change it.
 
-    The `mem_mb` and `runtime` requests of the heavy rules are read only by a
-    cluster executor; a single computer ignores them.
+    The heavy rules, the BBMap legs among them, also declare `mem_mb` and
+    `runtime`. A cluster executor reads both. A single computer ignores `runtime`
+    and uses `mem_mb` only when the launch line passes `--resources mem_mb=N`; each
+    heavy step then counts as `ram_gb` × 1024 MB against N.
 
 ---
 
@@ -562,9 +564,11 @@ replicons for chromosome contiguity; say so in your methods. Full treatment:
 
 After BlobTools assigns every contig a genus, the selector keeps or discards
 contigs by this policy and writes an audit row for every decision. One policy
-covers all four modes, and it runs on the draft assembly, before annotation, so a
-contaminant never reaches CheckM or Bakta. `hybrid` also judges its delivered
-genome a second time with `long_read_mode`, as a check that changes no contig.
+covers all four modes, and it runs on the draft assembly, before annotation. In
+`illumina`, `contigs` and `nanopore` that draft becomes the delivered genome, so a
+contaminant it removes never reaches CheckM or Bakta. In `hybrid` it screens the
+Illumina draft; the delivered genome is built from the long reads and is only
+judged, a second time, with `long_read_mode`, as a check that changes no contig.
 
 !!! note "`mode` here is the filtering policy, not the pipeline mode"
 

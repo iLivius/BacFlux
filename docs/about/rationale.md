@@ -141,12 +141,12 @@ table declaring a closed chromosome circular. That makes Bakta's gene caller run
 closed mode, which shifts a couple of marginal start codons anywhere in the genome. It
 is one feature in several thousand, and it is the better call.
 
-The helper scripts that carry real logic — the Medaka model check, the replicon table,
-CARD reporting, plasmid concordance and the mobilome helpers — are plain Python and are
-tested without Snakemake:
+The helper scripts that carry real logic — the decontamination selector, the Medaka
+model check, the replicon table, CARD reporting, plasmid concordance and the mobilome
+helpers — are plain Python and are tested without Snakemake:
 
 ```bash
-pytest workflow/scripts        # 457 passed, 2 skipped
+pytest workflow/scripts        # all pass; two are skipped without real GTDB-Tk files
 ```
 
 ## What did not change

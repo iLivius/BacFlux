@@ -459,7 +459,8 @@ The helper scripts are importable Python and are tested outside Snakemake:
 pytest workflow/scripts
 ```
 
-457 tests pass and 2 skip. 380 of them are the mobilome package's own. They test
+All the tests pass; two are skipped unless pointed at real GTDB-Tk files, and most of
+them are the mobilome package's own. They test
 the code, not the biology — that a repeat planted at a known offset is found, that a
 confidence cap cannot be bypassed, that a malformed input is refused rather than
 silently parsed. Nothing in them says a call is correct.

@@ -224,9 +224,11 @@ against a named resource **only when the launch line passes it**, as in
 way to give Qualimap less memory without lowering `ram_gb` for everything else.
 
 The heavy rules also declare `mem_mb` and `runtime`, the memory and time a job
-asks a cluster scheduler for. A single computer ignores them; on a cluster they
-are how `ram_gb` and `resources.runtime_hours` reach the scheduler — see
-[On a cluster](#on-a-cluster).
+asks a cluster scheduler for; on a cluster they are how `ram_gb` and
+`resources.runtime_hours` reach the scheduler — see [On a cluster](#on-a-cluster).
+A single computer ignores `runtime`, and uses `mem_mb` only when the launch line
+passes `--resources mem_mb=N`: each heavy step then counts as `ram_gb` × 1024 MB
+against N, so with N at or below that figure only one heavy step runs at a time.
 
 ### eggNOG `--dbmem`
 
@@ -399,9 +401,12 @@ node.
 | Run steps 2 to 4 and the real run from the same folder, with the same configuration and the same `--conda-prefix`. | Relative paths in the configuration are read from the launch folder, and Snakemake keeps its records in `.snakemake/` there. Without `--conda-prefix` the environments are in that `.snakemake/conda/` too. Snakemake also records where each step's environment was, so with another prefix the real run builds the environments again and runs every download step again (reason `Software environment definition has changed since last execution`). |
 | Run steps 2 to 4 again after any change to the configuration. | A short-read mode adds PhiX and CARD, the other phage caller adds its own database, and each mobilome layer switched on adds its own. |
 
-Behind a proxy that re-signs HTTPS traffic, point `SSL_CERT_FILE` at your site's
-certificate file before starting Snakemake: the download tools check servers
-against the certificate list in their conda environment, not the computer's.
+Behind a proxy that re-signs HTTPS traffic, point both `SSL_CERT_FILE` and
+`REQUESTS_CA_BUNDLE` at your site's certificate file before starting Snakemake. The
+download tools check servers against the certificate list in their conda
+environment, not the computer's: `wget` and `curl` read `SSL_CERT_FILE`, and the
+Python downloaders, among them Medaka's download of its model weights, read
+`REQUESTS_CA_BUNDLE`.
 
 What `download_all` fetches, according to the configuration:
 
@@ -441,7 +446,7 @@ Then, on the login node, start Snakemake inside `screen` or `tmux`, so that it
 keeps running when you log out:
 
 ```bash
-snakemake --executor slurm --jobs 20 --latency-wait 60 --local-cores 4 --sdm conda \
+snakemake --executor slurm --jobs 20 --latency-wait 60 --sdm conda \
     --conda-prefix /path/to/project_space/bacflux_envs \
     --default-resources slurm_account=<account> slurm_partition=<partition> mem_mb=8000 runtime=240 \
     --configfile config/config_custom.yaml
@@ -452,12 +457,17 @@ snakemake --executor slurm --jobs 20 --latency-wait 60 --local-cores 4 --sdm con
 | `--executor slurm` | submits every step to Slurm with `sbatch`, except the local rules: the download steps and `check_medaka_model` run on the login node |
 | `--jobs 20` | the most jobs Snakemake keeps queued or running at once; it refuses to start without `--jobs` |
 | `--latency-wait 60` | after a job ends, Snakemake waits up to 60 seconds for its files to appear on the login node. Shared storage can show a file written on a compute node only some seconds later, and the default wait, 5 seconds, is often too short |
-| `--local-cores 4` | the most CPUs the local rules use on the login node together; the CheckV download, which also builds a DIAMOND index, asks for up to 8 |
 | `--default-resources` | the values for every job that does not set its own: the account and partition for every job (leave them out if your cluster needs none), memory (MB) and time (minutes) for the light steps. A rule's own value wins over it |
 
 `--cores` is not needed: `resources.threads` already caps the CPUs of each job.
-Given together with `--executor`, it caps the CPUs of all running jobs together,
-which holds jobs back.
+Given together with `--executor`, it does not cap the jobs' total; it lowers each
+job's threads to at most that number, and the job then asks Slurm for that many.
+
+The local rules run on the login node with their own thread counts, and Snakemake
+9.14.6 has no setting that limits them there. The heaviest is the CheckV download,
+which builds a DIAMOND index with up to 8 threads. Running the
+[preparation](#cluster-preparation) first means every download is done before the
+run starts, so during the run the only local step is the Medaka model check.
 
 Each Slurm job writes a log of its own under `.snakemake/slurm_logs/` in the
 launch folder, and when a job fails the `Error in rule` block names that file.
@@ -493,8 +503,11 @@ node.
   hour, give `--default-resources mem_mb=8000 runtime=240` as above, and raise it
   if a light step is stopped for memory or time.
 - Changing `threads` or `runtime_hours` re-runs nothing. Changing `ram_gb`
-  re-runs only the BBMap steps, and only when `min(ram_gb, 32)` changes with it,
-  because that number is one of their parameters.
+  re-runs the BBMap steps when `min(ram_gb, 32)` changes with it, because that
+  number is one of their parameters. In `illumina` and `hybrid` that reaches much
+  further: the trimmed reads those steps read are temporary, so Snakemake trims
+  the reads again, and everything that reads them runs again too, the assembly
+  included. Settle `ram_gb` before the first run.
 
 ### Run B: the whole run in one batch job { #cluster-run-b }
 

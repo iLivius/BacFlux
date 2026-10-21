@@ -81,7 +81,7 @@ resolved to an absolute path for you.
 
 One consequence is easy to miss: the conda environments have moved. Snakemake
 creates them under `.snakemake/conda` in the launch directory. Launching from the same
-place each time is what stops the 31 environments being rebuilt; `--conda-prefix
+place each time is what stops the environments being rebuilt; `--conda-prefix
 /some/path` puts them somewhere specific, for example shared between projects.
 
 ## 4. The output directory is renumbered

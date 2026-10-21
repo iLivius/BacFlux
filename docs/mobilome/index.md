@@ -66,7 +66,7 @@ until you give it a source ([Optional layers](optional-layers.md)).
 ```mermaid
 flowchart LR
     C([contigs_final.fasta<br/>02.assembly])
-    FAA([bakta .faa and .gff3<br/>04.annotation])
+    FAA([bakta .faa, .gff3 and .tsv<br/>04.annotation])
     TAX([GTDB-Tk call<br/>03.taxonomy])
     PLA([Platon calls<br/>06.plasmids])
 
@@ -108,8 +108,8 @@ Three things follow from that picture:
   and reads its database from `{bakta_db}/amrfinderplus-db/latest`; the CONJscan
   models are fetched at run time, so the machine needs network access on the first run.
 - **Stage 08 consumes earlier stages rather than repeating them.** It reads the
-  assembly, the Bakta proteins and GFF3, the GTDB-Tk species call, and Platon's
-  replicon calls from `06.plasmids`.
+  assembly, the Bakta proteins, GFF3 and annotation table, the GTDB-Tk species call,
+  and Platon's replicon calls from `06.plasmids`.
 
 The ICE/IME caller, the composite-transposon test and the *att*-site search run in
 **all four modes**, including `illumina`. The one leg that is mode-restricted is the
@@ -173,11 +173,14 @@ annotation, Puterová & Martínek (2021) put the "improbable or not an IS elemen
 discovery rate between 0% and 23.7% depending on the tool, with **ISEScan — the caller
 BacFlux uses — at 8.0%** (2.2% on their larger ISbrowser set). So every row carries
 `confidence` (high / medium / low), and anything resting on a contig boundary or on a
-partial hit is capped at `low`. One false call is predictable and is removed before
-anything reads the IS table: ISEScan reports a partial IS21 lying over *dnaA*, most
-likely because IS21 elements carry a helper protein (IstB) related to DnaA. *dnaA* is
+partial hit is capped at `low`. One predictable false call is removed before anything
+reads the IS table: ISEScan reports a partial IS21 lying over *dnaA*, most likely
+because IS21 elements carry a helper protein (IstB) related to DnaA. *dnaA* is
 essential, so no living isolate carries an insertion inside it; the call goes to
-`{sample}_is_discarded.tsv` with the reason `overlaps_dnaA`.
+`{sample}_is_discarded.tsv` with the reason `overlaps_dnaA`. The same IS21 profile
+also matches the helicase loaders DnaC (in Enterobacterales) and DnaI (in Firmicutes).
+Those calls are not removed: they stay in the IS table as partial IS21 calls, so read
+a partial IS21 sitting on *dnaC* or *dnaI* the same way.
 
 The module was validated on closed genomes and then measured again on deliberately
 fragmented ones — 40 benchmark genomes cut to ~150 kb, ~50 kb and ~20 kb N50,

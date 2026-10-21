@@ -150,8 +150,9 @@ where it can, and why the mutations file is a separate deliverable
 ([Turning it on](enabling.md)).
 
 A `{sample}_amrfinderplus_mutations.tsv` with no mutation rows means **not assessed**,
-not "no mutations found": AMRFinderPlus curates mutations for 31 mostly clinical
-organisms (version 4.2.7), and the refusal, with its reason, is written to
+not "no mutations found": AMRFinderPlus curates point mutations for 30 mostly clinical
+organisms (in the AMRFinderPlus database that comes with the Bakta database), and the
+refusal, with its reason, is written to
 `{sample}_amrfinder_organism_audit.tsv`.
 
 ## Language discipline

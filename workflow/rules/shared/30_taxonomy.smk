@@ -106,7 +106,8 @@ rule taxonomic_assignment:
         "../../envs/gtdbtk.yaml"
     threads: capped_cpus(24)
     resources:
-        # Cluster requests (00_common.smk §3a); a single computer ignores them.
+        # Cluster requests (00_common.smk §3a). A single computer reads mem_mb
+        # only when the launch line passes --resources mem_mb=N.
         mem_mb = HEAVY_MEM_MB,
         runtime = LONG_RUNTIME_MINUTES,
     log:

@@ -516,6 +516,13 @@ second case is the call that runs on into *dnaN*, the next gene, because ISEScan
 finder joined the two. That half is `DNAA_OVERLAP_FRACTION`, a constant in
 `isescan_to_table.py`, not a setting meant to be tuned.
 
+The same IS21 profile also matches the helicase loaders DnaC (in Enterobacterales) and
+DnaI (in Firmicutes), and those calls are **kept**. Their gene names cannot separate
+them safely: Bakta can also name *dnaC* an IstB-like protein that belongs to a real
+IS21 element, or the loader carried by a phage or an integrative element. So a partial
+IS21 call sitting on *dnaC* or *dnaI* counts in the IS totals and is used downstream;
+read it as the same artefact.
+
 ### Boundaries: the att search
 
 | Knob | Layer | Default | Source | Meaning |

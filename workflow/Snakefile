@@ -152,8 +152,11 @@ rule all:
 # that runs Snakemake anyway. This target is for a run whose jobs have no
 # internet at all, such as the whole run inside one batch job: run it first on a
 # computer with internet, from the same folder, with the same config and the
-# same --conda-prefix. download_targets() in 00_common.smk lists what it fetches
-# and what it leaves out.
+# same --conda-prefix. It builds only the environments of the download steps, so
+# such a run also needs --conda-create-envs-only beforehand, which builds every
+# environment the run will use (docs/reference/running.md, "On a cluster").
+# download_targets() in 00_common.smk lists what it fetches and what it leaves
+# out.
 #
 # Must stay below `rule all`: Snakemake runs the first rule of the Snakefile when
 # no target is named, and that must be the whole workflow.

@@ -259,8 +259,9 @@ species and inspects the coordinate itself.
 
 ### `--organism`, and why it is usually absent
 
-`--organism` only engages for the organisms AMRFinderPlus curates mutations for —
-**31** in version 4.2.7, overwhelmingly clinical. `amrfinder_organism` translates
+`--organism` only engages for the organisms AMRFinderPlus has settings for — **31**
+in the AMRFinderPlus database that comes with the Bakta database, overwhelmingly
+clinical, 30 of them with curated point mutations. `amrfinder_organism` translates
 this sample's GTDB-Tk species call into one of those names, or into nothing, and
 writes an audit file recording the decision and its reason either way.
 

@@ -104,7 +104,8 @@ rule annotation:
     # resources.threads.
     threads: capped_cpus(24)
     resources:
-        # Cluster requests (00_common.smk §3a); a single computer ignores them.
+        # Cluster requests (00_common.smk §3a). A single computer reads mem_mb
+        # only when the launch line passes --resources mem_mb=N.
         mem_mb = HEAVY_MEM_MB,
         runtime = LONG_RUNTIME_MINUTES,
     log:
@@ -204,7 +205,8 @@ rule functional_annotation:
         # prints that exact flag, with the user's own ram_gb filled in, whenever
         # --dbmem is switched on.
         mem_gb = EGGNOG_DBMEM_GB if EGGNOG_DBMEM else 0,
-        # Cluster requests (00_common.smk §3a); a single computer ignores them.
+        # Cluster requests (00_common.smk §3a). A single computer reads mem_mb
+        # only when the launch line passes --resources mem_mb=N.
         mem_mb = HEAVY_MEM_MB,
         runtime = LONG_RUNTIME_MINUTES,
     log:
@@ -335,7 +337,8 @@ rule secondary_metabolites_analysis:
         "../../envs/antismash.yaml"
     threads: capped_cpus(24)
     resources:
-        # Cluster requests (00_common.smk §3a); a single computer ignores them.
+        # Cluster requests (00_common.smk §3a). A single computer reads mem_mb
+        # only when the launch line passes --resources mem_mb=N.
         mem_mb = HEAVY_MEM_MB,
         runtime = LONG_RUNTIME_MINUTES,
     log:

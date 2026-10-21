@@ -83,7 +83,7 @@ tables are kept side by side, so cite the ones you actually read.
 | `mode:` | Front end | Reference |
 |---|---|---|
 | `illumina` | Bowtie 2 (PhiX removal), fastp 1.0.1, SPAdes 4.3.0 | 34, 12, 3 |
-| `nanopore` | NanoPlot 1.47.1 (NanoPack), Filtlong 0.3.1, Flye 2.9.6, dnaapler 1.4.0, Medaka 2.2.2 *(optional — `parameters.{nanopore,hybrid}.medaka_model: false` skips it)* | 16, 50, 32, 5, 41 |
+| `nanopore` | NanoPlot 1.47.4 (NanoPack), Filtlong 0.3.1, Flye 2.9.6, dnaapler 1.4.0, Medaka 2.2.2 *(optional — `parameters.{nanopore,hybrid}.medaka_model: false` skips it)* | 16, 50, 32, 5, 41 |
 | `hybrid` | both front ends above — the short reads are assembled too, as the comparator genome — then BWA + Polypolish 0.7.1 to correct the ONT assembly with them, and Snippy 4.6.0 to compare the two | the two rows above, plus 36, 51, 48 |
 | `contigs` | no assembler — contig filtering only, with minimap2 self-mapping for the coverage track | 35 |
 

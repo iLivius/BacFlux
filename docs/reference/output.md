@@ -116,8 +116,9 @@ Absent entirely in `contigs` mode, which has no reads to QC.
 | `{sample}/ont/{sample}_filt.fastq` | `filter_long_reads` | The Oxford Nanopore reads Filtlong kept — what Flye assembled and what Medaka polished with. |
 | `{sample}/ont/raw_qc/`, `{sample}/ont/filt_qc/` | `raw_long_read_qc`, `filtered_long_read_qc` | NanoPlot read-length and quality profiles, before and after filtering: `{sample}_NanoPlot-report.html`, one interactive HTML file per plot, and `{sample}_NanoStats.txt`. Read side by side: the difference is what the filter did. The plots are HTML only, with no PNG copies, because NanoPlot needs a Chrome browser on the machine to draw static images. |
 
-The trimmed Illumina pairs (`{sample}_trim_R{1,2}.fastq`) and the PhiX reference and
-its index under `01.reads/phix/` are all temporary and are gone when the run finishes.
+The trimmed Illumina pairs (`{sample}_trim_R{1,2}.fastq`) and the PhiX index are
+temporary and are gone when the run finishes. The PhiX genome itself,
+`01.reads/phix/phix.fna.gz`, is kept, so it is fetched only once.
 See [Illumina mode](../modes/illumina.md) and [Nanopore mode](../modes/nanopore.md).
 
 ---
@@ -393,7 +394,7 @@ not a failure.
 | Gone by the end | Why it existed |
 |---|---|
 | `01.reads/{sample}/illumina/{sample}.{1,2}.fastq` and `{sample}_trim_R{1,2}.fastq` | The PhiX-free pairs and then the fastp-trimmed pairs. The trimmed ones survive until the last rule that reads them is done: the assembler, the coverage alignment, the CARD leg, and in `hybrid` the mapping that picks the Illumina pairs to keep. |
-| `01.reads/phix/` | The PhiX reference and its index, needed only while reads are being screened. |
+| the PhiX index in `01.reads/phix/` | Needed only while reads are being screened; the PhiX genome beside it is kept. |
 | `02.assembly/{sample}/contaminants/{sample}_map.bam`, the BlobTools JSON and coverage file | Intermediates of the screen; the BlobTools *table* is kept. |
 | `02.assembly/{sample}/eval/genomes/` | Staging copies of the assemblies under their bin ids, for QUAST, CheckM and GTDB-Tk. |
 | `02.assembly/{sample}/polypolish/` contents | Alignments and the pre-correction draft. |

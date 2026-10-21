@@ -40,8 +40,8 @@ it is already installed by Bakta, and reads its database from
 own.
 
 Stage 08 **consumes** earlier stages rather than repeating them. It reads the delivered
-genome, the Bakta proteins and GFF3, the GTDB-Tk species call, and Platon's replicon
-calls from `06.plasmids`. Nothing in it re-detects a plasmid or a prophage.
+genome, the Bakta proteins, GFF3 and annotation table, the GTDB-Tk species call, and
+Platon's replicon calls from `06.plasmids`. Nothing in it re-detects a plasmid or a prophage.
 
 !!! note "The first run needs network access"
 
