@@ -764,13 +764,20 @@ if LONGREAD_SCREEN:
     #           did — but its own mode, from parameters.decontamination.long_read_mode,
     #           defaulting to "off".
     #
+    #           --check-only keeps it a check: the mode stays long_read_mode even
+    #           for a sample whose sample_overrides row names a mode for the first
+    #           screen (the row's genus lists and discard_no_hit still apply), and
+    #           a policy that would remove every contig is reported, not fatal.
+    #           long_read_mode: include with no genus list at all is a config
+    #           mistake, stopped at start-up in 00_common.smk.
+    #
     #           "off" makes the selector return keep/mode_off for every contig, so the
     #           audit is written and nothing is removed. That default is deliberate:
     #           BlobTools identifies outliers within a cloud of contigs, and a
-    #           long-read assembly has two to five. A false positive there deletes a
-    #           whole replicon — usually the plasmid — rather than trimming a
-    #           fragment, and BLAST bestsum can follow database composition
-    #           instead of biology on exactly that call.
+    #           long-read assembly has two to five. A wrong verdict there concerns a
+    #           whole replicon — usually the plasmid — rather than a fragment, and
+    #           BLAST bestsum can follow database composition instead of biology on
+    #           exactly that call.
     # Produces: FINAL_TAXO_DECISIONS, one audited row per contig. The FASTA it writes
     #           is a byproduct; FINAL_CONTIGS remains what every later stage reads.
     rule screen_final_contigs:
@@ -813,5 +820,6 @@ if LONGREAD_SCREEN:
               --output-list {output.list:q} \
               --output-fasta {output.contigs:q} \
               --composition {output.abund:q} \
-              --decisions {output.decisions:q} > {log} 2>&1
+              --decisions {output.decisions:q} \
+              --check-only > {log} 2>&1
             """

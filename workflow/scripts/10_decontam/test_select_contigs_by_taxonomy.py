@@ -10,7 +10,9 @@ genus:
     counts (auto_vote: contigs);
   * the genus written to the kept-genus file, which Bakta receives as the
     organism name;
-  * the composition report's line shape.
+  * the composition report's line shape;
+  * --check-only, the hybrid second screen: its mode is not replaced by a
+    sample's override row, and removing every contig does not stop the run.
 
 No tools and no databases: a made-up BlobTools table and FASTA are written to a
 temporary folder and the script is run on them, the way rule select_contigs
@@ -191,6 +193,103 @@ class TestSelectorRun(unittest.TestCase):
         out = run_selector(self.folder, CONTIGS, ["--mode", "off"])
         self.assertEqual(out["process"].returncode, 0, out["process"].stderr)
         self.assertFalse(os.path.exists(out["kept_genus"]))
+
+
+# ── The hybrid second screen: --check-only ───────────────────────────────────
+# Rule screen_final_contigs runs the selector as a check on the delivered genome.
+# Its mode is parameters.decontamination.long_read_mode, and nothing it decides
+# may change the genome or stop the run.
+
+def write_override(folder, row):
+    """Write a one-sample override table: header, then the given row."""
+    path = os.path.join(folder, "overrides.tsv")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("sample\tmode\tinclude_genera\texclude_genera\tdiscard_no_hit\n")
+        handle.write(row + "\n")
+    return path
+
+
+class TestCheckOnly(unittest.TestCase):
+
+    def setUp(self):
+        self.folder = tempfile.mkdtemp()
+
+    def test_override_row_sets_the_mode_of_a_normal_screen(self):
+        # The first screen follows the sample's row: include GenusE keeps the
+        # three plasmids and removes the chromosome.
+        overrides = write_override(self.folder, "SAMPLE1\tinclude\tGenusE\t\t")
+        out = run_selector(self.folder, CONTIGS, ["--mode", "off", "--sample-overrides", overrides])
+        self.assertEqual(out["process"].returncode, 0, out["process"].stderr)
+        self.assertIn("decontamination mode: include", out["process"].stdout)
+        self.assertNotIn("chrom_1", read_text(out["list"]).split())
+
+    def test_check_only_keeps_the_given_mode_over_an_override_row(self):
+        # The same row, but as the second screen: the mode stays the one given
+        # with --mode (here off), so every contig reads keep.
+        overrides = write_override(self.folder, "SAMPLE1\tinclude\tGenusE\t\t")
+        out = run_selector(self.folder, CONTIGS, ["--mode", "off", "--sample-overrides", overrides,
+                                                  "--check-only"])
+        self.assertEqual(out["process"].returncode, 0, out["process"].stderr)
+        self.assertIn("decontamination mode: off", out["process"].stdout)
+        self.assertNotIn("\tremove\t", read_text(out["decisions"]))
+
+    def test_check_only_still_uses_the_override_genus_list(self):
+        # The row's genus list applies to the check as it does to the first
+        # screen; only its mode is ignored. With --mode include the row's GenusE
+        # is the list, so the chromosome reads remove.
+        overrides = write_override(self.folder, "SAMPLE1\tauto\tGenusE\t\t")
+        out = run_selector(self.folder, CONTIGS, ["--mode", "include", "--include-genera", "GenusK",
+                                                  "--sample-overrides", overrides, "--check-only"])
+        self.assertEqual(out["process"].returncode, 0, out["process"].stderr)
+        self.assertIn("chrom_1\tGenusK\tremove", read_text(out["decisions"]))
+
+    def test_normal_screen_stops_when_every_contig_would_go(self):
+        out = run_selector(self.folder, CONTIGS, ["--mode", "include", "--include-genera", "GenusZ"])
+        self.assertNotEqual(out["process"].returncode, 0)
+        self.assertIn("No contigs were kept", out["process"].stderr)
+
+    def test_check_only_still_uses_the_override_discard_no_hit(self):
+        # The row's discard_no_hit applies to the check too: with the run-wide
+        # value false and the row's true, an unplaced contig reads remove.
+        contigs = dict(CONTIGS, small_1=("no-hit", 50))
+        overrides = write_override(self.folder, "SAMPLE1\t\t\t\ttrue")
+        out = run_selector(self.folder, contigs, ["--mode", "exclude", "--discard-no-hit", "false",
+                                                  "--sample-overrides", overrides, "--check-only"])
+        self.assertEqual(out["process"].returncode, 0, out["process"].stderr)
+        self.assertIn("small_1\tno-hit\tremove\tdiscarded_no_hit", read_text(out["decisions"]))
+
+    def test_check_only_log_says_what_the_policy_would_do(self):
+        out = run_selector(self.folder, CONTIGS, ["--mode", "include", "--include-genera", "GenusZ",
+                                                  "--check-only"])
+        self.assertIn("this policy would discard", out["process"].stdout)
+        self.assertIn("Would keep 0 of 4", out["process"].stdout)
+        self.assertNotIn("decontamination is discarding", out["process"].stdout)
+
+    def test_inputs_that_do_not_match_still_stop_a_check(self):
+        # No BlobTools contig is in the FASTA: a wiring problem, not a verdict.
+        table, _ = write_inputs(self.folder, CONTIGS)
+        other_fasta = os.path.join(self.folder, "other.fasta")
+        with open(other_fasta, "w", encoding="utf-8") as handle:
+            handle.write(">unrelated_1\nACGT\n")
+        process = subprocess.run([
+            sys.executable, SCRIPT, "--bestscore", table, "--contigs", other_fasta,
+            "--sample", "SAMPLE1", "--mode", "off", "--check-only",
+            "--output-list", os.path.join(self.folder, "l"),
+            "--output-fasta", os.path.join(self.folder, "f"),
+            "--composition", os.path.join(self.folder, "c"),
+            "--decisions", os.path.join(self.folder, "d"),
+        ], capture_output=True, text=True)
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("do not describe the same assembly", process.stderr)
+
+    def test_check_only_reports_and_carries_on_when_every_contig_would_go(self):
+        out = run_selector(self.folder, CONTIGS, ["--mode", "include", "--include-genera", "GenusZ",
+                                                  "--check-only"])
+        self.assertEqual(out["process"].returncode, 0, out["process"].stderr)
+        self.assertIn("Check only", out["process"].stdout)
+        decisions = read_text(out["decisions"]).splitlines()[1:]
+        self.assertEqual(len(decisions), 4)
+        self.assertTrue(all("\tremove\t" in row for row in decisions))
 
 
 if __name__ == "__main__":

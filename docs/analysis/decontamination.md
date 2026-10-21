@@ -536,13 +536,15 @@ from the Oxford Nanopore reads (Flye, Medaka, dnaapler, Polypolish). With
 contaminant long reads before Flye assembles them. So the delivered genome gets a
 screen of its own, built the same way:
 
-- **coverage** from the long reads mapped back onto `contigs_final.fasta` (minimap2);
+- **coverage** from the long reads mapped back onto `contigs_final.fasta` (minimap2),
+  for the BlobTools table beside the genus;
 - **taxonomy** from the second megablast table, `{sample}_final_blastout`, which the
   plasmid stage needs anyway;
 - **the same selector**, with the same genus lists, aliases, `auto_vote` and
   `discard_no_hit` as the first screen, but its own mode, set by
   `parameters.decontamination.long_read_mode` (`off`, `auto`, `include` or `exclude`;
-  default `off`).
+  default `off`). A sample's `sample_overrides` row changes the genus lists and
+  `discard_no_hit` here as it does in the first screen, but not the mode.
 
 It writes `contaminants/{sample}_final_contig_taxonomy_decisions.tsv`, one row per
 delivered contig with its genus, a verdict and the reason, and
@@ -554,6 +556,8 @@ Every `hybrid` run produces both.
 mode decides only which verdict each contig gets: with `off` every contig reads
 `keep` / `mode_off`; with `auto`, `include` or `exclude` the verdicts follow the same
 rules as the first screen, so you can see which contigs that policy would remove.
+If the policy would remove every contig, the screen says so in its log and the run
+carries on.
 
 `off` is the default because this screen judges very few contigs. BlobTools finds a
 contaminant as an outlier among many contigs, and a long-read genome has two to five:

@@ -49,6 +49,11 @@ What it writes
                     reason          one token saying why — decide() carries the
                                     full vocabulary
                                     source: decide()
+  --check-only    set only by rule screen_final_contigs, the hybrid second screen,
+                  which is a check. The mode stays the one given with --mode even
+                  when a sample's override row names another, and a policy that
+                  would remove every contig ends normally instead of stopping the
+                  run. The FASTA and list it writes are read by nothing.
 
 How auto mode picks the genus
 -----------------------------
@@ -80,6 +85,7 @@ a pinned Python with nothing else in it.
 
 import argparse
 import csv
+import os
 import sys
 from collections import Counter, OrderedDict
 
@@ -546,7 +552,8 @@ def write_composition(path, counts, total, bp_by_genus=None, total_bp=0):
         else:
             # No contig of the BlobTools table was found in the FASTA, so there
             # are no lengths to share out. The contig shares are still written,
-            # and main() then stops the run because nothing can be kept.
+            # and main() then stops the run, because the two inputs do not
+            # describe the same assembly (with or without --check-only).
             for genus, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
                 handle.write(f"{genus}: contigs {count / total:.2f}\n")
 
@@ -575,7 +582,9 @@ CONFUSED_GENUS_COUNT = 2
 LARGE_REMOVAL_BASE_FRACTION = 0.20
 
 
-def warn_if_selection_looks_wrong(bp_by_genus, total_bp, removed_bp):
+def warn_if_selection_looks_wrong(bp_by_genus, total_bp, removed_bp,
+                                  decisions_name="contig_taxonomy_decisions.tsv",
+                                  check_only=False):
     """Print a warning when the genus assignment, or the amount being discarded,
     suggests the keep/remove call should be checked by a human.
 
@@ -587,7 +596,9 @@ def warn_if_selection_looks_wrong(bp_by_genus, total_bp, removed_bp):
     without this warning it proceeds silently either way.
 
     Input:  base pairs per genus, the assembly total, and how much is being
-            removed (all in bp).
+            removed (all in bp); the name of the decisions file to point the
+            reader at; and whether this run is only a check (--check-only), in
+            which case the removal warning says what the policy WOULD discard.
     Output: nothing; prints to stdout, which the Snakemake rule captures into
             logs/select_contigs_{sample}.log.
     """
@@ -607,10 +618,16 @@ def warn_if_selection_looks_wrong(bp_by_genus, total_bp, removed_bp):
             f"{MAJOR_GENUS_BASE_FRACTION:.0%} of this assembly ({listed}). "
             "Either the sample is a mixed culture, or one genome is being split "
             "across related genera by the BLAST assignment. Check the kept/removed "
-            "split in contig_taxonomy_decisions.tsv before trusting this assembly."
+            f"split in {decisions_name} before trusting this assembly."
         )
 
-    if removed_fraction > LARGE_REMOVAL_BASE_FRACTION:
+    if removed_fraction > LARGE_REMOVAL_BASE_FRACTION and check_only:
+        print(
+            f"WARNING: this policy would discard {removed_fraction:.0%} of the "
+            f"assembly ({removed_bp:,} of {total_bp:,} bp). Nothing is removed: "
+            "this screen is a check. Read the verdicts before acting on them."
+        )
+    elif removed_fraction > LARGE_REMOVAL_BASE_FRACTION:
         print(
             f"WARNING: decontamination is discarding {removed_fraction:.0%} of the "
             f"assembly ({removed_bp:,} of {total_bp:,} bp). If the kept "
@@ -647,6 +664,15 @@ def main():
     parser.add_argument("--composition", required=True)
     parser.add_argument("--kept-genus", nargs="?", const="", default="")
     parser.add_argument("--decisions", required=True)
+    # Set by rule screen_final_contigs, the hybrid second screen, which is a CHECK:
+    # it writes a verdict per delivered contig and changes nothing. Two things
+    # differ from a normal screen. The mode is the one passed with --mode
+    # (parameters.decontamination.long_read_mode), even for a sample whose
+    # override row names a mode for the first screen; the row's genus lists and
+    # discard_no_hit still apply, as they do there. And a policy that would remove
+    # every contig does not stop the run: nothing reads this script's FASTA in
+    # that rule, so the verdicts are written and the script ends normally.
+    parser.add_argument("--check-only", action="store_true")
     args = parser.parse_args()
 
     # Start from the run-wide policy. Each genus list is the inline config value
@@ -665,7 +691,8 @@ def main():
     overrides = read_overrides(args.sample_overrides)
     if args.sample in overrides:
         override = overrides[args.sample]
-        mode = override["mode"] or mode
+        if not args.check_only:
+            mode = override["mode"] or mode
         if override["include"]:
             include = override["include"]
         if override["exclude"]:
@@ -740,7 +767,8 @@ def main():
 
     # Announce a taxonomically confused sample, or an unusually large removal,
     # before the run moves on. Purely advisory: no decision above depends on it.
-    warn_if_selection_looks_wrong(bp_by_genus, total_bp, removed_bp)
+    warn_if_selection_looks_wrong(bp_by_genus, total_bp, removed_bp,
+                                  os.path.basename(args.decisions), args.check_only)
 
     # The genus Bakta is given as the organism name: the kept genus that wins
     # the same vote, counted over the kept contigs only. One line, or an empty
@@ -783,7 +811,22 @@ def main():
             f"WARNING: {len(missing)} contigs from BlobTools table were not found in FASTA.",
             file=sys.stderr,
         )
-    if not kept:
+    # None of BlobTools' contigs is in the FASTA: the two inputs do not describe
+    # the same assembly. That is a wiring problem, so it stops the run even in a
+    # check, rather than being reported as a policy that removes everything.
+    if not any(contig in fasta_by_id for contig, _ in records):
+        raise ValueError(
+            f"None of the contigs in '{args.bestscore}' is in '{args.contigs}' for "
+            f"sample '{args.sample}': the two inputs do not describe the same assembly."
+        )
+    if not kept and args.check_only:
+        # A check: report it and carry on. The verdicts above are the result, and
+        # the empty FASTA beside them is read by nothing (see --check-only).
+        print(
+            f"Check only: the '{mode}' policy would remove every contig of sample "
+            f"'{args.sample}'. Nothing is removed; the verdicts are in {args.decisions}."
+        )
+    elif not kept:
         # Nothing survived. Raise rather than write an empty FASTA: Snakemake
         # would otherwise mark the rule complete and every stage from annotation
         # onwards would run on zero sequence. The decisions file written above is
@@ -797,7 +840,11 @@ def main():
     print(f"Sample {args.sample} decontamination mode: {mode}")
     if mode == "auto":
         print(f"Auto vote by {args.auto_vote}: kept genus {auto_genus or 'none'}.")
-    print(f"Kept {len(kept)} of {len(records)} contig assignments.")
+    if args.check_only:
+        print(f"Would keep {len(kept)} of {len(records)} contig assignments; "
+              "nothing is removed (check only).")
+    else:
+        print(f"Kept {len(kept)} of {len(records)} contig assignments.")
     if args.kept_genus:
         print(f"Genus given to Bakta: {label_genus or 'none'}.")
 
