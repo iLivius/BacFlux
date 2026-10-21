@@ -21,7 +21,7 @@ cd BacFlux
 
 # 2. Launcher environment (Snakemake only; the analysis tools are installed later,
 #    per rule, by conda)
-conda create -c conda-forge -c bioconda -n snakemake snakemake
+conda create -c conda-forge -c bioconda -n snakemake snakemake=9.14.6
 conda activate snakemake
 
 # 3. Make your own copy of the config, then edit the copy
@@ -149,7 +149,7 @@ The header tells you what BacFlux understood. Read it before committing cores:
 
 Mode: illumina — Genomic analysis of bacterial Illumina reads.
 Phage caller: virsorter2 (default). Plasmid stage: Platon-only (geNomad off).
-Decontamination mode: auto (discard_no_hit=false).
+Decontamination mode: auto (auto_vote=bp, discard_no_hit=true).
 Using CheckV database from link: 'https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz' (db_id='checkv-db-v1.5').
 Sample isolate1 will be processed.
 ```
@@ -189,9 +189,12 @@ What is checked before the first job starts, and what each failure looks like:
 [BacFlux] mode=illumina removes PhiX spike-in reads before assembly, which requires 'links.phix_link' to be set in the config.
 [BacFlux] mode=illumina runs the read-based CARD AMR leg, which requires 'links.card_link' to be set in the config.
 [BacFlux] directories.checkv_db points at '/data/db/checkv', which is not a directory. …
-Missing Illumina mate pair for sample 'isolate1': /data/reads/illumina/isolate1_R2.fastq.gz
-Sample name 'isolate 1' contains unsupported characters.
+[BacFlux] Missing Illumina mate pair for sample 'isolate1': /data/reads/illumina/isolate1_R2.fastq.gz
+[BacFlux] Sample name 'isolate 1' contains characters that are not allowed (' '). Rename the input files.
 ```
+
+Each of them stops Snakemake with exit status 1, so a wrapper script or a cluster
+job that launched the run sees it fail.
 
 A config with no `mode` at all stops with a `KeyError: 'mode'` from
 `workflow/rules/shared/00_common.smk`, rather than guessing a pipeline.
@@ -225,7 +228,7 @@ itself. **Do not also pass `--jobs`/`-j`** — for a local run it is an alias fo
 `--cores`, and passing both can let rules oversubscribe the machine. The reasoning
 and the measurement are on [running BacFlux](../reference/running.md).
 
-A first run spends a long time on setup: a default Illumina run builds 19 of the 31
+A first run spends a long time on setup: a default Illumina run builds 21 of the 33
 conda environments in `workflow/envs/` and downloads the databases BacFlux fetches
 for itself. Environments are created under `.snakemake/conda` in the directory you
 launched from, so launching from the same place each time is what stops them being
@@ -241,6 +244,7 @@ After a successful single-sample run, with the mobilome module off (the default)
 
 ```text
 /data/results/run1/
+├── 01.reads/phix/phix.fna.gz             # the PhiX genome, fetched once and kept
 ├── 01.reads/isolate1/illumina/
 │   ├── isolate1_fastp.html               # trimming report; the trimmed FASTQs are temporary
 │   └── isolate1_fastp.json
@@ -251,6 +255,7 @@ After a successful single-sample run, with the mobilome module off (the default)
 │   ├── contaminants/
 │   │   ├── contig_taxonomy_decisions.tsv # one row per contig: kept or dropped, and why
 │   │   ├── isolate1_composition.txt      # genus composition of the assembly
+│   │   ├── isolate1_kept_genus.txt       # the genus Bakta names the genome after
 │   │   ├── isolate1_blastout
 │   │   ├── contigs.list
 │   │   └── bestscore.blob.blobDB.table.txt
@@ -281,8 +286,8 @@ short reads). `08.mobilome` appears only when the module is switched on — see
 
 Intermediates are declared temporary and deleted as soon as the last rule needing
 them has finished, which is why `01.reads` ends up holding only reports and the
-PhiX genome and its index disappear entirely. CARD's extracted copy under
-`05.amr/card_db/` goes the same way and is fetched again on a fresh run; set
+PhiX genome; the PhiX index is rebuilt whenever it is needed. CARD's extracted copy
+under `05.amr/card_db/` is temporary too and is fetched again on a fresh run; set
 `directories.card_db` to a copy you hold to avoid that.
 
 The files most runs end at:

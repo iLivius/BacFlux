@@ -51,9 +51,9 @@ mobilome layer uses too. See
 ## The default path
 
 VirSorter2 and not geNomad is the default virus caller, and the reason is the
-licence rather than the science
-(`workflow/rules/shared/00_common.smk:104-111`). The licence types a default run
-depends on:
+licence rather than the science (the licensing note above `PHAGE_CALLER` in
+`workflow/rules/shared/00_common.smk`). The licence types a default run depends
+on:
 
 | Component | Licence type |
 |---|---|
@@ -128,15 +128,16 @@ not one to make by copying a URL out of a comment.
 
 The workflow reports this itself, not only in this document:
 
-- Selecting geNomad prints a notice at parse time, before any job starts
-  (`workflow/rules/shared/00_common.smk:123-127`).
+- Selecting geNomad prints a notice at parse time, before any job starts (where
+  `PHAGE_CALLER` is read, in `workflow/rules/shared/00_common.smk`).
 - `conjscan_models` and `icescan_models` write the CC BY-NC-SA notice to the top
-  of their own logs
-  (`workflow/rules/shared/80_mobilome.smk:596`, `:730`).
+  of their own logs (the first lines of each rule's shell, in
+  `workflow/rules/shared/80_mobilome.smk`).
 - Every opt-in download comes from an unversioned address, so each writes a
   `PROVENANCE.txt` beside the data. `tncentral_db`, `iceberg_db` and `isosdb_db`
-  record the source, the fetch date, the checksum of the FASTA that actually
-  arrived, the sequence count and the licence statement for that source;
+  record the source, the fetch date, the checksum of the FASTA as it was indexed
+  (for TnCentral and ICEberg, after BacFlux has repaired their deflines), the
+  sequence count and the licence statement for that source;
   `icescan_models` records the package's own version line and profile count in
   place of a checksum. That file is the only record of which release you
   analysed — see [Optional layers](../mobilome/optional-layers.md).

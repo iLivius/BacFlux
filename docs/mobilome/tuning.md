@@ -103,7 +103,7 @@ awk -F'\t' '$8=="no_mge_context" || $8=="tier_not_raised"' \
     The two tables also spell their booleans differently: `{sample}_amr_mobility.tsv`
     writes `yes` / `no` / `NA`, `{sample}_ice_candidates.tsv` writes `TRUE` / `FALSE` /
     `NA` so that R reads them straight into a logical column
-    (`conjscan_to_ice.py:947`).
+    (`_tsv_bool` in `conjscan_to_ice.py`).
 
 ## Three places a knob can live
 
@@ -139,10 +139,12 @@ To change one, add the flag to the rule's shell block:
 
 Every script the mobilome rules run lives in `workflow/scripts/80_mobilome/`, a
 directory named after the rule file that runs it, with each script's tests beside it.
+The rules run these scripts in `workflow/envs/python.yaml`, a pinned Python with
+nothing else in it, so the scripts use the standard library only.
 A script sitting loose in `workflow/scripts/` is not part of a run — it is a maintenance
 tool you invoke by hand. `workflow/scripts/README.md` has the full map. After a Layer C
-edit, `pytest workflow/scripts` (457 pass, 2 skip; 380 of them mobilome) is the check that you
-did not break something else on the way; the tests encode today's thresholds in places,
+edit, `pytest workflow/scripts` is the check that you did not break something else on
+the way; the tests encode today's thresholds in places,
 so expect to update a test alongside a deliberate change.
 
 !!! warning "Layer B values are not sanity-checked"
@@ -152,7 +154,8 @@ so expect to update a test alongside a deliberate change.
     indistinguishable from a genome that has none.
 
     `mobilome.coverage_profile` is the exception, and its guard lives in the workflow
-    rather than in the script (`80_mobilome.smk:196`): MacSyFinder accepts
+    rather than in the script (the check right after `MOBILOME_COVERAGE_PROFILE`, at
+    the top of `80_mobilome.smk`): MacSyFinder accepts
     `--coverage-profile 30` and then finds nothing, which looks exactly like a genome
     with no conjugative system, so BacFlux exits at parse time instead — when Snakemake
     reads the config, before any rule runs. The general lesson for any knob you add:
@@ -168,8 +171,8 @@ so expect to update a test alongside a deliberate change.
     exception is the naming layer: `{sample}_named_elements_discarded.tsv` always closes
     with a `summary` / `tncentral_naming_complete` row naming both thresholds it applied.
     The parse-time banner prints only `max_composite_span_bp` and `contig_boundary_bp`
-    (`00_common.smk:1252-1257`). If you change a Layer B knob, write the value down
-    yourself.
+    (the `Mobilome module: ON` line, printed from `00_common.smk`). If you change a
+    Layer B knob, write the value down yourself.
 
 ## Symptom to knob
 
@@ -185,8 +188,8 @@ Grep `{sample}_ice_discarded.tsv`:
 | `cluster_longer_than_max` | anchors chained across the contig into one implausible element | `--max-element-bp`, or **lower** `--window-bp` so the chain breaks |
 | `no_conjugation_anchor` | integrases with no relaxase and no mating apparatus nearby — a genome's ordinary complement of recombinases | not a threshold problem |
 | `integrase_without_conjugation_machinery` | the integrase marking your element was attached to no machinery cluster | `--integrase-window-bp`, but read the next box first |
-| `untrusted_integrase_profile` | an ICEscan integrase profile deliberately ignored (integron and housekeeping recombinases that would anchor elements onto the wrong gene) | Layer C: `ICESCAN_TRUSTED_INTEGRASE_PROFILES`, `conjscan_to_ice.py:255` |
-| `integrase_match_is_a_transposase` | the Bakta product text matched the integrase pattern but the protein is a transposase | Layer C: `TRANSPOSASE_PRODUCT_PATTERN`, `conjscan_to_ice.py:532` |
+| `untrusted_integrase_profile` | an ICEscan integrase profile deliberately ignored (integron and housekeeping recombinases that would anchor elements onto the wrong gene) | Layer C: `ICESCAN_TRUSTED_INTEGRASE_PROFILES` in `conjscan_to_ice.py` |
+| `integrase_match_is_a_transposase` | the Bakta product text matched the integrase pattern but the protein is a transposase | Layer C: `TRANSPOSASE_PRODUCT_PATTERN` in `conjscan_to_ice.py` |
 | `conjscan_found_no_systems` | MacSyFinder assembled nothing at all | `mobilome.coverage_profile`, then the ICEscan layer |
 | `hit_id_not_in_annotation` | a MacSyFinder hit could not be joined to the Bakta GFF3 | not a threshold — a mismatched input pair. Check that the Bakta run and the `.faa` MacSyFinder read are the same run |
 
@@ -236,8 +239,8 @@ awk -F'\t' '$5=="kept_flagged"' 08.mobilome/S1/S1_ice_discarded.tsv | cut -f6 | 
 
 | Cap reason | Meaning | Knob |
 |---|---|---|
-| `few_anchor_classes` | fewer than 3 of the five anchor classes were present | `MIN_ANCHOR_CLASSES_FOR_HIGH` (Layer C, `conjscan_to_ice.py:682`) — read the box first |
-| `machinery_not_intact` | low system wholeness, a decayed model, or a truncated relaxase/VirB4 | `WHOLENESS_INTACT_MIN` / `PROFILE_COVERAGE_INTACT_MIN` (Layer C, both 0.7, `conjscan_to_ice.py:666,672`) |
+| `few_anchor_classes` | fewer than 3 of the five anchor classes were present | `MIN_ANCHOR_CLASSES_FOR_HIGH` (Layer C, in `conjscan_to_ice.py`) — read the box first |
+| `machinery_not_intact` | low system wholeness, a decayed model, or a truncated relaxase/VirB4 | `WHOLENESS_INTACT_MIN` / `PROFILE_COVERAGE_INTACT_MIN` (Layer C, both 0.7, in `conjscan_to_ice.py`) |
 | `at_contig_boundary` | machinery runs into a contig end → capped **low** | `--boundary-bp` |
 | `spans_contigs` | hits on more than one contig → capped **low**, absolutely | none, deliberately |
 | `no_assembled_system` | profile hits only, no assembled system → capped **low** | `mobilome.coverage_profile`, or accept the tier |
@@ -288,7 +291,8 @@ recommendation.
 ### `coverage_profile` — the one Layer A knob that changes what is detected
 
 The fraction of an HMM profile a protein must align to before the hit is kept
-(`mobilome.coverage_profile`, default **0.5**, `80_mobilome.smk:190`). Not identity, not
+(`mobilome.coverage_profile`, default **0.5**, read into `MOBILOME_COVERAGE_PROFILE` at
+the top of `80_mobilome.smk`). Not identity, not
 an E-value: a hit can be statistically beyond doubt and still be dropped by this rule
 alone. It is applied to **both** MacSyFinder searches deliberately — their hit tables
 are merged, so different stringencies would make an element's class depend on which
@@ -296,8 +300,8 @@ model set was looser.
 
 Lowering it admits divergent full-length relaxases that share only a catalytic core, and
 also genuine fragments. Measured end to end over 18 curated ICEs, 12 curated IMEs and 12
-genomes with no curated element (32.6 Mb), with the ICEscan layer on
-(`config/config.yaml:397-400`):
+genomes with no curated element (32.6 Mb), with the ICEscan layer on (the same table
+sits in the comment above `coverage_profile` in `config/config.yaml`):
 
 | `coverage_profile` | curated ICEs | curated IMEs | calls on the negative set |
 |---|---|---|---|
@@ -317,8 +321,8 @@ confidence with a real mobility claim, unverified either way.
 
 **When to lower it anyway.** Across all 395 curated IMEs, 73 carry a relaxase hit that
 is clean on E-value and fails only this rule — 60 of them the `T4SS_MOBT` family at
-about 0.32 coverage, largely the *Streptococcus salivarius* clade
-(`config/config.yaml:432-436`). If your isolates sit in that space, 0.4 is worth trying.
+about 0.32 coverage, largely the *Streptococcus salivarius* clade (the same comment
+in `config/config.yaml`). If your isolates sit in that space, 0.4 is worth trying.
 Nothing measured supports 0.3 for single isolates. The EBI mobilome-annotation-pipeline
 runs 0.3, which reflects a metagenome pipeline's priorities — recall first, because MAG
 proteins are fragmentary anyway — not a verdict on what a single-isolate workflow should
@@ -347,8 +351,10 @@ what every measured result in this project was produced at. They are Layer B.
 | `--integrase-window-bp` | 50,000 | an integrase further from the machinery may still anchor the element | more `integrase_without_conjugation_machinery` orphans, so fewer ICE/IME calls |
 | `--att-flank-window-bp` | 50,000 | more candidate repeats to rank | the element's real ends may sit outside the window |
 
-Defaults read from `conjscan_to_ice.py:905, 906, 911, 912, 925, 1820` and
-`att_search.py:99`.
+The defaults are the `DEFAULT_…` constants of `conjscan_to_ice.py`
+(`DEFAULT_WINDOW_BP`, `DEFAULT_MIN_ELEMENT_BP`, `DEFAULT_MIN_IME_ELEMENT_BP`,
+`DEFAULT_MAX_ELEMENT_BP`, `DEFAULT_BOUNDARY_BP`, `DEFAULT_INTEGRASE_WINDOW_BP`) and
+`DEFAULT_FLANK_WINDOW_BP` in `att_search.py`.
 
 **Why there is a separate IME floor.** The floor is applied to the *anchor-cluster span*,
 and that span scales with the number of machinery genes, not with the element's length.
@@ -367,10 +373,10 @@ Measured over the 28 small-machinery calls (IME + AICE) in the benchmark:
 | 8,000 (= the ICE floor) | 15 | 1 |
 
 The recall cliff is between 3,000 and 5,000, not at the default: the five detected
-curated IMEs have machinery spans of 3,840 / 4,959 / 5,942 / 6,252 / 8,164 bp
-(`config/config.yaml:788-789`). **3,000 bp drops five calls at a measured cost of zero
-curated IMEs** — that is where to go if 2,000 feels unevidenced. It does not make 3,000
-the better default: five calls is a small sample and none of the five is a known false
+curated IMEs have machinery spans of 3,840 / 4,959 / 5,942 / 6,252 / 8,164 bp (listed
+in the note on the ICE/IME geometry thresholds in `config/config.yaml`). **3,000 bp
+drops five calls at a measured cost of zero curated IMEs** — that is where to go if
+2,000 feels unevidenced. It does not make 3,000 the better default: five calls is a small sample and none of the five is a known false
 positive.
 
 !!! warning "2,000 bp is an empirical cut, not a published bound"
@@ -388,7 +394,7 @@ positive.
     floor. The deliberate reading is that an att pair implying a 3 kb element is mostly
     noise; the honest reading is that IME boundaries are therefore largely unresolved.
     Making the floors agree per class would change results, so it has not been done
-    quietly (`config/config.yaml:783-792`).
+    quietly (the same note in `config/config.yaml`).
 
 `--integrase-window-bp` is deliberately much larger than `--window-bp`: conjugation
 machinery is an operon and clusters tightly, whereas the integrase sits at the element
@@ -404,24 +410,25 @@ where the curve flattens rather than an arbitrary larger number.
 
 ### The composite span, and the co-localisation constants
 
-`mobilome.max_composite_span_bp` (Layer A, default **20,000**, `00_common.smk:1168`) is
+`mobilome.max_composite_span_bp` (Layer A, default **20,000**, `MOBILOME_MAX_COMPOSITE_SPAN`
+in `00_common.smk`) is
 the longest span accepted for a composite transposon, which is ladder tier 3. Real
 composites run from about 2.5 kb (IS*26* translocatable units) to about 25 kb. The
 measured span is always reported next to the call, in `flanking_span_bp`.
 
 Everything else in the co-localisation step is Layer C, in `colocalise.py`:
 
-| Constant | Line | Default | Meaning |
-|---|--:|--:|---|
-| `HYBRID_PROMOTER_MAX_BP` | 153 | 500 | how close an upstream, correctly oriented IS must be before the module says it may be driving the gene from an outward-reading promoter (tier 2). IS*Ecp1* sits 42–266 bp upstream of *bla*<sub>CTX-M</sub> |
-| `IS_ADJACENT_MAX_BP` | 158 | 5,000 | beyond this the nearest IS is still reported in `distance_bp` but no longer sets `mge_context` |
-| `CONTIG_END_WINDOW_BP` | 173 | 1,000 | triggers the boundary flag and the low-confidence cap on an AMR row |
-| `MIN_AMR_FRACTION_INSIDE_ELEMENT` | 178 | 0.9 | fraction of the AMR gene inside a named element before the element is said to carry it |
-| `MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION` | 183 | 0.5 | fraction overlapped by an IS before the CDS is called disrupted (likely inactivated) rather than merely overlapping |
-| `ABUTTING_IS_MAX_GAP_BP` | 191 | 25 | how flush an IS must be against a **partial** AMR hit to read the pair as "the IS split this gene". Tight on purpose: it tests "butted up against", not "nearby" |
-| `MIN_COVERAGE_FOR_INTACT_GENE` | 196 | 90.0 | below this percent coverage an AMRFinderPlus hit is treated as a fragment. Used only with the abutting-IS test |
-| `ORIENTATION_EXEMPT_IS_FAMILIES` | 206 | `{IS6, IS26, …}` | families exempt from the same-orientation rule for composites |
-| `UNINFORMATIVE_FAMILY_VALUES` | 211 | `{"", NA, NEW, UNKNOWN, ISNCY, …}` | ISEScan family labels carrying no information about *which* element this is |
+| Constant | Default | Meaning |
+|---|--:|---|
+| `HYBRID_PROMOTER_MAX_BP` | 500 | how close an upstream, correctly oriented IS must be before the module says it may be driving the gene from an outward-reading promoter (tier 2). IS*Ecp1* sits 42–266 bp upstream of *bla*<sub>CTX-M</sub> |
+| `IS_ADJACENT_MAX_BP` | 5,000 | beyond this the nearest IS is still reported in `distance_bp` but no longer sets `mge_context` |
+| `CONTIG_END_WINDOW_BP` | 1,000 | triggers the boundary flag and the low-confidence cap on an AMR row |
+| `MIN_AMR_FRACTION_INSIDE_ELEMENT` | 0.9 | fraction of the AMR gene inside a named element before the element is said to carry it |
+| `MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION` | 0.5 | fraction overlapped by an IS before the CDS is called disrupted (likely inactivated) rather than merely overlapping |
+| `ABUTTING_IS_MAX_GAP_BP` | 25 | how flush an IS must be against a **partial** AMR hit to read the pair as "the IS split this gene". Tight on purpose: it tests "butted up against", not "nearby" |
+| `MIN_COVERAGE_FOR_INTACT_GENE` | 90.0 | below this percent coverage an AMRFinderPlus hit is treated as a fragment. Used only with the abutting-IS test |
+| `ORIENTATION_EXEMPT_IS_FAMILIES` | `{IS6, IS26, …}` | families exempt from the same-orientation rule for composites |
+| `UNINFORMATIVE_FAMILY_VALUES` | `{"", NA, NEW, UNKNOWN, ISNCY, …}` | ISEScan family labels carrying no information about *which* element this is |
 
 !!! warning "Do not remove IS26 from `ORIENTATION_EXEMPT_IS_FAMILIES`"
 
@@ -444,10 +451,10 @@ Both naming layers are *optional* and stay off until you give each a source — 
 
 | Key | Default | Source | Meaning |
 |---|--:|---|---|
-| `mobilome.tncentral.min_identity` | 90.0 | `00_common.smk:1206` | percent identity before a BLAST hit may confer a curated **name**. Below it the sequence may be a relative of the element, but the name would claim more than the data shows |
-| `mobilome.tncentral.min_reference_coverage` | 0.80 | `00_common.smk:1207` | fraction of the **reference element** that must be present — "is the whole of this known transposon here?" |
-| `mobilome.iceberg.min_identity` | 80.0 | `00_common.smk:1224` | identity floor for an ICE name |
-| `mobilome.iceberg.min_overlap_fraction` | 0.50 | `00_common.smk:1225` | how much of *our* candidate the curated element must cover to be treated as the same thing. Lenient next to the transposon cascade, because ICEs are mosaic and their cargo varies between strains |
+| `mobilome.tncentral.min_identity` | 90.0 | `TNCENTRAL_MIN_IDENTITY`, `00_common.smk` | percent identity before a BLAST hit may confer a curated **name**. Below it the sequence may be a relative of the element, but the name would claim more than the data shows |
+| `mobilome.tncentral.min_reference_coverage` | 0.80 | `TNCENTRAL_MIN_COVERAGE`, `00_common.smk` | fraction of the **reference element** that must be present — "is the whole of this known transposon here?" |
+| `mobilome.iceberg.min_identity` | 80.0 | `ICEBERG_MIN_IDENTITY`, `00_common.smk` | identity floor for an ICE name |
+| `mobilome.iceberg.min_overlap_fraction` | 0.50 | `ICEBERG_MIN_OVERLAP`, `00_common.smk` | how much of *our* candidate the curated element must cover to be treated as the same thing. Lenient next to the transposon cascade, because ICEs are mosaic and their cargo varies between strains |
 
 Neither layer changes any gene's tier by loosening: `mobilome.iceberg.*` only labels the
 candidates already found, and `mobilome.tncentral.*` decides whether a curated element is
@@ -477,9 +484,9 @@ numbers and only one of them is a config key.
 
 | Window | Value | Where | Question it answers |
 |---|--:|---|---|
-| `mobilome.contig_boundary_bp` | 100 | Layer A, `00_common.smk:1174`; passed to `isescan_to_table.py` as `--boundary-bp` | is an **IS call** sitting on the edge of its contig? Feeds `at_contig_boundary` and `fraction_at_contig_boundary` in the IS summary |
-| `CONTIG_END_WINDOW_BP` | 1,000 | Layer C, `colocalise.py:173` | was there enough flanking sequence to have **seen** a neighbouring element at all? Caps confidence in the mobility table |
-| `--boundary-bp` on `conjscan_ice` | 1,000 | Layer B, `conjscan_to_ice.py:925` | the same question again, for an **ICE/IME candidate** rather than an AMR gene |
+| `mobilome.contig_boundary_bp` | 100 | Layer A, `MOBILOME_BOUNDARY_BP` in `00_common.smk`; passed to `isescan_to_table.py` as `--boundary-bp` | is an **IS call** sitting on the edge of its contig? Feeds `at_contig_boundary` and `fraction_at_contig_boundary` in the IS summary |
+| `CONTIG_END_WINDOW_BP` | 1,000 | Layer C, `colocalise.py` | was there enough flanking sequence to have **seen** a neighbouring element at all? Caps confidence in the mobility table |
+| `--boundary-bp` on `conjscan_ice` | 1,000 | Layer B, `DEFAULT_BOUNDARY_BP` in `conjscan_to_ice.py` | the same question again, for an **ICE/IME candidate** rather than an AMR gene |
 
 An IS 500 bp from a contig end is not "at the edge", but you still could not have seen
 its partner 2 kb away — so absence of evidence there is not evidence of absence. That is
@@ -489,24 +496,35 @@ a config key.
 
 A high `fraction_at_contig_boundary` means the assembly broke exactly where the IS
 elements are, and the located IS count should be read as a floor. For reference, the
-hybrid assemblies of the clinical *K. pneumoniae* isolates TUM24772 and K3 score 0.0089
-(1 of 112 IS calls) and 0.0103 (1 of 97) — near-closed genomes. A short-read draft will
-be far higher.
+hybrid assemblies of the clinical *K. pneumoniae* isolates TUM24772 and K3, near-closed
+genomes, score 0: none of their 96 and 111 IS calls sits at a contig end. A short-read
+draft will be far higher.
 
 ISEScan itself is run with **no** `--removeShortIS`, on purpose: partials are kept and
 tiered rather than discarded. `--min-length-bp` on `rule isescan_table` defaults to **0**
-(`isescan_to_table.py:958`) — set it to 500 if you want the discard-below-500-bp
-convention applied to IS calls too.
+(the flag's default in `isescan_to_table.py`) — set it to 500 if you want the
+discard-below-500-bp convention applied to IS calls too.
+
+One call is dropped for a biological reason rather than a threshold: an IS call lying
+over the *dnaA* gene. *dnaA* is essential, so no living isolate carries an insertion
+inside it. ISEScan reports a partial IS21 there, most likely because IS21 elements
+carry IstB, a helper protein related to DnaA, so the IS21 profile matches DnaA itself.
+`rule isescan_table` reads Bakta's annotation table to find *dnaA*, and a call goes to
+`{sample}_is_discarded.tsv` with reason `overlaps_dnaA` when at least half of it lies
+inside a CDS Bakta calls *dnaA*, or at least half of that CDS lies inside the call. The
+second case is the call that runs on into *dnaN*, the next gene, because ISEScan's gene
+finder joined the two. That half is `DNAA_OVERLAP_FRACTION`, a constant in
+`isescan_to_table.py`, not a setting meant to be tuned.
 
 ### Boundaries: the att search
 
 | Knob | Layer | Default | Source | Meaning |
 |---|:-:|--:|---|---|
-| `mobilome.require_trna_boundary_for_high` | A | `false` | `00_common.smk:1189` | whether an element must have tRNA-anchored ends before it may be called **high** confidence |
-| `MIN_ATT_REPEAT_BP` | C | 15 | `att_search.py:480` | shortest exact repeat that may be an *att* site. Matches ICEfinder2; DBSCAN-SWA uses 12 |
-| `DENOVO_MAX_EXPECTED_CHANCE_MATCHES` | C | 0.05 | `att_search.py:117` | how many chance repeats to tolerate when picking the shortest believable length for *this* pair of flanks |
-| `MAX_ATT_COPIES_OUTSIDE_TRNA` | C | 2 | `att_search.py:606` | copies of the repeat allowed outside any annotated tRNA before it is judged a repeat *family* rather than a single integration scar |
-| `MAX_SEED_MATCHES` | C | 200,000 | `att_search.py:500` | compute guard in repeat-dense regions |
+| `mobilome.require_trna_boundary_for_high` | A | `false` | `MOBILOME_REQUIRE_TRNA_BOUNDARY`, `00_common.smk` | whether an element must have tRNA-anchored ends before it may be called **high** confidence |
+| `MIN_ATT_REPEAT_BP` | C | 15 | `att_search.py` | shortest exact repeat that may be an *att* site. Matches ICEfinder2; DBSCAN-SWA uses 12 |
+| `DENOVO_MAX_EXPECTED_CHANCE_MATCHES` | C | 0.05 | `att_search.py` | how many chance repeats to tolerate when picking the shortest believable length for *this* pair of flanks |
+| `MAX_ATT_COPIES_OUTSIDE_TRNA` | C | 2 | `att_search.py` | copies of the repeat allowed outside any annotated tRNA before it is judged a repeat *family* rather than a single integration scar |
+| `MAX_SEED_MATCHES` | C | 200,000 | `att_search.py` | compute guard in repeat-dense regions |
 
 `require_trna_boundary_for_high` folds two different questions into one number: *is this
 an ICE?* (anchors, machinery, one contig) and *where does it end?* (`boundary_method`).
@@ -526,8 +544,9 @@ reported but never widens an element, so the interval stays the machinery span, 
     **The length floor is not the guard that does the work.** The chance-match
     calculation resolves to 18 bp at the shipped 50 kb window — and returned 18 at the
     old 30 kb window too, so widening the window does not move it
-    (`att_search.py:362-364`). It also does not filter much: measured on the
-    *K. pneumoniae* positive-control chromosome over 300 randomly placed non-ICE spans,
+    (`minimum_informative_repeat_length` in `att_search.py`). It also does not filter
+    much: measured on the *K. pneumoniae* positive-control chromosome over 300
+    randomly placed non-ICE spans,
     the length threshold alone let 22% of them return a confident boundary against the
     1.3% the formula predicts. The guard that actually works is the copy count,
     `MAX_ATT_COPIES_OUTSIDE_TRNA` — an rRNA operon repeat clears every length threshold
@@ -538,22 +557,22 @@ reported but never widens an element, so the interval stays the machinery span, 
     quantities: repeat length says how unlikely a match is by chance, sitting at a tRNA
     3′ end says the match is where integration actually happens. Measured on SPI-7, a
     51 bp repeat in ordinary sequence beat the real 24 bp *att* pair at tRNA-Phe and the
-    element came out 50 kb short (`att_search.py:770-789`).
+    element came out 50 kb short (`search_maximal_repeat` in `att_search.py`).
 
     **`MAX_SEED_MATCHES` truncates silently.** Hitting it breaks out of the scan, so a
     real repeat sitting among the unexamined seeds is missed and the element reports
     `boundary_method=none` — indistinguishable from "the flanks carry no repeat". No
     audit row says the search was cut short. Across 246 att searches over 52 benchmark
     genomes no window reached the cap, so this is a latent gap rather than a live
-    problem (`att_search.py:487-499`).
+    problem (the note above `MAX_SEED_MATCHES` in `att_search.py`).
 
 ### IS copy number and replicon calling
 
 | Knob | Layer | Default | Source | Meaning |
 |---|:-:|--:|---|---|
-| `mobilome.isosdb.min_covered_percent` | A | 90.0 | `00_common.smk:1244` | a database entry must be covered end to end before its depth is believed. A partially covered entry is usually a conserved domain shared with another family, and averaging it in inflates every estimate |
-| `mobilome.isosdb.min_copy_number` | A | 0.5 | `00_common.smk:1245` | below this multiple of the genome baseline the element is treated as absent. Under 1.0 on purpose: a real single-copy IS sits near 1×, and sampling noise plus mapping loss routinely push it to 0.6–0.8× |
-| `--min-chromosome-bp` | B | 2,000,000 | `platon_replicons.py:260` | above this length an unclassified contig may be called the chromosome |
+| `mobilome.isosdb.min_covered_percent` | A | 90.0 | `ISOSDB_MIN_COVERED`, `00_common.smk` | a database entry must be covered end to end before its depth is believed. A partially covered entry is usually a conserved domain shared with another family, and averaging it in inflates every estimate |
+| `mobilome.isosdb.min_copy_number` | A | 0.5 | `ISOSDB_MIN_COPIES`, `00_common.smk` | below this multiple of the genome baseline the element is treated as absent. Under 1.0 on purpose: a real single-copy IS sits near 1×, and sampling noise plus mapping loss routinely push it to 0.6–0.8× |
+| `--min-chromosome-bp` | B | 2,000,000 | `DEFAULT_MIN_CHROMOSOME_BP`, `platon_replicons.py` | above this length an unclassified contig may be called the chromosome |
 
 The copy-number leg is *optional* (`mobilome.isosdb.fasta_url`) and runs in Illumina and
 hybrid modes only, because it needs reads. It changes no AMR gene's tier and must not: it
@@ -672,7 +691,8 @@ what changes about tuning.
 **Read the first row of the audit before anything else.** `{sample}_ice_discarded.tsv`
 opens with an `assembly_qc` row carrying the sample's own contig count and N50, plus one
 sentence saying which of three measured bands it falls in. The band edges are 150 kb and
-30 kb (`conjscan_to_ice.py:1215-1216`); 30 kb rather than 50 kb because the divider has
+30 kb (`CONTIGUITY_N50_TRUSTED_BP` and `CONTIGUITY_N50_CLASS_ONLY_BP` in
+`conjscan_to_ice.py`); 30 kb rather than 50 kb because the divider has
 to sit *between* the two arms it separates, and detection held at the 50 kb arm.
 
 **Do not turn on `require_trna_boundary_for_high`.** On the 52 complete records it

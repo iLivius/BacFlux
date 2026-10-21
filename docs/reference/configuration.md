@@ -149,15 +149,21 @@ lists the keys:
 | `links.dbcan_link` | set, and a `.tar.gz` | Stops |
 | `links.card_link`, `links.phix_link` | set whenever the mode has short reads | Stops naming the key and the mode |
 | `links.checkv_link`, `links.genomad_link` | a `.tar.gz` if set | Stops |
+| `resources.threads`, `ram_gb`, `runtime_hours` | a whole number, 1 or more | Stops, naming the key and the value |
 | `parameters.eggnog.dbmem` | `resources.ram_gb` can hold one job | Stops, and names the number to raise |
 | `parameters.spades_kmers` | `auto`, or odd ascending integers below 128 | Stops, naming the offending value |
 | `parameters.decontamination.mode` | one of `auto`, `include`, `exclude`, `off` | Stops |
+| `parameters.decontamination.auto_vote` | `bp` or `contigs` | Stops |
 | `parameters.<mode>.flye_input_mode` | one of `auto`, `nano-raw`, `nano-hq` | Stops |
 | `phage.caller` | `virsorter2` or `genomad` | Stops |
 | `mobilome.coverage_profile` | a fraction in `(0, 1]` | Stops, and says it is a fraction, not a percentage |
 | `mobilome.icescan.run` | has a `url` or a `dir` to use | Stops |
 | `mobilome.isosdb.fasta_url` | `family_map_url` set alongside it | Stops |
 | any boolean key | recognisable as true/false | Stops naming the value |
+
+Each stop ends the run with exit status 1, so a wrapper script or a cluster
+submission sees the failure. Most messages begin with `[BacFlux]`; a missing
+required key is reported by Python as a `KeyError` naming it.
 
 Database *contents* are not opened at parse time, so a placeholder path in
 `bakta_db` or `blast_db` passes a dry run and fails later. The optional
@@ -257,9 +263,9 @@ directories:
 
 Reusing one output directory across runs is what stops the self-downloaded
 databases being fetched again. Conda environments do **not** live here: Snakemake
-puts them under `.snakemake/conda` in the directory you launch from, so launching
-from the same place each time is what avoids rebuilding them. See
-[running BacFlux](running.md).
+puts them under `.snakemake/conda` in the directory you launch from, or in the
+folder `--conda-prefix` names, so launching from the same place each time is what
+avoids rebuilding them. See [running BacFlux](running.md).
 
 ### The five databases you provide
 
@@ -363,16 +369,24 @@ licence of each is tabulated on [licensing](../about/licensing.md).
 resources:
   threads: 16
   ram_gb:  64
+  runtime_hours: 24
 ```
 
 | Key | What it does | Default | Notes |
 |---|---|---|---|
-| `threads` | How many cores the machine has to give. Every CPU-bound rule builds its own request against this number. | `16` | Nothing needs configuring per rule. |
-| `ram_gb` | The memory budget handed to the rules that can be told a limit. | `64` | Not enforced by Snakemake — see below. |
+| `threads` | How many cores the machine has to give. Every CPU-bound rule builds its own request against this number. | `16` | Nothing needs configuring per rule. On a cluster, at most the CPUs of one node: the assemblers ask for all of it. |
+| `ram_gb` | The memory budget handed to the rules that can be told a limit. On a cluster, also the memory each heavy step asks the scheduler for. | `64` | Not enforced by Snakemake on a single computer — see below. On a cluster, at most one node's memory, and at least about 60, because GTDB-Tk alone needs 55 GB. |
+| `runtime_hours` | Cluster only: the time limit each long step asks the scheduler for, in hours | `24` | At most your queue's limit. A step that runs over is stopped by the scheduler; raise the value and run again. Ignored on a single computer, and changing it re-runs nothing. |
+
+All three must be whole numbers, 1 or more. Anything else — `2.5`, a word, `true`,
+`0` — stops the run at parse time, naming the key, rather than being rounded or
+misread. A key left out takes its default.
 
 These describe your machine. What actually enforces the CPU budget at run time is
 `--cores N` on the command line; set it to the same value as `threads`, and see
-[running BacFlux](running.md) for why `--jobs` must not be added alongside it.
+[running BacFlux](running.md) for why `--jobs` must not be added alongside it. On
+a cluster, `ram_gb` and `runtime_hours` become each heavy job's memory and time
+request — see [On a cluster](running.md#on-a-cluster).
 
 ### How `threads` reaches a rule
 
@@ -382,21 +396,22 @@ makes a plain `--cores N` a real ceiling.
 
 | Request | Rules |
 |---|---|
-| all of `threads` | `map_phix`, `illumina_assembly`, `ont_assembly`, `map_contigs`, `map_sel_contigs` |
+| all of `threads` | `map_phix`, `illumina_assembly`, `ont_assembly`, `map_contigs`, `map_sel_contigs`, `map_final_contigs` |
 | `min(threads, 24)` | `blast_contigs`, `blast_final_contigs`, `genome_assembly_evaluation`, `completeness_and_contamination`, `map_evaluation`, `taxonomic_assignment`, `annotation`, `functional_annotation`, `secondary_metabolites_analysis`, `cazyme_gene_cluster`, `map_amr_db`, `plasmid_search`, `viral_identification_virsorter2`, `viral_quality`, `genomad_end_to_end`, `fix_start`, `short_read_correction`, `compare_hybrid_assemblies`, `long_read_consensus` (nanopore) |
 | `min(threads, 16)` | `trim_adapters`, `assembly_depth`, `isosdb_map` |
 | `min(threads, 8)` | the NanoPlot rules, `long_read_consensus` (hybrid), `checkv_db`, `checkv_db_local`, and the mobilome rules `amrfinderplus`, `isescan`, `conjscan`, `icescan`, `tncentral_blast`, `iceberg_blast` |
 | `min(threads, 4)` | `virsorter2_db` |
-| none declared | both ABRicate rules, and the small parsing rules that run plain Python |
+| none declared | both ABRicate rules, and the small helper steps — BacFlux's own Python scripts, which run in `envs/python.yaml` |
 
 ### How `ram_gb` reaches a rule
 
 | Rule | What it gets |
 |---|---|
 | `illumina_assembly` | SPAdes `-m`, a hard ceiling, uncapped |
-| `map_evaluation` | Qualimap's JVM heap, `min(ram_gb, 64)` GB |
+| `map_evaluation` | Qualimap's Java heap, the most memory Java may use: `ram_gb` minus 4 GB, at most 64 GB and at least 1 GB. The 4 GB are left for what Java needs beyond its heap |
 | `map_amr_db`, `assembly_depth`, `isosdb_map` | BBMap's `-Xmx`, `min(ram_gb, 32)` GB |
 | `functional_annotation` | 42 GB, only when `parameters.eggnog.dbmem` is on |
+| the heavy rules, on a cluster | `ram_gb` × 1024 MB as the job's memory request (`mem_mb`); Qualimap asks for its heap plus 4 GB, never more than `ram_gb` |
 
 !!! warning "`ram_gb` is a number handed to tools, not a budget Snakemake polices"
 
@@ -407,11 +422,15 @@ makes a plain `--cores N` a real ceiling.
     mem_gb=N` for eggNOG, `java_mem=N` for Qualimap, `ram=N` for SPAdes. Without
     that, two large jobs running at once can each take their full share. eggNOG
     with `--dbmem` is the one case where this matters enough that BacFlux prints
-    the exact flag to add.
+    the exact flag to add. `java_mem=N` also lowers each Qualimap heap to N GB,
+    the way to give Qualimap less without lowering `ram_gb` for everything else.
 
     The three BBMap legs (`map_amr_db`, `assembly_depth`, `isosdb_map`) are not
-    schedulable at all: their figure is a `params:` value handed straight to
-    `-Xmx`, not a declared resource.
+    schedulable at all on a single computer: their figure is a `params:` value
+    handed straight to `-Xmx`, not a declared resource.
+
+    The `mem_mb` and `runtime` requests of the heavy rules are read only by a
+    cluster executor; a single computer ignores them.
 
 ---
 
@@ -531,6 +550,7 @@ replicons for chromosome contiguity; say so in your methods. Full treatment:
 ```yaml
   decontamination:
     mode: auto                 # auto | include | exclude | off
+    auto_vote: bp              # bp | contigs
     discard_no_hit: true
     include_genera:
     include_genera_by_sample:
@@ -551,7 +571,8 @@ contaminant never reaches CheckM or Bakta.
 
 | Key | What it does | Default | Notes |
 |---|---|---|---|
-| `mode` | `auto` keeps the most abundant genus BlobTools inferred; `include` keeps only the genera you list; `exclude` removes the ones you list; `off` keeps everything | `auto` | |
+| `mode` | `auto` keeps the one genus that wins the vote set by `auto_vote`; `include` keeps only the genera you list; `exclude` removes the ones you list; `off` keeps everything | `auto` | |
+| `auto_vote` | How `auto` picks its genus: `bp` adds up the length of each genus's contigs and keeps the genus with the most base pairs, the one most of the assembly belongs to; `contigs` keeps the genus with the most contigs | `bp` | The two agree on a clean isolate. They differ when one genus sits in a few long contigs and another in many short ones — the normal shape of a long-read assembly, where a chromosome plus a few plasmids that BLAST assigns to another genus would outvote the chromosome on a contig count. An exact tie goes to the genus first in alphabetical order, so the answer never changes between runs. The genus Bakta writes as the organism name is counted the same way, over the kept contigs. See [how `auto` picks the genus](../analysis/decontamination.md#how-auto-picks-the-genus). |
 | `discard_no_hit` | Removes contigs BLAST could not place | `true` in the shipped template | Omitting the key entirely resolves to `false`, so keep the line. Applied *before* the mode logic. In `auto` it also drops "no-hit" from the vote that picks the dominant genus. |
 | `include_genera` | Genera to keep, for every sample | unset | An inline list: `"GenusA;GenusB"` or `[GenusA, GenusB]`. Commas and semicolons both separate. |
 | `include_genera_by_sample` | **A file path** to a two-column TSV (`sample`, `genus`) | unset | The compact form when many samples each need their own include list. A sample may appear on several rows. |
@@ -638,8 +659,10 @@ The block is namespaced per mode: a run reads only the block named after itself.
     Name the model explicitly for such a dataset.
 
 The model is validated right after read filtering, before the assembler runs, so
-a typo fails in seconds rather than an hour in. Details and the model table:
-[nanopore mode](../modes/nanopore.md).
+a typo fails in seconds rather than an hour in. The same check downloads the
+model's weights, on the computer that runs Snakemake, so the polishing job itself
+never needs internet ([On a cluster](running.md#cluster-medaka)). Details and the
+model table: [nanopore mode](../modes/nanopore.md).
 
 ---
 

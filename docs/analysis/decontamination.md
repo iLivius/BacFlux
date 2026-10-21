@@ -22,6 +22,7 @@ long-read modes need.
     | **GTDB** | Genome Taxonomy Database, the reference taxonomy GTDB-Tk classifies against |
     | **AMR** | antimicrobial resistance |
     | **QC** | quality control |
+    | **bp** | base pairs; for a genus, the summed length of the contigs assigned to it |
 
 ## The chain
 
@@ -196,8 +197,8 @@ This is where contigs are kept or thrown away. The script reads the BlobTools
 table, resolves each contig to a genus, applies the configured policy, and writes an
 audit line for every contig either way.
 
-It is stdlib-only Python with no conda environment of its own, so it runs in the
-environment Snakemake was launched from.
+It is standard-library Python and runs in `workflow/envs/python.yaml`, a pinned Python
+with nothing else in it.
 
 ### The policy
 
@@ -205,6 +206,7 @@ environment Snakemake was launched from.
 parameters:
   decontamination:
     mode: auto                 # auto | include | exclude | off
+    auto_vote: bp              # auto mode only: bp | contigs
     discard_no_hit: true       # drop contigs with no taxonomic hit
     include_genera:            # inline list to KEEP, e.g. "Bacillus;Priestia"
     include_genera_by_sample:  # PATH to a 2-column TSV (sample, genus)
@@ -220,7 +222,7 @@ parameters:
 
 | `mode` | What it keeps | When to use it |
 |---|---|---|
-| `auto` | the genus carried by the most **contigs** | a clean single-organism culture; the default |
+| `auto` | one genus: by default the one that makes up most of the assembly's DNA ([how it is picked](#how-auto-picks-the-genus)) | a clean single-organism culture; the default |
 | `include` | only the genera you list | you know what the isolate is, or a plasmid was lost (see below) |
 | `exclude` | everything except the genera you list | you know what the contaminant is |
 | `off` | everything — the audit files are still written | a clean clinical isolate, or when small replicons are the point |
@@ -235,6 +237,58 @@ usually short and low-coverage. It can equally be a small plasmid that `nt` has 
 neighbour for, which is why it is a switch and not a hard-coded rule. Keep the line
 even when you want the default — delete it and the code falls back to `false`, the
 opposite of what the template says.
+
+### How `auto` picks the genus
+
+`auto` keeps one genus. To choose it, every contig votes for the genus BLAST
+assigned it, and `auto_vote` sets what one vote is worth:
+
+| `auto_vote` | A contig's vote | The genus kept |
+|---|---|---|
+| `bp` (default) | its length in base pairs | the one whose contigs add up to the most DNA: what the assembly is mostly made of |
+| `contigs` | one, whatever its length | the one assigned to the most contigs |
+
+On a clean isolate the two give the same answer. They differ when one genus sits in a
+few long contigs and another in many short ones. That is the normal shape of a
+long-read assembly, one chromosome and a handful of plasmids:
+
+```text
+contig       assigned genus   length
+contig_1     GenusA           5,000,000 bp   (the chromosome)
+contig_2     GenusB              60,000 bp
+contig_3     GenusB              45,000 bp
+contig_4     GenusB               8,000 bp
+```
+
+`bp` keeps GenusA: 5,000,000 bp against 113,000. `contigs` keeps GenusB, three
+contigs against one, and throws the chromosome away. That is why `bp` is the default.
+Whichever genus wins, the contigs of the other one are discarded; when those are
+plasmids you want, see [Route 1](#route-1-bestsum-follows-database-composition-not-biology)
+below.
+
+Three details complete the rule:
+
+- **Unplaced contigs do not vote.** With `discard_no_hit: true`, `no-hit` is left out of
+  the vote, so it can never be the genus kept.
+- **Ties.** If two genera have exactly the same vote, the one that comes first in
+  alphabetical order is kept. This is only a tie-break, there so that the same
+  assembly always gives the same answer. With `bp` an exact tie practically never
+  happens.
+- **Close relatives.** The vote is counted per genus. Once it is decided,
+  [the genus aliases](#the-genus-aliases) also keep contigs assigned to a close
+  relative of the winner.
+
+`logs/select_contigs_{sample}.log` names the vote and its result, for example
+`Auto vote by bp: kept genus GenusA.`, and
+[the composition report](#the-composition-report) shows both measures for every
+genus, so you can see whether the two votes would have agreed.
+
+The same vote, counted again over the contigs that were **kept**, names the genome for
+annotation: the winner is written to `{sample}_kept_genus.txt`, and Bakta receives it
+as the genus (see [the genus hint](annotation.md#the-genus-hint)). In `auto` mode that
+is the genus that won the vote; in `include`, `exclude` and `off` mode it is whichever
+kept genus wins the same count. The log line `Genus given to Bakta: GenusA.` repeats
+it.
 
 ### One example of each
 
@@ -392,29 +446,27 @@ dropped contigs alike, with two figures per genus. An illustrative file, for an 
 whose contigs BLAST assigned to four genera:
 
 ```text
-GenusA: bases 0.46  contigs 0.22
-GenusB: bases 0.31  contigs 0.38
-GenusC: bases 0.14  contigs 0.24
-GenusD: bases 0.09  contigs 0.16
+GenusA: bp 0.46  contigs 0.22
+GenusB: bp 0.31  contigs 0.38
+GenusC: bp 0.14  contigs 0.24
+GenusD: bp 0.09  contigs 0.16
 ```
 
-`bases` is the share of the assembly's DNA; `contigs` is the share of the contig count.
-**`auto` mode votes on the contig count**, so a genus can win the vote while another
-genus holds most of the genome. When that happens the two columns disagree and the file
-says so at a glance. In the example, `auto` keeps only GenusB, because it has the most
-contigs. GenusA holds more of the DNA but is discarded. If the four are really one
-genome that BLAST has split, `auto` keeps less than a third of it.
+`bp` is the genus's share of the assembly's DNA; `contigs` is its share of the contig
+count. These are the two measures [`auto` can vote with](#how-auto-picks-the-genus). On
+a clean isolate one genus is close to 1.00 in both columns. Here they disagree: GenusA
+holds most of the DNA, GenusB most of the contigs, so `auto_vote: bp` keeps GenusA and
+`auto_vote: contigs` keeps GenusB. If the four are really one genome that BLAST has
+split, either vote keeps less than half of it, which is what the warnings below are for.
 
-The file is sorted by DNA, which is the more honest ranking of "what is this sample
-mostly made of". It is also read back by the annotation stage as Bakta's `--genus`
-hint, and adding the second figure broke that reader's numeric sort: the genus Bakta
-gets handed is the alphabetically last one, not the most abundant. See
-[the genus hint](annotation.md#the-genus-hint).
+The file is sorted by DNA share, the more honest ranking of "what is this sample mostly
+made of". It is a report for you to read; no later step reads it.
 
 ### The two warnings
 
 Both are advisory: they change no decision, they ask a human to look. They go to
-`logs/select_contigs_{sample}.log`. For the illustrative assembly above, both fire:
+`logs/select_contigs_{sample}.log`. For the illustrative assembly above, with the
+default `auto_vote: bp`, both fire:
 
 ```text
 WARNING: 4 genera each hold at least 5% of this assembly (GenusA 46%, GenusB 31%, ...).
@@ -424,7 +476,7 @@ before trusting this assembly.
 ```
 
 ```text
-WARNING: decontamination is discarding 69% of the assembly (N of M bp). If the kept
+WARNING: decontamination is discarding 54% of the assembly (N of M bp). If the kept
 assembly then looks incomplete but NOT contaminated, the filter has most likely
 removed genome rather than contamination.
 ```
@@ -530,6 +582,7 @@ All under `02.assembly/{sample}/contaminants/`, except the delivered assembly.
 | `{sample}_final_blastout` | yes | the same screen over the delivered genome; `nanopore` and `hybrid` only |
 | `bestscore.blob.blobDB.table.txt` | yes | BlobTools' per-contig table — the evidence behind every decision |
 | `{sample}_composition.txt` | yes | per-genus share of DNA and of contig count |
+| `{sample}_kept_genus.txt` | yes | one line: the kept genus Bakta receives; empty when no kept contig has a genus |
 | `contig_taxonomy_decisions.tsv` | yes | **the audit trail** — every contig, its genus, kept or removed, and why |
 | `contigs.list` | yes | the kept contig IDs; no rule reads it |
 | `contigs_sel.fasta` / `assembly_decontam.fasta` | yes | the kept sequences in `hybrid` / `nanopore` |
@@ -545,8 +598,9 @@ assembly step there.
 
 - `contig_taxonomy_decisions.tsv` — before trusting the *absence* of anything.
 - `{sample}_composition.txt` — the two columns should agree for a clean isolate.
-- `logs/select_contigs_{sample}.log` — the two warnings, the kept/dropped counts, and
-  the missing-contig message all land here rather than on the console.
+- `logs/select_contigs_{sample}.log` — the vote and the genus it kept, the genus given
+  to Bakta, the two warnings, the kept/dropped counts, and the missing-contig message
+  all land here rather than on the console.
 - CheckM's completeness and contamination in [Assembly QC](assembly-qc.md) — high
   contamination means something got through; high completeness loss with *low*
   contamination usually means the filter removed genome.

@@ -79,15 +79,26 @@ with three settings:
 
 NanoPlot runs on both sides of the filter — `01.reads/{sample}/ont/raw_qc/` and
 `filt_qc/` — so what the filter removed is visible rather than assumed. Read the two
-side by side.
+side by side. Its plots are interactive HTML pages, gathered in
+`{sample}_NanoPlot-report.html`. It writes no PNG images (`--no_static`), which would
+need a Chrome browser on the computer running the job. The HTML plots load their
+plotting library from the internet when you open them.
 
 ## 2. The Medaka model is resolved before anything is assembled
 
 `check_medaka_model` (a shared rule) runs straight after read filtering, validates
 `parameters.nanopore.medaka_model` or infers it from the basecaller tag in the read
-headers, and writes the resolved name to `{sample}_medaka_model.txt`. The assembler
-waits on that file. A typo therefore fails in seconds with a table of suggestions,
-instead of an hour later when Flye has already finished.
+headers, and writes the result to `{sample}_medaka_model.txt`: the model's name, or in
+`auto` mode the path to its weights file. The assembler waits on that file. A typo
+therefore fails in seconds with a table of suggestions, instead of an hour later when
+Flye has already finished.
+
+The check also puts the model's weights on disk. Medaka ships the weights of only a
+few models and downloads the rest from GitHub the first time they are needed; `auto`
+inference downloads them as part of resolving the model, and an explicit name is
+followed by `medaka tools download_models`. The check is a *local rule*: on a cluster
+it runs on the computer that runs Snakemake, not on a compute node, so the polishing
+job itself needs no internet.
 
 | `medaka_model` | Effect |
 |---|---|
@@ -139,6 +150,11 @@ geNomad and the BLAST screen all join on that token.
 The contamination screen runs on the **reoriented** assembly, and Medaka polishes the
 **decontaminated** one. Polishing a contaminant contig with this isolate's reads would
 waste effort and could smear real differences.
+
+Medaka runs with `-x`, which rebuilds its two index files of the draft (`.fai` and
+`.map-ont.mmi`, written beside the draft in `contaminants/`) every time it runs. The
+screen rewrites that draft whenever it runs again, so rebuilding is what keeps the
+index describing the contigs actually being polished. It takes seconds.
 
 `finalize_contigs` then copies whichever file ended the chain — the Medaka consensus,
 or the decontaminated assembly when Medaka is off — to `contigs_final.fasta`, and logs

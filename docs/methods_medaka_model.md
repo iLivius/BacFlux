@@ -59,6 +59,13 @@ This happens in `check_medaka_model` (`workflow/rules/shared/12_medaka_check.smk
 which runs *before* assembly so a bad or incompatible model fails in seconds rather
 than after the assembler has spent an hour.
 
+The same check puts the model's weights on disk. Medaka ships the weights of only a
+few models and downloads the rest from GitHub the first time they are needed:
+`resolve_model` above does that download as part of resolving the model, and an
+explicit name is followed by `medaka tools download_models --models <name>`. The
+check is a local rule, so on a cluster it runs on the computer that runs Snakemake,
+and the polishing job itself needs no internet.
+
 !!! note "Naming drift: `dorado polish --bacteria`"
 
     Wick's 2026 posts recommend `dorado polish --bacteria` in place of Medaka. As of
@@ -219,7 +226,8 @@ four times the residual errors the bacterial one does — still the right choice
 amplified DNA, but a real cost.
 
 `check_medaka_model` validates any explicit name against the installed Medaka's model
-list and fails early with a suggestion table if it is wrong. Amplification status cannot
+list, fetches its weights, and fails early with a suggestion table if the name is
+wrong. Amplification status cannot
 be read from the reads; it has to come from the lab record.
 
 ## Sourcing: what is documented, what is inference

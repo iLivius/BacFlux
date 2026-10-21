@@ -145,12 +145,13 @@ Usually it stops within seconds, because the four filename conventions do not
 overlap. Pointing `illumina` at a directory of `{sample}_ont.fastq.gz`:
 
 ```text
-No suitable illumina input files found.
+[BacFlux] No suitable illumina input files found.
 ```
 
 and `hybrid` at two directories that do not describe the same isolates:
 
 ```text
+[BacFlux] hybrid mode needs Illumina and ONT reads for every sample.
 Missing ONT files for the following samples:
   - isolate_03
 ```
@@ -160,6 +161,8 @@ An unset or non-existent input directory is caught in the same pass:
 ```text
 [BacFlux] mode=nanopore requires 'input.nanopore_dir' to be set in the config.
 ```
+
+Each of these stops Snakemake with exit status 1, before any job has started.
 
 !!! warning "Two cases that do not stop the run"
 

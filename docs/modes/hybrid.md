@@ -126,6 +126,15 @@ The two FASTAs have entirely different contig names, because the screen ran on o
 the delivered genome came from the other. That is expected, and it is why the plasmid
 stage gets a second BLAST table of `contigs_final.fasta` to look contigs up by ID.
 
+## Medaka
+
+The long-read arm polishes with Medaka exactly as [Nanopore mode](nanopore.md) does.
+`check_medaka_model` resolves the model, or validates `parameters.hybrid.medaka_model`,
+and downloads its weights before Flye starts, so a bad model fails in seconds and the
+polishing job needs no internet. Medaka runs with `-x`, rebuilding its index of the
+draft every time. `parameters.hybrid.medaka_model: false` skips it; Polypolish then
+corrects the reoriented assembly directly.
+
 ## Polypolish
 
 `short_read_correction` aligns each mate **separately** with `bwa mem -a` — all
@@ -165,5 +174,6 @@ Everything `illumina` and `nanopore` write, plus:
 | `02.assembly/{sample}/snps/` | the four Snippy runs and `SNPs_summary.txt` |
 | `02.assembly/{sample}/contaminants/{sample}_final_blastout` | the second BLAST, over the delivered genome, for the plasmid stage |
 
-Environments built: everything `illumina` and `nanopore` need except minimap (a hybrid
-run has short reads, so it maps with Bowtie2), plus polypolish and snippy.
+Environments built: everything `illumina` and `nanopore` need, plus polypolish and
+snippy. Bowtie2 builds the coverage track of the screen on the Illumina draft; minimap
+maps the long reads for the second screen, over the delivered genome.

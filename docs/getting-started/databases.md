@@ -16,7 +16,6 @@ local symlink view and never modifies, moves or deletes it.
     | | |
     |---|---|
     | **GTDB** | Genome Taxonomy Database, the reference used for taxonomic placement |
-    | **HPC** | high-performance computing — a shared compute cluster |
 
 ## The five you download
 
@@ -162,7 +161,7 @@ same output directory across runs of a project and they are downloaded once.
 
 | Database | Where it lands | Link key | Read in |
 |---|---|---|---|
-| PhiX | `01.reads/phix/` (temporary) | `links.phix_link` | `illumina`, `hybrid` — **required** |
+| PhiX | `01.reads/phix/` | `links.phix_link` | `illumina`, `hybrid` — **required** |
 | CARD | `05.amr/card_db/` (temporary) | `links.card_link` | `illumina`, `hybrid` — **required** |
 | dbCAN | `04.annotation/dbcan/<version>/` | `links.dbcan_link` | all |
 | antiSMASH | `04.annotation/antismash/databases/` | — (its own downloader) | all |
@@ -185,6 +184,39 @@ mirrors are unmodified copies. Change `links.genomad_md5` whenever you change
     because run_dbcan's official mirror only ever hosts the current one, and moving to
     5.2.x is not a drop-in swap. See [Annotation](../analysis/annotation.md) for what
     the two versions call differently.
+
+### Fetching everything in one step
+
+Each database is normally fetched by the first run that needs it. The `download_all`
+target fetches all of them at once, mobilome data sets included, and runs nothing
+else:
+
+```bash
+snakemake download_all --sdm conda --cores 4 --configfile config/config_custom.yaml
+```
+
+Name the target straight after `snakemake`: `--sdm` and `--configfile` each accept
+several values, so a target written after them would be read as one of those.
+
+It asks for exactly what this config would download. The same switches decide, so
+nothing that a `directories.*_db` copy replaces, and nothing for a layer that is off,
+is fetched. Run it from the directory you will launch the real run from, with the
+same config (and the same `--conda-prefix`, if you use one), so the run finds the
+databases and the download environments already in place. That is how to prepare a
+run whose jobs have no internet at all, for example a whole run inside one cluster
+batch job.
+
+Two things it does not fetch:
+
+- **the five databases you download by hand**, above;
+- **the Medaka model weights** in the long-read modes. The model check that
+  downloads them reads the filtered long reads, so it cannot run before they exist.
+  A long-read run with no internet needs that check to have run once on a computer
+  with internet, or `parameters.<mode>.medaka_model: false`.
+
+Every download rule is a *local rule*: when a cluster executor sends the other jobs
+to compute nodes, the downloads still run on the computer that runs Snakemake, so an
+ordinary cluster run needs internet only there.
 
 ## Pointing at a copy you already hold
 
@@ -218,10 +250,11 @@ and each writes a `PROVENANCE.txt` recording what actually arrived. See
 
 ## Practical notes
 
-**Downloads use the launcher environment.** The rules that fetch and unpack a database
-declare no conda environment of their own and use `wget`, `tar` and `sha256sum` from
-whatever you launched Snakemake in. `wget` is missing from some minimal conda bases
-and HPC login shells — check before a long run ([Installation](installation.md)).
+**Downloads bring their own tools.** The rules that fetch and unpack a database take
+`wget`, `tar`, `gzip` and `bzip2` from `workflow/envs/download.yaml`, or from the
+tool's own environment for geNomad, VirSorter2 and CheckV; the mobilome layers fetch
+with `curl` and `unzip` from theirs. The computer needs nothing beyond the standard
+Unix utilities ([Installation](installation.md)).
 
 **A wrong required path is not always caught at parse time.** The five
 `directories.*_db` values are read but not opened while the plan is built. Some are

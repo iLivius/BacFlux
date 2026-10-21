@@ -366,7 +366,10 @@ recoverable.
   real length — and since the naming cascade tests coverage as
   `alignment / reference length`, an inflated reference makes an element almost
   impossible to name, silently. After repair, each rule asserts that every `>`
-  begins a line and stops if it does not.
+  begins a line and stops if it does not. The ICEberg rule also replaces characters
+  `makeblastdb` cannot store in a defline: two element names in the release checked
+  are written with an en dash, which becomes a hyphen (`ICESpsH35-1`), and any other
+  non-ASCII character becomes `_`. Sequence lines are not touched.
 - **They rebuild the BLAST index as v5.** TnCentral ships a v4 index built from
   the *unrepaired* FASTA, so it is missing the same 21 records. It is deleted
   rather than reused.
@@ -379,13 +382,13 @@ downloads them again. That is what the `dir:` key on every layer is for: point i
 at a copy you already hold and nothing is fetched. `dir:` always takes precedence
 over the URLs, exactly as `directories:` beats `links:` elsewhere in the config.
 
-**Network and environments.** `icescan_models` uses `wget` and `tar` from the
-environment you launched Snakemake in, with no conda environment of its own — the
-same arrangement as the CARD download ([Installation](../getting-started/installation.md)).
-The other three download rules, and the BLAST searches that follow them, share one
-small conda environment carrying BLAST, `curl` and `unzip`, built on first use.
+**Network and environments.** `icescan_models` takes `wget` and `tar` from
+`workflow/envs/download.yaml`, the small environment the CARD and dbCAN downloads also
+use. The other three download rules, and the BLAST searches that follow them, share
+one small conda environment carrying BLAST, `curl` and `unzip`, built on first use.
 The ISOSDB read mapping uses the same BBMap environment the CARD leg already
-builds.
+builds. Every download rule is a local rule, so on a cluster it runs on the computer
+that runs Snakemake.
 
 **Do not mix runs.** Switching a layer on or off mid-project changes what the
 mobility table can report, and nothing in the table says which layers were on when

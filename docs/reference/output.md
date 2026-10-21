@@ -114,7 +114,7 @@ Absent entirely in `contigs` mode, which has no reads to QC.
 | `{sample}/illumina/{sample}_fastp.json` | `trim_adapters` | The same numbers for MultiQC. |
 | `{sample}/illumina/{sample}_sel_R{1,2}.fastq` | `map_sel_contigs` | `[hybrid]` The Illumina pairs that mapped as proper pairs to the decontaminated Illumina assembly. Two rules read them: Filtlong scores the Oxford Nanopore reads against these pairs, so a contig dropped by the contamination screen takes its long reads with it; Polypolish then uses them to correct the final genome. Kept, not temporary — deleting them would force the whole short-read half to re-run. |
 | `{sample}/ont/{sample}_filt.fastq` | `filter_long_reads` | The Oxford Nanopore reads Filtlong kept — what Flye assembled and what Medaka polished with. |
-| `{sample}/ont/raw_qc/`, `{sample}/ont/filt_qc/` | `raw_long_read_qc`, `filtered_long_read_qc` | NanoPlot read-length and quality profiles, before and after filtering. Read side by side: the difference is what the filter did. |
+| `{sample}/ont/raw_qc/`, `{sample}/ont/filt_qc/` | `raw_long_read_qc`, `filtered_long_read_qc` | NanoPlot read-length and quality profiles, before and after filtering: `{sample}_NanoPlot-report.html`, one interactive HTML file per plot, and `{sample}_NanoStats.txt`. Read side by side: the difference is what the filter did. The plots are HTML only, with no PNG copies, because NanoPlot needs a Chrome browser on the machine to draw static images. |
 
 The trimmed Illumina pairs (`{sample}_trim_R{1,2}.fastq`) and the PhiX reference and
 its index under `01.reads/phix/` are all temporary and are gone when the run finishes.
@@ -169,7 +169,8 @@ The contamination screen and its audit trail, all under
 | `bestscore.blob.blobDB.table.txt` | The BlobTools per-contig table — taxonomy and coverage. The evidence behind every keep/drop decision, so it is kept. |
 | `contig_taxonomy_decisions.tsv` | **The audit file.** Every contig, its assigned genus, and the reason it was kept or dropped. |
 | `contigs.list` | The kept contig IDs, one per line. |
-| `{sample}_composition.txt` | One line per genus with its share of the DNA and of the contig count, over *every* contig in the BlobTools table — kept or dropped. Also read by the annotation step as Bakta's genus hint. |
+| `{sample}_composition.txt` | One line per genus with its share of the DNA (`bp`) and of the contig count (`contigs`), over *every* contig in the BlobTools table — kept or dropped. A report to read; no later step reads it. |
+| `{sample}_kept_genus.txt` | One line: the genus of the **kept** contigs, by default the kept genus holding the most DNA. The annotation step gives it to Bakta as the organism's genus. Empty when no kept contig has a genus. |
 
 `blob.blobDB.json`, the coverage file beside it, and the alignment BAM are all
 temporary. Full reasoning, and the two routes by which this step can delete a real
@@ -259,13 +260,10 @@ destroyed.
 
 !!! warning "What this leg is actually screened at"
 
-    BBMap is passed `minid=0.76` — its own default (`CARD_MIN_IDENTITY`,
-    `workflow/rules/shared/00_common.smk:394`). The rule used to pass `idfilter=0.99`
-    instead, which BBMap does not apply to the primary alignment of a properly-paired
-    read, so 0.76 is what has been in force throughout. Read this as a **sensitive
-    screen**: its specificity comes from requiring reads to cover at least **70% of the
-    reference gene's length** (`CARD_MIN_COVERED`, same file, line 395), not from
-    per-read identity. There is one mapping pass, and no "divergent" tier.
+    BBMap is passed `minid=0.76`, its own default (`CARD_MIN_IDENTITY` in
+    `workflow/rules/shared/00_common.smk`). Read this as a **sensitive screen**: its
+    specificity comes from requiring reads to cover at least **70% of the reference
+    gene's length** (`CARD_MIN_COVERED`, same file), not from per-read identity.
 
 `05.amr/card_db/` holds the CARD database this run used — downloaded there, or a
 symlink view of the copy at `directories.card_db`. Either way it is temporary, and
@@ -320,7 +318,7 @@ Per sample, `08.mobilome/{sample}/` holds:
 | `{sample}_amr_mobility.tsv` | **The deliverable.** One row per AMR gene: its mobile-element context, the element's identity where one is known, the contig-edge flags, a mobility tier from 1 to 6 and a confidence. |
 | `{sample}_amr_mobility_audit.tsv` | Why every gene that got no context got none. |
 | `{sample}_is_summary.tsv` | The honesty metric: how many insertion-sequence calls sit within `mobilome.contig_boundary_bp` of a contig end, and what fraction of the total that is. **Read this before the table above.** |
-| `{sample}_is_elements.tsv`, `{sample}_is_discarded.tsv` | One tidy row per insertion sequence, and the dropped rows with a reason. |
+| `{sample}_is_elements.tsv`, `{sample}_is_discarded.tsv` | One tidy row per insertion sequence, and the dropped rows with a reason — among them `overlaps_dnaA`, a call lying over the essential gene *dnaA*, which ISEScan reports but which cannot be a real insertion. |
 | `{sample}_ice_candidates.tsv`, `{sample}_ice_discarded.tsv` | ICE/IME candidates with their anchors, boundaries and class; and the discard trail. |
 | `{sample}_amrfinderplus.tsv`, `_amrfinderplus_mutations.tsv` | The AMR calls with coordinates and a method column; point mutations separately. |
 | `{sample}_amrfinder_organism.txt`, `_amrfinder_organism_audit.tsv` | Which AMRFinderPlus `--organism` the GTDB-Tk placement mapped to, or none, and why. |

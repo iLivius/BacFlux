@@ -13,7 +13,7 @@ v2.0.1
 **Bacterial whole-genome workflow — Illumina, Nanopore, both, or a finished assembly — from
 reads to annotation, resistance genes, and whether those genes sit on something that can move.**
 
-![Snakemake](https://img.shields.io/badge/snakemake-%E2%89%A59.10.1-brightgreen.svg)
+![Snakemake](https://img.shields.io/badge/snakemake-%E2%89%A59.14.6-brightgreen.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11143917.svg)](https://doi.org/10.5281/zenodo.11143917)
 
@@ -112,8 +112,8 @@ and the retired repositories keep their DOIs. If you are coming from one of them
 git clone https://github.com/iLivius/BacFlux.git
 cd BacFlux
 
-# 2. Create the launcher environment (Snakemake ≥ 9.10.1 and nothing else)
-conda create -n snakemake -c conda-forge -c bioconda snakemake
+# 2. Create the launcher environment (Snakemake 9.14.6 and nothing else)
+conda create -n snakemake -c conda-forge -c bioconda snakemake=9.14.6
 conda activate snakemake
 
 # 3. Copy the shipped config and edit the copy: `mode`, the input directory for
@@ -159,9 +159,10 @@ is the current database for every Platon from 1.5.0 onwards, including the 1.8 t
 workflow pins, so the two numbers are meant to differ.
 
 Everything else — PhiX, CARD, CheckV, dbCAN, VirSorter2, antiSMASH, and the optional
-mobilome databases — is downloaded into `output_dir` on the first run that needs it. Most
-of those also take a `directories.*_db` key: point it at a copy you already hold and
-nothing is fetched. Download recipes, disk sizes and every optional key are on
+mobilome databases — is downloaded into `output_dir` on the first run that needs it, or
+all at once with `snakemake download_all`. Most of those also take a `directories.*_db`
+key: point it at a copy you already hold and nothing is fetched. Download recipes, disk
+sizes and every optional key are on
 [reference databases](https://iLivius.github.io/BacFlux/getting-started/databases/).
 
 ## Output

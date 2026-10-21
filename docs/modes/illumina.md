@@ -47,8 +47,9 @@ organisms.
 
 `download_phix` fetches the reference named by `links.phix_link`, `build_phix`
 indexes it, and `map_phix` runs `bowtie2 --local` per sample keeping the pairs that
-did **not** align. The reference and its index are fetched and built once per run,
-not once per sample, and both are temporary.
+did **not** align. The reference is fetched once and kept, at a few kilobytes, in
+`01.reads/phix/`; the index is built once per run, not once per sample, and is
+temporary.
 
 `links.phix_link` is required in this mode: an unset value stops the run at parse
 time rather than at the first job.

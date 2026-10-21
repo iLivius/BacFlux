@@ -81,6 +81,7 @@ flowchart LR
 
     C --> CL
     C --> IS --> IST
+    FAA --> IST
     FAA --> AFP
     FAA --> CJ --> CJI
     TAX --> ORG --> AFP
@@ -172,7 +173,11 @@ annotation, Puterová & Martínek (2021) put the "improbable or not an IS elemen
 discovery rate between 0% and 23.7% depending on the tool, with **ISEScan — the caller
 BacFlux uses — at 8.0%** (2.2% on their larger ISbrowser set). So every row carries
 `confidence` (high / medium / low), and anything resting on a contig boundary or on a
-partial hit is capped at `low`.
+partial hit is capped at `low`. One false call is predictable and is removed before
+anything reads the IS table: ISEScan reports a partial IS21 lying over *dnaA*, most
+likely because IS21 elements carry a helper protein (IstB) related to DnaA. *dnaA* is
+essential, so no living isolate carries an insertion inside it; the call goes to
+`{sample}_is_discarded.tsv` with the reason `overlaps_dnaA`.
 
 The module was validated on closed genomes and then measured again on deliberately
 fragmented ones — 40 benchmark genomes cut to ~150 kb, ~50 kb and ~20 kb N50,

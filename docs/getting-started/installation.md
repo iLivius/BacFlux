@@ -19,7 +19,6 @@ Three things to put in place:
     | | |
     |---|---|
     | **BAM** | the binary alignment file a read mapper writes |
-    | **HPC** | high-performance computing — a shared compute cluster |
 
 ## 1. Get the repository
 
@@ -38,7 +37,7 @@ Four places in it matter:
 | `config/config.yaml` | The configuration template: every setting of a run, commented in place. Copy it and edit the copy — never this file. |
 | `workflow/Snakefile` | The entry point. It reads `mode` from your config and includes that mode's rule files plus the shared ones. |
 | `workflow/rules/` | The rules themselves, in `shared/` and one directory per mode (`illumina/`, `nanopore/`, `hybrid/`, `contigs/`). |
-| `workflow/envs/` | 31 conda environment specifications, one per tool stack. |
+| `workflow/envs/` | 33 conda environment specifications, one per tool stack. |
 
 A fifth directory, `.snakemake/`, appears in whatever directory you launch from:
 it holds the conda environments Snakemake builds and its own bookkeeping. It is
@@ -47,12 +46,14 @@ git-ignored, so it never ends up in a commit.
 ## 2. Create the launcher environment
 
 ```bash
-conda create -n snakemake -c conda-forge -c bioconda snakemake
+conda create -n snakemake -c conda-forge -c bioconda snakemake=9.14.6
 conda activate snakemake
 ```
 
-Snakemake **9.10.1 or newer**, the minimum BacFlux declares. This documentation
-was written against 9.14.6.
+Snakemake **9.14.6 or newer**. That is the version BacFlux is tested with, and
+the Snakefile declares it as the minimum: an older Snakemake stops at once, before
+reading a single rule, with a message naming the version it needs. The pin in the
+command above gives you exactly the tested version.
 
 The environment is a launcher and nothing more. It reads the config, plans the
 run and starts jobs; it contains no analysis software. Adding Bakta or SPAdes to
@@ -97,71 +98,62 @@ Two practical consequences:
 
 | Run | Environments built |
 |-----|--------------------|
-| Any mode | blast, blobtools, quast, checkm, gtdbtk, bakta, antismash, dbcan, eggnog-mapper, abricate, platon, checkv, multiqc, and either virsorter or genomad |
+| Any mode | blast, blobtools, quast, checkm, gtdbtk, bakta, antismash, dbcan, eggnog-mapper, abricate, platon, checkv, multiqc, python, download, and either virsorter or genomad |
 | `illumina` adds | fastp, bowtie, spades, bbmap, qualimap |
 | `nanopore` adds | nanoplot, filtlong, flye, dnaapler, medaka, minimap, qualimap |
-| `hybrid` adds | everything in the two rows above except minimap (a hybrid run has short reads, so it maps with Bowtie2), plus polypolish and snippy |
+| `hybrid` adds | everything in the two rows above, plus polypolish and snippy. Bowtie2 builds the first screen's coverage track; minimap maps the long reads for the second screen, over the delivered genome |
 | `contigs` adds | minimap — its own front-end rule is plain `awk`, but BlobTools still wants a BAM, so the contigs are mapped against themselves |
 | `mobilome.run: true` adds | isescan, macsyfinder, and tncentral for the optional naming and copy-number layers |
 
 ## 4. The tools BacFlux expects to find, and does not install
 
-Twenty-three of the workflow's rules declare no conda environment. They run in
-the environment you launched Snakemake from, and use whatever is on its `PATH`.
-**BacFlux does not install these tools and does not check for them in advance** —
-if one is missing, the rule fails with a bare `command not found`, and it fails
-after the run has already started.
-
-They fall into four groups.
+Eight of the workflow's rules declare no conda environment, and two more, `all` and
+`download_all`, are targets that run no command of their own. The eight run in the
+environment you launched Snakemake from and use whatever is on its `PATH`:
 
 | Group | Rules | Needs |
 |-------|-------|-------|
-| Fetch and unpack a database | `download_phix`, `download_amr_db` (CARD), `cazyme_db_download` (dbCAN), `icescan_models` | `wget`, `tar`, `sha256sum`, `awk`, `grep`, `head`, `cut`, `find` |
-| Build a symlink view of a database you already hold | `download_amr_db_local`, `cazyme_db_local`, `secondary_metabolites_db_local`, `genomad_db_local`, `virsorter2_db_local` | `ln`, `mkdir`, `basename` |
-| Run one of BacFlux's own helper scripts | `select_contigs`, `build_replicons`, and nine rules of the mobilome module | `python` |
-| Filter, copy or stage a FASTA | `filter_contigs`, `finalize_contigs`, `stage_qc_genomes` | `awk`, `grep`, `head`, `cp`, `cat` |
+| Filter, copy or stage a FASTA | `filter_contigs`, `finalize_contigs`, `stage_qc_genomes` | `awk`, `grep`, `head`, `cat`, `cp`, `mkdir`, `ls` |
+| Build a symlink view of a database you already hold | `download_amr_db_local`, `cazyme_db_local`, `secondary_metabolites_db_local`, `genomad_db_local`, `virsorter2_db_local` | `ln`, `mkdir`, `basename`, `dirname`, `find`, `sort`, `head` |
 
-Apart from `wget`, the shell commands above are all standard Unix utilities,
-present on any Linux system that can run Snakemake. The helper scripts import
-nothing outside Python's standard library, so the Python that came with your
-Snakemake environment already runs them — there is no `pip install` step.
+All of them are standard Unix utilities, present on any Linux system that can run
+Snakemake, so there is nothing to install and nothing to check in advance.
 
-!!! warning "`wget` is the one to check for"
+Every other rule has a conda environment of its own, including two kinds that run
+small jobs:
 
-    It is absent from some minimal conda base environments and from some HPC login
-    shells, and all four rules that need it are database downloads.
+- **BacFlux's own helper scripts.** Twelve rules — `select_contigs`,
+  `screen_final_contigs`, `build_replicons` and nine rules of the mobilome module —
+  run their script in `workflow/envs/python.yaml`, a pinned Python with nothing
+  else in it. The scripts import only Python's standard library, so there is no
+  `pip install` step.
+- **The database downloads.** `wget`, `tar`, `gzip` and `bzip2` come from
+  `workflow/envs/download.yaml` (PhiX, CARD, dbCAN, the ICEscan models), or from
+  the tool's own environment, which carries the same tools (geNomad, VirSorter2,
+  CheckV). A minimal Linux system without `wget` runs them as they are. The small
+  utilities those commands call alongside, such as `sha256sum`, `awk` and `grep`,
+  come from the system, as they do for every rule.
 
-    Check before you launch, and fix it in the launcher environment if it is
-    missing:
-
-    ```bash
-    conda activate snakemake
-    command -v wget tar sha256sum awk python
-
-    # if wget is not there
-    conda install -n snakemake -c conda-forge wget
-    ```
-
-    Three of those four downloads can be avoided entirely by pointing BacFlux at a
-    copy you already hold: `directories.card_db`, `directories.dbcan_db` and
-    `mobilome.icescan.dir`. See [Reference databases](databases.md).
-
-The helper scripts' own tests run against that same Python, so they double as a
-check that the launcher environment is sound. `pytest` is not in the environment
-created above, so add it first:
+The helper scripts' unit tests need nothing but Python and `pytest`, so they run
+from the launcher environment. `pytest` is not in the environment created above, so
+add it first:
 
 ```bash
 conda install -n snakemake -c conda-forge pytest
-pytest workflow/scripts -q        # 457 passed, 2 skipped
+pytest workflow/scripts miscellaneous -q    # all pass; two are skipped unless pointed at real GTDB files
 ```
+
+`miscellaneous/` holds the workflow's own guard tests. They read the rule files and
+check, for example, that every helper rule names its Python environment and that
+every download rule is a local rule.
 
 ## 5. Reference databases
 
 Five databases must be downloaded by hand before a run: Bakta, NCBI `core_nt`,
 eggNOG, GTDB and Platon. A further six may be pointed at a copy you already hold,
-and the rest BacFlux fetches itself on the first run that needs them. Sizes,
-download recipes and the config keys that hold the paths are all on
-[Reference databases](databases.md).
+and the rest BacFlux fetches itself on the first run that needs them, or all at
+once with the `download_all` target. Sizes, download recipes and the config keys
+that hold the paths are all on [Reference databases](databases.md).
 
 Delete one of the five required keys from your config and the run stops at parse
 time, in seconds, rather than an hour in. Leaving it as the empty string the

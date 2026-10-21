@@ -111,12 +111,12 @@ Python** — `vmatch -l N` semantics, which is what ICEfinder and ICEfinder2 use
 The search is in `workflow/scripts/80_mobilome/att_search.py`
 (`find_maximal_repeats` / `search_maximal_repeat`).
 
-It calls no external program. `att_search.py` is standard-library only and the rule
-that runs it has no conda environment of its own, so shelling out to `blastn` would
-make the module depend on whatever happened to be on `PATH`. A BLAST search would be
-more sensitive — it absorbs mismatches and gaps, which an exact repeat search cannot —
-so this is a deliberate trade of sensitivity for a rule with no dependencies, not an
-equivalence.
+It calls no external program. `att_search.py` is standard-library only, and the rule
+that runs it, `conjscan_ice`, uses `workflow/envs/python.yaml`, a pinned Python with
+nothing else in it. Shelling out to `blastn` would mean adding BLAST to that
+environment. A BLAST search would be more sensitive — it absorbs mismatches and gaps,
+which an exact repeat search cannot — so this is a deliberate trade of sensitivity
+for a rule that needs nothing beyond Python, not an equivalence.
 
 How it works, and where each choice comes from:
 

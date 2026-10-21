@@ -12,7 +12,7 @@ orthologous group all sit on the same coordinates.
 
 | Tool | Version | Answers | Written to |
 |---|---|---|---|
-| [Bakta](https://github.com/oschwengers/bakta) | 1.12.0 | where the genes are, and what they are called | `04.annotation/bakta/{sample}/` |
+| [Bakta](https://github.com/oschwengers/bakta) | 1.12.1 | where the genes are, and what they are called | `04.annotation/bakta/{sample}/` |
 | [eggNOG-mapper](https://github.com/eggnogdb/eggnog-mapper) | 2.1.15 | what each protein's orthologous group is known to do | `04.annotation/eggnog/{sample}/` |
 | [antiSMASH](https://github.com/antismash/antismash) | 8.0.4 | which biosynthetic gene clusters the genome carries | `04.annotation/antismash/{sample}/` |
 | [run_dbcan](https://github.com/bcb-unl/run_dbcan) | 5.1.2 | which sugars and polysaccharides it can process | `04.annotation/dbcan/{sample}/` |
@@ -40,7 +40,7 @@ its dependency on the directory and reaches in for the one file it wants.
 
 | | |
 |---|---|
-| **In** | `02.assembly/{sample}/contigs_final.fasta`; the per-genus composition table from [decontamination](decontamination.md); the replicon table in the long-read modes |
+| **In** | `02.assembly/{sample}/contigs_final.fasta`; the kept genus, `{sample}_kept_genus.txt`, from [decontamination](decontamination.md); the replicon table in the long-read modes |
 | **Out** | `04.annotation/bakta/{sample}/` — `{sample}.faa`, `.gff3`, `.gbff`, `.tsv` and the rest |
 | **Next** | eggNOG-mapper (`.faa`), antiSMASH (`.gbff`), dbCAN (`.faa` + `.gff3`), MultiQC, and the [mobilome module](../mobilome/index.md) (`.faa` + `.gff3`) |
 
@@ -59,26 +59,25 @@ older one. See [Reference databases](../getting-started/databases.md).
 
 ### The genus hint
 
-Bakta annotates more accurately when it knows roughly what it is looking at, so the
-rule derives a genus from the composition table decontamination wrote, and passes it
-as `--genus X --species sp.`. It is a hint and nothing more: a wrong genus costs
-annotation accuracy, never contigs or reads. Lines for the literal genus `no-hit` are
-skipped first, so a poorly-placed sample cannot end up annotated as `--genus no-hit`.
-A sample with no usable genus is still annotated, just without the hint.
+Bakta annotates more accurately when it knows roughly what it is looking at, and it
+writes the organism name into the GFF3, GenBank and EMBL files and the title of its
+plot. The rule therefore passes it a genus, as `--genus X --species sp.`, where X is
+the one line of `02.assembly/{sample}/contaminants/{sample}_kept_genus.txt`.
 
-!!! note "Check which genus was used"
+Decontamination writes that file. It holds the genus of the contigs that were
+**kept**, chosen by the same count `auto` mode votes with: by default, the kept genus
+holding the most DNA. So the genus Bakta receives is always one that is actually in
+the delivered genome, and in `auto` mode it is the genus the vote kept (see
+[how `auto` picks the genus](decontamination.md#how-auto-picks-the-genus)). Contigs
+BLAST could not place never count, so the genus is never `no-hit`.
 
-    When the table lists more than one genus, the line picked is **not** the most
-    abundant one. Every line carries two labelled figures — see
-    [the composition report](decontamination.md#the-composition-report) — so the numeric
-    sort that reads them scores each line zero, and the tie then breaks on the whole
-    line, reversed: the alphabetically last genus wins. On the illustrative four-genus
-    file shown there (GenusA 0.46 of the DNA, GenusB 0.31, GenusC 0.14, GenusD 0.09)
-    Bakta is handed GenusD.
+It is a hint and nothing more: a wrong genus costs annotation accuracy, never contigs
+or reads. When no kept contig has a genus, the file is empty and Bakta runs without
+one. That happens only when every kept contig is unplaced, which needs
+`discard_no_hit: false` or `mode: off`.
 
-    Nothing announces it during the run, so on a mixed assembly read the first line of
-    `logs/annotation_{sample}.log`: it records the genus that was used, or says that
-    none was found.
+The first line of `logs/annotation_{sample}.log` records the genus used, as
+`Annotating {sample} as genus: X`, or says that there was none.
 
 ### Circular replicons
 
@@ -289,10 +288,10 @@ the integrity claim holds for the download path alone.
 caps the total at run time.
 
 The database rules ask for nothing in particular; they fetch or link, once, for the
-whole run. `cazyme_db_download` is the one to know about: it runs in the environment
-BacFlux was launched from rather than a conda environment of its own, so `wget`, `tar`,
-`sha256sum` and `awk` must be available there — see
-[Installation](../getting-started/installation.md).
+whole run. `cazyme_db_download` takes `wget` and `tar` from `workflow/envs/download.yaml`
+and needs only `sha256sum` and `awk` from the computer, both part of every Linux base
+system. It is a local rule: on a cluster it runs on the computer that runs Snakemake,
+which is the one with internet.
 
 ## What to check afterwards
 

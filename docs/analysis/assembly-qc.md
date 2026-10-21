@@ -139,6 +139,17 @@ qualimap bamqc -bam {sample}_map.bam --java-mem-size={N}G -nt {threads} \
   -outdir eval/qualimap -outformat html
 ```
 
+`{N}` is Qualimap's Java heap, the most memory Java may use:
+`resources.ram_gb` minus 4 GB, at most 64 GB (see [Resources](#resources)).
+Before Qualimap starts, the rule clears two settings a login script or a cluster
+module may have left behind. `JAVA_OPTS`, when set, is taken by Qualimap's start
+script as the whole list of Java options, and `--java-mem-size` would be
+ignored. `DISPLAY` makes Java try to open a screen to draw its charts, which
+fails at the report-writing step when there is none. The rule tells Java instead
+that there is no screen (`-Djava.awt.headless=true`, through
+`JAVA_TOOL_OPTIONS`), which Java confirms in the log with a line beginning
+`Picked up JAVA_TOOL_OPTIONS`.
+
 Input is the decontamination BAM — Bowtie2 in the short-read modes, minimap2 `map-ont`
 in `nanopore`. That BAM is temporary, so this rule's dependency on it is what keeps it
 alive long enough to be used twice.
@@ -175,13 +186,15 @@ Three places, answering different questions:
 | `stage_qc_genomes` | 1 | negligible — `mkdir` and `cp` |
 | `genome_assembly_evaluation` | capped at 24 | modest |
 | `completeness_and_contamination` | capped at 24 | tens of GB; pplacer is the driver |
-| `map_evaluation` | capped at 24 | `min(resources.ram_gb, 64)` GB handed to the JVM |
+| `map_evaluation` | capped at 24 | a Java heap of `resources.ram_gb` minus 4 GB, at most 64 GB and at least 1 GB; the 4 GB are left for what Java needs beyond its heap |
 
 "Capped at 24" means the rule asks for `min(resources.threads, 24)`, and `--cores`
 caps what Snakemake then grants it. Qualimap's memory figure is
-a JVM heap size in gigabytes, not a core count, which is why it is a resource rather
-than a thread count; Snakemake only schedules against it if the launch line passes
-`--resources java_mem=N`. See [Running BacFlux](../reference/running.md).
+a Java heap size in gigabytes, not a core count, which is why it is a resource
+(`java_mem`) rather than a thread count; Snakemake only schedules against it if
+the launch line passes `--resources java_mem=N`, which also lowers each heap to
+N GB. On a cluster the job asks the scheduler for the heap plus 4 GB, never more
+than `ram_gb`. See [Running BacFlux](../reference/running.md#memory).
 
 CheckM and GTDB-Tk both run pplacer and each can use tens of GB, so
 [the taxonomy rule](taxonomy.md) deliberately waits for CheckM rather than running
