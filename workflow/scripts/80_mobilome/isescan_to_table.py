@@ -26,6 +26,15 @@ false discovery is real even on curated genomes — ISEScan scored an 8.0%
 larger ISbrowser set (Puterová & Martínek 2021, BMC Bioinformatics 22:258) — so
 nothing downstream should quote a bare IS count without these numbers beside it.
 
+One kind of call is dropped because it cannot be an insertion at all: a call
+lying over the dnaA gene. dnaA starts chromosome replication and is essential,
+so no living isolate carries an insertion inside it. ISEScan nevertheless
+reports a partial IS21 there, most likely because IS21 elements carry a helper
+protein, IstB, from the same family of ATP-binding proteins as DnaA, so the
+IS21 profile matches DnaA itself. Bakta's annotation table (--bakta-tsv) says
+where dnaA is, and such a call goes to the audit file with reason overlaps_dnaA
+instead of into the table.
+
 Where the input comes from: rule isescan runs ISEScan 1.7.3 on the delivered
 assembly, 02.assembly/{sample}/contigs_final.fasta, deliberately WITHOUT
 --removeShortIS, so complete and partial copies (truncated, or single-copy with
@@ -85,6 +94,7 @@ Two ways to run it, called from two different rules:
      isescan_to_table.py --sample S \
          --isescan-out 08.mobilome/S/isescan \
          --contig-lengths 08.mobilome/S/S_contig_lengths.tsv \
+         --bakta-tsv 04.annotation/bakta/S/S.tsv \
          --boundary-bp 100 \
          --out-table  08.mobilome/S/S_is_elements.tsv \
          --out-summary 08.mobilome/S/S_is_summary.tsv \
@@ -160,6 +170,32 @@ OPTIONAL_ISESCAN_COLUMNS = [
 # quantify.
 ISESCAN_TYPE_COMPLETE = "c"
 ISESCAN_TYPE_PARTIAL = "p"
+
+
+# ── A call that is not an insertion: one lying over dnaA ─────────────────────
+
+# dnaA encodes the protein that starts chromosome replication. The gene is
+# essential, so an insertion inside it would kill the cell, and an IS call lying
+# over it cannot be a real insertion. ISEScan reports one regardless: a partial
+# IS21-family call covering most of dnaA. The most likely reason is that IS21
+# elements carry a helper protein, IstB, that belongs to the same family of
+# ATP-binding proteins as DnaA, so ISEScan's IS21 profile matches DnaA itself.
+#
+# Such a call is dropped when at least this share of its length lies inside a
+# CDS that Bakta calls dnaA. The calls in question lie almost entirely inside the
+# gene, so half is a safe line; an IS that merely sits next to dnaA overlaps it
+# by far less and is kept.
+DNAA_OVERLAP_FRACTION = 0.5
+
+# How Bakta names dnaA. Either is enough: the gene symbol is the usual signal,
+# and the product name catches an annotation that has the name but no symbol.
+DNAA_GENE_SYMBOL = "dnaA"
+DNAA_PRODUCT = "chromosomal replication initiator protein DnaA"
+
+# The columns read from Bakta's annotation table, looked up by name in the
+# table's own header line ("#Sequence Id<TAB>Type<TAB>Start...").
+BAKTA_COLUMNS_NEEDED = ["Sequence Id", "Type", "Start", "Stop", "Locus Tag",
+                        "Gene", "Product"]
 
 
 # ── The three tables this writes ─────────────────────────────────────────────
@@ -258,6 +294,9 @@ AUDIT_COLUMNS = [
 #     unparseable_coordinates         isBegin/isEnd were not numbers
 #     invalid_coordinate_range        start > end, or a zero/negative coordinate
 #     below_min_length_bp             shorter than --min-length-bp
+#     overlaps_dnaA                   at least half of the call lies inside dnaA,
+#                                     an essential gene, so it is not an
+#                                     insertion (see DNAA_OVERLAP_FRACTION)
 #  ** contig_not_in_contig_lengths    the contig is missing from the lengths file,
 #                                     so distance-to-contig-end cannot be computed
 #                                     and the IS is dropped rather than reported
@@ -460,6 +499,93 @@ def read_contig_lengths(path):
     return lengths
 
 
+# ── Bakta's annotation: where dnaA is ────────────────────────────────────────
+
+def read_dnaa_genes(path):
+    """Find the dnaA gene(s) in Bakta's annotation table.
+
+    Input:  Bakta's {sample}.tsv for the same assembly (rule annotation writes it
+            to 04.annotation/bakta/{sample}/). It opens with a few comment lines
+            starting with '#'; the last of them is the column header
+            (#Sequence Id, Type, Start, Stop, Strand, Locus Tag, Gene, Product,
+            DbXrefs).
+    Output: a list of {contig, start, end, locus_tag}, one per CDS Bakta calls
+            dnaA (see DNAA_GENE_SYMBOL and DNAA_PRODUCT). Usually one; empty when
+            Bakta found none, in which case no IS call is dropped for this reason.
+
+    Columns are found by name in Bakta's own header, the same defensive choice
+    read_isescan_table makes. A file with no such header raises ValueError naming
+    the file: carrying on would quietly switch the dnaA check off.
+
+    A CDS whose Start is larger than its Stop runs across the end of a circular
+    contig. It is skipped, because one start..end interval cannot describe it, and
+    skipping it can only keep an IS call, never drop one wrongly.
+    """
+    with open(path, "r", encoding="utf-8") as handle:
+        lines = [line.rstrip("\n") for line in handle]
+
+    header = None
+    for line in lines:
+        if line.startswith("#Sequence Id"):
+            header = line[1:].split("\t")
+    if header is None:
+        raise ValueError(
+            f"{path}: no '#Sequence Id' header line, so this does not look like "
+            "Bakta's .tsv annotation table."
+        )
+    missing = [name for name in BAKTA_COLUMNS_NEEDED if name not in header]
+    if missing:
+        raise ValueError(
+            f"{path}: Bakta table is missing column(s) {', '.join(missing)}. "
+            f"Header seen: {header}"
+        )
+    column = {name: header.index(name) for name in BAKTA_COLUMNS_NEEDED}
+    last_needed = max(column.values())
+
+    genes = []
+    for line in lines:
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) <= last_needed:
+            continue
+        if fields[column["Type"]].strip() != "cds":
+            continue
+        gene_symbol = fields[column["Gene"]].strip()
+        product = fields[column["Product"]].strip()
+        if gene_symbol != DNAA_GENE_SYMBOL and product != DNAA_PRODUCT:
+            continue
+        start = _int_or_none(fields[column["Start"]])
+        end = _int_or_none(fields[column["Stop"]])
+        if start is None or end is None or start > end:
+            continue
+        genes.append({
+            "contig": fields[column["Sequence Id"]].strip(),
+            "start": start,
+            "end": end,
+            "locus_tag": fields[column["Locus Tag"]].strip(),
+        })
+    return genes
+
+
+def overlapping_dnaa_gene(contig, start, end, dnaa_genes):
+    """Return (gene, overlap_bp) for the dnaA gene this IS call lies over, or None.
+
+    "Lies over" means at least DNAA_OVERLAP_FRACTION of the call's length is
+    inside the gene. Both intervals are 1-based and inclusive, so the overlap
+    counts its first and last base; with no overlap at all the number comes out
+    zero or negative and fails the test.
+    """
+    call_length_bp = end - start + 1
+    for gene in dnaa_genes or []:
+        if gene["contig"] != contig:
+            continue
+        overlap_bp = min(end, gene["end"]) - max(start, gene["start"]) + 1
+        if overlap_bp >= DNAA_OVERLAP_FRACTION * call_length_bp:
+            return gene, overlap_bp
+    return None
+
+
 # ── Finding ISEScan's results file ───────────────────────────────────────────
 
 def find_isescan_results(path):
@@ -598,11 +724,13 @@ def read_isescan_table(path):
     return records
 
 
-def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_bp):
+def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_bp,
+                      dnaa_genes=None):
     """Turn ISEScan's records into the tidy output rows, and decide what to drop.
 
     Input:  records from read_isescan_table, the {contig: length} map from the
-            assembly, the boundary threshold in bp, and a minimum IS length.
+            assembly, the boundary threshold in bp, a minimum IS length, and the
+            dnaA genes from read_dnaa_genes (None or empty: no dnaA check).
     Output: (rows, audit_rows) — the deliverable table, and one audit row for
             every record dropped or flagged, each with an explicit reason.
 
@@ -619,6 +747,9 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
                                    distances — the whole honesty mechanism — could
                                    not be computed for this IS.
       coordinates_beyond_contig_length  same mismatch, seen from the other side.
+      overlaps_dnaA                at least half of the call lies inside dnaA.
+                                   The gene is essential, so this is ISEScan's
+                                   profile matching DnaA, not an insertion.
 
     The one FLAG (kept, not dropped) is an unrecognised completeness letter: we
     would rather report an IS with is_complete=NA than lose a real element over a
@@ -712,7 +843,22 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             )
             continue
 
-        # ── 6. Completeness: ISEScan's own complete/partial letter ───────────
+        # ── 6. Not an insertion: a call lying over dnaA ──────────────────────
+        # Why such a call exists at all is explained at DNAA_OVERLAP_FRACTION.
+        # Checked after the contig checks above, so a call that fails those is
+        # reported as the wiring problem it points to.
+        dnaa_match = overlapping_dnaa_gene(contig, start, end, dnaa_genes)
+        if dnaa_match is not None:
+            gene, overlap_bp = dnaa_match
+            audit(
+                contig, start, end, "dropped", "overlaps_dnaA",
+                f"{overlap_bp} of {length_bp} bp lie inside dnaA "
+                f"({gene['locus_tag']}, {gene['start']}..{gene['end']}). dnaA is "
+                "essential, so this is a profile match to DnaA, not an insertion",
+            )
+            continue
+
+        # ── 7. Completeness: ISEScan's own complete/partial letter ───────────
         raw_type = (record.get("type") or "").strip().lower()
         if raw_type == ISESCAN_TYPE_COMPLETE:
             is_complete = True
@@ -726,7 +872,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
                 "kept with is_complete=NA",
             )
 
-        # ── 7. Terminal inverted repeats ─────────────────────────────────────
+        # ── 8. Terminal inverted repeats ─────────────────────────────────────
         # A pair of inverted repeats at the two ends is the structural signature of
         # an intact IS, so its presence is one of the confidence signals the
         # module tiers on. ISEScan reports irLen = 0 when it found none; if that
@@ -739,7 +885,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             tir_text = (record.get("tir") or "").strip()
             ir_present = bool(tir_text) and tir_text not in {"-", "NA", "."}
 
-        # ── 8. How close is this IS to where the assembly broke? ─────────────
+        # ── 9. How close is this IS to where the assembly broke? ─────────────
         # An IS sitting at a contig end is the assembler telling us it could not
         # resolve that repeat: whatever was next to the IS is missing from the
         # assembly, so any statement about its genomic context is unsupported.
@@ -938,6 +1084,11 @@ def build_parser():
                         help="ISEScan results .tsv, OR the ISEScan --output directory.")
     parser.add_argument("--contig-lengths",
                         help="Two-column TSV (contig, length) for the same assembly.")
+    parser.add_argument("--bakta-tsv",
+                        help="Bakta's annotation table ({sample}.tsv) for the same "
+                             "assembly. When given, an IS call lying over dnaA is "
+                             "dropped and written to the audit file (reason "
+                             "overlaps_dnaA). Rule isescan_table always gives it.")
     # There are three contig-edge thresholds in this module, deliberately
     # different numbers on different objects, so do not "harmonise" them (two of
     # the three even share this flag's name):
@@ -978,8 +1129,8 @@ def main(argv=None):
     code Snakemake will see.
 
     1 means the run was mis-wired (flags missing, genome FASTA absent,
-    contig-lengths file unreadable, ISEScan columns unidentifiable) and the
-    workflow must stop. 0 covers everything else INCLUDING a genome with no
+    contig-lengths file or Bakta table unreadable, ISEScan columns
+    unidentifiable) and the workflow must stop. 0 covers everything else INCLUDING a genome with no
     insertion sequences, which is a result and not a failure.
     """
     parser = build_parser()
@@ -1031,6 +1182,27 @@ def main(argv=None):
         sys.stderr.write(f"ERROR: {error}\n")
         return 1
 
+    # Where dnaA is, so that a call lying over it can be dropped (step 6 of
+    # normalise_records). Like the contig lengths, a table that was asked for but
+    # cannot be read is a wiring problem, so it stops the run.
+    dnaa_genes = []
+    if args.bakta_tsv:
+        if not os.path.exists(args.bakta_tsv):
+            sys.stderr.write(f"ERROR: Bakta annotation table not found: {args.bakta_tsv}\n")
+            return 1
+        try:
+            dnaa_genes = read_dnaa_genes(args.bakta_tsv)
+        except ValueError as error:
+            sys.stderr.write(f"ERROR: {error}\n")
+            return 1
+        if dnaa_genes:
+            places = ", ".join(
+                f"{gene['contig']}:{gene['start']}..{gene['end']}" for gene in dnaa_genes
+            )
+            print(f"dnaA in Bakta's table: {places}. An IS call lying over it is dropped.")
+        else:
+            print("No dnaA in Bakta's table, so no IS call is checked against it.")
+
     # Locate ISEScan's results. None is normal: ISEScan writes no files at all for
     # a genome in which it found no IS.
     results_file = find_isescan_results(args.isescan_out)
@@ -1050,7 +1222,8 @@ def main(argv=None):
         return 1
 
     rows, audit_rows = normalise_records(
-        args.sample, records, contig_lengths, args.boundary_bp, args.min_length_bp
+        args.sample, records, contig_lengths, args.boundary_bp, args.min_length_bp,
+        dnaa_genes,
     )
     # When there is nothing to report, say in the audit file WHY there is nothing:
     # "ISEScan found no IS in this genome" and "ISEScan produced no results file"

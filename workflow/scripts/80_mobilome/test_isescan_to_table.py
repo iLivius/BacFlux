@@ -4,7 +4,8 @@ isescan_to_table turns one sample's raw ISEScan output into the three files the
 rest of the module depends on: the IS table colocalise.py reads, the per-sample
 QC summary that table has to be read alongside, and the audit file naming every
 record dropped or flagged. These tests cover all three, plus the second CLI mode
-(rule contig_lengths) that measures the assembly FASTA.
+(rule contig_lengths) that measures the assembly FASTA, and the one call dropped
+for a biological reason: an IS call lying over the essential gene dnaA.
 
 No tools, no databases, no real ISEScan run: every test builds a small
 ISEScan-shaped .tsv by hand and pushes it through the parser, so the whole
@@ -639,6 +640,149 @@ def test_min_length_filter_is_off_by_default_and_audits_when_used(tmp_path):
     assert len(table) == 1
     assert audit[0]["reason"] == "below_min_length_bp"
     assert summary["min_length_bp"] == "400"
+
+
+# ── A call lying over dnaA is not an insertion ───────────────────────────────
+# dnaA is essential, so no living isolate has an IS inside it. ISEScan still
+# reports a partial IS21 over the gene (its IS21 profile matches DnaA), and the
+# script drops that call when Bakta's table says where dnaA is.
+
+# The comment lines and the header Bakta writes at the top of {sample}.tsv.
+BAKTA_PREAMBLE = [
+    "# Annotated with Bakta",
+    "# Software: v1.12.1",
+    "# Database: v6.0, full",
+    "#Sequence Id\tType\tStart\tStop\tStrand\tLocus Tag\tGene\tProduct\tDbXrefs",
+]
+
+
+def bakta_row(contig="contig_1", feature_type="cds", start=1, stop=1440,
+              locus_tag="S1_00001", gene="dnaA",
+              product="chromosomal replication initiator protein DnaA"):
+    """One data line of Bakta's annotation table; by default the dnaA CDS."""
+    return "\t".join([contig, feature_type, str(start), str(stop), "+",
+                      locus_tag, gene, product, "COG:COG0593"])
+
+
+def write_bakta_tsv(path, rows):
+    """Write a Bakta-shaped annotation table: comment lines, header, rows."""
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(BAKTA_PREAMBLE + list(rows)) + "\n")
+    return str(path)
+
+
+def dnaa_call(**overrides):
+    """The call ISEScan makes over dnaA: a partial IS21 lying over most of the
+    gene (30..1600 against dnaA at 1..1440, so 1,411 of its 1,571 bp inside)."""
+    fields = {"family": "IS21", "cluster": "IS21_1", "isBegin": "30",
+              "isEnd": "1600", "type": "p"}
+    fields.update(overrides)
+    return isescan_row(**fields)
+
+
+def test_call_over_dnaa_is_dropped_with_a_reason(tmp_path):
+    results = write_isescan_tsv(tmp_path / "r.tsv", [dnaa_call(), isescan_row()])
+    bakta = write_bakta_tsv(tmp_path / "bakta.tsv", [bakta_row()])
+    code, table, summary, audit = run_main(
+        tmp_path, results, {"contig_1": 50000}, extra=["--bakta-tsv", bakta]
+    )
+    assert code == 0
+    assert [row["start"] for row in table] == ["5000"]
+    assert audit[0]["action"] == "dropped"
+    assert audit[0]["reason"] == "overlaps_dnaA"
+    assert "1411 of 1571 bp" in audit[0]["detail"]
+    assert "S1_00001" in audit[0]["detail"]
+    # The call sat 29 bp from the contig start. Dropped, it no longer counts as
+    # an IS, nor as an IS at a contig end.
+    assert summary["n_is_total"] == "1"
+    assert summary["n_is_at_contig_boundary"] == "0"
+    assert summary["n_records_dropped"] == "1"
+
+
+def test_without_a_bakta_table_the_dnaa_call_is_kept(tmp_path):
+    # The check needs Bakta's table. Without it nothing changes, so the script
+    # still runs on ISEScan's output alone.
+    results = write_isescan_tsv(tmp_path / "r.tsv", [dnaa_call()])
+    code, table, _, audit = run_main(tmp_path, results, {"contig_1": 50000})
+    assert code == 0
+    assert len(table) == 1
+    assert audit == []
+
+
+def test_call_next_to_dnaa_is_kept(tmp_path):
+    # A real IS can sit beside dnaA. This one overlaps the gene's last 141 bp,
+    # under a tenth of its 1,601 bp, so it stays in the table.
+    results = write_isescan_tsv(tmp_path / "r.tsv",
+                                [isescan_row(isBegin="1300", isEnd="2900")])
+    bakta = write_bakta_tsv(tmp_path / "bakta.tsv", [bakta_row()])
+    code, table, _, audit = run_main(
+        tmp_path, results, {"contig_1": 50000}, extra=["--bakta-tsv", bakta]
+    )
+    assert code == 0
+    assert len(table) == 1
+    assert audit == []
+
+
+def test_call_over_another_gene_is_kept(tmp_path):
+    results = write_isescan_tsv(tmp_path / "r.tsv", [dnaa_call()])
+    bakta = write_bakta_tsv(tmp_path / "bakta.tsv", [
+        bakta_row(gene="dnaN", product="DNA polymerase III subunit beta"),
+    ])
+    code, table, _, audit = run_main(
+        tmp_path, results, {"contig_1": 50000}, extra=["--bakta-tsv", bakta]
+    )
+    assert code == 0
+    assert len(table) == 1
+    assert audit == []
+
+
+def test_dnaa_on_another_contig_does_not_drop_the_call(tmp_path):
+    results = write_isescan_tsv(tmp_path / "r.tsv", [dnaa_call()])
+    bakta = write_bakta_tsv(tmp_path / "bakta.tsv", [bakta_row(contig="contig_2")])
+    code, table, _, _ = run_main(
+        tmp_path, results, {"contig_1": 50000, "contig_2": 50000},
+        extra=["--bakta-tsv", bakta],
+    )
+    assert code == 0
+    assert len(table) == 1
+
+
+def test_dnaa_is_found_by_its_product_when_the_symbol_is_missing(tmp_path):
+    path = write_bakta_tsv(tmp_path / "bakta.tsv", [bakta_row(gene="")])
+    genes = it.read_dnaa_genes(path)
+    assert [(gene["contig"], gene["start"], gene["end"]) for gene in genes] == [
+        ("contig_1", 1, 1440)
+    ]
+
+
+def test_dnaa_running_across_the_contig_end_is_skipped(tmp_path):
+    # Start larger than Stop: the CDS runs across the end of a circular contig.
+    # One interval cannot describe it, and skipping it can only keep a call.
+    path = write_bakta_tsv(tmp_path / "bakta.tsv", [bakta_row(start=49500, stop=900)])
+    assert it.read_dnaa_genes(path) == []
+
+
+def test_missing_bakta_table_fails_loudly(tmp_path, capsys):
+    results = write_isescan_tsv(tmp_path / "r.tsv", [isescan_row()])
+    code, _, _, _ = run_main(
+        tmp_path, results, {"contig_1": 50000},
+        extra=["--bakta-tsv", str(tmp_path / "nope.tsv")],
+    )
+    assert code == 1
+    assert "nope.tsv" in capsys.readouterr().err
+
+
+def test_bakta_table_without_its_header_fails_loudly(tmp_path, capsys):
+    # Finding no dnaA in a file we cannot read would quietly switch the check
+    # off, so a table without Bakta's header stops the run instead.
+    path = tmp_path / "bakta.tsv"
+    path.write_text(bakta_row() + "\n", encoding="utf-8")
+    results = write_isescan_tsv(tmp_path / "r.tsv", [isescan_row()])
+    code, _, _, _ = run_main(
+        tmp_path, results, {"contig_1": 50000}, extra=["--bakta-tsv", str(path)]
+    )
+    assert code == 1
+    assert "Sequence Id" in capsys.readouterr().err
 
 
 # ── Loud failure when the format is not recognisable ─────────────────────────

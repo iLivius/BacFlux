@@ -30,7 +30,9 @@
 #   contigs_final.fasta ─┬─► contig_lengths ──────────────────┐
 #                        │                                     │
 #                        ├─► isescan ──► is_table ─────────────┤   (WP-C)
-#                        │   (IS elements on the genome)       │
+#                        │   (IS elements on the genome; a     │
+#                        │    false call over dnaA, found      │
+#                        │    via Bakta's table, is dropped)   │
 #                        │                                     │
 #   bakta/{sample}.faa ──┼─► amrfinderplus ──► amr TSV ────────┤   (WP-A)
 #   bakta/{sample}.gff3 ─┘        ▲                            │
@@ -55,7 +57,8 @@
 # amrfinderplus          : the AMR calls, with coordinates and a method column.
 # isescan                : insertion sequences on the contigs.
 # isescan_table          : ISEScan's output tree → one tidy row per IS, plus how
-#                          many of those calls sit at a contig end.
+#                          many of those calls sit at a contig end. Drops a
+#                          call lying over dnaA (not a real insertion).
 # conjscan_models        : fetch the CONJScan model package once for all samples.
 # conjscan               : conjugation machinery on this genome.
 #     only when mobilome.icescan.run (a second, non-commercial model set):
@@ -520,12 +523,20 @@ if MOBILOME_RUN:
             """
 
     # ── isescan_table — tidy the IS calls and measure the honesty ──
-    # Takes in: the ISEScan output directory (rule isescan) and the contig lengths
-    #           (rule contig_lengths).
-    # Does: normalise ISEScan's 24-column table to one tidy row per IS, and
-    #       compute the QC that keeps this module truthful — how many IS calls
-    #       sit within MOBILOME_BOUNDARY_BP of a contig end, and what fraction of
-    #       the total that is.
+    # Takes in: the ISEScan output directory (rule isescan), the contig lengths
+    #           (rule contig_lengths), and Bakta's annotation table (rule
+    #           annotation), which says where the dnaA gene is.
+    # Does: normalise ISEScan's 24-column table to one tidy row per IS, drop a
+    #       call that lies over dnaA, and compute the QC that keeps this module
+    #       truthful — how many IS calls sit within MOBILOME_BOUNDARY_BP of a
+    #       contig end, and what fraction of the total that is.
+    #
+    # Why dnaA: the gene starts chromosome replication and is essential, so an IS
+    # call over it cannot be a real insertion. ISEScan reports one regardless, a
+    # partial IS21, most likely because IS21 elements carry a helper protein
+    # (IstB) related to DnaA. Left in, it would count as an IS and, on a genome
+    # that starts at dnaA, as one sitting at a contig end. The script writes it to
+    # IS_AUDIT with reason overlaps_dnaA instead.
     # Produces: IS_TABLE (rows), IS_SUMMARY (the QC line), IS_AUDIT (dropped rows
     #       with a reason).
     # Consumed by: amr_mge_colocalisation and conjscan_ice, which masks these
@@ -545,6 +556,9 @@ if MOBILOME_RUN:
         input:
             isescan_dir = ISESCAN_DIR,
             lengths = CONTIG_LENGTHS,
+            # Bakta writes its table as {sample}.tsv inside this directory; the
+            # shell below names that file.
+            bakta_dir = DIR_ANNOTATION + "/bakta/{sample}",
         output:
             table = IS_TABLE,
             summary = IS_SUMMARY,
@@ -562,6 +576,7 @@ if MOBILOME_RUN:
               --sample {wildcards.sample} \
               --isescan-out {input.isescan_dir} \
               --contig-lengths {input.lengths} \
+              --bakta-tsv {input.bakta_dir}/{wildcards.sample}.tsv \
               --boundary-bp {params.boundary_bp} \
               --out-table {output.table} \
               --out-summary {output.summary} \
@@ -1397,6 +1412,7 @@ if MOBILOME_RUN:
                 awk '{{ if (substr($0,1,1) != ">") gsub(/>/, "\\n>"); print }}' \
                   {output.db_dir}/iceberg.fa > {output.db_dir}/iceberg.repaired.fa
                 mv {output.db_dir}/iceberg.repaired.fa {output.db_dir}/iceberg.fa
+
 
                 N_SEQ=$(grep -c '^>' {output.db_dir}/iceberg.fa)
                 N_MARK=$(grep -o '>' {output.db_dir}/iceberg.fa | wc -l)
