@@ -20,6 +20,22 @@ family of pipelines.
     | **AMR** | antimicrobial resistance |
     | **GTDB** | Genome Taxonomy Database, the reference used for taxonomic placement |
     | **ICE** | integrative and conjugative element — integrates into the chromosome and carries its own conjugation machinery |
+    | **IME** | integrative mobilisable element — integrates like an ICE but has no conjugation machinery of its own, so it needs a helper element to transfer |
+    | **MGE** | mobile genetic element — DNA that can move within a genome or between bacteria: insertion sequences, transposons, integrons, plasmids, ICEs |
+
+## The workflow at a glance
+
+[![Metro map of BacFlux v2.1.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table.](assets/bacflux_metro.png#only-light)](assets/bacflux_metro.png)
+[![Metro map of BacFlux v2.1.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table.](assets/bacflux_metro_dark.png#only-dark)](assets/bacflux_metro_dark.png)
+
+Each coloured line is one mode. The four lines take their own routes to
+`contigs_final.fasta`, the genome each mode delivers, and from there run through the
+same stages. In `hybrid` the purple line has two arms: the Illumina arm assembles a
+SPAdes draft and decontaminates it, and the Illumina reads that map back to the kept
+contigs are what Polypolish uses to correct the long-read assembly. An open ring marks
+a step the config switches on or off; the prophage stage runs VirSorter2 by default,
+or geNomad instead. The dashed red line is the optional mobilome module. Select the
+map to open it at full size.
 
 ## The four modes
 
