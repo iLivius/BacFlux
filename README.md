@@ -10,8 +10,9 @@ _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <
 v2.1.0
 ```
 
-**Bacterial whole-genome workflow — Illumina, Nanopore, both, or a finished assembly — from
-reads to annotation, resistance genes, and whether those genes sit on something that can move.**
+**One Snakemake workflow for bacterial genomes — Illumina, Nanopore, both, or an assembly —
+through decontamination, QC, taxonomy, annotation, AMR, plasmids, prophages and the mobility
+of resistance genes.**
 
 ![Snakemake](https://img.shields.io/badge/snakemake-%E2%89%A59.14.6-brightgreen.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
