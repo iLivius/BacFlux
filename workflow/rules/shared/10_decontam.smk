@@ -29,7 +29,7 @@
 # select_contigs     : applies the decontamination policy, writes the kept contigs
 #                      and the per-contig audit trail.
 #
-# Where decontamination sits per mode (decision D3 — v1 order preserved exactly):
+# Where decontamination sits per mode (v1 order preserved exactly):
 #
 #   mode      DRAFT_CONTIGS (screened)        DECONTAM_CONTIGS (written)
 #   ────────  ──────────────────────────────  ──────────────────────────────────
@@ -206,8 +206,8 @@ elif HAS_LONG_READS:
     # Consumed by: blob_json and map_evaluation (Qualimap, shared/20_qc.smk).
     #
     # (v1 message: "--- Minimap2: Map reads against contigs. ---";
-    #  v1 rule was also called map_contigs, its Qualimap rule map_qc → D5 renames
-    #  that one to map_evaluation everywhere.)
+    #  v1 rule was also called map_contigs, its Qualimap rule map_qc → v2 renames
+    #  that one to map_evaluation in every mode that has reads.)
     rule map_contigs:
         input:
             reads = FILT_LONG,

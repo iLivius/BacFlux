@@ -21,9 +21,10 @@
 #                 shared/15_replicons.smk which contigs are chromosomes and which
 #                 are plasmids.
 #
-# D3 ORDERING, preserved from v1: dnaapler runs BEFORE the contamination screen
-# and Medaka runs AFTER it. That is why DRAFT_CONTIGS (what the screen reads) is
-# the dnaapler output, and why nanopore/30_polish.smk polishes DECONTAM_CONTIGS.
+# WHERE DECONTAMINATION SITS, preserved from v1: dnaapler runs BEFORE the
+# contamination screen and Medaka runs AFTER it. That is why DRAFT_CONTIGS (what
+# the screen reads) is the dnaapler output, and why nanopore/30_polish.smk
+# polishes DECONTAM_CONTIGS.
 #
 # Everything referenced here comes from 00_common.smk: FILT_LONG, FLYE_DIR,
 # FLYE_CONTIGS, FLYE_INFO, FLYE_IGNORE_LIST, FLYE_INPUT_MODE, USE_MEDAKA,
@@ -77,8 +78,9 @@
 # fix_start/ and medaka/ written by other rules, and Snakemake wipes and recreates
 # a directory() output on a re-run.
 #
-# (v1 rule name: `assembly` in BacFluxL, `ONT_assembly` in BacFluxL+; D5 unifies
-#  on `ont_assembly`. v1 message: "--- Flye: Genome assembly with long reads. ---")
+# (v1 rule name: `assembly` in BacFluxL, `ONT_assembly` in BacFluxL+; v2 uses
+#  `ont_assembly` in both long-read modes.
+#  v1 message: "--- Flye: Genome assembly with long reads. ---")
 rule ont_assembly:
     input:
         filt_long = FILT_LONG,

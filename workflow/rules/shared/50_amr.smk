@@ -5,8 +5,8 @@
 # them live in this file.
 #
 #   * ABRicate on the ASSEMBLED CONTIGS, once per curated database. It consumes
-#     nothing but FINAL_CONTIGS (the D2 hand-off), so it is identical in all four
-#     modes.
+#     nothing but FINAL_CONTIGS, the one assembly hand-off from every mode, so it
+#     is identical in all four modes.
 #   * BBMap mapping the TRIMMED READS straight onto CARD's reference sequences,
 #     gated on HAS_SHORT_READS. Assembly collapses repeats, so a resistance gene
 #     present in several copies — or one sitting on a repeat-rich mobile element
@@ -54,7 +54,7 @@
 # CARD_REPORT_SCRIPT, TRIM_R1, TRIM_R2, RAM, capped_cpus, HAS_SHORT_READS. The
 # eight-database list lives ONCE in 00_common and drives (a) the per-db fan-out in
 # rule all, (b) the {db} wildcard constraint, and (c) the summary input — one
-# list, one source of truth (D7).
+# list, one source of truth.
 #
 # conda: paths resolve relative to THIS file (workflow/rules/shared/), so
 # "../../envs/abricate.yaml" climbs shared/ → rules/ → workflow/ and lands on
@@ -134,7 +134,7 @@ rule amr_contigs:
 # Produces: 05.amr/abricate/{sample}/AMR_summary.txt.
 # Consumed by: the user.
 #
-# D7 single-source: v1 hard-coded all eight database filenames TWICE (as eight
+# One database list: v1 hard-coded all eight database filenames TWICE (as eight
 # named input: keys AND again in the shell). Here input: is driven by the shared
 # DATABASES list and the shell passes {input} positionally, so adding or removing
 # a database in 00_common.DATABASES now propagates by itself to rule all, the
@@ -162,7 +162,7 @@ rule AMR_summary:
 
 # ──────────────────── CARD read-mapping leg (BBMap) ────────────
 # Gated on the CAPABILITY flag HAS_SHORT_READS (illumina + hybrid), not on the
-# mode name (D7). _downstream_targets() in 00_common.smk requests these files
+# mode name. _downstream_targets() in 00_common.smk requests these files
 # behind the SAME flag, so rule all and the rule definitions can never disagree:
 # either both exist or neither does. nanopore and contigs get no CARD leg at all
 # — v1 had none for them, and neither mode's config even declares links.card_link.

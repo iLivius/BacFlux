@@ -30,8 +30,8 @@
 # ──────────────────── Short-read assembly (SPAdes) ─────────────
 # Takes in: r1, r2 = TRIM_R1 / TRIM_R2, the fastp-trimmed, PhiX-free pairs written
 #           by rule trim_adapters (illumina/10_reads.smk).
-# Does:     one SPAdes de novo assembly per sample in --isolate mode, over the six
-#           the k-mer ladder set by parameters.spades_kmers (default auto, which
+# Does:     one SPAdes de novo assembly per sample in --isolate mode, over the
+#           k-mer ladder set by parameters.spades_kmers (default auto, which
 #           lets SPAdes size it from the reads). OMP_NUM_THREADS is exported so the
 #           OpenMP parts of SPAdes obey the same thread budget as the -t flag;
 #           without it they default to every core on the machine, which
@@ -46,7 +46,7 @@
 # SPAdes is the single most expensive step in this mode and scales with both.
 #
 # LAYOUT LANDMINE — do not "simplify" the output back to the sample directory.
-# v1 declared directory("02.assembly/{sample}"). Under the v2 layout (D1) that
+# v1 declared directory("02.assembly/{sample}"). Under the v2 layout, that
 # directory ALSO holds contaminants/, eval/ and (in the long-read modes)
 # fix_start/, medaka/ and snps/, written by OTHER rules. Snakemake deletes and
 # recreates a directory() output when the rule re-runs, so declaring the sample
@@ -54,7 +54,7 @@
 # therefore declares only its own sub-directory, SPADES_DIR.
 #
 # (v1 rule name: `genome_assembly` in BacFlux, `illumina_assembly` in BacFluxL+.
-#  D5 unifies on `illumina_assembly`, so the SPAdes rule has ONE name in both the
+#  v2 uses `illumina_assembly`, so the SPAdes rule has ONE name in both the
 #  illumina and hybrid front ends. The log filename changes with it.
 #  v1 message: "--- SPAdes: genome assembly. ---")
 rule illumina_assembly:

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Unit tests for workflow/scripts/60_plasmid/plasmid_concordance.py (D9).
+"""Unit tests for workflow/scripts/60_plasmid/plasmid_concordance.py.
 
-D9 is the label of the BacFlux v2 design decision that script implements: the
-Platon/geNomad plasmid concordance.
+That script implements the Platon/geNomad plasmid concordance: the per-contig
+table BacFlux builds only when geNomad was opted in as the phage caller.
 
 These tests need no tools and no databases — they feed tiny in-memory fixtures
 (Platon TSV, Platon chromosome FASTA, verified_plasmids.txt, geNomad plasmid

@@ -14,10 +14,10 @@
 # finalize_contigs    : copies whichever file ended the chain to one canonical
 #                       name and logs which file that was.
 #
-# D3 ORDERING: Medaka polishes the DECONTAMINATED assembly, not the raw one. That
-# is v1 nanopore behaviour and it is deliberate — polishing a contaminant contig
-# with this isolate's reads would be wasted effort at best and would smear real
-# differences at worst.
+# WHERE DECONTAMINATION SITS: Medaka polishes the DECONTAMINATED assembly, not
+# the raw one. That is v1 nanopore behaviour and it is deliberate — polishing a
+# contaminant contig with this isolate's reads would be wasted effort at best and
+# would smear real differences at worst.
 #
 # WHY finalize_contigs EXISTS AT ALL: whether Medaka runs is a config choice, so
 # the last file in this mode's chain is either the Medaka consensus or the
@@ -56,8 +56,8 @@ if USE_MEDAKA:
     #   reads   = FILT_LONG             the same reads Flye assembled, from rule
     #                                   filter_long_reads (nanopore/10_reads.smk).
     #   contigs = MEDAKA_INPUT          in nanopore mode that is DECONTAM_CONTIGS,
-    #                                   the assembly AFTER the contamination screen
-    #                                   (D3), written by rule select_contigs
+    #                                   the assembly AFTER the contamination
+    #                                   screen, written by rule select_contigs
     #                                   (shared/10_decontam.smk).
     #   model   = MEDAKA_MODEL_RESOLVED the one-line file holding the model NAME,
     #                                   from check_medaka_model
@@ -140,7 +140,7 @@ if USE_MEDAKA:
 # Does:     copies that file to one canonical name, and logs WHICH file it copied
 #           — that one line is the provenance of the delivered genome.
 # Produces: final = FINAL_CONTIGS, 02.assembly/{sample}/contigs_final.fasta, the
-#           single canonical hand-off (D2).
+#           single canonical hand-off that every mode's front end ends by writing.
 # Consumed by: build_replicons (shared/15_replicons.smk); stage_qc_genomes
 #              (shared/20_qc.smk), which is also how taxonomic_assignment
 #              (shared/30_taxonomy.smk) gets it; annotation

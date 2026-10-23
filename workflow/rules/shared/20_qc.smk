@@ -199,7 +199,7 @@ rule genome_assembly_evaluation:
 # the staged directory as temp().
 #
 # The stats file gained a {sample}_ prefix (v1 wrote a bare checkm_stats.tsv).
-# Under the D1 layout every sample's containing directory is called "checkm", so
+# Under the v2 layout every sample's containing directory is called "checkm", so
 # the report's staging loop can no longer recover the sample name from the
 # directory and takes it from the filename instead — see the checkm_stats loop in
 # shared/90_report.smk.
@@ -244,7 +244,7 @@ rule completeness_and_contamination:
 
 
 # ──────────────────────── Mapping QC (reads-only modes) ────────
-# Gated on HAS_READS — the capability flag rather than the mode name, per D7 — so
+# Gated on HAS_READS — the capability flag rather than the mode name — so
 # in contigs mode the rule below is never defined and QUALIMAP_DIR is never
 # requested by all_targets() in 00_common.smk. Contigs mode does have a BAM, but
 # it is the contigs aligned against THEMSELVES, made only to satisfy
@@ -283,7 +283,7 @@ if HAS_READS:
     # `--resources java_mem=N`, which then also lowers each heap to N.
     #
     # (v1 message: "--- Qualimap: Mapping evaluation. ---"; the nanopore v1 rule
-    #  was named map_qc — D5 unifies on map_evaluation.)
+    #  was named map_qc — v2 uses map_evaluation in every mode that has reads.)
     rule map_evaluation:
         input:
             bam = DECONTAM_BAM,

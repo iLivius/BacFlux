@@ -6,9 +6,7 @@
 #
 # What gets aggregated depends on what the mode actually produced, so the input
 # set is assembled from the capability flags (HAS_SHORT_READS / HAS_LONG_READS /
-# HAS_READS, defined in 00_common.smk) rather than from the mode name. That is
-# decision D7 of the unification (legend at the top of 00_common.smk) — gate on
-# what a mode produces, not on what it is called:
+# HAS_READS, defined in 00_common.smk) rather than from the mode name:
 #
 #   input                        illumina  nanopore  hybrid  contigs
 #   ───────────────────────────  ────────  ────────  ──────  ───────
@@ -33,7 +31,7 @@
 # NANOPLOT_FILT_DIR, CHECKM_RELABEL_AWK, GTDBTK_RELABEL_AWK, QC_GENOMES,
 # IS_HYBRID and the capability flags.
 #
-# "the D1 layout", which the rename map refers to, is v2's unified stage
+# The sample-name rename map below is written against v2's unified stage
 # numbering: all technology-specific work is grouped under 01.reads and
 # 02.assembly, so every shared stage lands on the same number in every mode
 # (03.taxonomy, 04.annotation, …). That is why v1's rename regexes needed only
@@ -48,7 +46,7 @@
 def multiqc_qc_inputs():
     """Every QC artefact MultiQC aggregates, for the ACTIVE mode only.
 
-    Built from the capability flags rather than the mode name (D7), so each line
+    Built from the capability flags rather than the mode name, so each line
     reads as a plain statement about what the mode produces. CheckM and GTDB-Tk
     are NOT in here — they are staged and relabelled first, so the rule names them
     separately (see the rule's input: block for why that split matters).
@@ -87,9 +85,9 @@ def multiqc_replace_block():
 
     Patterns are raw strings so the \\1 backreferences reach MultiQC intact. Both
     the regex form and the backreferences are inherited from v1, so they are known
-    to work with this MultiQC version — only the path components changed (the D1
-    layout). Hybrid needs two QUAST lines because a hybrid sample is QC'd as two
-    genomes, {sample}_illumina and {sample}_ont.
+    to work with this MultiQC version — only the path components changed (to the
+    stage numbering every mode shares). Hybrid needs two QUAST lines because a
+    hybrid sample is QC'd as two genomes, {sample}_illumina and {sample}_ont.
     """
     lines = []
     if HAS_SHORT_READS:
@@ -302,7 +300,7 @@ EOF
         mkdir -p "$REPORT_INPUT_DIR/checkm" "$REPORT_INPUT_DIR/gtdbtk"
 
         # The sample name is recovered from the FILE name here, not the directory:
-        # under the D1 layout every sample's CheckM directory is called "checkm".
+        # every sample's CheckM directory is called "checkm", in every mode.
         for f in {input.checkm_stats}; do
           sample=$(basename "$f" _checkm_stats.tsv)
           mkdir -p "$REPORT_INPUT_DIR/checkm/$sample"

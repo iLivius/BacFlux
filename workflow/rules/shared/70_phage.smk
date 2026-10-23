@@ -1,11 +1,11 @@
 # BacFlux v2.0.0 — virus and prophage detection on the finished genome (stage
 # 07.phages), followed by CheckV quality grading. Like the rest of the shared tail
-# this module reads only FINAL_CONTIGS (the D2 hand-off), so it behaves identically
-# in all four modes.
+# this module reads only FINAL_CONTIGS, the one assembly hand-off from every mode,
+# so it behaves identically in all four modes.
 #
 # Two callers are wired in and exactly one of them is defined per run, chosen by
 # config phage.caller (resolved into PHAGE_CALLER in 00_common.smk; the choice
-# itself is decision D8, explained in docs/analysis/phages.md):
+# itself is explained in docs/analysis/phages.md):
 #   virsorter2 (DEFAULT) — permissively licensed (GPLv2, commercial use OK), so it
 #                          is what an out-of-the-box run gets. Its conda env is the
 #                          fragile part — the whole story is at the VirSorter2
@@ -16,7 +16,7 @@
 #                          push that restriction onto its users, so geNomad is
 #                          never the default — see docs/about/licensing.md. Opting in also
 #                          switches on the plasmid concordance in
-#                          shared/60_plasmid.smk (decision D9).
+#                          shared/60_plasmid.smk.
 #   CheckV     (ALWAYS)  — neither caller reports completeness or contamination, so
 #                          CheckV 1.0.3 grades whatever the caller produced.
 #
@@ -59,7 +59,7 @@
 # One cross-stage edge: when geNomad is opted in, shared/60_plasmid.smk (stage 06)
 # reads a file that physically lives under THIS stage's 07.phages/genomad/{sample}/
 # directory. Reading "backwards" from 06 into 07 is safe: the stage numbers group
-# tools for the reader (D1), and Snakemake orders work by the input/output DAG.
+# tools for the reader, and Snakemake orders work by the input/output DAG.
 #
 # Defined once in 00_common.smk and never re-derived here: FINAL_CONTIGS,
 # DIR_PHAGES, PHAGE_CALLER, GENOMAD_DB_DIR, GENOMAD_DIR, GENOMAD_PREFIX,
@@ -258,9 +258,9 @@ if PHAGE_CALLER == "genomad":
     # intermediates. If a huge input ever needs a RAM lever, `--splits N` caps peak
     # memory at a speed cost; isolate-sized genomes do not need it.
     #
-    # Input is FINAL_CONTIGS, the decontaminated assembly (D4: all four modes scan
-    # decontaminated contigs, where v1 illumina scanned the pre-decontam
-    # contigs_filt.fasta — noted in docs/getting-started/from-v1.md).
+    # Input is FINAL_CONTIGS, the genome each mode delivers, in all four modes
+    # (v1 illumina scanned the pre-decontam contigs_filt.fasta instead — noted in
+    # docs/getting-started/from-v1.md).
     #
     # The output is declared a DIRECTORY so a failed or rerun job is wiped clean and
     # geNomad cannot resume on stale intermediates. geNomad names every output after
@@ -401,8 +401,9 @@ if PHAGE_CALLER == "virsorter2":
     # ── VirSorter2 virus calling ──
     # Identify phages and prophages on the finished genome — a faithful port of v1's
     # `viral_identification` (VS2 half) onto the 00_common.smk paths, with the same
-    # viral groups and the same score cutoff. Input is FINAL_CONTIGS (D4 change: v1
-    # illumina used the pre-decontam contigs_filt.fasta) plus the VS2 database.
+    # viral groups and the same score cutoff. Input is FINAL_CONTIGS (the genome
+    # each mode delivers, where v1 illumina used the pre-decontam
+    # contigs_filt.fasta) plus the VS2 database.
     #
     # min_score 0.5 and the five viral groups come from the VirSorter2 SOP the
     # workflow follows (protocols.io, linked from docs/analysis/phages.md): a deliberately

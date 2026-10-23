@@ -533,12 +533,12 @@ def read_replicon_calls(path):
 
     Where it comes from: rule mobilome_replicons (shared/80_mobilome.smk), which
     reads Platon's chromosome/plasmid split and, WHEN THE USER OPTED IN TO
-    geNomad, that tool's independent call through the plasmid concordance table
-    (D9). geNomad is academic/non-commercial licensed, so it cannot be BacFlux's
-    default and the table is Platon-only in a stock run. Either way this is far
-    better evidence than any single marker gene: plenty of real plasmids carry no
-    recognisable repA, which is exactly why dnaapler reported "No_MMseqs2_hits"
-    for the two Col plasmids on these isolates.
+    geNomad, that tool's independent call through the plasmid concordance table.
+    geNomad is academic/non-commercial licensed, so it cannot be BacFlux's
+    default, and in a stock run the replicon table is Platon-only. Either way it
+    is far better evidence than any single marker gene: plenty of real plasmids
+    carry no recognisable repA, which is exactly why dnaapler reported
+    "No_MMseqs2_hits" for the two Col plasmids on these isolates.
 
     A missing file yields an empty dict and every contig is treated as unknown,
     which leaves behaviour unchanged — the module degrades rather than failing.
@@ -3635,9 +3635,11 @@ def build_parser():
     parser = argparse.ArgumentParser(
         description=(
             "Turn CONJscan machinery hits plus Bakta annotation into ICE/IME "
-            "candidate rows for the mobilome co-localisation step. Implements "
-            "phases 0, 1, 2, 3, 4 and 6, as listed at the top of this script. "
-            "The att-site search (phase 3) runs in every mode - the constraint "
+            "candidate rows for the mobilome co-localisation step. It collects "
+            "the conjugation-machinery and integrase anchors, clusters them "
+            "into candidates and classifies each one, searches for att sites "
+            "at the element ends, and settles each candidate's confidence. "
+            "The att-site search runs in every mode - the constraint "
             "is assembly contiguity, not the sequencer - and degrades to "
             "boundary_method=none when the flanks are absent. Only a "
             "tRNA-anchored boundary is applied to the element interval; a de "
@@ -3708,7 +3710,7 @@ def build_parser():
                              f"is flagged as probably truncated and capped at low "
                              f"confidence (default {DEFAULT_BOUNDARY_BP}).")
     parser.add_argument("--genome", default="",
-                        help="genome FASTA Bakta annotated; enables the Phase 3 "
+                        help="genome FASTA Bakta annotated; enables the "
                              "att-site search that resolves element boundaries")
     parser.add_argument("--is-table", default="",
                         help="IS element table. These intervals are blanked out of "
@@ -3721,7 +3723,7 @@ def build_parser():
                         help="how far beyond the machinery span to look for the "
                              "element's real ends")
     parser.add_argument("--require-trna-boundary-for-high", action="store_true",
-                        help="Apply the strict Phase 6 confidence rule: an element "
+                        help="Apply the strict confidence rule: an element "
                              "may only reach HIGH confidence if a tRNA-anchored "
                              "att pair fixed its ends. OFF by default, because on "
                              "a fragmented short-read assembly the flanks are "

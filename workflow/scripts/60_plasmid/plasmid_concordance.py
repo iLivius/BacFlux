@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Join Platon and geNomad plasmid calls into one confidence-tiered table (D9).
+"""Join Platon and geNomad plasmid calls into one confidence-tiered table.
 
-D9 is the label of the BacFlux v2 design decision this script implements, the
-Platon/geNomad plasmid concordance; the comments below use it as shorthand.
+This script implements the Platon/geNomad plasmid concordance: the per-contig
+table BacFlux builds only when geNomad was opted in as the phage caller.
 
 BacFlux v2 calls plasmids with TWO independent tools and reports where they
 agree, instead of trusting either one alone:
@@ -328,24 +328,23 @@ def parse_genomad_plasmids(path):
     return genomad_plasmids
 
 
-# ── Agreement becomes confidence: the D9 rules ──────────────────────────────
+# ── Agreement becomes confidence: the concordance rules ─────────────────────
 
-# Pure rules, and the whole point of D9. Two callers that fail in different ways
-# agreeing is much better evidence than either one alone:
+# Pure rules, and the whole point of this script. Two callers that fail in
+# different ways agreeing is much better evidence than either one alone:
 #   - both call plasmid                     -> strongest evidence     (high)
 #   - one calls plasmid, the other silent   -> single-tool evidence   (medium)
 #   - Platon chromosome vs geNomad plasmid  -> a real clash, kept     (low)
 #
-# LIMITATION (D9 open issue — verify and upgrade on the first real geNomad run):
+# LIMITATION (still open) — the comparison is not symmetric yet:
 # the geNomad input here is only its plasmid_summary (POSITIVE plasmid calls),
 # so genomad_call="absent" conflates "geNomad actively called it chromosome or
 # virus" with "geNomad never scored it". The FORWARD conflict (Platon chromosome
 # vs geNomad plasmid) IS flagged low; the REVERSE clash (Platon plasmid vs
 # geNomad-NOT-plasmid) is currently reported "platon_only"/medium, not
 # "conflict"/low. Reading geNomad's per-contig aggregated_classification.tsv
-# would make this symmetric — deferred until geNomad can be run to confirm that
-# file's exact format. Nothing is discarded either way; only the tier label of
-# that reverse case is conservative.
+# would make this symmetric. Nothing is discarded either way; only the tier label
+# of that reverse case is conservative.
 def classify(platon_call, genomad_call):
     """Turn a (Platon, geNomad) call pair into (agreement, confidence).
 
@@ -485,7 +484,7 @@ def main():
     platon_assessed = not platon_run_failed(args.verified_plasmids)
     genomad_plasmids = parse_genomad_plasmids(args.genomad_plasmid_summary)
 
-    # Join-key audit — D9's whole agreement mechanism rests on byte-identical
+    # Join-key audit — the whole agreement mechanism rests on byte-identical
     # contig IDs across the three sources. If both tools called something but NONE
     # of the IDs overlap, the join has almost certainly broken (a header not
     # trimmed to one token upstream, a geNomad seq_name suffix, a Platon rename),

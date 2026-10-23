@@ -1,7 +1,7 @@
 # Stage 04 annotation: the four tools that turn a finished genome into gene calls
 # and functional labels, plus the two database fetches they need. Shared by all
 # four entry points — every front end has already converged on one canonical
-# assembly (FINAL_CONTIGS, D2) and one kept-genus file, so nothing here
+# assembly (FINAL_CONTIGS) and one kept-genus file, so nothing here
 # branches on the sequencing technology.
 #
 # Chain: contigs_final.fasta + {sample}_kept_genus.txt → Bakta → a DIRECTORY of
@@ -66,11 +66,12 @@
 # Consumed by: functional_annotation (.faa), secondary_metabolites_analysis
 #              (.gbff), cazyme_gene_cluster (.faa + .gff3) and the report module.
 #
-# (v1 named this `annotation` here and `accurate_annotation` in FastaFlux; D5
-#  unifies on `annotation`. v1 message: "--- Bakta: Genome annotation. ---")
+# (v1 named this `annotation` here and `accurate_annotation` in FastaFlux; v2
+#  uses `annotation` in every mode.
+#  v1 message: "--- Bakta: Genome annotation. ---")
 rule annotation:
     input:
-        # The finished genome — one canonical hand-off from any front end (D2).
+        # The finished genome — one canonical hand-off from any front end.
         contigs = FINAL_CONTIGS,
         # The genus to name the genome after, a CROSS-STAGE edge: select_contigs
         # writes it in shared/10_decontam.smk as the genus holding most of the

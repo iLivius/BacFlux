@@ -22,22 +22,17 @@
 #
 # ── Data flow ──
 #
-# (WP-A, WP-C, WP-D below are "work package" labels: the order the module was
-# built in, kept as short names for its parts here and in other files.
-# WP-A = surface the AMR calls, WP-C = find the IS elements, WP-D = intersect the
-# two and award a mobility tier. WP-B is the database layer, WP-E the ICE work.)
-#
 #   contigs_final.fasta ─┬─► contig_lengths ──────────────────┐
 #                        │                                     │
-#                        ├─► isescan ──► is_table ─────────────┤   (WP-C)
+#                        ├─► isescan ──► is_table ─────────────┤
 #                        │   (IS elements on the genome; a     │
 #                        │    false call over dnaA, found      │
 #                        │    via Bakta's table, is dropped)   │
 #                        │                                     │
-#   bakta/{sample}.faa ──┼─► amrfinderplus ──► amr TSV ────────┤   (WP-A)
+#   bakta/{sample}.faa ──┼─► amrfinderplus ──► amr TSV ────────┤
 #   bakta/{sample}.gff3 ─┘        ▲                            │
 #                                 │                            ├─► amr_mge_colocalisation
-#   03.taxonomy/{sample} ─► amrfinder_organism ────────────────┤        (WP-D)
+#   03.taxonomy/{sample} ─► amrfinder_organism ────────────────┤           │
 #              (GTDB-Tk)   (unlocks point mutations)           │           │
 #                                                              │           ▼
 #   bakta/{sample}.faa ──┬─► conjscan ──► conjugation table ───┤   {sample}_amr_mobility.tsv
@@ -289,9 +284,8 @@ if MOBILOME_RUN:
     # no IS next to this gene" from "the contig ended before we could tell".
     #
     # Takes in: FINAL_CONTIGS — the single delivered genome, contigs_final.fasta.
-    #           Every mode's front end ends by writing that one file (the
-    #           workflow calls this the "D2 hand-off"), so no rule from stage 03
-    #           onwards has to know which assembler produced it.
+    #           Every mode's front end ends by writing that one file, so no rule
+    #           from stage 03 onwards has to know which assembler produced it.
     # Does: a stdlib FASTA scan (no biopython) writing contig + length.
     # Produces: {sample}_contig_lengths.tsv.
     # Consumed by: isescan_table, conjscan_ice and amr_mge_colocalisation.
@@ -369,7 +363,7 @@ if MOBILOME_RUN:
               --out-audit {output.audit} > {log} 2>&1
             """
 
-    # ── amrfinderplus — the structured AMR input (WP-A) ──
+    # ── amrfinderplus — the structured AMR input ──
     # Biology: Bakta already runs AMRFinderPlus internally, but surfaces only the
     # gene name and product. The full report adds five things this module needs:
     #   1. the Method column (EXACTX / BLASTX / PARTIALX / HMM / POINTX …) — a
@@ -462,7 +456,7 @@ if MOBILOME_RUN:
             fi
             """
 
-    # ── isescan — find insertion sequences on the genome (WP-C) ──
+    # ── isescan — find insertion sequences on the genome ──
     # Biology: IS elements are the workhorse of the bacterial mobilome — small,
     # self-mobile, and present in many copies. They matter here for two reasons:
     # an IS beside an AMR gene can supply a promoter (raising expression without
@@ -972,7 +966,7 @@ if MOBILOME_RUN:
     #   * Bakta's GFF3 — the genomic coordinates of every protein hit, the
     #     integrase genes found by product regex, and the tRNAs the att search
     #     anchors on                                                    (annotation)
-    #   * the genome itself, for the att-site sequence search            (D2 hand-off)
+    #   * the genome itself, for the att-site sequence search            (front end)
     #   * the IS table, masked out of the att search (see below)         (isescan_table)
     #   * the contig lengths, for the contig-edge flags                  (contig_lengths)
     #   * chromosome-or-plasmid, per contig                       (mobilome_replicons)
@@ -1232,7 +1226,7 @@ if MOBILOME_RUN:
         # much stronger statement than inferring a composite from two IS copies,
         # which is why a hit here is what makes ladder tier 4 reachable.
         #
-        # Takes in: this sample's contigs (the D2 hand-off) + the v5 BLAST
+        # Takes in: this sample's contigs (FINAL_CONTIGS) + the v5 BLAST
         #           database from rule tncentral_db above.
         # Does: blastn the whole assembly against the curated set. The whole
         #       assembly rather than the ISEScan calls, because a transposon is
@@ -1459,7 +1453,7 @@ if MOBILOME_RUN:
         # named in the literature. Matching one turns "a predicted
         # self-transmissible element" into a name you can look up.
         #
-        # Takes in: this sample's contigs (the D2 hand-off) + the v5 database from
+        # Takes in: this sample's contigs (FINAL_CONTIGS) + the v5 database from
         #           rule iceberg_db above.
         # Does: blastn the WHOLE genome, not our ICE intervals, so a curated
         #       element that OVERHANGS our interval still shows up — which is how
@@ -1551,7 +1545,7 @@ if MOBILOME_RUN:
                   --out-audit {output.audit} > {log} 2>&1
                 """
 
-    # ── How many IS copies did the assembly lose? (WP-C) ──
+    # ── How many IS copies did the assembly lose? ──
     # The four rules below exist only when MOBILOME_COPY_NUMBER is true, which
     # needs both an ISOSDB source (mobilome.isosdb.fasta_url or .dir) and a mode
     # that has short reads — illumina or hybrid, since the whole leg is built on
@@ -1669,7 +1663,7 @@ if MOBILOME_RUN:
         # sample happened to be sequenced — 200x over an IS is unremarkable in a
         # 200x library and means four copies in a 50x one.
         #
-        # Takes in: the sample's contigs (the D2 hand-off) and its trimmed
+        # Takes in: the sample's contigs (FINAL_CONTIGS) and its trimmed
         #           Illumina reads (rule trim_adapters, in the illumina/hybrid
         #           front end).
         # Does: BBMap the reads back onto the assembly. ambiguous=best and
@@ -1889,7 +1883,7 @@ if MOBILOME_RUN:
               --out {output.replicons} > {log} 2>&1
             """
 
-    # ── amr_mge_colocalisation — the deliverable (WP-D) ──
+    # ── amr_mge_colocalisation — the deliverable ──
     # Biology: this is where the module answers its question. For every AMR gene
     # AMRFinderPlus found, look at what mobile elements sit around it and decide
     # where it lands on the mobility ladder:

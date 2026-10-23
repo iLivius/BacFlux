@@ -18,8 +18,9 @@
 # 3a. Resources          : CPUS, RAM, capped_cpus().
 # 3b. Capability flags   : HAS_SHORT_READS / HAS_LONG_READS / HAS_READS /
 #                          IS_HYBRID — what every downstream gate branches on.
-# 4.  Stage layout (D1)  : the numbered output directories, plus the one
-#                          canonical assembly hand-off FINAL_CONTIGS (D2).
+# 4.  Stage layout       : the numbered output directories, plus the one
+#                          canonical assembly hand-off FINAL_CONTIGS; both are
+#                          the same in all four modes.
 # 4b. Per-mode hand-offs : the decontamination, read and front-end paths each
 #                          mode's rules must produce or consume.
 # 5a. Shared constants   : ABRicate database list, banned sample-name
@@ -35,15 +36,6 @@
 #                          other three modes' globs and exits never fire.
 # 9b. Wildcard constraint: pins {sample} to the discovered sample names.
 # 10. Rule-all targets   : the list `rule all` asks for.
-#
-# "D1", "D2" and so on in comments: DECISIONS from merging the four v1 workflows.
-#   D1 = one stage-directory numbering; D2 = one assembly hand-off, FINAL_CONTIGS.
-#   D3 = where decontamination sits in each mode, as in that mode's v1 workflow.
-#   D4 = the phage callers read the decontaminated contigs in every mode.
-#   D5 = rule names unified across modes (v1 named some jobs differently).
-#   D7 = small cleanups: gate on capability flags; list the AMR databases once.
-#   D8 = VirSorter2 is the default phage caller; geNomad is an opt-in.
-#   D9 = the Platon/geNomad plasmid concordance, built only when geNomad runs.
 #
 # House rule for anyone editing this file: every parse-time side effect that
 # depends on the input data (a print, a glob of the input directory, a sys.exit
@@ -96,7 +88,7 @@ MODE_TAGLINE = {
 print(f"Mode: {MODE} — {MODE_TAGLINE[MODE]}.")
 
 
-# ────────── 1b. Phage and virus caller selection (D8) ──────────
+# ───────────── 1b. Phage and virus caller selection ────────────
 # Which tool calls viruses/prophages. VirSorter2 is the DEFAULT; geNomad is a
 # SELECTABLE opt-in (config.phage.caller: genomad). Resolved here next to the MODE
 # dispatch (it is mode-independent), following the same validate-or-exit pattern.
@@ -354,10 +346,11 @@ WORKFLOW_DIR = workflow.basedir
 # select_contigs rule in every mode.
 SELECT_TAXONOMY_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "10_decontam", "select_contigs_by_taxonomy.py")
 
-# D9 plasmid-concordance helper: joins Platon's plasmid calls and geNomad's plasmid
+# Plasmid-concordance helper: joins Platon's plasmid calls and geNomad's plasmid
 # calls into one confidence-tiered TSV. Stdlib-only Python; consumed by the
 # plasmid_concordance rule in shared/60_plasmid.smk (run in the platon env, which
-# already ships a Python — so this adds no dependency).
+# already ships a Python — so this adds no dependency). It runs only when geNomad
+# is the phage caller, since only then are there geNomad calls to join.
 PLASMID_CONCORDANCE_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "60_plasmid", "plasmid_concordance.py")
 
 # CARD read-mapping report helper: joins the strict and relaxed BBMap coverage
@@ -482,7 +475,7 @@ HAS_LONG_READS  = MODE in ("nanopore", "hybrid")   # filtlong, NanoPlot, Flye, M
 HAS_READS       = MODE != "contigs"                # anything populating 01.reads/ at all
 
 
-# ───────── 4. Unified stage layout (D1) + hand-off (D2) ────────
+# ────────── 4. Shared stage layout + assembly hand-off ─────────
 # In v1 the shared downstream stages landed at different numbers per mode
 # (taxonomy was 03/04/09 depending on how many front-end stages preceded it).
 # v2 groups ALL tech-specific front-end work under two fixed parents (01.reads,
@@ -531,9 +524,9 @@ ICE_AUDIT                = MOBILOME_DIR + "/{sample}_ice_discarded.tsv"
 # BLAST against TnCentral. This is what makes ladder tier 4 ("inside a NAMED unit
 # transposon or integron") reachable at all — colocalise.py has always known how
 # to award it, but until this layer existed nothing produced an element of the
-# right type. (No retained run has actually produced a tier-4 call yet — see
-# "What the benchmark does not show" in docs/mobilome/validation.md.) Fetched
-# once and shared by every sample, like the CONJscan models.
+# right type. On the ATCC BAA-2146 positive control it puts blaCTX-M-15 at tier 4,
+# inside TnEcp1.1 (docs/mobilome/validation.md). Fetched once and shared by every
+# sample, like the CONJscan models.
 TNCENTRAL_DB_DIR         = DIR_MOBILOME + "/tncentral_db"       # a DIRECTORY (rule tncentral_db)
 TNCENTRAL_FASTA          = TNCENTRAL_DB_DIR + "/tncentral.fa"
 TNCENTRAL_BLAST_DB       = TNCENTRAL_DB_DIR + "/tncentral_v5"   # a PREFIX, not a file
@@ -576,7 +569,7 @@ DIR_REPORT     = OUT + "/09.report"      # multiqc
 LOGS  = OUT + "/logs"
 BENCH = OUT + "/benchmarks"
 
-# D2 — the ONE canonical hand-off. Every mode's front end ends by writing this
+# The ONE canonical assembly hand-off. Every mode's front end ends by writing this
 # exact file, and every rule in 03.* – 08.* consumes ONLY this file, so the
 # downstream half never needs to know which front end (or assembler) produced
 # it. Built from DIR_ASSEMBLY so the stage number lives in exactly one place.
@@ -605,10 +598,10 @@ KEPT_GENUS = DIR_ASSEMBLY + "/{sample}/contaminants/{sample}_kept_genus.txt"
 # output and the analysis rule's input reference the exact same path.
 ANTISMASH_DB_DIR = DIR_ANNOTATION + "/antismash/databases"
 
-# ── Plasmid (06) + phage (07) stage paths (D8/D9) ──
+# ── Plasmid (06) + phage (07) stage paths ──
 # When the user OPTS IN to geNomad (PHAGE_CALLER == "genomad"), ONE end-to-end run
 # per sample (defined in shared/70_phage.smk) produces BOTH the virus calls
-# (→ CheckV) AND the plasmid calls (→ the D9 Platon/geNomad concordance). On the
+# (→ CheckV) AND the plasmid calls (→ the Platon/geNomad concordance). On the
 # default (virsorter2) geNomad does not run at all, and the geNomad constants below
 # are simply never referenced by any active rule. 60_plasmid.smk and 70_phage.smk
 # consume the files below ONLY through these constants — the same anti-drift,
@@ -651,7 +644,7 @@ PLATON_DIR          = DIR_PLASMIDS + "/{sample}/platon"                         
 PLATON_TABLE        = PLATON_DIR + "/" + GENOMAD_PREFIX + ".tsv"                    # Platon per-plasmid table (contigs_final.tsv)
 PLATON_CHROMOSOME   = PLATON_DIR + "/" + GENOMAD_PREFIX + ".chromosome.fasta"       # Platon chromosome contigs
 PLATON_VERIFIED     = PLATON_DIR + "/verified_plasmids.txt"                         # kept v1 BLAST-text check (supplementary)
-PLASMID_CONCORDANCE = DIR_PLASMIDS + "/{sample}/{sample}_plasmid_concordance.tsv"   # D9 terminal deliverable (rule plasmid_concordance)
+PLASMID_CONCORDANCE = DIR_PLASMIDS + "/{sample}/{sample}_plasmid_concordance.tsv"   # built only with geNomad (rule plasmid_concordance)
 
 # Cross-stage input contract (same single-source idea as COMPOSITION): the
 # contamination-screen BLAST table. WRITTEN by blast_contigs in
@@ -712,7 +705,7 @@ BLOB_TABLE        = BLOB_TABLE_PREFIX + ".blob.blobDB.table.txt"
 CONTIG_LIST      = DECONTAM_DIR + "/contigs.list"
 CONTIG_DECISIONS = DECONTAM_DIR + "/contig_taxonomy_decisions.tsv"
 
-# ── The two per-mode assembly hand-offs (D3, front-end contract) ──
+# ── The two per-mode assembly hand-offs (front-end contract) ──
 # DRAFT_CONTIGS    — what goes INTO the contamination screen (BLAST + BlobTools +
 #                    selector). The mode's front end declares this exact string as
 #                    an output.
@@ -958,8 +951,8 @@ QUAST_DIR        = DIR_ASSEMBLY + "/{sample}/eval/quast"
 CHECKM_DIR       = DIR_ASSEMBLY + "/{sample}/eval/checkm"
 # The {sample}_ prefix is a deliberate rename from v1's bare checkm_stats.tsv. The
 # MultiQC staging loop used to recover the sample with `basename $checkm_dir`;
-# under the D1 layout that basename is now the literal "checkm", so the sample name
-# has to be carried by the FILE name instead.
+# under the shared stage layout (…/{sample}/eval/checkm) that basename is now the
+# literal "checkm", so the sample name has to be carried by the FILE name instead.
 CHECKM_STATS     = CHECKM_DIR + "/{sample}_checkm_stats.tsv"
 CHECKM_LINEAGE   = CHECKM_DIR + "/lineage.ms"                                 # name chosen by CheckM itself
 QUALIMAP_DIR     = DIR_ASSEMBLY + "/{sample}/eval/qualimap"
@@ -1703,7 +1696,7 @@ DBCAN_DB_DIR   = DIR_ANNOTATION + "/dbcan/" + DBCAN_DB_ID
 DBCAN_SENTINEL = DBCAN_DB_DIR + "/.verified.sha256"
 
 # CARD: needed only by the read-based AMR leg, which exists only where the mode
-# produces short reads (D7). Resolved here so a missing key reports the config key
+# produces short reads. Resolved here so a missing key reports the config key
 # by name at parse time instead of surfacing as a bare KeyError from inside the
 # download rule. Modes without short reads never look at it.
 CARD_LINK = str(_links.get("card_link") or "").strip()
@@ -1810,7 +1803,7 @@ if HAS_LONG_READS:
     # (final_contigs(wc), polishing_input_contigs(wc)) that re-read the config
     # while the DAG was being built.
     if MODE == "nanopore":
-        # Medaka polishes AFTER the contamination screen (D3, v1 behaviour).
+        # Medaka polishes AFTER the contamination screen (v1 behaviour).
         MEDAKA_INPUT = DECONTAM_CONTIGS
         # What finalize_contigs copies to FINAL_CONTIGS.
         FINALIZE_SOURCE = MEDAKA_CONSENSUS if USE_MEDAKA else DECONTAM_CONTIGS
@@ -1989,11 +1982,11 @@ def _rule_modules_present():
 
 def _frontend_targets_for(mode):
     # Front-end leaf targets. Every mode guarantees the canonical finished
-    # assembly (D2, FINAL_CONTIGS); on top of that, ANYTHING a front end produces
+    # assembly (FINAL_CONTIGS); on top of that, ANYTHING a front end produces
     # that no other rule consumes has to be asked for BY NAME here, or Snakemake
     # will simply never build it.
     #
-    # We branch on the capability FLAGS rather than on the `mode` argument (D7),
+    # We branch on the capability FLAGS rather than on the `mode` argument,
     # so the intent reads as "this mode has long reads" instead of enumerating
     # mode names. The parameter is kept only so the call site in all_targets()
     # does not change.
@@ -2024,8 +2017,8 @@ def _frontend_targets_for(mode):
 def _downstream_targets():
     # The shared deliverables — 02.assembly/eval and 03.* – 09.* — produced by the
     # rules in rules/shared/. Identical across modes (that is the whole point of
-    # the D1 layout), apart from the conditional legs at the bottom: mapping QC,
-    # the CARD read-mapping leg and the mobilome module.
+    # the shared stage layout), apart from the conditional legs at the bottom:
+    # mapping QC, the CARD read-mapping leg and the mobilome module.
     targets = [
         # 02.assembly/eval — assembly + genome QC leaves. Listed explicitly
         # because v1's `rule all` listed them in all four workflows, and because
@@ -2047,7 +2040,7 @@ def _downstream_targets():
         *expand(DIR_AMR + "/abricate/{sample}/{db}.tsv", sample=SAMPLES, db=DATABASES),
         *expand(DIR_AMR + "/abricate/{sample}/AMR_summary.txt", sample=SAMPLES),
         # 06.plasmids — terminal plasmid deliverable depends on the phage caller:
-        #   geNomad opt-in → the Platon+geNomad concordance TSV (D9; pulls in both
+        #   geNomad opt-in → the Platon+geNomad concordance TSV (pulls in both
         #                    Platon via PLATON_DIR and geNomad via GENOMAD_DIR).
         #   default        → Platon's verified_plasmids.txt (Platon-only; geNomad
         #                    never runs, so there is no concordance to build).

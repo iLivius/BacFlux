@@ -1,7 +1,7 @@
 # BacFlux v2.0.0 — plasmid calling on the finished genome (stage 06.plasmids).
 # Platon is the primary caller; geNomad is an optional second opinion. Like the
-# rest of the shared tail this module reads only FINAL_CONTIGS (the D2 hand-off),
-# so it behaves identically in all four modes.
+# rest of the shared tail this module reads only FINAL_CONTIGS, the one assembly
+# hand-off from every mode, so it behaves identically in all four modes.
 #
 # Which file is the terminal deliverable depends on config phage.caller, because
 # geNomad calls viruses and plasmids in ONE run and only runs when it was opted in
@@ -9,12 +9,11 @@
 #   virsorter2 (default) — Platon alone, and Platon's verified_plasmids.txt is the
 #                          deliverable, exactly as in v1.
 #   genomad    (opt-in)  — Platon and geNomad are joined into a per-contig
-#                          concordance table (decision D9, see
-#                          docs/analysis/plasmids.md).
+#                          concordance table (see docs/analysis/plasmids.md).
 #
 # geNomad is opt-in and never the default because Berkeley Lab licenses it for
 # academic / non-commercial use only, and BacFlux is MIT — so the concordance is
-# opt-in too (00_common.smk §1b, decision D8).
+# opt-in too (00_common.smk §1b; see docs/about/licensing.md).
 # Platon runs either way, and either way v1's supplementary "does the nt BLAST hit
 # call this contig a plasmid?" check rides along as one visible annotation — never
 # as the decision.
@@ -34,7 +33,7 @@
 #
 # The geNomad summary the concordance reads physically lives under 07.phages/.
 # Reading "backwards" from stage 06 into stage 07 is safe: the stage numbers group
-# tools for the reader (D1), and Snakemake orders work by the input/output DAG,
+# tools for the reader, and Snakemake orders work by the input/output DAG,
 # not by directory name.
 #
 # Defined once in 00_common.smk and never re-derived here: FINAL_CONTIGS,
@@ -57,7 +56,7 @@
 # the subject title contains the word "plasmid". It stays an annotation and never
 # a filter, because a mobile element carried by a genuinely chromosomal contig can
 # push Platon's score AND that contig's best nt hit the same wrong way — so
-# agreement here is weaker evidence than it looks (D9).
+# agreement here is weaker evidence than it looks.
 #
 # Platon's own output lands in a platon/ SUB-directory of the sample directory (v1
 # wrote it straight into {sample}/) so the concordance TSV can sit beside it as a
@@ -157,7 +156,7 @@ rule plasmid_search:
 # rule all asks for verified_plasmids.txt instead (see 00_common.smk).
 if PHAGE_CALLER == "genomad":
 
-    # ── Join the two callers into one per-contig table (D9) ──
+    # ── Join the two callers into one per-contig table ──
     # The two callers fail differently — Platon scores protein families by how
     # plasmid-like they are, geNomad classifies from gene content with its own
     # marker set — so genuine agreement between them is far stronger evidence than
