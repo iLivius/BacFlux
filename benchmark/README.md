@@ -66,4 +66,8 @@ those two folders to it.
 !!! note
     `ground_truth.tsv` came from ICEberg 3.0, which is unversioned and carries no reuse
     statement. A future download could differ from this copy with no way to tell, which
-    is the other reason the file is kept rather than re-fetched on demand.
+    is the other reason the file is kept rather than re-fetched on demand. It holds
+    facts only, one row per element: kind, name, source accession, start and end,
+    length and organism, with no sequence. ICEberg's sequences are not in the
+    repository: the ICEberg layer downloads them, or reads your own copy, only when you
+    switch it on.
