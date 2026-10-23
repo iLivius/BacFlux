@@ -416,7 +416,7 @@ parameters:
 # viruses and plasmids together, so it also switches on the Platon + geNomad
 # concordance in 06.plasmids. On the default, that stage is Platon alone and
 # geNomad never runs. Its database comes from directories.genomad_db, or
-# links.genomad_link above. (Decisions D8/D9 — see docs/about/licensing.md.)
+# links.genomad_link above. Why VirSorter2 is the default: docs/about/licensing.md.
 phage:
   caller: virsorter2           # Options: virsorter2 (default) | genomad (opt-in, non-commercial licence)
 
