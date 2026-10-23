@@ -9,25 +9,6 @@ edit_uri: edit/main/docs/
 # preview; `mkdocs build` writes the static site to site/ (gitignored).
 docs_dir: docs
 
-# On the maintainer's computer docs/ also holds a few internal working documents
-# (design notes, the plan for merging the four v1 workflows, validation records).
-# They are not part of the repository: .gitignore keeps them out, with the same
-# patterns as below. Listing them here as well keeps them out of a site built or
-# deployed from that computer. Excluded files are not copied into site/ and do
-# not count as "missing from the nav", so a strict build stays quiet about them.
-#
-# Patterns are gitignore-style and each one is anchored with a leading slash, so
-# it matches only at the top level of docs/. A public page inside docs/mobilome/
-# is unaffected even if its filename starts with `mobilome_`.
-#
-# Adding a new file at the top of docs/ that is neither listed here nor in the
-# nav will be built but left unreachable — check both lists when you add one.
-exclude_docs: |
-  /README_notes.md
-  /mobilome_*.md
-  /unification_migration_plan.md
-  /validation/
-
 theme:
   name: material
   language: en
