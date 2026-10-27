@@ -26,14 +26,24 @@ false discovery is real even on curated genomes — ISEScan scored an 8.0%
 larger ISbrowser set (Puterová & Martínek 2021, BMC Bioinformatics 22:258) — so
 nothing downstream should quote a bare IS count without these numbers beside it.
 
-One kind of call is dropped because it cannot be an insertion at all: a call
-lying over the dnaA gene. dnaA starts chromosome replication and is essential,
-so no living isolate carries an insertion inside it. ISEScan nevertheless
-reports a partial IS21 there, most likely because IS21 elements carry a helper
-protein, IstB, from the same family of ATP-binding proteins as DnaA, so the
-IS21 profile matches DnaA itself. Bakta's annotation table (--bakta-tsv) says
-where dnaA is, and such a call goes to the audit file with reason overlaps_dnaA
-instead of into the table.
+Two kinds of call are dropped because they cannot be insertions at all. The
+first is a call lying over the dnaA gene. dnaA starts chromosome replication
+and is essential, so no living isolate carries an insertion inside it. ISEScan
+nevertheless reports a partial IS21 there, most likely because IS21 elements
+carry a helper protein, IstB, from the same family of ATP-binding proteins as
+DnaA, so the IS21 profile matches DnaA itself. Bakta's annotation table
+(--bakta-tsv) says where dnaA is, and such a call goes to the audit file with
+reason overlaps_dnaA instead of into the table.
+
+The second is a partial IS21 call lying over the chromosome's own replicative
+helicase loader: dnaC in Enterobacterales, dnaI in Bacillota. IstB is related
+to these loaders as well, and the loader is just as essential. The gene name
+alone is not enough here, because phages, integrative elements and plasmids
+carry loaders of their own, and Bakta can name the IstB of a real IS21 element
+dnaC. So the call is dropped, with reason overlaps_helicase_loader, only when
+Bakta's table also shows the loader's chromosomal neighbour beside it (dnaT for
+dnaC, nrdR for dnaI) and no IS21 transposase near it. The full test is
+explained at HELICASE_LOADER_SYMBOLS below.
 
 Where the input comes from: rule isescan runs ISEScan 1.7.3 on the delivered
 assembly, 02.assembly/{sample}/contigs_final.fasta, deliberately WITHOUT
@@ -114,6 +124,7 @@ workflow/scripts/80_mobilome/test_isescan_to_table.py
 import argparse
 import csv
 import os
+import re
 import sys
 
 
@@ -199,6 +210,79 @@ DNAA_PRODUCT = "chromosomal replication initiator protein DnaA"
 # table's own header line ("#Sequence Id<TAB>Type<TAB>Start...").
 BAKTA_COLUMNS_NEEDED = ["Sequence Id", "Type", "Start", "Stop", "Locus Tag",
                         "Gene", "Product"]
+
+
+# ── A call that is not an insertion: one lying over the helicase loader ──────
+
+# The same IS21 profile also matches the chromosome's replicative helicase
+# loader, the protein that places the replication helicase onto the DNA: DnaC in
+# Enterobacterales, DnaI in Bacillota (Firmicutes). IstB, the IS21 helper
+# protein, is an ATPase of that same family. The loader is essential, so a call
+# lying over it cannot be a real insertion either, yet ISEScan reports a partial
+# IS21 there just as it does over dnaA.
+#
+# The gene name alone cannot single out the chromosome's own loader. Phages,
+# integrative elements and plasmids carry loaders of their own, and Bakta can
+# name the IstB of a real IS21 element dnaC. So a call is dropped, with reason
+# overlaps_helicase_loader, only when ALL FOUR of these hold:
+#   1. ISEScan calls it a PARTIAL element (type 'p') of family IS21. The profile
+#      match is an IS21 one, so a call of any other family, and a complete IS21
+#      call, is never dropped this way.
+#   2. It lies over a CDS that Bakta names dnaC or dnaI (gene symbol), by the
+#      same two-sided test as dnaA: the two overlap by at least
+#      DNAA_OVERLAP_FRACTION of the shorter of the two.
+#   3. That CDS has its chromosomal partner on the same contig, within
+#      LOADER_PARTNER_WINDOW_BP (the LOADER_PARTNER_* constants below).
+#   4. No IS21 transposase lies on the same contig within
+#      IS21_TRANSPOSASE_WINDOW_BP of the loader (the IS21_TRANSPOSASE_*
+#      constants below).
+# Every other call over dnaC or dnaI is KEPT: the loaders of phages, ICEs and
+# plasmids (none sits beside a dnaT or nrdR), an IS21 IstB that Bakta names dnaC,
+# and the chromosome's own loader in a taxon that has no such partner gene, or on
+# a draft assembly where the partner fell on another contig.
+HELICASE_LOADER_SYMBOLS = ("dnaC", "dnaI")
+HELICASE_LOADER_IS_FAMILY = "IS21"
+
+# The neighbour that marks a loader as the chromosome's own (condition 3).
+# Distances are the gap between the two CDS, 0 when they touch or overlap.
+#   - dnaT, directly beside dnaC in the dnaC-dnaT operon of Enterobacterales,
+#     0 to 2 bp away. It counts only when Bakta's product is exactly
+#     "primosomal protein DnaT": mobile elements carry DnaT-like proteins that
+#     Bakta also gives the symbol dnaT, but describes as "DnaT DNA-binding
+#     domain-containing protein", and those must not vouch for a loader.
+#   - nrdR, at the head of the nrdR-dnaB-dnaI cluster of Bacillota, about 1.2
+#     to 3.2 kb from dnaI with dnaB in between. The symbol alone is enough.
+# 5 kb covers both with room to spare. The loaders carried by phages, ICEs and
+# plasmids sit far from either gene: in the genomes this test was checked on,
+# the nearest was more than 100 kb away.
+LOADER_PARTNER_WINDOW_BP = 5000
+LOADER_PARTNER_DNAT_SYMBOL = "dnaT"
+LOADER_PARTNER_DNAT_PRODUCT = "primosomal protein DnaT"
+LOADER_PARTNER_NRDR_SYMBOL = "nrdR"
+
+# The safety catch (condition 4). A real IS21 element is a transposase, IstA,
+# sitting beside its helper, IstB. When an IS21 transposase lies within this
+# distance of the "loader", that loader may be a real element's IstB that Bakta
+# happens to call dnaC, so the call is kept.
+#
+# A CDS counts as an IS21 transposase when its gene symbol is istA, or when its
+# product contains, ignoring case, any of IS21_TRANSPOSASE_PRODUCT_TEXTS or the
+# whole word IstA. The texts other than "IS21" are there because IstA belongs to
+# the same family of transposases as the phage Mu transposase and the retroviral
+# integrases, and Bakta often names it after that domain. IstA must be a whole
+# word because the same four letters sit inside ordinary words: "resistance"
+# would otherwise count. "IS21" also matches the IS21 helper proteins themselves
+# ("IS21-like element helper ATPase IstB"), which is just as good a sign that an
+# IS21 element is close by.
+#
+# A bare "transposase" does NOT count. Unrelated transposases sit 2.7 to 3.8 kb
+# from several true chromosomal loaders, and counting them would keep exactly
+# the calls this test exists to drop.
+IS21_TRANSPOSASE_WINDOW_BP = 5000
+IS21_TRANSPOSASE_SYMBOL = "istA"
+IS21_TRANSPOSASE_PRODUCT_TEXTS = ("IS21", "Mu transposase",
+                                  "integrase catalytic", "integrase core")
+IS21_TRANSPOSASE_PRODUCT_WORD = "IstA"
 
 
 # ── The three tables this writes ─────────────────────────────────────────────
@@ -301,7 +385,14 @@ AUDIT_COLUMNS = [
 #                                     or at least half of dnaA inside the call;
 #                                     dnaA is essential, so it is not an
 #                                     insertion (see DNAA_OVERLAP_FRACTION)
-#  ** contig_not_in_contig_lengths    the contig is missing from the lengths file,
+#     overlaps_helicase_loader        a partial IS21 call lying over dnaC or dnaI
+#                                     (same two-sided test) where that loader has
+#                                     its chromosomal partner, dnaT or nrdR,
+#                                     beside it and no IS21 transposase near it.
+#                                     The chromosome's own helicase loader is
+#                                     essential, so it is not an insertion (see
+#                                     HELICASE_LOADER_SYMBOLS)
+#  ** contig_not_in_contig_lengths   the contig is missing from the lengths file,
 #                                     so distance-to-contig-end cannot be computed
 #                                     and the IS is dropped rather than reported
 #                                     without the honesty flag.
@@ -503,27 +594,83 @@ def read_contig_lengths(path):
     return lengths
 
 
-# ── Bakta's annotation: where dnaA is ────────────────────────────────────────
+# ── Bakta's annotation: where dnaA and the helicase loader are ───────────────
 
-def read_dnaa_genes(path):
-    """Find the dnaA gene(s) in Bakta's annotation table.
+def _is_dnaa(gene_symbol, product):
+    """True for a CDS Bakta calls dnaA, by its symbol or, failing that, by its
+    product name (see DNAA_GENE_SYMBOL and DNAA_PRODUCT)."""
+    return gene_symbol == DNAA_GENE_SYMBOL or product == DNAA_PRODUCT
+
+
+def _is_helicase_loader(gene_symbol):
+    """True for a CDS Bakta names dnaC or dnaI. Symbol only: whether it is the
+    chromosome's own loader is decided later, by its neighbours."""
+    return gene_symbol in HELICASE_LOADER_SYMBOLS
+
+
+def _is_loader_partner(gene_symbol, product):
+    """True for the neighbour that marks a loader as chromosomal: a dnaT whose
+    product is exactly "primosomal protein DnaT", or any nrdR. The DnaT-like
+    proteins of mobile elements also get the symbol dnaT but a different
+    product, and are left out (see LOADER_PARTNER_WINDOW_BP)."""
+    if gene_symbol == LOADER_PARTNER_DNAT_SYMBOL:
+        return product == LOADER_PARTNER_DNAT_PRODUCT
+    return gene_symbol == LOADER_PARTNER_NRDR_SYMBOL
+
+
+def _is_is21_transposase(gene_symbol, product):
+    """True for a CDS that shows an IS21 element is nearby: symbol istA, or a
+    product containing one of IS21_TRANSPOSASE_PRODUCT_TEXTS or the whole word
+    IstA, ignoring case (see IS21_TRANSPOSASE_WINDOW_BP for why these words and
+    not a bare "transposase")."""
+    if gene_symbol == IS21_TRANSPOSASE_SYMBOL:
+        return True
+
+    product_lower = product.lower()
+    for text in IS21_TRANSPOSASE_PRODUCT_TEXTS:
+        if text.lower() in product_lower:
+            return True
+
+    # Whole word: cut the product at every character that is not a letter or a
+    # digit ("IstA-like" -> "ista", "like"), then look for the word itself.
+    product_words = re.split(r"[^a-z0-9]+", product_lower)
+    return IS21_TRANSPOSASE_PRODUCT_WORD.lower() in product_words
+
+
+def read_bakta_genes(path):
+    """Collect, in one pass over Bakta's annotation table, every CDS that the two
+    biological checks in normalise_records need.
 
     Input:  Bakta's {sample}.tsv for the same assembly (rule annotation writes it
             to 04.annotation/bakta/{sample}/). It opens with a few comment lines
             starting with '#'; the last of them is the column header
             (#Sequence Id, Type, Start, Stop, Strand, Locus Tag, Gene, Product,
             DbXrefs).
-    Output: a list of {contig, start, end, locus_tag}, one per CDS Bakta calls
-            dnaA (see DNAA_GENE_SYMBOL and DNAA_PRODUCT). Usually one; empty when
-            Bakta found none, in which case no IS call is dropped for this reason.
+    Output: a dict of four lists, each entry {contig, start, end, locus_tag,
+            gene, product}:
+              "dnaA"              every CDS Bakta calls dnaA (by symbol or by
+                                  product). Usually one; empty when Bakta found
+                                  none, and then no call is dropped as
+                                  overlaps_dnaA.
+              "helicase_loader"   every CDS named dnaC or dnaI
+              "loader_partner"    every dnaT "primosomal protein DnaT" and nrdR
+              "is21_transposase"  every CDS that shows an IS21 element nearby.
+                                  These entries also carry
+                                  runs_across_contig_end (see below).
+            judge_helicase_loaders reads the last three; read_dnaa_genes hands
+            on the first.
 
     Columns are found by name in Bakta's own header, the same defensive choice
     read_isescan_table makes. A file with no such header raises ValueError naming
-    the file: carrying on would quietly switch the dnaA check off.
+    the file: carrying on would quietly switch both checks off.
 
     A CDS whose Start is larger than its Stop runs across the end of a circular
-    contig. It is skipped, because one start..end interval cannot describe it, and
-    skipping it can only keep an IS call, never drop one wrongly.
+    contig, and one start..end interval cannot describe it. For dnaA, the loader
+    and its partner it is skipped, which can only keep an IS call, never drop one
+    wrongly. An IS21 transposase is the opposite case: missing it could drop a
+    call that should be kept. So it is kept, flagged runs_across_contig_end, and
+    its distance to a loader is measured to the nearer of its two pieces (see
+    _gap_to_cds_across_contig_end), with the same 5 kb window as any other.
     """
     with open(path, "r", encoding="utf-8") as handle:
         lines = [line.rstrip("\n") for line in handle]
@@ -546,7 +693,12 @@ def read_dnaa_genes(path):
     column = {name: header.index(name) for name in BAKTA_COLUMNS_NEEDED}
     last_needed = max(column.values())
 
-    genes = []
+    genes = {
+        "dnaA": [],
+        "helicase_loader": [],
+        "loader_partner": [],
+        "is21_transposase": [],
+    }
     for line in lines:
         if not line or line.startswith("#"):
             continue
@@ -555,35 +707,206 @@ def read_dnaa_genes(path):
             continue
         if fields[column["Type"]].strip() != "cds":
             continue
-        gene_symbol = fields[column["Gene"]].strip()
-        product = fields[column["Product"]].strip()
-        if gene_symbol != DNAA_GENE_SYMBOL and product != DNAA_PRODUCT:
-            continue
         start = _int_or_none(fields[column["Start"]])
         end = _int_or_none(fields[column["Stop"]])
-        if start is None or end is None or start > end:
+        if start is None or end is None:
             continue
-        genes.append({
+        gene_symbol = fields[column["Gene"]].strip()
+        product = fields[column["Product"]].strip()
+        cds = {
             "contig": fields[column["Sequence Id"]].strip(),
             "start": start,
             "end": end,
             "locus_tag": fields[column["Locus Tag"]].strip(),
-        })
+            "gene": gene_symbol,
+            "product": product,
+        }
+        runs_across_contig_end = start > end
+
+        # The transposase first, because it is the one role kept even when the
+        # CDS runs across the contig end (see the docstring).
+        if _is_is21_transposase(gene_symbol, product):
+            transposase = dict(cds)
+            transposase["runs_across_contig_end"] = runs_across_contig_end
+            genes["is21_transposase"].append(transposase)
+
+        if runs_across_contig_end:
+            continue
+        # A CDS can in principle fill more than one role, so each is tested on
+        # its own; every list gets its own copy of the record.
+        if _is_dnaa(gene_symbol, product):
+            genes["dnaA"].append(dict(cds))
+        if _is_helicase_loader(gene_symbol):
+            genes["helicase_loader"].append(dict(cds))
+        if _is_loader_partner(gene_symbol, product):
+            genes["loader_partner"].append(dict(cds))
     return genes
 
 
-def overlapping_dnaa_gene(contig, start, end, dnaa_genes):
-    """Return (gene, overlap_bp) for the dnaA gene this IS call lies over, or None.
+def read_dnaa_genes(path):
+    """Find the dnaA gene(s) in Bakta's annotation table: the "dnaA" list of
+    read_bakta_genes, which documents the input and how dnaA is recognised."""
+    return read_bakta_genes(path)["dnaA"]
+
+
+def _gap_between(first, second):
+    """Return the bp of sequence lying between two CDS on the same contig, 0 when
+    they touch or overlap.
+
+    Both are 1-based and inclusive, so a CDS ending at 100 and one starting at
+    101 touch, with nothing between them: 101 - 100 - 1 = 0.
+    """
+    if first["end"] < second["start"]:
+        return second["start"] - first["end"] - 1
+    if second["end"] < first["start"]:
+        return first["start"] - second["end"] - 1
+    return 0
+
+
+def _gap_to_cds_across_contig_end(anchor, wrapped):
+    """Return the bp of sequence between an ordinary CDS (the anchor, e.g. dnaC)
+    and a CDS that runs across the end of a circular contig, 0 when they touch
+    or overlap.
+
+    Bakta writes such a CDS with Start larger than Stop: it covers Start up to
+    the contig's last base, then carries on from base 1 to Stop. In the record
+    from read_bakta_genes, "start" holds Start and "end" holds Stop. So it is
+    measured as those two pieces, and the nearer piece counts:
+      - the piece 1..Stop lies before the anchor:
+            gap = anchor start - Stop - 1
+      - the piece Start..contig end lies after the anchor:
+            gap = Start - anchor end - 1
+    No contig length is needed. A negative number means the anchor overlaps
+    that piece, so the gap is 0. This is the same along-the-contig distance used
+    for every other pair of CDS.
+    """
+    gap_to_piece_before_bp = anchor["start"] - wrapped["end"] - 1
+    gap_to_piece_after_bp = wrapped["start"] - anchor["end"] - 1
+    nearer_gap_bp = min(gap_to_piece_before_bp, gap_to_piece_after_bp)
+    if nearer_gap_bp < 0:
+        return 0
+    return nearer_gap_bp
+
+
+def _nearest_on_same_contig(anchor, candidates):
+    """Return (cds, gap_bp) for the candidate CDS closest to the anchor CDS on the
+    same contig, or (None, None) when that contig has none.
+
+    A candidate flagged runs_across_contig_end (only IS21 transposases carry the
+    flag) is measured to the nearer of its two pieces by
+    _gap_to_cds_across_contig_end; every other candidate by _gap_between.
+    """
+    nearest_cds = None
+    nearest_gap_bp = None
+    for candidate in candidates:
+        if candidate["contig"] != anchor["contig"]:
+            continue
+        if candidate.get("runs_across_contig_end"):
+            gap_bp = _gap_to_cds_across_contig_end(anchor, candidate)
+        else:
+            gap_bp = _gap_between(anchor, candidate)
+        if nearest_gap_bp is None or gap_bp < nearest_gap_bp:
+            nearest_cds = candidate
+            nearest_gap_bp = gap_bp
+    return nearest_cds, nearest_gap_bp
+
+
+def judge_helicase_loaders(bakta_genes):
+    """Decide, for every dnaC and dnaI in Bakta's table, whether it is the
+    chromosome's own helicase loader: conditions 3 and 4 at
+    HELICASE_LOADER_SYMBOLS.
+
+    Input:  the dict from read_bakta_genes.
+    Output: one dict per dnaC/dnaI CDS, a copy of its Bakta entry plus:
+              partner_gene, partner_locus_tag, partner_gap_bp
+                  the nearest dnaT/nrdR partner on the same contig, or None
+              is21_transposase_locus_tag, is21_transposase_gap_bp
+                  the nearest IS21 transposase on the same contig, or None
+              is_chromosomal
+                  True when the partner is within LOADER_PARTNER_WINDOW_BP AND
+                  no IS21 transposase is within IS21_TRANSPOSASE_WINDOW_BP
+              decision
+                  one plain sentence saying which way it went and why
+            main() prints every decision to the run log, and hands the loaders
+            with is_chromosomal True to normalise_records, which tests
+            conditions 1 and 2 against each IS call.
+
+    The loader itself is not left out of the transposase search: a CDS that
+    Bakta names dnaC but describes as an IS21 protein is an IS21 IstB, and its
+    call must be kept.
+    """
+    judged = []
+    for loader in bakta_genes["helicase_loader"]:
+        partner, partner_gap_bp = _nearest_on_same_contig(
+            loader, bakta_genes["loader_partner"]
+        )
+        transposase, transposase_gap_bp = _nearest_on_same_contig(
+            loader, bakta_genes["is21_transposase"]
+        )
+
+        has_partner = (
+            partner is not None and partner_gap_bp <= LOADER_PARTNER_WINDOW_BP
+        )
+        has_is21_transposase = (
+            transposase is not None
+            and transposase_gap_bp <= IS21_TRANSPOSASE_WINDOW_BP
+        )
+
+        if not has_partner:
+            is_chromosomal = False
+            decision = (
+                f"kept out of the check: no dnaT or nrdR partner within "
+                f"{LOADER_PARTNER_WINDOW_BP} bp on the same contig, so nothing "
+                "shows it is the chromosome's own (it may belong to a phage, ICE "
+                "or plasmid, or the partner is missing or on another contig)"
+            )
+        elif has_is21_transposase:
+            is_chromosomal = False
+            where = f"lies {transposase_gap_bp} bp away"
+            if transposase.get("runs_across_contig_end"):
+                wrap_note = (" (it runs across the contig end; measured to its "
+                             "nearer piece)")
+                where = where + wrap_note
+            decision = (
+                f"kept out of the check: IS21 transposase "
+                f"{transposase['locus_tag']} ({transposase['product']}) {where}, "
+                "so this may be a real IS21 element's IstB"
+            )
+        else:
+            is_chromosomal = True
+            decision = (
+                f"the chromosome's own loader ({partner['gene']} "
+                f"{partner['locus_tag']} {partner_gap_bp} bp away, no IS21 "
+                "transposase nearby); a partial IS21 call lying over it is dropped"
+            )
+
+        entry = dict(loader)
+        entry["partner_gene"] = partner["gene"] if partner else None
+        entry["partner_locus_tag"] = partner["locus_tag"] if partner else None
+        entry["partner_gap_bp"] = partner_gap_bp
+        entry["is21_transposase_locus_tag"] = (
+            transposase["locus_tag"] if transposase else None
+        )
+        entry["is21_transposase_gap_bp"] = transposase_gap_bp
+        entry["is_chromosomal"] = is_chromosomal
+        entry["decision"] = decision
+        judged.append(entry)
+    return judged
+
+
+def overlapping_gene(contig, start, end, genes):
+    """Return (gene, overlap_bp) for the first gene this IS call lies over, or
+    None. Used for both biological checks: dnaA, and the helicase loader.
 
     "Lies over" means the call and the gene overlap by at least
     DNAA_OVERLAP_FRACTION of the shorter of the two lengths, which covers both a
-    call sitting inside dnaA and a call that contains most of it. Both intervals
-    are 1-based and inclusive, so the overlap counts its first and last base;
-    with no overlap at all the number comes out zero or negative and fails the
-    test.
+    call sitting inside the gene and a call that contains most of it. Both
+    intervals are 1-based and inclusive, so the overlap counts its first and last
+    base; with no overlap at all the number comes out zero or negative and fails
+    the test.
     """
     call_length_bp = end - start + 1
-    for gene in dnaa_genes or []:
+    for gene in genes or []:
         if gene["contig"] != contig:
             continue
         gene_length_bp = gene["end"] - gene["start"] + 1
@@ -592,6 +915,12 @@ def overlapping_dnaa_gene(contig, start, end, dnaa_genes):
         if overlap_bp >= DNAA_OVERLAP_FRACTION * shorter_length_bp:
             return gene, overlap_bp
     return None
+
+
+def overlapping_dnaa_gene(contig, start, end, dnaa_genes):
+    """Return (gene, overlap_bp) for the dnaA gene this IS call lies over, or
+    None: overlapping_gene applied to the dnaA list."""
+    return overlapping_gene(contig, start, end, dnaa_genes)
 
 
 # ── Finding ISEScan's results file ───────────────────────────────────────────
@@ -733,12 +1062,15 @@ def read_isescan_table(path):
 
 
 def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_bp,
-                      dnaa_genes=None):
+                      dnaa_genes=None, helicase_loaders=None):
     """Turn ISEScan's records into the tidy output rows, and decide what to drop.
 
     Input:  records from read_isescan_table, the {contig: length} map from the
-            assembly, the boundary threshold in bp, a minimum IS length, and the
-            dnaA genes from read_dnaa_genes (None or empty: no dnaA check).
+            assembly, the boundary threshold in bp, a minimum IS length, the
+            dnaA genes from read_bakta_genes (None or empty: no dnaA check), and
+            the chromosome's own helicase loaders, i.e. the entries of
+            judge_helicase_loaders with is_chromosomal True (None or empty: no
+            loader check).
     Output: (rows, audit_rows) — the deliverable table, and one audit row for
             every record dropped or flagged, each with an explicit reason.
 
@@ -759,6 +1091,12 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
                                    at least half of dnaA inside the call. The
                                    gene is essential, so this is ISEScan's
                                    profile matching DnaA, not an insertion.
+      overlaps_helicase_loader     a partial IS21 call lying over dnaC or dnaI,
+                                   by the same two-sided test, where that loader
+                                   has its chromosomal partner (dnaT or nrdR)
+                                   beside it and no IS21 transposase near it.
+                                   The chromosome's own loader is essential, so
+                                   this too is a profile match, not an insertion.
 
     The one FLAG (kept, not dropped) is an unrecognised completeness letter: we
     would rather report an IS with is_complete=NA than lose a real element over a
@@ -767,7 +1105,12 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
     rows = []
     audit_rows = []
 
-    def audit(contig, start, end, action, reason, detail):
+    def audit(contig, start, end, action, reason, detail, whole_detail=False):
+        # Details that quote a raw ISEScan line are cut to AUDIT_DETAIL_MAX_CHARS.
+        # whole_detail=True keeps a detail that quotes no raw line and is all
+        # explanation, which a reader needs in full.
+        if not whole_detail:
+            detail = detail[:AUDIT_DETAIL_MAX_CHARS]
         audit_rows.append({
             "sample": sample,
             "contig": _text_or_na(contig),
@@ -775,7 +1118,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             "end": _text_or_na(end),
             "action": action,
             "reason": reason,
-            "detail": detail[:AUDIT_DETAIL_MAX_CHARS],
+            "detail": detail,
         })
 
     for record in records:
@@ -871,7 +1214,43 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             )
             continue
 
-        # ── 7. Completeness: ISEScan's own complete/partial letter ───────────
+        # ── 7. Not an insertion: a partial IS21 over the helicase loader ─────
+        # Why such a call exists, and the four conditions, are explained at
+        # HELICASE_LOADER_SYMBOLS. helicase_loaders holds only the loaders that
+        # already passed conditions 3 and 4 (a dnaT or nrdR partner beside
+        # them, no IS21 transposase near them; judge_helicase_loaders). Here
+        # each call is tested for the other two: is it a partial IS21 (1), and
+        # does it lie over one of those loaders (2)?
+        family = (record.get("family") or "").strip()
+        type_letter = (record.get("type") or "").strip().lower()
+        is_partial_is21 = (
+            family == HELICASE_LOADER_IS_FAMILY
+            and type_letter == ISESCAN_TYPE_PARTIAL
+        )
+        if is_partial_is21:
+            loader_match = overlapping_gene(contig, start, end, helicase_loaders)
+        else:
+            loader_match = None
+        if loader_match is not None:
+            loader, overlap_bp = loader_match
+            loader_length_bp = loader["end"] - loader["start"] + 1
+            share_of_call = round(100 * overlap_bp / length_bp)
+            share_of_gene = round(100 * overlap_bp / loader_length_bp)
+            # Kept whole: this detail quotes no raw line, and cutting it would
+            # lose the partner distance or the reason.
+            audit(
+                contig, start, end, "dropped", "overlaps_helicase_loader",
+                f"{overlap_bp} bp shared with {loader['gene']} "
+                f"({loader['locus_tag']}, {loader['start']}..{loader['end']}): "
+                f"{share_of_call}% of the call, {share_of_gene}% of the gene; "
+                f"partner {loader['partner_gene']} {loader['partner_gap_bp']} bp "
+                "away. The chromosome's own helicase loader is essential; this is "
+                "a profile match, not an insertion",
+                whole_detail=True,
+            )
+            continue
+
+        # ── 8. Completeness: ISEScan's own complete/partial letter ───────────
         raw_type = (record.get("type") or "").strip().lower()
         if raw_type == ISESCAN_TYPE_COMPLETE:
             is_complete = True
@@ -885,7 +1264,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
                 "kept with is_complete=NA",
             )
 
-        # ── 8. Terminal inverted repeats ─────────────────────────────────────
+        # ── 9. Terminal inverted repeats ─────────────────────────────────────
         # A pair of inverted repeats at the two ends is the structural signature of
         # an intact IS, so its presence is one of the confidence signals the
         # module tiers on. ISEScan reports irLen = 0 when it found none; if that
@@ -898,7 +1277,7 @@ def normalise_records(sample, records, contig_lengths, boundary_bp, min_length_b
             tir_text = (record.get("tir") or "").strip()
             ir_present = bool(tir_text) and tir_text not in {"-", "NA", "."}
 
-        # ── 9. How close is this IS to where the assembly broke? ─────────────
+        # ── 10. How close is this IS to where the assembly broke? ────────────
         # An IS sitting at a contig end is the assembler telling us it could not
         # resolve that repeat: whatever was next to the IS is missing from the
         # assembly, so any statement about its genomic context is unsupported.
@@ -1101,7 +1480,12 @@ def build_parser():
                         help="Bakta's annotation table ({sample}.tsv) for the same "
                              "assembly. When given, an IS call lying over dnaA is "
                              "dropped and written to the audit file (reason "
-                             "overlaps_dnaA). Rule isescan_table always gives it.")
+                             "overlaps_dnaA), and so is a partial IS21 call lying "
+                             "over the chromosome's own helicase loader, dnaC or "
+                             "dnaI with its dnaT or nrdR partner beside it and no "
+                             "IS21 transposase near it (reason "
+                             "overlaps_helicase_loader). Rule isescan_table always "
+                             "gives it.")
     # There are three contig-edge thresholds in this module, deliberately
     # different numbers on different objects, so do not "harmonise" them (two of
     # the three even share this flag's name):
@@ -1195,19 +1579,23 @@ def main(argv=None):
         sys.stderr.write(f"ERROR: {error}\n")
         return 1
 
-    # Where dnaA is, so that a call lying over it can be dropped (step 6 of
-    # normalise_records). Like the contig lengths, a table that was asked for but
-    # cannot be read is a wiring problem, so it stops the run.
+    # Where dnaA and the chromosome's own helicase loader are, so that a call
+    # lying over either can be dropped (steps 6 and 7 of normalise_records). Like
+    # the contig lengths, a table that was asked for but cannot be read is a
+    # wiring problem, so it stops the run.
     dnaa_genes = []
+    chromosomal_loaders = []
     if args.bakta_tsv:
         if not os.path.exists(args.bakta_tsv):
             sys.stderr.write(f"ERROR: Bakta annotation table not found: {args.bakta_tsv}\n")
             return 1
         try:
-            dnaa_genes = read_dnaa_genes(args.bakta_tsv)
+            bakta_genes = read_bakta_genes(args.bakta_tsv)
         except ValueError as error:
             sys.stderr.write(f"ERROR: {error}\n")
             return 1
+
+        dnaa_genes = bakta_genes["dnaA"]
         if dnaa_genes:
             places = ", ".join(
                 f"{gene['contig']}:{gene['start']}..{gene['end']}" for gene in dnaa_genes
@@ -1215,6 +1603,19 @@ def main(argv=None):
             print(f"dnaA in Bakta's table: {places}. An IS call lying over it is dropped.")
         else:
             print("No dnaA in Bakta's table, so no IS call is checked against it.")
+
+        # Every dnaC/dnaI gets one log line saying whether it is treated as the
+        # chromosome's own loader and why, so a kept call over a loader can be
+        # explained from the log. Only the chromosomal ones go on to step 7.
+        judged_loaders = judge_helicase_loaders(bakta_genes)
+        for loader in judged_loaders:
+            print(f"{loader['gene']} {loader['locus_tag']} at {loader['contig']}:"
+                  f"{loader['start']}..{loader['end']}: {loader['decision']}.")
+            if loader["is_chromosomal"]:
+                chromosomal_loaders.append(loader)
+        if not judged_loaders:
+            print("No dnaC or dnaI in Bakta's table, so no IS call is checked "
+                  "against a helicase loader.")
 
     # Locate ISEScan's results. None is normal: ISEScan writes no files at all for
     # a genome in which it found no IS.
@@ -1236,7 +1637,7 @@ def main(argv=None):
 
     rows, audit_rows = normalise_records(
         args.sample, records, contig_lengths, args.boundary_bp, args.min_length_bp,
-        dnaa_genes,
+        dnaa_genes, chromosomal_loaders,
     )
     # When there is nothing to report, say in the audit file WHY there is nothing:
     # "ISEScan found no IS in this genome" and "ISEScan produced no results file"

@@ -327,7 +327,7 @@ Per sample, `08.mobilome/{sample}/` holds:
 | `{sample}_amr_mobility.tsv` | **The deliverable.** One row per AMR gene: its mobile-element context, the element's identity where one is known, the contig-edge flags, a mobility tier from 1 to 6 and a confidence. |
 | `{sample}_amr_mobility_audit.tsv` | Why every gene that got no context got none. |
 | `{sample}_is_summary.tsv` | The honesty metric: how many insertion-sequence calls sit within `mobilome.contig_boundary_bp` of a contig end, and what fraction of the total that is. **Read this before the table above.** |
-| `{sample}_is_elements.tsv`, `{sample}_is_discarded.tsv` | One tidy row per insertion sequence, and the dropped rows with a reason — among them `overlaps_dnaA`, a call lying over the essential gene *dnaA*, which ISEScan reports but which cannot be a real insertion. |
+| `{sample}_is_elements.tsv`, `{sample}_is_discarded.tsv` | One tidy row per insertion sequence, and the dropped rows with a reason — among them `overlaps_dnaA`, a call lying over the essential gene *dnaA*, and `overlaps_helicase_loader`, a partial IS21 lying over the chromosome's own helicase loader (*dnaC* or *dnaI* with its chromosomal partner beside it and no IS21 transposase near it). ISEScan reports both, but neither can be a real insertion. |
 | `{sample}_ice_candidates.tsv`, `{sample}_ice_discarded.tsv` | ICE/IME candidates with their anchors, boundaries and class; and the discard trail. |
 | `{sample}_amrfinderplus.tsv`, `_amrfinderplus_mutations.tsv` | The AMR calls with coordinates and a method column; point mutations separately. |
 | `{sample}_amrfinder_organism.txt`, `_amrfinder_organism_audit.tsv` | Which AMRFinderPlus `--organism` the GTDB-Tk placement mapped to, or none, and why. |

@@ -497,7 +497,7 @@ a config key.
 A high `fraction_at_contig_boundary` means the assembly broke exactly where the IS
 elements are, and the located IS count should be read as a floor. For reference, the
 hybrid assemblies of the clinical *K. pneumoniae* isolates TUM24772 and K3, near-closed
-genomes, score 0: none of their 96 and 111 IS calls sits at a contig end. A short-read
+genomes, score 0: none of their 95 and 110 IS calls sits at a contig end. A short-read
 draft will be far higher.
 
 ISEScan itself is run with **no** `--removeShortIS`, on purpose: partials are kept and
@@ -505,8 +505,8 @@ tiered rather than discarded. `--min-length-bp` on `rule isescan_table` defaults
 (the flag's default in `isescan_to_table.py`) — set it to 500 if you want the
 discard-below-500-bp convention applied to IS calls too.
 
-One call is dropped for a biological reason rather than a threshold: an IS call lying
-over the *dnaA* gene. *dnaA* is essential, so no living isolate carries an insertion
+Two kinds of call are dropped for a biological reason rather than a threshold. The
+first is an IS call lying over the *dnaA* gene. *dnaA* is essential, so no living isolate carries an insertion
 inside it. ISEScan reports a partial IS21 there, most likely because IS21 elements
 carry IstB, a helper protein related to DnaA, so the IS21 profile matches DnaA itself.
 `rule isescan_table` reads Bakta's annotation table to find *dnaA*, and a call goes to
@@ -516,12 +516,40 @@ second case is the call that runs on into *dnaN*, the next gene, because ISEScan
 finder joined the two. That half is `DNAA_OVERLAP_FRACTION`, a constant in
 `isescan_to_table.py`, not a setting meant to be tuned.
 
-The same IS21 profile also matches the helicase loaders DnaC (in Enterobacterales) and
-DnaI (in Firmicutes), and those calls are **kept**. Their gene names cannot separate
-them safely: Bakta can also name *dnaC* an IstB-like protein that belongs to a real
-IS21 element, or the loader carried by a phage or an integrative element. So a partial
-IS21 call sitting on *dnaC* or *dnaI* counts in the IS totals and is used downstream;
-read it as the same artefact.
+The same IS21 profile also matches the chromosome's replicative helicase loader, DnaC
+in Enterobacterales and DnaI in Bacillota, and that gene is just as essential. Its name
+alone cannot single it out: phages, integrative elements and plasmids carry loaders of
+their own, and Bakta can name the IstB of a real IS21 element *dnaC*. What marks the
+chromosome's own loader is its neighbour. A call goes to `{sample}_is_discarded.tsv`
+with reason `overlaps_helicase_loader` only when all four of these hold:
+
+1. ISEScan calls it a **partial** IS21. A complete IS21, or a call of any other family,
+   is never dropped this way.
+2. It lies over a CDS that Bakta names *dnaC* or *dnaI*, by the same half-of-the-shorter
+   test as *dnaA*.
+3. That CDS has its chromosomal partner on the same contig within 5 kb: *dnaT* with the
+   product "primosomal protein DnaT", the other half of the *dnaC*–*dnaT* operon of
+   Enterobacterales, which sits 0–2 bp away; or *nrdR*, at the head of the
+   *nrdR*–*dnaB*–*dnaI* cluster of Bacillota, about 1.2–3.2 kb away. The DnaT-like
+   proteins of mobile elements, which Bakta also names *dnaT* but describes as "DnaT
+   DNA-binding domain-containing protein", do not count.
+4. No IS21 transposase lies on the same contig within 5 kb of the loader: no CDS named
+   *istA*, and none whose product mentions IS21, the word IstA, Mu transposase,
+   integrase catalytic or integrase core. When one is there, the "loader" may be a
+   real IS21 element's IstB, and the call is kept. A transposase of another family does
+   not count, because unrelated transposases do sit a few kb from true chromosomal
+   loaders.
+
+The audit row names the loader, its locus tag and coordinates, the partner and its
+distance, and how much of the call and of the gene they share. Every other partial
+IS21 over *dnaC* or *dnaI* is kept and counts in the IS totals: the loaders of phages,
+ICEs and plasmids, which sit nowhere near a *dnaT* or *nrdR*; a real IS21 element whose
+IstB Bakta names *dnaC*; and the chromosome's own loader where the partner is not on
+the same contig, either because the taxon lacks it (Paenibacillaceae, Clostridia,
+*Aquifex*) or because a fragmented draft put it on another contig. The run log of `rule
+isescan_table` says, for every *dnaC* and *dnaI*, which way it went and why. The two
+5 kb windows and the gene names are constants in `isescan_to_table.py`
+(`LOADER_PARTNER_*`, `IS21_TRANSPOSASE_*`), not settings meant to be tuned.
 
 ### Boundaries: the att search
 

@@ -4,8 +4,9 @@ isescan_to_table turns one sample's raw ISEScan output into the three files the
 rest of the module depends on: the IS table colocalise.py reads, the per-sample
 QC summary that table has to be read alongside, and the audit file naming every
 record dropped or flagged. These tests cover all three, plus the second CLI mode
-(rule contig_lengths) that measures the assembly FASTA, and the one call dropped
-for a biological reason: an IS call lying over the essential gene dnaA.
+(rule contig_lengths) that measures the assembly FASTA, and the two kinds of call
+dropped for a biological reason: an IS call lying over the essential gene dnaA,
+and a partial IS21 lying over the chromosome's own helicase loader, dnaC or dnaI.
 
 No tools, no databases, no real ISEScan run: every test builds a small
 ISEScan-shaped .tsv by hand and pushes it through the parser, so the whole
@@ -658,9 +659,9 @@ BAKTA_PREAMBLE = [
 
 def bakta_row(contig="contig_1", feature_type="cds", start=1, stop=1440,
               locus_tag="S1_00001", gene="dnaA",
-              product="chromosomal replication initiator protein DnaA"):
+              product="chromosomal replication initiator protein DnaA", strand="+"):
     """One data line of Bakta's annotation table; by default the dnaA CDS."""
-    return "\t".join([contig, feature_type, str(start), str(stop), "+",
+    return "\t".join([contig, feature_type, str(start), str(stop), strand,
                       locus_tag, gene, product, "COG:COG0593"])
 
 
@@ -804,6 +805,397 @@ def test_bakta_table_without_its_header_fails_loudly(tmp_path, capsys):
     )
     assert code == 1
     assert "Sequence Id" in capsys.readouterr().err
+
+
+# ── A partial IS21 lying over the chromosome's helicase loader ───────────────
+# The same IS21 profile matches the replicative helicase loader, DnaC in
+# Enterobacterales and DnaI in Bacillota, which is essential too. The call is
+# dropped only when the loader has its chromosomal partner beside it (dnaT
+# "primosomal protein DnaT" for dnaC, nrdR for dnaI) and no IS21 transposase
+# within 5 kb. Everything else over a loader is kept: phage, ICE and plasmid
+# loaders, a real IS21 element's IstB that Bakta calls dnaC, and the loader in a
+# taxon or a draft where the partner is not on the same contig.
+#
+# The layout below copies the Enterobacterales arrangement: dnaC at 10001..10738
+# (738 bp) with dnaT touching it at 10739..11278, and ISEScan's partial IS21 at
+# 9800..11100, which holds all of dnaC: 738 bp shared, 57% of the 1,301 bp call
+# and 100% of the gene.
+
+def dnac_row(**overrides):
+    """The chromosomal dnaC CDS of the layout above."""
+    fields = {"start": 10001, "stop": 10738, "locus_tag": "S1_00950",
+              "gene": "dnaC", "product": "DNA replication protein DnaC"}
+    fields.update(overrides)
+    return bakta_row(**fields)
+
+
+def dnat_row(**overrides):
+    """dnaT, touching dnaC: the gap between the two CDS is 0 bp."""
+    fields = {"start": 10739, "stop": 11278, "locus_tag": "S1_00951",
+              "gene": "dnaT", "product": "primosomal protein DnaT"}
+    fields.update(overrides)
+    return bakta_row(**fields)
+
+
+def loader_call(**overrides):
+    """ISEScan's partial IS21 call over the dnaC of the layout above."""
+    fields = {"family": "IS21", "cluster": "IS21_259", "isBegin": "9800",
+              "isEnd": "11100", "type": "p"}
+    fields.update(overrides)
+    return isescan_row(**fields)
+
+
+def run_loader_case(tmp_path, bakta_rows, calls=None, lengths=None):
+    """Run main() on the given Bakta rows and IS calls (by default the partial
+    IS21 over dnaC plus the ordinary IS3 at 5000..6200 from DEFAULT_FIELDS, which
+    must always survive), and return (table, summary, audit)."""
+    if calls is None:
+        calls = [loader_call(), isescan_row(isBegin="20000", isEnd="21200")]
+    if lengths is None:
+        lengths = {"contig_1": 50000}
+    results = write_isescan_tsv(tmp_path / "r.tsv", calls)
+    bakta = write_bakta_tsv(tmp_path / "bakta.tsv", bakta_rows)
+    code, table, summary, audit = run_main(
+        tmp_path, results, lengths, extra=["--bakta-tsv", bakta]
+    )
+    assert code == 0
+    return table, summary, audit
+
+
+def test_partial_is21_over_dnac_with_dnat_beside_it_is_dropped(tmp_path):
+    table, summary, audit = run_loader_case(tmp_path, [dnac_row(), dnat_row()])
+    # Only the ordinary IS survives.
+    assert [row["start"] for row in table] == ["20000"]
+    assert len(audit) == 1
+    assert audit[0]["action"] == "dropped"
+    assert audit[0]["reason"] == "overlaps_helicase_loader"
+    assert (audit[0]["contig"], audit[0]["start"], audit[0]["end"]) == (
+        "contig_1", "9800", "11100")
+    assert summary["n_is_total"] == "1"
+    assert summary["n_records_dropped"] == "1"
+
+
+def test_helicase_loader_audit_detail_names_everything(tmp_path):
+    # The detail must let a reader check the decision without opening Bakta's
+    # table: the loader, its locus tag and coordinates, the partner and its
+    # distance, the overlap, and why the call cannot be an insertion. It is
+    # longer than the 200 characters other details are cut to, and kept whole.
+    _, _, audit = run_loader_case(tmp_path, [dnac_row(), dnat_row()])
+    detail = audit[0]["detail"]
+    assert "738 bp shared with dnaC (S1_00950, 10001..10738)" in detail
+    assert "57% of the call, 100% of the gene" in detail
+    assert "partner dnaT 0 bp away" in detail
+    assert detail.endswith(
+        "The chromosome's own helicase loader is essential; this is a profile "
+        "match, not an insertion")
+    assert len(detail) > it.AUDIT_DETAIL_MAX_CHARS
+
+
+def test_partial_is21_over_dnai_with_nrdr_upstream_is_dropped(tmp_path):
+    # The Bacillota arrangement: nrdR, then dnaB, then dnaI, with 1,500 bp of
+    # sequence between nrdR and dnaI. The call holds all 903 bp of dnaI.
+    bakta_rows = [
+        bakta_row(start=20001, stop=20456, locus_tag="S1_01700", gene="nrdR",
+                  product="transcriptional regulator NrdR"),
+        bakta_row(start=20500, stop=21900, locus_tag="S1_01701", gene="dnaB",
+                  product="Replicative helicase loader DnaB"),
+        bakta_row(start=21957, stop=22859, locus_tag="S1_01702", gene="dnaI",
+                  product="primosomal protein DnaI"),
+    ]
+    calls = [isescan_row(family="IS21", type="p", isBegin="21530", isEnd="23271")]
+    table, _, audit = run_loader_case(tmp_path, bakta_rows, calls=calls)
+    assert table == []
+    assert audit[0]["reason"] == "overlaps_helicase_loader"
+    assert "903 bp shared with dnaI (S1_01702, 21957..22859)" in audit[0]["detail"]
+    assert "partner nrdR 1500 bp away" in audit[0]["detail"]
+
+
+def test_minus_strand_loader_and_partner_are_dropped_the_same_way(tmp_path):
+    # Bakta writes Start < Stop on both strands, so the strand changes nothing.
+    table, _, audit = run_loader_case(
+        tmp_path, [dnac_row(strand="-"), dnat_row(strand="-")]
+    )
+    assert [row["start"] for row in table] == ["20000"]
+    assert audit[0]["reason"] == "overlaps_helicase_loader"
+
+
+def test_dnac_without_a_partner_is_kept(tmp_path):
+    # A phage loader: Bakta calls it dnaC, but no dnaT or nrdR sits near it.
+    table, _, audit = run_loader_case(tmp_path, [dnac_row(product="Phage related protein")])
+    assert [row["start"] for row in table] == ["9800", "20000"]
+    assert audit == []
+
+
+def test_dnat_like_protein_of_a_mobile_element_does_not_count(tmp_path):
+    # Mobile elements carry DnaT-like proteins that Bakta also names dnaT, but
+    # with this product. They must not vouch for the loader beside them.
+    table, _, audit = run_loader_case(tmp_path, [
+        dnac_row(),
+        dnat_row(product="DnaT DNA-binding domain-containing protein"),
+    ])
+    assert len(table) == 2
+    assert audit == []
+
+
+def test_partner_on_another_contig_does_not_count(tmp_path):
+    # On a draft assembly the partner can fall on a different contig. Nothing
+    # then shows that this loader is the chromosome's, so the call is kept.
+    table, _, audit = run_loader_case(
+        tmp_path,
+        [dnac_row(), dnat_row(contig="contig_2", start=1, stop=540)],
+        lengths={"contig_1": 50000, "contig_2": 3000},
+    )
+    assert len(table) == 2
+    assert audit == []
+
+
+# The two 5,000 bp windows carry the evidence behind the rule: nrdR sits up to
+# about 3.2 kb from a chromosomal dnaI, and unrelated transposases sit 2.7-3.8 kb
+# from several true chromosomal loaders. These tests pin both windows and their
+# inclusive edge, so a later edit to either constant fails here. The dnaC of the
+# layout ends at 10738, so a CDS starting at 10738 + 1 + gap lies `gap` bp away.
+
+def partner_dnat_at_gap(gap_bp):
+    """dnaT placed `gap_bp` bp after the layout's dnaC (0 would touch it)."""
+    start = 10738 + 1 + gap_bp
+    return dnat_row(start=start, stop=start + 539)
+
+
+def test_partner_exactly_5000_bp_away_still_counts(tmp_path):
+    table, _, audit = run_loader_case(tmp_path, [dnac_row(), partner_dnat_at_gap(5000)])
+    assert [row["start"] for row in table] == ["20000"]
+    assert audit[0]["reason"] == "overlaps_helicase_loader"
+
+
+def test_partner_5001_bp_away_does_not_count(tmp_path):
+    table, _, audit = run_loader_case(tmp_path, [dnac_row(), partner_dnat_at_gap(5001)])
+    assert [row["start"] for row in table] == ["9800", "20000"]
+    assert audit == []
+
+
+def test_nrdr_3200_bp_upstream_of_dnai_is_its_partner(tmp_path):
+    # The widest gap seen between nrdR and a chromosomal dnaI was about 3.2 kb.
+    dnai = dnac_row(gene="dnaI", product="primosomal protein DnaI")
+    nrdr = bakta_row(start=6300, stop=10001 - 1 - 3200, locus_tag="S1_00940",
+                     gene="nrdR", product="transcriptional regulator NrdR")
+    table, _, audit = run_loader_case(tmp_path, [nrdr, dnai])
+    assert [row["start"] for row in table] == ["20000"]
+    assert audit[0]["reason"] == "overlaps_helicase_loader"
+
+
+def ista_at_gap(gap_bp):
+    """An IS21 transposase placed `gap_bp` bp after the layout's dnaC."""
+    start = 10738 + 1 + gap_bp
+    return bakta_row(start=start, stop=start + 1199, locus_tag="S1_00960",
+                     gene="istA", product="IS21 family transposase")
+
+
+def test_transposase_exactly_5000_bp_away_keeps_the_call(tmp_path):
+    table, _, audit = run_loader_case(tmp_path, [dnac_row(), dnat_row(), ista_at_gap(5000)])
+    assert [row["start"] for row in table] == ["9800", "20000"]
+    assert audit == []
+
+
+def test_transposase_5001_bp_away_does_not_protect_the_call(tmp_path):
+    table, _, audit = run_loader_case(tmp_path, [dnac_row(), dnat_row(), ista_at_gap(5001)])
+    assert [row["start"] for row in table] == ["20000"]
+    assert audit[0]["reason"] == "overlaps_helicase_loader"
+
+
+def test_ista_near_the_loader_keeps_the_call(tmp_path):
+    # An IS21 transposase 1,261 bp away: the "loader" may be a real IS21
+    # element's IstB that Bakta happens to call dnaC.
+    table, _, audit = run_loader_case(tmp_path, [
+        dnac_row(), dnat_row(),
+        bakta_row(start=12000, stop=13500, locus_tag="S1_00953", gene="istA",
+                  product="IS21 family transposase"),
+    ])
+    assert len(table) == 2
+    assert audit == []
+
+
+def test_ista_named_only_in_its_product_keeps_the_call(tmp_path):
+    # No istA symbol, and a wording that says neither "IstA" nor "transposase
+    # IS21": the product's "IS21" is enough. It sits 1,500 bp away on the other
+    # side of dnaC, with another CDS between them.
+    table, _, audit = run_loader_case(tmp_path, [
+        bakta_row(start=7000, stop=8500, locus_tag="S1_00948", gene="",
+                  product="Transposase for insertion sequence element IS21-like "
+                          "C-terminal domain-containing protein"),
+        bakta_row(start=8600, stop=9900, locus_tag="S1_00949", gene="yjjB",
+                  product="threonine/serine exporter"),
+        dnac_row(), dnat_row(),
+    ])
+    assert len(table) == 2
+    assert audit == []
+
+
+def test_unrelated_transposase_near_the_loader_does_not_keep_the_call(tmp_path):
+    # A bare "transposase" is not IS21 evidence: transposases of other families
+    # do sit a few kb from true chromosomal loaders.
+    table, _, audit = run_loader_case(tmp_path, [
+        bakta_row(start=6000, stop=7000, locus_tag="S1_00947", gene="",
+                  product="IS3 family transposase"),
+        dnac_row(), dnat_row(),
+    ])
+    assert [row["start"] for row in table] == ["20000"]
+    assert audit[0]["reason"] == "overlaps_helicase_loader"
+
+
+def wrapped_ista_row(start, stop):
+    """An istA that runs across the end of the 50 kb circular contig: Bakta
+    writes it with Start larger than Stop, so it covers Start..50000 and then
+    1..Stop."""
+    return bakta_row(start=start, stop=stop, locus_tag="S1_04999", gene="istA",
+                     product="IS21 family transposase")
+
+
+def test_is21_transposase_across_the_contig_end_far_from_the_loader(tmp_path):
+    # The istA covers 49500..50000 and 1..900. Its nearer piece, 1..900, ends
+    # 9,100 bp before dnaC (10001 - 900 - 1), outside the 5 kb window, so it is
+    # no evidence of an IS21 element here and the call is dropped as usual.
+    table, _, audit = run_loader_case(tmp_path, [
+        dnac_row(), dnat_row(), wrapped_ista_row(49500, 900),
+    ])
+    assert [row["start"] for row in table] == ["20000"]
+    assert audit[0]["reason"] == "overlaps_helicase_loader"
+
+
+def test_is21_transposase_across_the_contig_end_near_the_loader(tmp_path):
+    # The same istA (49500..50000 and 1..900), but the loader layout moved to
+    # the start of the contig: dnaC 2001..2738, dnaT touching it, the call at
+    # 1800..3100. The piece 1..900 now ends 1,100 bp before dnaC, inside the
+    # window, so the "loader" may be an IS21 IstB and the call is kept.
+    calls = [loader_call(isBegin="1800", isEnd="3100"),
+             isescan_row(isBegin="20000", isEnd="21200")]
+    table, _, audit = run_loader_case(tmp_path, [
+        dnac_row(start=2001, stop=2738), dnat_row(start=2739, stop=3278),
+        wrapped_ista_row(49500, 900),
+    ], calls=calls)
+    assert len(table) == 2
+    assert audit == []
+
+
+def test_is21_transposase_across_the_contig_end_near_the_loader_from_behind(tmp_path):
+    # Here the loader sits near the END of the contig (dnaC 46001..46738, dnaT
+    # touching it, the call at 45800..47100) and the istA covers 48500..50000
+    # and 1..400. The piece 48500..50000 starts 1,761 bp after dnaC
+    # (48500 - 46738 - 1), inside the window, so the call is kept.
+    calls = [loader_call(isBegin="45800", isEnd="47100"),
+             isescan_row(isBegin="20000", isEnd="21200")]
+    table, _, audit = run_loader_case(tmp_path, [
+        dnac_row(start=46001, stop=46738), dnat_row(start=46739, stop=47278),
+        wrapped_ista_row(48500, 400),
+    ], calls=calls)
+    assert len(table) == 2
+    assert audit == []
+
+
+def test_gap_to_cds_across_contig_end_measures_the_nearer_piece():
+    # The wrapped CDS covers 48500..end and 1..400 (Start 48500, Stop 400).
+    wrapped = {"start": 48500, "end": 400}
+    # dnaC at 10001..10738: 9,600 bp after the piece 1..400 (10001 - 400 - 1)
+    # and 37,761 bp before the piece from 48500 (48500 - 10738 - 1), so the
+    # nearer piece gives 9,600.
+    assert it._gap_to_cds_across_contig_end({"start": 10001, "end": 10738},
+                                            wrapped) == 9600
+    # Touching the piece 1..400 (anchor starts at 401): nothing between them.
+    assert it._gap_to_cds_across_contig_end({"start": 401, "end": 900},
+                                            wrapped) == 0
+    # Overlapping either piece also gives 0.
+    assert it._gap_to_cds_across_contig_end({"start": 300, "end": 900},
+                                            wrapped) == 0
+    assert it._gap_to_cds_across_contig_end({"start": 48000, "end": 48600},
+                                            wrapped) == 0
+
+
+def test_complete_is21_over_a_partnered_loader_is_kept(tmp_path):
+    # A complete IS21 call is a whole element, not a profile match on a gene.
+    table, _, audit = run_loader_case(
+        tmp_path, [dnac_row(), dnat_row()],
+        calls=[loader_call(type="c")],
+    )
+    assert len(table) == 1
+    assert audit == []
+
+
+def test_partial_call_of_another_family_over_a_partnered_loader_is_kept(tmp_path):
+    # The loader match is an IS21 one; an IS3 call over dnaC is something else.
+    table, _, audit = run_loader_case(
+        tmp_path, [dnac_row(), dnat_row()],
+        calls=[loader_call(family="IS3", cluster="IS3_1")],
+    )
+    assert len(table) == 1
+    assert audit == []
+
+
+def test_call_grazing_the_loader_is_kept(tmp_path):
+    # 10638..12000 shares only dnaC's last 101 bp: under half of the 738 bp
+    # gene, the shorter of the two, so it does not lie over the loader.
+    table, _, audit = run_loader_case(
+        tmp_path, [dnac_row(), dnat_row()],
+        calls=[loader_call(isBegin="10638", isEnd="12000")],
+    )
+    assert len(table) == 1
+    assert audit == []
+
+
+def test_loader_is_recognised_by_its_symbol_only(tmp_path):
+    # The same product without the dnaC symbol is not treated as a loader.
+    table, _, audit = run_loader_case(tmp_path, [dnac_row(gene=""), dnat_row()])
+    assert len(table) == 2
+    assert audit == []
+
+
+def test_bakta_table_without_loaders_drops_only_the_dnaa_call(tmp_path):
+    # A genome with dnaA but no dnaC or dnaI: the dnaA check works as before
+    # and nothing else is dropped, the partial IS21 elsewhere included.
+    calls = [dnaa_call(), loader_call(), isescan_row(isBegin="20000", isEnd="21200")]
+    table, _, audit = run_loader_case(
+        tmp_path, [bakta_row(), dnat_row()], calls=calls
+    )
+    assert [row["start"] for row in table] == ["9800", "20000"]
+    assert [row["reason"] for row in audit] == ["overlaps_dnaA"]
+
+
+def test_dnaa_and_loader_calls_are_dropped_with_their_own_reasons(tmp_path):
+    calls = [dnaa_call(), loader_call(), isescan_row(isBegin="20000", isEnd="21200")]
+    table, summary, audit = run_loader_case(
+        tmp_path, [bakta_row(), dnac_row(), dnat_row()], calls=calls
+    )
+    assert [row["start"] for row in table] == ["20000"]
+    assert [row["reason"] for row in audit] == ["overlaps_dnaA", "overlaps_helicase_loader"]
+    assert summary["n_records_dropped"] == "2"
+
+
+def test_what_counts_as_an_is21_transposase():
+    # Symbol istA, or a product with IS21, the whole word IstA, or the domain
+    # names Bakta uses for IstA's transposase family. Ignoring case.
+    counts = it._is_is21_transposase
+    assert counts("istA", "hypothetical protein")
+    assert counts("", "IS21 family transposase")
+    assert counts("", "Truncated IS232 IstA -like protein")
+    assert counts("", "Mu transposase, C-terminal domain-containing protein")
+    assert counts("", "Integrase catalytic domain-containing protein")
+    assert counts("", "integrase core domain-containing protein")
+    # Not IS21 evidence: another family, a bare transposase, and a word that
+    # merely contains the letters of IstA.
+    assert not counts("", "IS3 family transposase")
+    assert not counts("", "transposase")
+    assert not counts("", "tellurite resistance protein")
+
+
+def test_judge_helicase_loaders_says_why_each_loader_was_or_was_not_used(tmp_path):
+    path = write_bakta_tsv(tmp_path / "bakta.tsv", [
+        dnac_row(), dnat_row(),
+        bakta_row(start=30001, stop=30738, locus_tag="S1_02000", gene="dnaC",
+                  product="Phage related protein"),
+    ])
+    judged = it.judge_helicase_loaders(it.read_bakta_genes(path))
+    assert [loader["is_chromosomal"] for loader in judged] == [True, False]
+    assert judged[0]["partner_gene"] == "dnaT"
+    assert judged[0]["partner_gap_bp"] == 0
+    assert "no dnaT or nrdR partner" in judged[1]["decision"]
 
 
 # ── Loud failure when the format is not recognisable ─────────────────────────

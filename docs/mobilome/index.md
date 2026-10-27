@@ -173,14 +173,21 @@ annotation, Puterová & Martínek (2021) put the "improbable or not an IS elemen
 discovery rate between 0% and 23.7% depending on the tool, with **ISEScan — the caller
 BacFlux uses — at 8.0%** (2.2% on their larger ISbrowser set). So every row carries
 `confidence` (high / medium / low), and anything resting on a contig boundary or on a
-partial hit is capped at `low`. One predictable false call is removed before anything
-reads the IS table: ISEScan reports a partial IS21 lying over *dnaA*, most likely
-because IS21 elements carry a helper protein (IstB) related to DnaA. *dnaA* is
+partial hit is capped at `low`. Two predictable false calls are removed before
+anything reads the IS table. ISEScan reports a partial IS21 lying over *dnaA*, most
+likely because IS21 elements carry a helper protein (IstB) related to DnaA. *dnaA* is
 essential, so no living isolate carries an insertion inside it; the call goes to
 `{sample}_is_discarded.tsv` with the reason `overlaps_dnaA`. The same IS21 profile
-also matches the helicase loaders DnaC (in Enterobacterales) and DnaI (in Firmicutes).
-Those calls are not removed: they stay in the IS table as partial IS21 calls, so read
-a partial IS21 sitting on *dnaC* or *dnaI* the same way.
+also matches the chromosome's helicase loader, DnaC in Enterobacterales and DnaI in
+Bacillota, which is just as essential. A partial IS21 lying over *dnaC* or *dnaI* is
+removed with the reason `overlaps_helicase_loader` when the loader's chromosomal
+neighbour sits beside it (*dnaT* next to *dnaC*, *nrdR* near *dnaI*) and no IS21
+transposase does. Every other call over a loader stays in the IS table: the loaders
+of phages, ICEs and plasmids, an IS21 IstB that Bakta names *dnaC*, and the
+chromosome's own loader in a taxon without that neighbour or on a draft where it fell
+on another contig. A partial IS21 still sitting on *dnaC* or *dnaI* may therefore be
+a real IS21 element or the same artefact; the neighbouring genes tell them apart
+([Tuning](tuning.md#the-three-contig-end-windows) has the full test).
 
 The module was validated on closed genomes and then measured again on deliberately
 fragmented ones — 40 benchmark genomes cut to ~150 kb, ~50 kb and ~20 kb N50,

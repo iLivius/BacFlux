@@ -26,7 +26,10 @@
 #                        │                                     │
 #                        ├─► isescan ──► is_table ─────────────┤
 #                        │   (IS elements on the genome; a     │
-#                        │    false call over dnaA, found      │
+#                        │    false call over dnaA, or a       │
+#                        │    partial IS21 over the            │
+#                        │    chromosome's own helicase        │
+#                        │    loader (dnaC/dnaI), each found   │
 #                        │    via Bakta's table, is dropped)   │
 #                        │                                     │
 #   bakta/{sample}.faa ──┼─► amrfinderplus ──► amr TSV ────────┤
@@ -53,7 +56,9 @@
 # isescan                : insertion sequences on the contigs.
 # isescan_table          : ISEScan's output tree → one tidy row per IS, plus how
 #                          many of those calls sit at a contig end. Drops a
-#                          call lying over dnaA (not a real insertion).
+#                          call lying over dnaA, or a partial IS21 lying over
+#                          the chromosome's own helicase loader (dnaC/dnaI):
+#                          neither is a real insertion.
 # conjscan_models        : fetch the CONJScan model package once for all samples.
 # conjscan               : conjugation machinery on this genome.
 #     only when mobilome.icescan.run (a second, non-commercial model set):
@@ -520,11 +525,13 @@ if MOBILOME_RUN:
     # ── isescan_table — tidy the IS calls and measure the honesty ──
     # Takes in: the ISEScan output directory (rule isescan), the contig lengths
     #           (rule contig_lengths), and Bakta's annotation table (rule
-    #           annotation), which says where the dnaA gene is.
+    #           annotation), which says where dnaA and the helicase loader genes
+    #           (dnaC, dnaI) and their neighbours are.
     # Does: normalise ISEScan's 24-column table to one tidy row per IS, drop a
-    #       call that lies over dnaA, and compute the QC that keeps this module
-    #       truthful — how many IS calls sit within MOBILOME_BOUNDARY_BP of a
-    #       contig end, and what fraction of the total that is.
+    #       call that lies over dnaA or a partial IS21 that lies over the
+    #       chromosome's own helicase loader, and compute the QC that keeps this
+    #       module truthful — how many IS calls sit within MOBILOME_BOUNDARY_BP
+    #       of a contig end, and what fraction of the total that is.
     #
     # Why dnaA: the gene starts chromosome replication and is essential, so an IS
     # call over it cannot be a real insertion. ISEScan reports one regardless, a
@@ -532,6 +539,14 @@ if MOBILOME_RUN:
     # (IstB) related to DnaA. Left in, it would count as an IS and, on a genome
     # that starts at dnaA, as one sitting at a contig end. The script writes it to
     # IS_AUDIT with reason overlaps_dnaA instead.
+    #
+    # Why the helicase loader: IstB is related to the replicative helicase loader
+    # too, DnaC in Enterobacterales and DnaI in Bacillota, and ISEScan reports a
+    # partial IS21 over it the same way. Phages, ICEs and plasmids carry loaders
+    # of their own, so the call is dropped (reason overlaps_helicase_loader) only
+    # when Bakta shows the chromosome's partner gene beside the loader (dnaT for
+    # dnaC, nrdR for dnaI) and no IS21 transposase near it. Every other call over
+    # a loader is kept. The full test is in isescan_to_table.py.
     # Produces: IS_TABLE (rows), IS_SUMMARY (the QC line), IS_AUDIT (dropped rows
     #       with a reason).
     # Consumed by: amr_mge_colocalisation and conjscan_ice, which masks these

@@ -196,7 +196,7 @@ organism can raise the threshold and re-run.
 | File | What it is for |
 |---|---|
 | `{sample}_is_summary.tsv` | how many IS calls sit within `mobilome.contig_boundary_bp` of a contig end, and what fraction that is. Read it first |
-| `{sample}_is_elements.tsv`, `_is_discarded.tsv` | one tidy row per insertion sequence, and the dropped rows with a reason. One reason is biological rather than technical: `overlaps_dnaA`, a call lying over the essential gene *dnaA*, which ISEScan reports but which cannot be a real insertion |
+| `{sample}_is_elements.tsv`, `_is_discarded.tsv` | one tidy row per insertion sequence, and the dropped rows with a reason. Two reasons are biological rather than technical: `overlaps_dnaA`, a call lying over the essential gene *dnaA*, and `overlaps_helicase_loader`, a partial IS21 lying over the chromosome's own helicase loader (*dnaC* with *dnaT* beside it, or *dnaI* with *nrdR* near it, and no IS21 transposase nearby). ISEScan reports both, but neither can be a real insertion |
 | `{sample}_ice_candidates.tsv`, `_ice_discarded.tsv` | ICE/IME candidates with anchors, boundaries, class and confidence — and the discard trail. The first row of the discard file records this assembly's own contig count and N50, with a sentence saying which contiguity band it falls in |
 | `{sample}_amrfinderplus.tsv`, `_amrfinderplus_mutations.tsv` | the raw AMR calls, and the point mutations separately |
 | `{sample}_amrfinder_organism.txt`, `_amrfinder_organism_audit.tsv` | which `--organism` the GTDB-Tk call mapped to, or none, and why |
