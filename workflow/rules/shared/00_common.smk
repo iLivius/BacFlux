@@ -1013,9 +1013,10 @@ if HAS_SHORT_READS:
     # one MultiQC reads). Written by trim_adapters; nothing downstream consumes it.
     FASTP_HTML = DIR_READS + "/{sample}/illumina/{sample}_fastp.html"
 
-    # PhiX control genome + its Bowtie2 index. No {sample} in these paths: the
-    # download and the index happen ONCE per run and are shared by every sample.
-    # All of them are declared temp() by the front end.
+    # PhiX control genome + its Bowtie2 index. No {sample} in these paths: both
+    # are made ONCE per output folder, shared by every sample, and KEPT (neither
+    # is temp()), so a sample added to the folder later is screened against the
+    # same index and the finished samples do not re-run.
     PHIX_DIR        = DIR_READS + "/phix"
     PHIX_FASTA      = PHIX_DIR + "/phix.fna.gz"
     PHIX_BT2_PREFIX = PHIX_DIR + "/phix"
@@ -1212,8 +1213,9 @@ GTDBTK_RELABEL_AWK = _relabel_awk("taxonomy")
 # ── CARD read-mapping leg (shared/50_amr.smk, short-read modes only) ──
 # The tarball is a SIBLING of the extracted-database directory, not a file inside
 # it: the house rule (see 40_annotation.smk) is never to nest one declared output
-# inside another rule's directory() output. Both are temp() — the database is only
-# needed while BBMap runs. Only the two PATHS are set here; the download URL is
+# inside another rule's directory() output. The tarball is temp(); the extracted
+# database is KEPT, like the PhiX genome and index, so it is fetched once per output
+# folder. Only the two PATHS are set here; the download URL is
 # CARD_LINK, resolved in section 7 below, because that is where the check "a
 # short-read config must name links.card_link" belongs.
 CARD_TARBALL = DIR_AMR + "/card.tar.bz2"

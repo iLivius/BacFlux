@@ -161,7 +161,7 @@ same output directory across runs of a project and they are downloaded once.
 
 | Database | Where it lands | Link key | Read in |
 |---|---|---|---|
-| PhiX | `01.reads/phix/` | `links.phix_link` | `illumina`, `hybrid` — **required** |
+| PhiX | `01.reads/phix/` (kept: the genome, and the Bowtie2 index the first run builds from it, about 8 MB) | `links.phix_link` | `illumina`, `hybrid` — **required** |
 | CARD | `05.amr/card_db/` (kept, about 50 MB) | `links.card_link` | `illumina`, `hybrid` — **required** |
 | dbCAN | `04.annotation/dbcan/<version>/` | `links.dbcan_link` | all |
 | antiSMASH | `04.annotation/antismash/databases/` | — (its own downloader) | all |
@@ -241,9 +241,13 @@ wrong copy is caught at parse time rather than by the tool.
 downloaded, or linked from your copy, is kept in the output folder. Under
 `--rerun-triggers mtime`, a changed link or `directories.*_db` path does not replace
 it, and new samples are then analysed against the old copy. To switch, delete that
-database's folder in the output folder first, or start a new output folder. Deleting it
-re-runs every step that read it; for CARD in `illumina` and `hybrid` that reaches back
-to the read trimming and the assembly.
+database's folder in the output folder first, or start a new output folder. Deleting
+the folder re-runs nothing by itself: finished samples keep the results made with the
+old copy until the database is fetched again, by `download_all` or by the next run that
+needs it, such as one that adds a sample. From then on, every step that read it is
+redone; for CARD, read in `illumina` and `hybrid`, that is every sample in the folder
+from its PhiX screen onwards, the assembly included. The PhiX index is not downloaded
+but built, by the next run that screens a sample; `download_all` does not build it.
 
 !!! warning "`version.txt` must be readable, not merely present"
 

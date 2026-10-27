@@ -321,14 +321,29 @@ whole batch stopping. Fix the one sample, then resume with `--rerun-incomplete`.
 |---|---|---|
 | `.snakemake/conda/` in the launch directory, or the `--conda-prefix` folder | the per-rule environments, and the Medaka model weights stored inside the medaka one | rebuilt from scratch, needs network |
 | `.snakemake/` metadata | what is up to date, and the lock | the next run recomputes more than it needs to |
-| under `output_dir` | the databases the workflow fetches and keeps — the PhiX genome, CARD, antiSMASH, dbCAN, CheckV, the phage caller's own database, and the optional mobilome databases | re-downloaded |
+| under `output_dir` | the databases the workflow fetches and keeps — the PhiX genome and its Bowtie2 index, CARD, antiSMASH, dbCAN, CheckV, the phage caller's own database, and the optional mobilome databases | re-downloaded or rebuilt; for PhiX and CARD, see below |
 | `output_dir/logs/` | one log per rule and sample (`LOGS` in `00_common.smk`) | nothing recomputes; you lose the record |
 
-CARD is kept for a reason beyond saving a download. The CARD step reads the trimmed
-reads, which are temporary. A CARD folder fetched again after a run would be newer
-than every finished sample's CARD result, so the next run would redo that step for
-each sample, and with it the read trimming and everything after it, the assembly
-included. Kept, CARD is fetched once per output folder.
+The PhiX index and CARD are kept for a reason beyond saving a download. Snakemake
+redoes every step whose input is rebuilt, or newer than that step's results:
+
+- **The PhiX index** is read by every sample's PhiX screen. If it were deleted after
+  each run, the next run that screens any sample in the same output folder, such as
+  a sample added to it, would build it again, and every finished sample would redo
+  its PhiX screen and everything after it, the assembly included.
+- **CARD** is read by every sample's CARD step, which works from the trimmed reads.
+  Those are temporary, and so are the PhiX-free reads they are trimmed from. A CARD
+  folder fetched again after a run would be newer than every finished sample's CARD
+  result, so the next run would redo that step for each sample, and with it
+  everything from the PhiX screen onwards, the assembly included.
+
+Kept, PhiX and CARD are downloaded and the index built once per output folder, and a
+sample added to the folder later runs on its own; only the MultiQC report, which
+covers every sample, is made again. A folder whose `01.reads/phix/` holds no
+`phix.*.bt2` files, for example after the archive clean-up
+(`workflow/scripts/clean_workdir.sh`) has removed them, has no index: the next run
+that screens a sample builds it, and every finished sample there is redone. Put new
+samples in a new output folder instead.
 
 Reusing the same launch directory and the same `output_dir` is what keeps the
 rest from being rebuilt. Databases you already hold elsewhere can be pointed at
@@ -414,7 +429,7 @@ What `download_all` fetches, according to the configuration:
 
 | Download | Rule | When | Where it lands, under `output_dir` |
 |---|---|---|---|
-| PhiX genome | `download_phix` | `illumina`, `hybrid` | `01.reads/phix/` |
+| PhiX genome | `download_phix` | `illumina`, `hybrid` | `01.reads/phix/phix.fna.gz`. Only the genome: its Bowtie2 index is built beside it by the first run that screens reads (`build_phix`), which needs no internet |
 | CARD | `download_amr_db` | `illumina`, `hybrid`, unless `directories.card_db` names your copy | `05.amr/card_db/` |
 | dbCAN database | `cazyme_db_download` | unless `directories.dbcan_db` names your copy | `04.annotation/dbcan/<release>/` |
 | antiSMASH databases | `secondary_metabolites_db` | unless `directories.antismash_db` names your copy | `04.annotation/antismash/databases/` |

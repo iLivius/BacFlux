@@ -244,7 +244,7 @@ After a successful single-sample run, with the mobilome module off (the default)
 
 ```text
 /data/results/run1/
-├── 01.reads/phix/phix.fna.gz             # the PhiX genome, fetched once and kept
+├── 01.reads/phix/                        # the PhiX genome and its Bowtie2 index, kept
 ├── 01.reads/isolate1/illumina/
 │   ├── isolate1_fastp.html               # trimming report; the trimmed FASTQs are temporary
 │   └── isolate1_fastp.json
@@ -286,9 +286,11 @@ short reads). `08.mobilome` appears only when the module is switched on — see
 
 Intermediates are declared temporary and deleted as soon as the last rule needing
 them has finished, which is why `01.reads` ends up holding only reports and the
-PhiX genome; the PhiX index is rebuilt whenever it is needed. CARD's extracted copy
-under `05.amr/card_db/` is kept, so it is downloaded once per output folder; set
-`directories.card_db` to a copy you hold to skip even that.
+PhiX genome with its index. Those two, and CARD's extracted copy under
+`05.amr/card_db/`, are kept, so PhiX and CARD are downloaded and the PhiX index built
+once per output folder, and a sample added to the folder later runs without redoing
+the finished ones ([why](../reference/running.md#what-survives-between-runs)). Set
+`directories.card_db` to a copy you hold to skip even the CARD download.
 
 The files most runs end at:
 

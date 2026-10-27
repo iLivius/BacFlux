@@ -27,8 +27,8 @@
 # DECONTAMINATED contigs, to pull the clean read set back out. That pair is
 # hybrid-only.
 #
-# download_phix    : fetch the PhiX control genome, once per run.
-# build_phix       : bowtie2-build an index of it.
+# download_phix    : fetch the PhiX control genome, once per output folder.
+# build_phix       : bowtie2-build an index of it, kept between runs.
 # map_phix         : map each raw pair against PhiX and keep what does NOT align.
 # trim_adapters    : fastp adapter removal and quality trimming.
 # raw_long_read_qc : NanoPlot length/quality profile of the ONT reads BEFORE
@@ -53,8 +53,8 @@ _READS_DIR = os.path.dirname(TRIM_R1)
 #
 # Takes in: nothing on disk — params.link = PHIX_LINK, the download URL resolved
 #           once from config links.phix_link in shared/00_common.smk.
-# Does:     wget the PhiX genome. Runs once per RUN, not once per sample: there
-#           is no {sample} anywhere in the path.
+# Does:     wget the PhiX genome. Runs once per output folder, not once per
+#           sample: there is no {sample} anywhere in the path.
 # Produces: phix = PHIX_FASTA, the gzipped PhiX genome. It is kept after the run
 #           (a few kilobytes), so `snakemake download_all` can fetch it ahead of a
 #           run whose jobs have no internet.
@@ -80,22 +80,40 @@ rule download_phix:
 
 # ──────────────────────── PhiX index (Bowtie2) ─────────────────
 # Takes in: phix = PHIX_FASTA, from rule download_phix.
-# Does:     bowtie2-build, writing under the prefix PHIX_BT2_PREFIX.
-# Produces: six temp() index files — .1.bt2, .2.bt2, .3.bt2, .4.bt2, .rev.1.bt2
-#           and .rev.2.bt2 — declared individually so Snakemake tracks all six.
+# Does:     bowtie2-build, writing under the prefix PHIX_BT2_PREFIX, once per
+#           output folder.
+# Produces: six index files — .1.bt2, .2.bt2, .3.bt2, .4.bt2, .rev.1.bt2 and
+#           .rev.2.bt2 — declared individually so Snakemake tracks all six. All
+#           six are KEPT in 01.reads/phix/, beside the genome: about 8 MB in all.
 # Consumed by: map_phix, and nothing else.
+#
+# Why the index is kept rather than temp() (a temp() file is one Snakemake
+# deletes as soon as the last job reading it has finished): Snakemake re-runs
+# every job that reads a file it is about to rebuild. A temp() index would be
+# gone after each run, so the next run that screens any sample in the same output
+# folder (a sample added to the batch, for example) would have to build it again,
+# and that rebuild would make every FINISHED sample's map_phix run again too, and
+# with it everything after it: trimming, the Illumina assembly and its screen,
+# the Polypolish correction of the long-read genome and every later stage (Flye
+# too, when parameters.hybrid.short_read_guidance is on). Kept, the index is
+# built once per output folder and an added sample runs on its own. A folder
+# whose 01.reads/phix/ has lost its index (the archive clean-up,
+# workflow/scripts/clean_workdir.sh, removes it) builds it again at the next run
+# that screens a sample, and every finished sample there re-runs; new samples
+# belong in a new output folder in that case.
 #
 # Identical to rules/illumina/10_reads.smk — keep in sync.
 rule build_phix:
     input:
         phix = PHIX_FASTA,
     output:
-        idx1  = temp(PHIX_BT2_PREFIX + ".1.bt2"),
-        idx2  = temp(PHIX_BT2_PREFIX + ".2.bt2"),
-        idx3  = temp(PHIX_BT2_PREFIX + ".3.bt2"),
-        idx4  = temp(PHIX_BT2_PREFIX + ".4.bt2"),
-        ridx1 = temp(PHIX_BT2_PREFIX + ".rev.1.bt2"),
-        ridx2 = temp(PHIX_BT2_PREFIX + ".rev.2.bt2"),
+        # Kept, not temp(): see "Why the index is kept" above.
+        idx1  = PHIX_BT2_PREFIX + ".1.bt2",
+        idx2  = PHIX_BT2_PREFIX + ".2.bt2",
+        idx3  = PHIX_BT2_PREFIX + ".3.bt2",
+        idx4  = PHIX_BT2_PREFIX + ".4.bt2",
+        ridx1 = PHIX_BT2_PREFIX + ".rev.1.bt2",
+        ridx2 = PHIX_BT2_PREFIX + ".rev.2.bt2",
     params:
         basename = PHIX_BT2_PREFIX,
     conda:

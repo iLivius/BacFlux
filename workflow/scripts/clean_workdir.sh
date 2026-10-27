@@ -212,9 +212,14 @@ case "$WORKFLOW" in
       "01.reads/*/*/*.fastq.gz"
       "01.reads/*/*/*.fq.gz"
 
-      # PhiX spike-in reference plus its bowtie2 index, downloaded per project
-      # (links.phix_link) for the short-read decontamination step. A database,
-      # not a result — re-fetched automatically if the workflow is rerun.
+      # PhiX spike-in reference, downloaded once per output folder
+      # (links.phix_link), plus the bowtie2 index built from it, about 8 MB: both
+      # kept by the workflow for the short-read PhiX screen (build_phix in
+      # rules/illumina/ and rules/hybrid/10_reads.smk). A database, not a
+      # result — fetched and rebuilt automatically when a later run needs them.
+      # That rebuild makes every finished sample in this folder re-run from the
+      # PhiX screen onwards, which is accepted, as for the read files above:
+      # add new samples to a new output folder once this one is archived.
       "01.reads/phix"
 
       # ── Per-sample assembly scaffolding (02.assembly) ──────────────────────
@@ -281,10 +286,11 @@ case "$WORKFLOW" in
       # version pinned in workflow/envs/gtdbtk.yaml.
 
       # CARD, fetched into the output tree (links.card_link) and kept, like the
-      # PhiX genome above: a database, not a result. With directories.card_db
-      # set it is a folder of symlinks to your own copy, and rm -rf removes only
-      # the links. BBMap's per-sample ref/ index is a temp() output
-      # (shared/50_amr.smk) that Snakemake removes itself, so it needs no target.
+      # PhiX genome and index above: a database, not a result. With
+      # directories.card_db set it is a folder of symlinks to your own copy, and
+      # rm -rf removes only the links. BBMap's per-sample ref/ index is a temp()
+      # output (shared/50_amr.smk) that Snakemake removes itself, so it needs no
+      # target.
       "05.amr/card_db"
 
       # antiSMASH's bundled reference database, fetched into the output tree

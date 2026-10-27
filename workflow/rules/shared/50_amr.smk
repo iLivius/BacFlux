@@ -175,15 +175,17 @@ if HAS_SHORT_READS:
     # waits on this one download.
     #
     # Produces card_tarball, temp(), and card_dir, which is KEPT, like the PhiX
-    # genome. Consumed by map_amr_db (the reference sequences) and by
-    # card_mapping_report (aro_index.tsv).
+    # genome and its Bowtie2 index (build_phix in illumina/ and hybrid/
+    # 10_reads.smk, kept for the same kind of reason). Consumed by map_amr_db (the
+    # reference sequences) and by card_mapping_report (aro_index.tsv).
     #
-    # Why card_dir is kept: the trimmed reads map_amr_db reads are temp(). If CARD
-    # were deleted at the end of a run and fetched again later, for example by
-    # `download_all`, every finished sample's map_amr_db would see a newer input,
-    # need its trimmed reads again, and re-run from the read trimming onwards,
-    # the assembly included. Kept, CARD is fetched once per output folder, and
-    # download_all can prepare it ahead of an offline run. It takes about 50 MB.
+    # Why card_dir is kept: the trimmed reads map_amr_db reads are temp(), and so
+    # are the PhiX-free reads they are trimmed from. If CARD were deleted at the
+    # end of a run and fetched again later, for example by `download_all`, every
+    # finished sample's map_amr_db would see a newer input, need its trimmed reads
+    # again, and re-run from the PhiX screen onwards, the assembly included.
+    # Kept, CARD is fetched once per output folder, and download_all can prepare
+    # it ahead of an offline run. It takes about 50 MB.
     # The flip side: a kept copy is not replaced when links.card_link or
     # directories.card_db changes under --rerun-triggers mtime; delete
     # 05.amr/card_db (or start a new output folder) to switch CARD releases.

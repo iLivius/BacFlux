@@ -139,7 +139,8 @@ Read the detail on [the AMR page](analysis/amr.md).
 
 ```text
 output_dir/
-├── 01.reads/       trimmed, PhiX-free, filtlong-filtered reads   (temporary)
+├── 01.reads/       read QC reports and the PhiX genome and index (kept);
+│                   trimmed, PhiX-free, filtlong-filtered reads   (temporary)
 ├── 02.assembly/    draft and decontaminated contigs, CheckM, QUAST
 ├── 03.taxonomy/    GTDB-Tk classification
 ├── 04.annotation/  Bakta, eggNOG, antiSMASH, dbCAN

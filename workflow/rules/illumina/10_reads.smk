@@ -7,11 +7,13 @@
 # trimmed.
 #
 # Stage chain: raw {sample}_R1/R2 → map_phix → trim_adapters → TRIM_R1/TRIM_R2.
-# The PhiX reference is fetched and indexed ONCE per run, not per sample:
-# download_phix → build_phix → six Bowtie2 index files shared by every sample.
+# The PhiX reference is fetched and indexed ONCE per output folder, not per
+# sample: download_phix → build_phix → six Bowtie2 index files shared by every
+# sample. The genome and its index are both kept between runs.
 #
 # download_phix  : wget the PhiX genome named by links.phix_link.
-# build_phix     : bowtie2-build over it — six index files sharing one prefix.
+# build_phix     : bowtie2-build over it — six index files sharing one prefix,
+#                  kept (see the rule's own comment for why).
 # map_phix       : bowtie2 --local per sample, keeping the pairs that do NOT
 #                  align to PhiX.
 # trim_adapters  : fastp adapter detection, sliding-window quality trimming and a
@@ -55,8 +57,8 @@ _READS_DIR = os.path.dirname(TRIM_R1)
 #           of a run whose jobs have no internet.
 # Consumed by: build_phix, below.
 #
-# Runs once per RUN, not once per sample — there is no {sample} in the path, so
-# every sample in the batch screens against this one download.
+# Runs once per output folder, not once per sample — there is no {sample} in the
+# path, so every sample in the batch screens against this one download.
 #
 # Environment: envs/download.yaml, for wget, so the computer's own tools do not
 # matter (a minimal Linux system often has no wget).
@@ -82,31 +84,47 @@ rule download_phix:
 
 # ──────────────────────── PhiX index (Bowtie2) ─────────────────
 # Takes in: phix = PHIX_FASTA, the genome fetched by rule download_phix.
-# Does:     bowtie2-build over it, once per run. The tool is handed the shared
-#           PREFIX the index files will have (params.basename = PHIX_BT2_PREFIX),
-#           not a filename, and works out the six names itself.
+# Does:     bowtie2-build over it, once per output folder. The tool is handed the
+#           shared PREFIX the index files will have (params.basename =
+#           PHIX_BT2_PREFIX), not a filename, and works out the six names itself.
 # Produces:
 #   idx1, idx2, idx3, idx4 = PHIX_BT2_PREFIX + ".1.bt2" through ".4.bt2", the
 #                            forward index plus bowtie2's own packed copy of the
-#                            reference sequence, all temp()
+#                            reference sequence
 #   ridx1, ridx2           = PHIX_BT2_PREFIX + ".rev.1.bt2" and ".rev.2.bt2", the
-#                            mirror index of the same genome, also temp()
-# Consumed by: map_phix, below.
+#                            mirror index of the same genome
+#   All six are KEPT in 01.reads/phix/, beside the genome: about 8 MB in all.
+# Consumed by: map_phix, below, once for every sample.
 #
-# All six are temp() because they are cheaper to rebuild than to keep, and useless
-# once every sample has been screened.
+# Why the index is kept rather than temp() (a temp() file is one Snakemake
+# deletes as soon as the last job reading it has finished): Snakemake re-runs
+# every job that reads a file it is about to rebuild. A temp() index would be
+# gone after each run, so the next run that screens any sample in the same output
+# folder (a sample added to the batch, for example) would have to build it again,
+# and that rebuild would make every FINISHED sample's map_phix run again too, and
+# with it everything after it: trimming, the assembly and every later stage.
+# Kept, the index is built once per output folder and an added sample runs on its
+# own. The same reasoning keeps CARD (download_amr_db in shared/50_amr.smk).
+#
+# The flip side: a folder whose 01.reads/phix/ has lost its index, for example
+# because the archive clean-up (workflow/scripts/clean_workdir.sh) removed it,
+# builds it again at the next run that screens a sample, and every finished
+# sample there re-runs. New samples belong in a new output folder in that case.
+#
+# Identical in rules/hybrid/10_reads.smk — keep the two in sync.
 #
 # (v1 message: "--- Bowtie2: Build PhiX genome db. ---")
 rule build_phix:
     input:
         phix = PHIX_FASTA,
     output:
-        idx1  = temp(PHIX_BT2_PREFIX + ".1.bt2"),
-        idx2  = temp(PHIX_BT2_PREFIX + ".2.bt2"),
-        idx3  = temp(PHIX_BT2_PREFIX + ".3.bt2"),
-        idx4  = temp(PHIX_BT2_PREFIX + ".4.bt2"),
-        ridx1 = temp(PHIX_BT2_PREFIX + ".rev.1.bt2"),
-        ridx2 = temp(PHIX_BT2_PREFIX + ".rev.2.bt2"),
+        # Kept, not temp(): see "Why the index is kept" above.
+        idx1  = PHIX_BT2_PREFIX + ".1.bt2",
+        idx2  = PHIX_BT2_PREFIX + ".2.bt2",
+        idx3  = PHIX_BT2_PREFIX + ".3.bt2",
+        idx4  = PHIX_BT2_PREFIX + ".4.bt2",
+        ridx1 = PHIX_BT2_PREFIX + ".rev.1.bt2",
+        ridx2 = PHIX_BT2_PREFIX + ".rev.2.bt2",
     params:
         # bowtie2-build takes the shared PREFIX of those six files, not a filename.
         basename = PHIX_BT2_PREFIX,
