@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — illumina front end, assembly.
+# BacFlux — illumina front end, assembly.
 #
 # Turn the cleaned read pairs into contigs, then drop the contigs that cannot be
 # real isolate sequence. SPAdes --isolate is tuned for a single high-coverage

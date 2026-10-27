@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — the Bakta replicon table (long-read modes only).
+# BacFlux — the Bakta replicon table (long-read modes only).
 #
 # build_replicons — write the small table that tells Bakta which contigs are
 # circular, plus the audit trail behind every call.

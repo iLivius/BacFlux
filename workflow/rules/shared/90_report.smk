@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — Stage 90 report module (rules/shared/90_report.smk)
+# BacFlux — Stage 90 report module (rules/shared/90_report.smk)
 #
 # One rule: gather every QC artefact the run produced into a single MultiQC HTML
 # page, with sample names a human can read. This module is included LAST by

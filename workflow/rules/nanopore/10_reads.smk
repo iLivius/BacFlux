@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — nanopore front end, read preparation.
+# BacFlux — nanopore front end, read preparation.
 #
 # An ONT run produces reads of wildly varying length and quality, and far more
 # data than a bacterial isolate needs. Assembling everything is slower AND worse:

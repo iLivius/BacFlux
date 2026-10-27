@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — virus and prophage detection on the finished genome (stage
+# BacFlux — virus and prophage detection on the finished genome (stage
 # 07.phages), followed by CheckV quality grading. Like the rest of the shared tail
 # this module reads only FINAL_CONTIGS, the one assembly hand-off from every mode,
 # so it behaves identically in all four modes.

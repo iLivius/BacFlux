@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════════════
-# BacFlux v2.0.0 — unified configuration
+# BacFlux — unified configuration
 # ═══════════════════════════════════════════════════════════════════════
 #
 # ONE config drives all four input modes. Set `mode` first; then fill in only

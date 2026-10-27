@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — illumina front end, read preparation.
+# BacFlux — illumina front end, read preparation.
 #
 # An Illumina run is not just the isolate's DNA. Every lane carries a PhiX
 # spike-in (a small bacteriophage genome added as a sequencing control), and every

@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — nanopore front end, assembly.
+# BacFlux — nanopore front end, assembly.
 #
 # ONT reads are long enough to span the repeats that break a short-read assembly,
 # so Flye usually closes a bacterial chromosome into a single circular contig. A

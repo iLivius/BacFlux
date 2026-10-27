@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — contamination screening of the draft assembly: reads mapped
+# BacFlux — contamination screening of the draft assembly: reads mapped
 # back for coverage, megablast against NCBI nt for taxonomy, BlobTools to join
 # the two, and a Python selector that applies the user's keep/drop policy and
 # records every decision.

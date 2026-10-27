@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — plasmid calling on the finished genome (stage 06.plasmids).
+# BacFlux — plasmid calling on the finished genome (stage 06.plasmids).
 # Platon is the primary caller; geNomad is an optional second opinion. Like the
 # rest of the shared tail this module reads only FINAL_CONTIGS, the one assembly
 # hand-off from every mode, so it behaves identically in all four modes.

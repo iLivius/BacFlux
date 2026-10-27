@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — nanopore front end, polishing and the delivered genome.
+# BacFlux — nanopore front end, polishing and the delivered genome.
 #
 # ONT reads are excellent at telling you the STRUCTURE of a genome and still
 # imperfect at telling you the exact base, especially in homopolymers. Medaka

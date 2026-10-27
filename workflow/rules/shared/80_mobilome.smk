@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — Stage 08 mobilome / AMR-mobility module
+# BacFlux — Stage 08 mobilome / AMR-mobility module
 # (rules/shared/80_mobilome.smk)
 #
 # The question this module answers, once per sample:

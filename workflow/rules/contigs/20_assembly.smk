@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — contigs front end: make a user-supplied FASTA usable.
+# BacFlux — contigs front end: make a user-supplied FASTA usable.
 #
 # This mode takes genomes that are ALREADY assembled — the user hands us FASTA
 # files, not reads — so there is no read QC and no assembler. The whole front end

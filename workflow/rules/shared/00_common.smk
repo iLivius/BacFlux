@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — shared foundation module (rules/shared/00_common.smk)
+# BacFlux — shared foundation module (rules/shared/00_common.smk)
 #
 # The first file the Snakefile includes, and the one place that knows about MODE.
 # Everything else — the mode-specific front ends and the shared downstream rules

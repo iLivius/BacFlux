@@ -1,4 +1,4 @@
-# BacFlux v2.0.0 — early Medaka model check: validate the consensus model, or in
+# BacFlux — early Medaka model check: validate the consensus model, or in
 # auto mode resolve it, before the assembler starts, so a bad model costs seconds
 # instead of hours.
 #
