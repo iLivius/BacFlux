@@ -37,13 +37,17 @@ What it checks, and what "correct" means
     gtdb_to_ncbi_majority_vote.py, done here on just the handful of species we
     care about.
 
-    Three questions are asked:
+    Four questions are asked:
       1. Does every entry in GTDB_SPECIES_EQUIVALENCES still point at the right
          organism in this release?
       2. Are the genus-level rules (GENUS_ORGANISMS) still safe - i.e. is nearly
          everything GTDB files under that unsuffixed genus really that organism?
       3. Are there NEW GTDB species that now resolve to a curated organism but
-         are missing from the table?
+         are missing from the table? (Names on the hand-curated refusal list are
+         withheld on purpose, so they are never proposed here.)
+      4. Does every GTDB species on the refusal list (gtdb_organism_refusals.tsv)
+         still exist in this release? A refusal is keyed on the exact GTDB name,
+         so if GTDB renames the species the refusal silently stops applying.
 
 Shared with the generator
     generate_gtdb_organism_table.py imports read_gtdb_metadata,
@@ -316,6 +320,12 @@ def check_for_missing_entries(counts, problems):
 
     candidates = []
     for gtdb_species, ncbi_counter in counts.items():
+        # A name on the refusal list is not missing: it is withheld on purpose,
+        # and map_classification below would return no organism for it, so
+        # without this skip it could come back as an ADD? proposal that undoes
+        # the refusal. Question 4 reports on these names instead.
+        if gtdb_species in gao.GTDB_SPECIES_REFUSALS:
+            continue
         ncbi_name, percent, total = majority_ncbi_species(ncbi_counter)
         organism = ncbi_to_organism.get(ncbi_name)
         if not organism:
@@ -372,10 +382,57 @@ def check_for_missing_entries(counts, problems):
     print("            Never map these - it would assert a different taxon.")
 
 
-# ── Run all three questions and report ───────────────────────────────────────
+# ── Question 4: do the refused GTDB species still exist? ─────────────────────
+
+def check_refusals(counts, problems):
+    """Question 4: is every name on the refusal list still a GTDB species here?
+
+    Input:  the per-cluster NCBI counts from read_gtdb_metadata, plus the running
+            `problems` list.
+    Does:   for every GTDB species in gtdb_organism_refusals.tsv (loaded into
+            gao.GTDB_SPECIES_REFUSALS at import), checks that the name still
+            exists in this release, and prints the three commonest NCBI names
+            inside it, so a human can see whether the reason for the refusal
+            still holds (for s__Burkholderia mallei: are B. pseudomallei genomes
+            still filed under it?).
+
+    One verdict is printed per refused name:
+      OK    the name is still a GTDB species; its NCBI make-up is listed
+      GONE  the name has disappeared, so the refusal no longer applies to
+            anything. Find where GTDB moved those genomes and update
+            gtdb_organism_refusals.tsv; until then the new name is mapped by
+            the ordinary rules.
+    Only GONE is pushed into `problems`. Whether the NCBI make-up still
+    justifies the refusal is a judgement this script leaves to the reader.
+    """
+    print("\n4. Refused GTDB species")
+    print("   (GTDB species that never get an --organism)\n")
+
+    if not gao.GTDB_SPECIES_REFUSALS:
+        print("   none listed.")
+        return
+
+    for gtdb_species in sorted(gao.GTDB_SPECIES_REFUSALS):
+        if gtdb_species not in counts:
+            print(f"   GONE     {gtdb_species:34s}")
+            print(f"            This GTDB species no longer exists in this release, "
+                  f"so the refusal applies to nothing.")
+            problems.append(f"refusal {gtdb_species}: no longer in GTDB; "
+                            f"update gtdb_organism_refusals.tsv")
+            continue
+
+        ncbi_counter = counts[gtdb_species]
+        total = sum(ncbi_counter.values())
+        commonest = ", ".join(f"{name or 'unnamed'} {count}"
+                              for name, count in ncbi_counter.most_common(3))
+        print(f"   OK       {gtdb_species:34s} {total} genomes; "
+              f"commonest NCBI names: {commonest}")
+
+
+# ── Run all four questions and report ────────────────────────────────────────
 
 def main(argv=None):
-    """Run the three questions over one release and set the exit status.
+    """Run the four questions over one release and set the exit status.
 
     Exit 0 means every entry still holds and nothing new qualifies; exit 1 means
     at least one thing needs a human decision, and each of them is listed. The
@@ -400,19 +457,20 @@ def main(argv=None):
     check_equivalence_entries(counts, problems)
     check_genus_rules(counts, genus_of_species, problems)
     check_for_missing_entries(counts, problems)
+    check_refusals(counts, problems)
 
     print("\n" + "=" * 70)
     if problems:
         print(f"{len(problems)} thing(s) need a human decision:")
         for problem in problems:
             print(f"   - {problem}")
-        # The advice below names the two constants because it predates the
-        # generator: neither is hand-typed any more, both are loaded from the
-        # generated TSVs. The real fix is to run generate_gtdb_organism_table.py
-        # against this same metadata file, commit the two files it rewrites, and
-        # re-run this check.
-        print("\nEdit GTDB_SPECIES_EQUIVALENCES / GENUS_ORGANISMS in "
-              "gtdb_amrfinder_organism.py, then re-run this check.")
+        # The fix depends on which list the problem is in. The two generated
+        # tables are never edited by hand: re-run generate_gtdb_organism_table.py
+        # against this same metadata file and commit the two files it rewrites.
+        # The refusal list is hand-kept: edit gtdb_organism_refusals.tsv.
+        print("\nFor a problem in the two generated tables, re-run "
+              "generate_gtdb_organism_table.py against this metadata file; for a "
+              "refused name, edit gtdb_organism_refusals.tsv. Then re-run this check.")
         return 1
 
     print("The organism table is still correct for this GTDB release.")

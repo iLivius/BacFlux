@@ -336,9 +336,10 @@ if MOBILOME_RUN:
     #           rule taxonomic_assignment in shared/30_taxonomy.smk).
     # Does: map the GTDB classification to a curated AMRFinderPlus --organism, or
     #       to nothing at all. The mapping is data, not code: the curated species
-    #       equivalences and the genus-level rules sit in two TSVs beside
-    #       scripts/80_mobilome/gtdb_amrfinder_organism.py, which is where to add a
-    #       species rather than in this rule.
+    #       equivalences, the genus-level rules and a short hand-kept list of GTDB
+    #       species that get no organism (gtdb_organism_refusals.tsv) sit in three
+    #       TSVs beside scripts/80_mobilome/gtdb_amrfinder_organism.py, which is
+    #       where to add or refuse a species rather than in this rule.
     # Produces: a one-line file holding the organism name (or an EMPTY file), plus
     #           an audit TSV recording the decision and its reason.
     # Consumed by: amrfinderplus (below).

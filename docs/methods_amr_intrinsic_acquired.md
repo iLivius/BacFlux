@@ -81,8 +81,9 @@ acquired and mobile side.
 
 ### The caveat
 
-`--organism` only engages for organisms AMRFinderPlus curates mutations for:
-31 in version 4.2.7, overwhelmingly clinical — *Escherichia*, *Salmonella*,
+`--organism` only engages for the organisms AMRFinderPlus has settings for:
+31 in the database that comes with the Bakta database, 30 of them with curated point
+mutations, overwhelmingly clinical — *Escherichia*, *Salmonella*,
 *Klebsiella*, *Staphylococcus aureus*, *Campylobacter*, *Pseudomonas aeruginosa*,
 *Enterococcus*, *Vibrio*, *Neisseria* and similar.
 
@@ -92,6 +93,13 @@ get no `--organism` at all. For such a sample,
 `{sample}_amrfinder_organism_audit.tsv` records the reason: *no curated organism
 for this taxon*. Its `{sample}_amrfinderplus_mutations.tsv` then holds no mutation
 rows, only a line saying point-mutation screening was not available.
+
+Two curated organisms, *Burkholderia mallei* and *B. pseudomallei*, are out of
+reach on purpose. GTDB files *B. pseudomallei* under its *B. mallei* species,
+while AMRFinderPlus curates the two separately, so BacFlux cannot tell which of
+the two an isolate is. It runs any isolate GTDB calls *B. mallei* without
+`--organism`, and the audit file says why
+([Antimicrobial resistance](analysis/amr.md#gtdb-to-amrfinderplus-organism)).
 
 **Read such a mutations file as "not assessed", never as "no mutations found."**
 BacFlux writes the refusal and its reason to the audit file so the distinction

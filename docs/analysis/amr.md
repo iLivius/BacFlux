@@ -294,6 +294,34 @@ Two committed lookup tables bridge the gap, both generated per GTDB release by
   the percentage of genomes on which GTDB and NCBI agree and how many genomes that
   rests on.
 
+A third, short list works the other way. **`gtdb_organism_refusals.tsv`** names GTDB
+species that never get an `--organism`, each with the reason that goes into the audit.
+It is kept by hand, because it records a judgement that genome counts cannot make: that
+one GTDB species covers two organisms AMRFinderPlus curates separately.
+
+It has one entry. GTDB has no *Burkholderia pseudomallei* species; it files those
+genomes under `s__Burkholderia mallei`. AMRFinderPlus curates *B. mallei* and
+*B. pseudomallei* as two organisms, and only *B. pseudomallei* has curated point
+mutations (15 in AMRFinderPlus database 2026-01-21.1, none for *B. mallei*). A GTDB
+call of *B. mallei* cannot say which of the two an isolate is, so naming either would
+assert a species the data do not support. Such an isolate runs without `--organism`,
+and its mutations file holds no mutation rows, only a line saying point-mutation
+screening was not available. Running without `--organism` also means AMRFinderPlus no
+longer hides the *bimA_Bm* virulence gene, which it suppresses for *B. mallei*, so a
+hit to it can appear in the AMRFinderPlus table. If other evidence shows the isolate is
+*B. pseudomallei*, run AMRFinderPlus on its Bakta output yourself with
+`--organism Burkholderia_pseudomallei`.
+
+GTDB's *Bordetella pertussis* is wider in a similar way, but it is not refused. GTDB has
+no unsuffixed *B. bronchiseptica* or *B. parapertussis* species, so genomes NCBI names
+that way sit in its *B. pertussis* or in a placeholder species such as
+`s__Bordetella bronchiseptica_F`. An isolate GTDB calls *B. pertussis* therefore runs
+with `--organism Bordetella_pertussis` even when it is one of the two relatives. That is
+kept on purpose: the one point mutation AMRFinderPlus curates for *B. pertussis*,
+23S rRNA A2047G (macrolide resistance), sits in a 23S site the genus shares, so the
+screen is meaningful for all three. Read that organism in the audit file as
+"*B. pertussis* or a close relative".
+
 !!! note "Rebuilding the tables is a manual step"
 
     `generate_gtdb_organism_table.py` is not invoked by any rule. It is run by hand,
@@ -303,10 +331,12 @@ Two committed lookup tables bridge the gap, both generated per GTDB release by
     and nothing in the workflow warns that they have gone stale. A stale table maps
     fewer species; an unmapped species silently loses its `--organism` flag, which
     means no point-mutation screening for that isolate. `check_gtdb_organism_table.py`
-    validates a rebuild.
+    validates a rebuild, and also reports a refused species that has disappeared from
+    a new GTDB release, since a refusal applies to one exact GTDB name.
 
-At run time `amrfinder_organism` looks this sample's classification up in those tables
-and writes either an organism name or nothing. Nothing is the safe default and the
+At run time `amrfinder_organism` checks this sample's classification against the
+refusal list first, then looks it up in the two generated tables, and writes either an
+organism name or nothing. Nothing is the safe default and the
 usual outcome: a wrong `--organism` would produce confidently wrong point-mutation
 calls, so the rule refuses to guess — including when a hybrid sample's two assemblies
 disagree. Every decision, and its reason, lands in

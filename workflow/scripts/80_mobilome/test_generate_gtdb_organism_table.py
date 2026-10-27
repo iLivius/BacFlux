@@ -12,6 +12,8 @@ Everything runs on a tiny SYNTHETIC bac120_metadata file built in pytest's
 tmp_path — no 225 MB GTDB download needed. Each test builds a handful of genomes
 shaped like one real situation (a naming artefact to accept, a look-alike species
 to reject, weak evidence to reject) and checks what the generator does with it.
+The last section also tests how check_gtdb_organism_table.py treats the
+hand-curated refusal list, since it needs the same fixture.
 
 Run: pytest workflow/scripts/80_mobilome/test_generate_gtdb_organism_table.py -q
 """
@@ -19,6 +21,7 @@ Run: pytest workflow/scripts/80_mobilome/test_generate_gtdb_organism_table.py -q
 import csv
 import os
 
+import check_gtdb_organism_table as gtdb_check
 import generate_gtdb_organism_table as gen
 import gtdb_amrfinder_organism as gao
 
@@ -314,3 +317,63 @@ def test_guess_release_reads_the_r_number_out_of_the_filename():
     assert gen.guess_release("bac120_metadata_r226.tsv.gz") == "r226"
     assert gen.guess_release("/some/path/bac120_metadata_r232.tsv.gz") == "r232"
     assert gen.guess_release("no_release_number.tsv.gz") == "unknown release"
+
+
+# ── The refusal list: neither maintenance script may undo it ─────────────────
+# gtdb_organism_refusals.tsv names GTDB species that must never get an
+# --organism (GTDB's s__Burkholderia mallei, which also holds every
+# B. pseudomallei genome). It is written by hand, and these two scripts must
+# respect it: the generator must never write an override row for a refused name,
+# the checker must never propose adding one back, and the checker must say so
+# when a refused name has disappeared from a GTDB release, because the refusal
+# is keyed on the exact name and would then apply to nothing. The checker has no
+# test file of its own; these live here because they share the synthetic
+# metadata fixture above.
+
+
+def test_generator_writes_no_row_for_a_refused_name(tmp_path, monkeypatch):
+    # The same cluster that test_unsuffixed_epithet_naming_artefact_is_accepted
+    # turns into a row, refused for the purpose of this test only.
+    counts, _genus = load(tmp_path, cluster(
+        "Campylobacter_D jejuni", "Campylobacter jejuni", 50, agreeing_fraction=0.97))
+    monkeypatch.setitem(gao.GTDB_SPECIES_REFUSALS, "Campylobacter_D jejuni", "test reason")
+    rows = gen.build_equivalence_rows(counts, genus_safe_organisms=set())
+    assert equivalence_for(rows, "Campylobacter_D jejuni") is None
+
+
+def test_checker_does_not_propose_adding_back_a_refused_name(tmp_path):
+    # A Burkholderia mallei cluster whose genomes are all labelled B. mallei at
+    # NCBI: the mapper refuses it, so without the skip the checker would see an
+    # unmatched name with perfect evidence and propose it as "ADD?".
+    assert "Burkholderia mallei" in gao.GTDB_SPECIES_REFUSALS
+    counts, _genus = load(tmp_path, cluster(
+        "Burkholderia mallei", "Burkholderia mallei", 30, agreeing_fraction=1.0))
+    problems = []
+    gtdb_check.check_for_missing_entries(counts, problems)
+    assert problems == []
+
+
+def test_checker_reports_a_refused_name_that_left_gtdb(tmp_path):
+    # A release with no s__Burkholderia mallei at all: the refusal no longer
+    # applies to anything, which needs a human to look.
+    counts, _genus = load(tmp_path, cluster(
+        "Burkholderia cepacia", "Burkholderia cepacia", 10, agreeing_fraction=1.0))
+    problems = []
+    gtdb_check.check_refusals(counts, problems)
+    assert any("Burkholderia mallei" in problem and "gtdb_organism_refusals.tsv" in problem
+               for problem in problems)
+
+
+def test_checker_accepts_a_refused_name_still_in_gtdb(tmp_path, capsys):
+    # The R232 situation: one GTDB species holding both NCBI names. Nothing to
+    # fix, and the NCBI make-up is printed so the reader can see the merge.
+    rows = (cluster("Burkholderia mallei", "Burkholderia pseudomallei", 90)
+            + [genome("mallei_%d" % i, "Burkholderia mallei", "Burkholderia mallei")
+               for i in range(10)])
+    counts, _genus = load(tmp_path, rows)
+    problems = []
+    gtdb_check.check_refusals(counts, problems)
+    assert problems == []
+    printed = capsys.readouterr().out
+    assert "Burkholderia pseudomallei 90" in printed
+    assert "Burkholderia mallei 10" in printed

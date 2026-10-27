@@ -1,0 +1,3 @@
+# Hand-curated, NOT written by generate_gtdb_organism_table.py. One row per GTDB species that must never receive an AMRFinderPlus --organism; the reason is copied into the audit TSV. Checked against GTDB release r232 and the AMRFinderPlus database 2026-01-21.1.
+gtdb_species	reason
+Burkholderia mallei	GTDB merges B. pseudomallei into its B. mallei species, but AMRFinderPlus curates B. mallei and B. pseudomallei as two organisms with different point-mutation lists; the GTDB call cannot tell which of the two this isolate is, so naming either would assert a species the data do not support

@@ -23,7 +23,10 @@ workflow run.** It is a maintenance tool you run by hand. Right now that is
 any rule. They build and validate the two committed tables
 (`gtdb_organism_equivalences.tsv`, `gtdb_organism_genus_rules.tsv`) that
 `gtdb_amrfinder_organism.py` reads at runtime, and they are re-run when a new GTDB
-release comes out — not once per sample.
+release comes out — not once per sample. The runtime also reads a third, hand-kept
+file, `gtdb_organism_refusals.tsv`, the GTDB species that never get an organism. The
+generator never writes it and never adds a refused name to the other two tables; the
+checker reports a refused name that has vanished from a new GTDB release.
 
 They stay here rather than moving in with `clean_workdir.sh` because they `import
 gtdb_amrfinder_organism`, which *is* a workflow script. Splitting them off would break

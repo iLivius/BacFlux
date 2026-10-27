@@ -965,3 +965,207 @@ def test_every_organism_the_equivalence_table_emits_is_a_legal_amrfinder_value()
     entry pointing at a non-existent name would kill the rule, not degrade."""
     for gtdb_name, organism in gao.GTDB_SPECIES_EQUIVALENCES.items():
         assert organism in gao.ALL_ORGANISMS, gtdb_name
+
+
+# ── Burkholderia: a GTDB species wider than the curated organism ─────────────
+# GTDB merges Burkholderia pseudomallei into its s__Burkholderia mallei (there is
+# no s__Burkholderia pseudomallei in GTDB), while AMRFinderPlus curates the two as
+# separate organisms with different point-mutation lists: none for
+# Burkholderia_mallei, 15 for Burkholderia_pseudomallei in AMRFinderPlus database
+# 2026-01-21.1. The plain exact-species rule would therefore give every
+# B. pseudomallei isolate the B. mallei list, find no mutations, and write an
+# audit row that reads like a confident match. So GTDB's B. mallei is on the
+# hand-curated refusal list, gtdb_organism_refusals.tsv: no --organism at all,
+# and an audit reason that says why.
+
+def burkholderia_lineage(species):
+    """A real-shaped GTDB lineage for a Burkholderia species (the shared
+    lineage() helper fills in Enterobacterales ranks, which would be wrong here,
+    although the mapper reads only g__ and s__)."""
+    return ("d__Bacteria;p__Pseudomonadota;c__Gammaproteobacteria;"
+            "o__Burkholderiales;f__Burkholderiaceae;g__Burkholderia;s__%s"
+            % species)
+
+
+def test_gtdb_burkholderia_mallei_gets_no_organism():
+    # The shipped refusal list must be present and loaded; without it this
+    # lineage would fall through to the exact-species match again.
+    assert "Burkholderia mallei" in gao.GTDB_SPECIES_REFUSALS, (
+        "gtdb_organism_refusals.tsv is missing or no longer lists it")
+
+    organism, reason = gao.map_classification(
+        burkholderia_lineage("Burkholderia mallei"))
+    assert organism == ""
+    # The audit must say that this was a deliberate refusal, of which GTDB
+    # name, where it is recorded, and the biology behind it, in plain words.
+    assert reason.startswith("organism withheld on purpose")
+    assert "s__Burkholderia mallei" in reason
+    assert "gtdb_organism_refusals.tsv" in reason
+    assert "pseudomallei" in reason
+    # And it must not be mistaken for the ordinary "nothing curated" outcome.
+    assert "exact species match" not in reason
+    assert not reason.startswith("no curated organism")
+
+
+def test_cli_writes_an_empty_organism_file_for_a_refused_species(tmp_path):
+    # End to end, as the Snakemake rule sees it: a hybrid sample whose two
+    # assemblies are both GTDB B. mallei. The organism file must be genuinely
+    # empty (rule amrfinderplus then runs without --organism), and the audit
+    # row must carry the refusal reason with matched_organism = NA.
+    summary = write_summary(tmp_path, [
+        ("BM01_illumina", burkholderia_lineage("Burkholderia mallei")),
+        ("BM01_ont", burkholderia_lineage("Burkholderia mallei")),
+    ])
+    organism_file = tmp_path / "BM01_amrfinder_organism.txt"
+    audit_file = tmp_path / "BM01_amrfinder_organism_audit.tsv"
+
+    exit_code = gao.main([
+        "--gtdbtk-summary", summary,
+        "--sample", "BM01",
+        "--out-organism", str(organism_file),
+        "--out-audit", str(audit_file),
+    ])
+
+    assert exit_code == 0
+    assert os.path.getsize(str(organism_file)) == 0
+
+    header, row = read_audit(str(audit_file))
+    assert header == ["sample", "gtdb_classification", "matched_organism", "reason"]
+    assert row["matched_organism"] == "NA"
+    assert "s__Burkholderia mallei" in row["gtdb_classification"]
+    assert row["reason"].startswith("organism withheld on purpose")
+    assert "2 assemblies of this sample agree" in row["reason"]
+    # The reason comes from a hand-edited file, so check it did not break the
+    # four-column shape of the audit.
+    with open(str(audit_file)) as handle:
+        for line in handle.read().splitlines():
+            assert len(line.split("\t")) == 4
+
+
+def test_neighbouring_burkholderia_species_are_unchanged():
+    # The refusal is keyed on one exact GTDB name and must not spill over onto
+    # the rest of the genus.
+    organism, reason = gao.map_classification(
+        burkholderia_lineage("Burkholderia cepacia"))
+    assert organism == "Burkholderia_cepacia"
+    assert reason.startswith("exact species match")
+
+    # Should a GTDB release ever name B. pseudomallei separately again, that
+    # name is unambiguous and still earns its own organism.
+    organism, reason = gao.map_classification(
+        burkholderia_lineage("Burkholderia pseudomallei"))
+    assert organism == "Burkholderia_pseudomallei"
+    assert reason.startswith("exact species match")
+
+    # An uncurated Burkholderia keeps the ordinary "not curated" reason, not
+    # the refusal one.
+    organism, reason = gao.map_classification(
+        burkholderia_lineage("Burkholderia thailandensis"))
+    assert organism == ""
+    assert "not one of the curated species" in reason
+
+
+def test_refusal_wins_over_an_equivalence_row(monkeypatch):
+    # The refusal is checked before the generated equivalences table, so a name
+    # that somehow sits in both is still refused. Enterococcus_B faecium is used
+    # only because it has a real equivalence row; it is not actually refused.
+    assert "Enterococcus_B faecium" in gao.GTDB_SPECIES_EQUIVALENCES
+    monkeypatch.setitem(gao.GTDB_SPECIES_REFUSALS, "Enterococcus_B faecium",
+                        "test reason")
+    organism, reason = gao.map_classification(
+        lineage("Enterococcus_B", "Enterococcus_B faecium"))
+    assert organism == ""
+    assert reason.endswith("test reason")
+
+
+def test_shipped_refusals_and_equivalences_do_not_overlap():
+    # A name in both files would be a contradiction a reader has to untangle;
+    # the generator is meant to make it impossible.
+    overlap = set(gao.GTDB_SPECIES_REFUSALS) & set(gao.GTDB_SPECIES_EQUIVALENCES)
+    assert overlap == set()
+
+
+def test_refusal_loader_keeps_a_row_with_a_blank_reason(tmp_path):
+    # On this list, dropping a row is the unsafe direction (the name would be
+    # mapped again), so a row with an empty reason still refuses.
+    path = tmp_path / "refusals.tsv"
+    path.write_text("# provenance\n"
+                    "gtdb_species\treason\n"
+                    "Burkholderia mallei\t\n"
+                    "\tno species on this row\n")
+    refusals = gao._load_species_refusals(str(path))
+    assert list(refusals) == ["Burkholderia mallei"]
+    assert refusals["Burkholderia mallei"].startswith("no reason recorded")
+
+
+def test_refusal_loader_keeps_a_row_with_no_tab_at_all(tmp_path):
+    # A hand-typed row with the reason left out and no tab: still a refusal.
+    path = tmp_path / "refusals.tsv"
+    path.write_text("# provenance\n"
+                    "gtdb_species\treason\n"
+                    "Burkholderia mallei\n")
+    refusals = gao._load_species_refusals(str(path))
+    assert list(refusals) == ["Burkholderia mallei"]
+    assert refusals["Burkholderia mallei"].startswith("no reason recorded")
+
+
+def test_refusal_loader_keeps_a_row_with_an_extra_column(tmp_path):
+    # One tab too many must not drop the row; the pieces become one reason, so
+    # the audit TSV keeps its four columns.
+    path = tmp_path / "refusals.tsv"
+    path.write_text("# provenance\n"
+                    "gtdb_species\treason\n"
+                    "Burkholderia mallei\tfirst part\tsecond part\n")
+    refusals = gao._load_species_refusals(str(path))
+    assert refusals == {"Burkholderia mallei": "first part; second part"}
+    assert "\t" not in refusals["Burkholderia mallei"]
+
+
+def test_refusal_loader_accepts_a_pasted_gtdb_prefix(tmp_path):
+    # A name copied straight from a GTDB-Tk lineage keeps its "s__"; it must
+    # still key on the bare name that map_classification looks up.
+    path = tmp_path / "refusals.tsv"
+    path.write_text("gtdb_species\treason\n"
+                    "s__Burkholderia  mallei \tsome reason\n")
+    refusals = gao._load_species_refusals(str(path))
+    assert refusals == {"Burkholderia mallei": "some reason"}
+
+
+def test_refusal_loader_warns_about_a_row_it_cannot_key(tmp_path, capsys):
+    # A row typed with spaces instead of a tab gives a "name" of many words,
+    # which can never match a GTDB species: it is reported, not silently lost.
+    path = tmp_path / "refusals.tsv"
+    path.write_text("gtdb_species\treason\n"
+                    "Burkholderia mallei  reason typed after spaces\n"
+                    "\tno species on this row\n")
+    refusals = gao._load_species_refusals(str(path))
+    assert refusals == {}
+    warnings = capsys.readouterr().err
+    assert warnings.count("WARNING") == 2
+    assert "reason typed after spaces" in warnings
+
+
+def test_refusal_loader_warns_when_the_file_is_missing(tmp_path, capsys):
+    # A missing list cannot fail towards caution, so it must at least be loud
+    # (stderr ends up in the amrfinder_organism log).
+    refusals = gao._load_species_refusals(str(tmp_path / "absent.tsv"))
+    assert refusals == {}
+    assert "WARNING" in capsys.readouterr().err
+
+
+def test_gtdb_really_merges_pseudomallei_into_mallei():
+    # Regression anchor for the refusal, against the installed GTDB taxonomy
+    # (same BACFLUX_TEST_GTDB_TAXONOMY variable as the anchor above). If a
+    # future release gives B. pseudomallei its own species again, this fails and
+    # the refusal gets revisited instead of withholding an organism for nothing.
+    if not os.path.isfile(GTDB_TAXONOMY):
+        import pytest
+        pytest.skip("set BACFLUX_TEST_GTDB_TAXONOMY to run this")
+
+    burkholderia = gtdb_species_names_matching("Burkholderia ")
+    assert "Burkholderia mallei" in burkholderia
+    assert "Burkholderia pseudomallei" not in burkholderia
+    # Every refused name must still be a name GTDB actually uses.
+    for gtdb_name in gao.GTDB_SPECIES_REFUSALS:
+        genus = gtdb_name.split()[0]
+        assert gtdb_name in gtdb_species_names_matching(genus), gtdb_name

@@ -252,7 +252,10 @@ def build_equivalence_rows(counts, genus_safe_organisms):
     Input:  the per-cluster NCBI-name counts (from read_gtdb_metadata), plus
             the set of organisms build_genus_rules just judged safe to match by
             genus alone.
-    Does, for every GTDB species cluster in the release:
+    Does, for every GTDB species cluster in the release that is NOT on the
+    hand-curated refusal list (gtdb_organism_refusals.tsv; map_classification
+    refuses those before it reads this table, so a row for one could only
+    mislead a reader into thinking the name is mapped):
       1. Find its NCBI majority name (>=50% of the cluster, else no name at all)
          and look up which curated organism (if any) that NCBI name belongs to.
          A cluster whose majority is not one of the 31 curated species is
@@ -298,8 +301,9 @@ def build_equivalence_rows(counts, genus_safe_organisms):
     Output: a list of dict rows, one per accepted override, unsorted (main
             sorts by GTDB name before writing them to
             gtdb_organism_equivalences.tsv). Every row here becomes a lookup
-            that map_classification consults FIRST, ahead of its own suffix
-            rules - which is exactly why the guards above matter.
+            that map_classification consults ahead of its own suffix rules
+            (only the refusal list is checked earlier) - which is exactly why
+            the guards above matter.
     """
     ncbi_to_organism = build_ncbi_to_organism_map()
     rows = []
@@ -307,6 +311,9 @@ def build_equivalence_rows(counts, genus_safe_organisms):
     for gtdb_species, ncbi_counter in counts.items():
         if " " not in gtdb_species:
             continue  # GTDB-Tk left the species field blank - nothing to key an override on
+
+        if gtdb_species in gao.GTDB_SPECIES_REFUSALS:
+            continue  # withheld on purpose (gtdb_organism_refusals.tsv) - never mapped
 
         ncbi_name, percent, total = gtdb_check.majority_ncbi_species(ncbi_counter)
         organism = ncbi_to_organism.get(ncbi_name)
