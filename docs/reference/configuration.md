@@ -136,7 +136,8 @@ lists the keys:
 
 | Key | Check | What happens |
 |---|---|---|
-| `mode` | present, and one of the four | Missing: stops with a `KeyError`. Present but unrecognised: stops, listing the four |
+| any block (`input`, `parameters`, `parameters.decontamination`, `phage`, `mobilome`, `mobilome.tncentral`, …) | its settings indented beneath it, not a single value such as `off` | Stops naming the block; for `decontamination`, `phage`, `mobilome` and the four mobilome layers it also says what to write instead |
+| `mode` | present, and one of the four | Missing: stops with a `KeyError`. Present but unrecognised, or a bare `on`/`off`: stops, listing the four |
 | `input.<mode>_dir` | set, and an existing directory | Stops naming the key |
 | input files | at least one, all sharing one extension, extension recognised | Stops listing the extensions it found |
 | sample names | none of the refused characters listed under [Input](#input-all-modes) | Stops naming the offending sample |
@@ -150,13 +151,14 @@ lists the keys:
 | `links.card_link`, `links.phix_link` | set whenever the mode has short reads | Stops naming the key and the mode |
 | `links.checkv_link`, `links.genomad_link` | a `.tar.gz` if set | Stops |
 | `resources.threads`, `ram_gb`, `runtime_hours` | a whole number, 1 or more | Stops, naming the key and the value |
+| `parameters.nt_version` | a folder name, not a bare `on`/`off` | Stops |
 | `parameters.eggnog.dbmem` | `resources.ram_gb` can hold one job | Stops, and names the number to raise |
 | `parameters.spades_kmers` | `auto`, or odd ascending integers below 128 | Stops, naming the offending value |
-| `parameters.decontamination.mode` | one of `auto`, `include`, `exclude`, `off` | Stops |
+| `parameters.decontamination.mode`, `long_read_mode` | one of `auto`, `include`, `exclude`, `off`; a bare `off` counts as `off` | Stops |
 | `parameters.decontamination.auto_vote` | `bp` or `contigs` | Stops |
 | `parameters.decontamination.mode` or `long_read_mode` set to `include` | a genus to include: `include_genera`, `include_genera_by_sample` or a `sample_overrides` file | Stops |
 | `parameters.<mode>.flye_input_mode` | one of `auto`, `nano-raw`, `nano-hq` | Stops |
-| `phage.caller` | `virsorter2` or `genomad` | Stops |
+| `phage.caller` | `virsorter2` or `genomad`; there is no `off` | Stops, and says phage calling has no off switch |
 | `mobilome.coverage_profile` | a fraction in `(0, 1]` | Stops, and says it is a fraction, not a percentage |
 | `mobilome.icescan.run` | has a `url` or a `dir` to use | Stops |
 | `mobilome.isosdb.fasta_url` | `family_map_url` set alongside it | Stops |
@@ -165,6 +167,21 @@ lists the keys:
 Each stop ends the run with exit status 1, so a wrapper script or a cluster
 submission sees the failure. Most messages begin with `[BacFlux]`; a missing
 required key is reported by Python as a `KeyError` naming it.
+
+!!! note "Unquoted `on`, `off`, `yes` and `no`"
+
+    Snakemake reads the config as YAML 1.1, which turns an **unquoted** `on`,
+    `yes` or `true` into the boolean *true*, and `off`, `no` or `false` into
+    *false*, before BacFlux sees the value. A word in quotes (`"off"`) always
+    stays a word. Where a bare on/off ends up:
+
+    | Where it is written | What BacFlux does |
+    |---|---|
+    | a switch: `mobilome.run`, `mobilome.icescan.run`, `discard_no_hit`, `eggnog.dbmem`, `short_read_guidance`, `medaka_model_fallback_auto`, `require_trna_boundary_for_high` | takes it as meant |
+    | `medaka_model` | `false` skips Medaka, `true` infers the model |
+    | `parameters.decontamination.mode` or `long_read_mode` | `off` counts as `off`; `on`, `yes` or `true` names no policy, and the run stops |
+    | any other key that takes a word: `mode`, `phage.caller`, `parameters.nt_version`, `spades_kmers`, `auto_vote`, `flye_input_mode` | stops, saying how YAML read the value and listing the words it accepts |
+    | a block written as one value, e.g. `decontamination: off` or `mobilome: on` | stops. Decontamination is switched off with `mode: off` inside its block and the mobilome module with `run: false` inside its block; phage calling has no off switch |
 
 Database *contents* are not opened at parse time, so a placeholder path in
 `bakta_db` or `blast_db` passes a dry run and fails later. The optional
@@ -683,7 +700,7 @@ phage:
 
 | Key | What it does | Default | Notes |
 |---|---|---|---|
-| `caller` | Which tool finds viruses and prophages in stage `07.phages` | `virsorter2` | CheckV then scores whatever that caller found, so this changes CheckV's input, not the QC itself. |
+| `caller` | Which tool finds viruses and prophages in stage `07.phages` | `virsorter2` | CheckV then scores whatever that caller found, so this changes CheckV's input, not the QC itself. Phage calling cannot be switched off: one of the two callers always runs, and `caller: off` stops the run. |
 
 Choosing `genomad` changes the plasmid stage too. One geNomad run calls viruses
 and plasmids together, so opting in also switches on the Platon + geNomad

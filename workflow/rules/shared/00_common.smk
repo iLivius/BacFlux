@@ -8,6 +8,9 @@
 #
 # Sections, in file order:
 #
+# 0.  Config shape       : stop on a block written as one value (a bare
+#                          `decontamination: off`), and define the check every
+#                          one-word key uses against YAML's on/off booleans.
 # 1.  Mode dispatch      : read and validate config.mode (illumina | nanopore |
 #                          hybrid | contigs).
 # 1b. Phage caller       : VirSorter2 (default) or geNomad (opt-in), and what
@@ -56,6 +59,130 @@ from urllib.parse import urlparse
 from snakemake.io import glob_wildcards
 
 
+# ──────────── 0. Config shape: blocks, and YAML's on/off ────────────
+# Snakemake reads the config file as YAML 1.1. In YAML 1.1 an UNQUOTED on, yes or
+# true is not a word but the boolean True, and an unquoted off, no or false is the
+# boolean False. So what reaches this file is Python's True or False, not the text
+# the user typed. Two kinds of key can be misread that way, and BacFlux stops the
+# run on both rather than guess what was meant:
+#
+#   * a BLOCK, i.e. a key with its settings indented beneath it, such as
+#     parameters.decontamination, written as a single value instead, e.g.
+#     `decontamination: off`. Checked in this section, for every block in
+#     config/config.yaml.
+#   * a WORD key, which takes one word from a fixed list, such as phage.caller
+#     (virsorter2 or genomad). Each one is checked where it is read, further down,
+#     with _stop_on_yaml_bool(), defined just below.
+#
+# Keys that really are on/off switches (mobilome.run, discard_no_hit, ...) are
+# read with _config_bool(), defined in section 5b, and a bare true or false is
+# exactly what they should get. medaka_model is the one word key that also takes a
+# boolean (false skips Medaka); section 8 reads it without this check.
+#
+# These checks look only at the config, never at the input data, and they are
+# the same in every mode, so under the house rule above they run unconditionally.
+# They come first, before any other line reads the config, so no later line can
+# meet a True or False where it expects a block of settings.
+
+
+def _stop_on_yaml_bool(key, value, valid_words, note=""):
+    # Stop the run when a WORD key arrived as a YAML boolean.
+    #   Takes in: the key's full name for the message (e.g. "phage.caller"), its
+    #             value as Snakemake loaded it from the config, the valid words
+    #             written out for a person to read (e.g. "virsorter2 or genomad"),
+    #             and an optional extra sentence about that key.
+    #   Does:     nothing unless the value is True or False. A boolean means the
+    #             config holds an unquoted on/yes/true or off/no/false where a word
+    #             belongs, so none of the valid words can be what was meant.
+    #   Produces: for a boolean, a [BacFlux] message and exit status 1, so a
+    #             wrapper script or a cluster job sees the failure. Otherwise
+    #             nothing, and the caller goes on to its own check of the word.
+    if not isinstance(value, bool):
+        return
+    if value:
+        typed = "an unquoted on, yes or true"
+    else:
+        typed = "an unquoted off, no or false"
+    sys.exit(
+        f"[BacFlux] {key} is {typed}, which YAML reads as the boolean "
+        f"{str(value).lower()}, not as a word. It must be {valid_words}.{note}"
+    )
+
+
+# Every block in config/config.yaml, by its full dotted name. A parent comes
+# before its children in this list, so the loop below has already checked the
+# parent by the time it reaches a child.
+_CONFIG_BLOCKS = (
+    "input", "directories", "links", "resources",
+    "parameters",
+    "parameters.eggnog", "parameters.long_read_qc", "parameters.decontamination",
+    "parameters.nanopore", "parameters.hybrid",
+    "phage",
+    "mobilome",
+    "mobilome.icescan", "mobilome.tncentral", "mobilome.iceberg", "mobilome.isosdb",
+)
+
+# What to write instead, for the blocks people try to switch on or off with one
+# word. Added to the end of the stop message for that block.
+_CONFIG_BLOCK_HINTS = {
+    "parameters.decontamination":
+        "To switch decontamination off, keep the block and write mode: off "
+        "indented beneath it.",
+    "phage":
+        "Phage calling has no off switch: one caller always runs. Choose it inside "
+        "the block, with caller: virsorter2 (the default) or caller: genomad.",
+    "mobilome":
+        "To switch the module on or off, write run: true or run: false indented "
+        "beneath it.",
+    "mobilome.icescan":
+        "To switch this layer on or off, write run: true or run: false indented "
+        "beneath it.",
+    # The three naming/copy-number layers have no run switch: each is on when a
+    # source is given and off while its url(s) and dir are empty.
+    "mobilome.tncentral":
+        "This layer is off while its url and dir are empty: delete this line, or "
+        "keep the block with url: \"\" and dir: \"\" beneath it.",
+    "mobilome.iceberg":
+        "This layer is off while its urls and dir are empty: delete this line, or "
+        "keep the block with urls: [] and dir: \"\" beneath it.",
+    "mobilome.isosdb":
+        "This layer is off while its fasta_url and dir are empty: delete this "
+        "line, or keep the block with fasta_url: \"\" and dir: \"\" beneath it.",
+}
+
+
+def _config_value(dotted_name):
+    # Look up a nested config key by its dotted name, e.g.
+    # "parameters.decontamination" gives config["parameters"]["decontamination"].
+    # Returns None when the key, or any level above it, is missing or empty.
+    value = config
+    for key in dotted_name.split("."):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(key)
+    return value
+
+
+for _block in _CONFIG_BLOCKS:
+    _block_value = _config_value(_block)
+    # A missing or empty block (None) is fine: every setting in it then takes its
+    # default. A mapping of settings is what a block should be.
+    if _block_value is None or isinstance(_block_value, dict):
+        continue
+    _block_message = (
+        f"[BacFlux] {_block} is a block: its settings go indented beneath it, but "
+        f"the config gives it the single value {_block_value!r}."
+    )
+    if isinstance(_block_value, bool):
+        _block_message += (
+            " YAML reads an unquoted on, yes or true as true, and an unquoted off, "
+            "no or false as false."
+        )
+    if _block in _CONFIG_BLOCK_HINTS:
+        _block_message += " " + _CONFIG_BLOCK_HINTS[_block]
+    sys.exit(_block_message)
+
+
 # ─────────────────────── 1. Mode dispatch ──────────────────────
 # The config is REQUIRED on the command line (the Snakefile deliberately declares
 # no default `configfile:` — see the note there). Fail with an actionable message
@@ -69,7 +196,10 @@ if not config:
 
 # The mode is REQUIRED. Bracket access means a config with no "mode" fails
 # immediately with a clear KeyError rather than silently guessing a pipeline.
-# .lower() normalises case so "Illumina" and "illumina" behave the same.
+# A bare `mode: on` or `mode: off` arrives as True or False (section 0), which
+# has no .lower() and would stop with a bare AttributeError, so it is caught first
+# and named. .lower() normalises case so "Illumina" and "illumina" behave the same.
+_stop_on_yaml_bool("mode", config["mode"], "illumina, nanopore, hybrid or contigs")
 MODE = config["mode"].lower()
 if MODE not in ("illumina", "nanopore", "hybrid", "contigs"):
     sys.exit(
@@ -108,9 +238,28 @@ print(f"Mode: {MODE} — {MODE_TAGLINE[MODE]}.")
 # stage is Platon-only and geNomad never runs. CheckV runs downstream of whichever
 # virus caller ran, either way. `config.get("phage", {}) or {}` guards a phage
 # block that is present but null.
-PHAGE_CALLER = str((config.get("phage", {}) or {}).get("caller") or "virsorter2").strip().lower()
+#
+# There is no "off": one of the two callers always runs. A bare `caller: off`
+# arrives as False (section 0), and the `or "virsorter2"` below would quietly
+# turn it into the default, so a user who meant to switch phage calling off would
+# get VirSorter2 without a word. It stops here instead, and so does a bare
+# on/yes/true, which names no caller either.
+#
+# A QUOTED "off", or any other word such as none, is a real word, so it passes the
+# boolean check and stops at the word check after it. Both stops end with the same
+# reminder, _PHAGE_NO_OFF_SWITCH, because whichever way "off" was typed the user
+# needs to hear that it does not exist, not just which words are valid.
+_PHAGE_NO_OFF_SWITCH = " Phage calling has no off switch: one of the two callers always runs."
+_phage_caller_raw = (config.get("phage", {}) or {}).get("caller")
+_stop_on_yaml_bool(
+    "phage.caller", _phage_caller_raw, "virsorter2 or genomad", _PHAGE_NO_OFF_SWITCH,
+)
+PHAGE_CALLER = str(_phage_caller_raw or "virsorter2").strip().lower()
 if PHAGE_CALLER not in ("genomad", "virsorter2"):
-    sys.exit(f"[BacFlux] config.phage.caller must be genomad | virsorter2 (got: {PHAGE_CALLER!r})")
+    sys.exit(
+        f"[BacFlux] phage.caller must be virsorter2 or genomad "
+        f"(got: {_phage_caller_raw!r}).{_PHAGE_NO_OFF_SWITCH}"
+    )
 if PHAGE_CALLER == "genomad":
     print(
         "Phage caller: geNomad (opt-in). NOTE: geNomad is licensed for ACADEMIC / "
@@ -461,8 +610,15 @@ def capped_cpus(n):
 
 # Which NCBI nucleotide database subfolder the contamination BLAST screens
 # against. Centralised here (was read inline in blast_contigs) with a safe
-# default so a config that omits it still parses.
-NT_VERSION = str((config.get("parameters", {}) or {}).get("nt_version") or "core_nt").strip()
+# default so a config that omits it still parses. A bare off/no/false would
+# otherwise become core_nt without a word, and on/yes/true a folder named "True",
+# so a boolean stops the run (section 0).
+_nt_version_raw = (config.get("parameters", {}) or {}).get("nt_version")
+_stop_on_yaml_bool(
+    "parameters.nt_version", _nt_version_raw,
+    "the name of a folder in directories.blast_db, such as core_nt or nt_prok",
+)
+NT_VERSION = str(_nt_version_raw or "core_nt").strip()
 
 
 # ────────────────── 3b. Mode-capability flags ──────────────────
@@ -783,12 +939,21 @@ PLASMID_BLASTOUT = (DECONTAM_DIR + "/{sample}_final_blastout") if NEEDS_FINAL_BL
 LONGREAD_SCREEN = MODE == "hybrid"
 _dec = (config.get("parameters", {}) or {}).get("decontamination", {}) or {}
 _lrm = _dec.get("long_read_mode", "off")
-# YAML 1.1 reads a bare off/no/false as a BOOLEAN, so `long_read_mode: off` arrives
-# here as False and would otherwise become the string "false" — which is not one of
-# the selector's modes, and would fail deep inside the rule rather than here.
-if isinstance(_lrm, bool):
-    _lrm = "off" if _lrm is False else "auto"
-LONGREAD_SCREEN_MODE = str(_lrm).strip().lower()
+# YAML 1.1 reads a bare off/no/false as a BOOLEAN (section 0), so
+# `long_read_mode: off` arrives here as False. Read it as the "off" the user wrote,
+# exactly as parameters.decontamination.mode does in _decontam_settings (section
+# 5b). True names no mode: a bare on/yes/true could mean auto, include or exclude,
+# so it stops the run, again exactly as mode does, rather than picking one.
+if _lrm is False:
+    _lrm = "off"
+_stop_on_yaml_bool(
+    "parameters.decontamination.long_read_mode", _lrm, "off, auto, include or exclude"
+)
+# A key left blank (`long_read_mode:` with nothing after it, which YAML reads as
+# None, "no value") or set to "" names no policy, so it gets the default "off".
+# That is what `or "off"` does here, and it is the same `or default_mode` that
+# mode uses, so a blank value means "use the default" for both keys.
+LONGREAD_SCREEN_MODE = str(_lrm or "off").strip().lower()
 if LONGREAD_SCREEN_MODE not in {"auto", "include", "exclude", "off"}:
     raise WorkflowError(
         f"[BacFlux] parameters.decontamination.long_read_mode is "
@@ -1386,7 +1551,15 @@ CONJSCAN_VERSION = "2.1.0"
 # overriding SPAdes on unusual data. Validated here rather than at job time so a typo
 # stops the run in seconds: every k must be an odd integer below 128 (SPAdes' own
 # limit), and they must ascend.
-_spades_kmers_cfg = str((config.get("parameters", {}) or {}).get("spades_kmers", "auto") or "auto").strip()
+#
+# A bare off/no/false would otherwise become auto without a word, so a boolean
+# stops the run (section 0), whichever way round it is.
+_spades_kmers_raw = (config.get("parameters", {}) or {}).get("spades_kmers", "auto")
+_stop_on_yaml_bool(
+    "parameters.spades_kmers", _spades_kmers_raw,
+    'auto, or a comma-separated list of odd integers such as "21,33,55,77"',
+)
+_spades_kmers_cfg = str(_spades_kmers_raw or "auto").strip()
 if _spades_kmers_cfg.lower() == "auto":
     SPADES_KMER_FLAG = ""
 else:
@@ -1459,11 +1632,17 @@ def _decontam_settings(default_mode):
     # YAML 1.1, which Snakemake reads the config with, turns a bare off, no or
     # false into the boolean False. So `mode: off` written without quotes arrives
     # here as False, and the `or default_mode` below would quietly make it auto.
-    # Read False as the "off" the user wrote. True names no mode, so it reaches
-    # the check below and stops the run like any other wrong value.
+    # Read False as the "off" the user wrote. True names no mode, so it stops the
+    # run with a message that says why (section 0). A blank mode, or "", gets the
+    # default through `or default_mode`. long_read_mode, read in section 4b, is
+    # handled the same way on all three counts (False is off, True stops, blank
+    # is the default), so the two keys behave alike.
     raw_mode = settings.get("mode", default_mode)
     if raw_mode is False:
         raw_mode = "off"
+    _stop_on_yaml_bool(
+        "parameters.decontamination.mode", raw_mode, "auto, include, exclude or off"
+    )
     mode = str(raw_mode or default_mode).strip().lower()
     if mode not in {"auto", "include", "exclude", "off"}:
         sys.exit(
@@ -1475,8 +1654,11 @@ def _decontam_settings(default_mode):
     # What auto mode counts per genus before keeping the one with the largest
     # number: base pairs ("bp", the default) or contigs ("contigs"). Read in every
     # mode, because the hybrid final screen can be set to auto as well, and the
-    # genus Bakta is given is counted the same way.
-    auto_vote = str(settings.get("auto_vote", "bp") or "bp").strip().lower()
+    # genus Bakta is given is counted the same way. A bare off/no/false would
+    # otherwise become bp without a word, so a boolean stops the run (section 0).
+    raw_auto_vote = settings.get("auto_vote", "bp")
+    _stop_on_yaml_bool("parameters.decontamination.auto_vote", raw_auto_vote, "bp or contigs")
+    auto_vote = str(raw_auto_vote or "bp").strip().lower()
     if auto_vote not in {"bp", "contigs"}:
         sys.exit(
             f"[BacFlux] parameters.decontamination.auto_vote must be bp or contigs "
@@ -1732,8 +1914,17 @@ if HAS_SHORT_READS and not PHIX_LINK:
 # config["parameters"][MODE] (i.e. parameters.nanopore.* or parameters.hybrid.*).
 if HAS_LONG_READS:
     _lr_params = (config.get("parameters", {}) or {}).get(MODE, {}) or {}
+    # medaka_model is NOT checked with _stop_on_yaml_bool (section 0): for this
+    # one word key a bare true or false is a real choice, true = infer the model
+    # and false = skip Medaka (see medaka_disabled in section 5b).
     _medaka_model_raw = _lr_params.get("medaka_model")             # None => infer, NOT skip
     _flye_input_mode_raw = _lr_params.get("flye_input_mode", "auto")
+    # flye_input_mode has no on/off meaning, so a bare on/off/yes/no/true/false
+    # stops the run with a message that says how YAML read it (section 0).
+    _stop_on_yaml_bool(
+        f"parameters.{MODE}.flye_input_mode", _flye_input_mode_raw,
+        "auto, nano-raw or nano-hq",
+    )
 
     # Decide whether Medaka runs at all. Only an explicit false-like value skips
     # it; None/auto/empty mean "run Medaka and infer the model".
