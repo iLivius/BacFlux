@@ -1388,7 +1388,19 @@ if MOBILOME_RUN:
 
                 if [ -n "{params.local_dir}" ]; then
                     echo "Using the local ICEberg directory '{params.local_dir}'. Nothing will be downloaded."
-                    cat "{params.local_dir}"/*.fas > {output.db_dir}/iceberg.fa
+                    # Either the downloaded ICEberg files (*.fas, joined here), or
+                    # the iceberg.fa an earlier BacFlux run built in its own
+                    # 08.mobilome/iceberg_db (already joined; the repair below is
+                    # safe to run on it again).
+                    if ls "{params.local_dir}"/*.fas > /dev/null 2>&1; then
+                        cat "{params.local_dir}"/*.fas > {output.db_dir}/iceberg.fa
+                    elif [ -s "{params.local_dir}/iceberg.fa" ]; then
+                        cp "{params.local_dir}/iceberg.fa" {output.db_dir}/iceberg.fa
+                    else
+                        echo "ERROR: '{params.local_dir}' holds neither the downloaded ICEberg" >&2
+                        echo "       .fas files nor an iceberg.fa built by BacFlux." >&2
+                        exit 1
+                    fi
                     SOURCE="local:{params.local_dir}"
                 else
                     : > {output.db_dir}/iceberg.fa

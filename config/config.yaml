@@ -730,7 +730,7 @@ mobilome:
                                #   observed checksum of the concatenated FASTA and the
                                #   fetch date land in iceberg_db/PROVENANCE.txt, which
                                #   is what a methods section needs.
-    dir: ""                    # OPTIONAL — a directory of .fas files you already hold.
+    dir: ""                    # OPTIONAL — a directory of .fas files you already hold, or an iceberg_db folder BacFlux built.
                                #   Takes precedence over `urls`; nothing is fetched.
     min_identity: 80.0         # identity floor for a name. Below this the elements are
                                #   related but not the same, and the name would mislead.

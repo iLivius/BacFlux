@@ -193,7 +193,7 @@ mobilome:
     urls:
       - https://tool2-mml.sjtu.edu.cn/ICEberg3/data/download/ICE_seq_all.fas
       - https://tool2-mml.sjtu.edu.cn/ICEberg3/data/download/IME_seq_all.fas
-    dir: ""                     # optional: a directory of .fas files you already hold
+    dir: ""                     # optional: a directory of .fas files, or an iceberg_db BacFlux built
     min_identity: 80.0          # identity floor for a name
     min_overlap_fraction: 0.5   # how much of OUR candidate the curated element must cover
 ```
@@ -380,7 +380,12 @@ recoverable.
 fetched once and shared by every sample in that run. A second project therefore
 downloads them again. That is what the `dir:` key on every layer is for: point it
 at a copy you already hold and nothing is fetched. `dir:` always takes precedence
-over the URLs, exactly as `directories:` beats `links:` elsewhere in the config.
+over the URLs, exactly as `directories:` beats `links:` elsewhere in the config. The
+folder another BacFlux run built for a layer in its own `08.mobilome/` works as that
+copy: `icescan_models` for ICEscan, `tncentral_db` for TnCentral, `iceberg_db` for
+ICEberg and `isosdb_db` for ISOSDB. So does a folder of the files as downloaded: the
+`ICEscan/` models, `tncentral.fa`, ICEberg's `.fas` files, or `ISOSDB.V3.fna` with
+`IS_fam_annot.txt`.
 
 **Network and environments.** `icescan_models` takes `wget` and `tar` from
 `workflow/envs/download.yaml`, the small environment the CARD and dbCAN downloads also
