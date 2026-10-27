@@ -808,15 +808,15 @@ def test_bakta_table_without_its_header_fails_loudly(tmp_path, capsys):
 
 
 # ── A partial IS21 lying over the chromosome's helicase loader ───────────────
-# The same IS21 profile matches the replicative helicase loader, DnaC in
-# Enterobacterales and DnaI in Bacillota, which is essential too. The call is
+# Two of ISEScan's IS21 models match the replicative helicase loader, DnaC in
+# E. coli and its relatives and DnaI in the Bacilli, which is essential too. The call is
 # dropped only when the loader has its chromosomal partner beside it (dnaT
 # "primosomal protein DnaT" for dnaC, nrdR for dnaI) and no IS21 transposase
 # within 5 kb. Everything else over a loader is kept: phage, ICE and plasmid
 # loaders, a real IS21 element's IstB that Bakta calls dnaC, and the loader in a
 # taxon or a draft where the partner is not on the same contig.
 #
-# The layout below copies the Enterobacterales arrangement: dnaC at 10001..10738
+# The layout below copies the E. coli arrangement: dnaC at 10001..10738
 # (738 bp) with dnaT touching it at 10739..11278, and ISEScan's partial IS21 at
 # 9800..11100, which holds all of dnaC: 738 bp shared, 57% of the 1,301 bp call
 # and 100% of the gene.
@@ -892,7 +892,7 @@ def test_helicase_loader_audit_detail_names_everything(tmp_path):
 
 
 def test_partial_is21_over_dnai_with_nrdr_upstream_is_dropped(tmp_path):
-    # The Bacillota arrangement: nrdR, then dnaB, then dnaI, with 1,500 bp of
+    # The Bacillus arrangement: nrdR, then dnaB, then dnaI, with 1,500 bp of
     # sequence between nrdR and dnaI. The call holds all 903 bp of dnaI.
     bakta_rows = [
         bakta_row(start=20001, stop=20456, locus_tag="S1_01700", gene="nrdR",

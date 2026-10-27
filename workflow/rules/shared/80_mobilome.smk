@@ -541,12 +541,13 @@ if MOBILOME_RUN:
     # IS_AUDIT with reason overlaps_dnaA instead.
     #
     # Why the helicase loader: IstB is related to the replicative helicase loader
-    # too, DnaC in Enterobacterales and DnaI in Bacillota, and ISEScan reports a
-    # partial IS21 over it the same way. Phages, ICEs and plasmids carry loaders
-    # of their own, so the call is dropped (reason overlaps_helicase_loader) only
-    # when Bakta shows the chromosome's partner gene beside the loader (dnaT for
-    # dnaC, nrdR for dnaI) and no IS21 transposase near it. Every other call over
-    # a loader is kept. The full test is in isescan_to_table.py.
+    # too, DnaC in E. coli and its relatives and DnaI in the Bacilli, and ISEScan
+    # reports a partial IS21 over it the same way. Phages, ICEs and plasmids
+    # carry loaders of their own, so the call is dropped (reason
+    # overlaps_helicase_loader) only when Bakta shows the chromosome's partner
+    # gene beside the loader (dnaT for dnaC, nrdR for dnaI) and no IS21
+    # transposase near it. Every other call over a loader is kept. The full test
+    # is in isescan_to_table.py.
     # Produces: IS_TABLE (rows), IS_SUMMARY (the QC line), IS_AUDIT (dropped rows
     #       with a reason).
     # Consumed by: amr_mge_colocalisation and conjscan_ice, which masks these

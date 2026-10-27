@@ -516,8 +516,9 @@ second case is the call that runs on into *dnaN*, the next gene, because ISEScan
 finder joined the two. That half is `DNAA_OVERLAP_FRACTION`, a constant in
 `isescan_to_table.py`, not a setting meant to be tuned.
 
-The same IS21 profile also matches the chromosome's replicative helicase loader, DnaC
-in Enterobacterales and DnaI in Bacillota, and that gene is just as essential. Its name
+Two of ISEScan's IS21 models (IS21_259 and IS21_288) also match the chromosome's
+replicative helicase loader, DnaC in *E. coli*, *Salmonella*, *Klebsiella* and their close
+relatives and DnaI in the Bacilli, and that gene is just as essential. Its name
 alone cannot single it out: phages, integrative elements and plasmids carry loaders of
 their own, and Bakta can name the IstB of a real IS21 element *dnaC*. What marks the
 chromosome's own loader is its neighbour. A call goes to `{sample}_is_discarded.tsv`
@@ -529,8 +530,8 @@ with reason `overlaps_helicase_loader` only when all four of these hold:
    test as *dnaA*.
 3. That CDS has its chromosomal partner on the same contig within 5 kb: *dnaT* with the
    product "primosomal protein DnaT", the other half of the *dnaC*–*dnaT* operon of
-   Enterobacterales, which sits 0–2 bp away; or *nrdR*, at the head of the
-   *nrdR*–*dnaB*–*dnaI* cluster of Bacillota, about 1.2–3.2 kb away. The DnaT-like
+   *E. coli* and its relatives, which sits 0–2 bp away; or *nrdR*, at the head of the
+   *nrdR*–*dnaB*–*dnaI* cluster of the Bacilli, about 1.2–3.2 kb away. The DnaT-like
    proteins of mobile elements, which Bakta also names *dnaT* but describes as "DnaT
    DNA-binding domain-containing protein", do not count.
 4. No IS21 transposase lies on the same contig within 5 kb of the loader: no CDS named

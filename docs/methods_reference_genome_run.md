@@ -32,7 +32,8 @@ genomes whose true content is known.
 | *Shigella flexneri* | 4,828,487 bp | 8 | 81.2 | 67× |
 
 IS density is counted by the mobilome module on each finished assembly, so it is a
-number the workflow produces rather than one taken from the literature.
+number the workflow produces rather than one taken from the literature. It counts every
+ISEScan call, including the one or two look-alike calls described under Mobilome below.
 
 !!! warning "The published depth is not a realistic depth"
 
@@ -140,6 +141,12 @@ Stage `08.mobilome` with all four optional layers enabled:
 | *Shigella flexneri* | 39 | 392 | 0 | 0 | tiers 1, 2, 3, 5 |
 | *Enterobacter hormaechei* | 44 | 40 | 4 | 2 | 10 × tier 1, **15 × tier 4**, 19 × tier 6 |
 | *Klebsiella pneumoniae* | 55 | 94 | 3 | 2 | 11 × tier 1, 44 × tier 6 |
+
+The IS counts include ISEScan's look-alike calls over *dnaA* and over the chromosome's
+helicase loader, which the module removes before anything reads the IS table (see
+[False IS21 calls over replication genes](mobilome/index.md#false-is21-calls-over-replication-genes)).
+On these genomes that is one call fewer for *Providencia* and two fewer for each of the
+other four. No AMR gene's tier and no ICE/IME candidate depends on those calls.
 
 The distribution matches what is known about these organisms. *Listeria innocua* is a
 non-pathogen and returns two AMR genes, both intrinsic candidates. *Klebsiella* returns

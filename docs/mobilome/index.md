@@ -173,21 +173,9 @@ annotation, Puterová & Martínek (2021) put the "improbable or not an IS elemen
 discovery rate between 0% and 23.7% depending on the tool, with **ISEScan — the caller
 BacFlux uses — at 8.0%** (2.2% on their larger ISbrowser set). So every row carries
 `confidence` (high / medium / low), and anything resting on a contig boundary or on a
-partial hit is capped at `low`. Two predictable false calls are removed before
-anything reads the IS table. ISEScan reports a partial IS21 lying over *dnaA*, most
-likely because IS21 elements carry a helper protein (IstB) related to DnaA. *dnaA* is
-essential, so no living isolate carries an insertion inside it; the call goes to
-`{sample}_is_discarded.tsv` with the reason `overlaps_dnaA`. The same IS21 profile
-also matches the chromosome's helicase loader, DnaC in Enterobacterales and DnaI in
-Bacillota, which is just as essential. A partial IS21 lying over *dnaC* or *dnaI* is
-removed with the reason `overlaps_helicase_loader` when the loader's chromosomal
-neighbour sits beside it (*dnaT* next to *dnaC*, *nrdR* near *dnaI*) and no IS21
-transposase does. Every other call over a loader stays in the IS table: the loaders
-of phages, ICEs and plasmids, an IS21 IstB that Bakta names *dnaC*, and the
-chromosome's own loader in a taxon without that neighbour or on a draft where it fell
-on another contig. A partial IS21 still sitting on *dnaC* or *dnaI* may therefore be
-a real IS21 element or the same artefact; the neighbouring genes tell them apart
-([Tuning](tuning.md#the-three-contig-end-windows) has the full test).
+partial hit is capped at `low`. Two predictable false calls are also removed before
+anything reads the IS table: [False IS21 calls over replication genes](#false-is21-calls-over-replication-genes)
+explains them.
 
 The module was validated on closed genomes and then measured again on deliberately
 fragmented ones — 40 benchmark genomes cut to ~150 kb, ~50 kb and ~20 kb N50,
@@ -204,6 +192,85 @@ on a draft means the assembly could not support a stronger claim, not that the c
 wrong. Which columns to read and what not to conclude:
 [Draft assemblies](draft-assemblies.md).
 
+## False IS21 calls over replication genes
+
+**The problem.** ISEScan finds insertion sequences (IS) by looking for the proteins
+they carry. One IS family, IS21, carries two: a transposase, IstA, and a helper
+protein, IstB. IstB belongs to the same protein family as two of the cell's own
+DNA-replication proteins (Koonin 1992; Arias-Palomo & Berger 2015):
+
+- **DnaA**, which starts chromosome replication;
+- the **replicative helicase loader**: DnaC in *E. coli*, *Salmonella*, *Klebsiella*
+  and their close relatives, and DnaI in *Bacillus*, *Listeria*, *Staphylococcus*,
+  *Streptococcus* and other Bacilli.
+
+Because they look alike, two of ISEScan's IS21 models also match these genes, and
+ISEScan reports "a partial IS21 element" sitting on top of them. Puterová & Martínek
+(2021) found the same hits over *dnaA*, *dnaC* and *dnaI*, and Nakajima et al. (2026)
+removed ISEScan calls over *dnaA* as artefacts. The calls are false: these genes are
+essential (Kobayashi et al. 2003; Baba et al. 2006), so an insertion inside one would
+not leave a living isolate. Left in, each call adds one IS to the counts, and it could
+make a resistance gene nearby look as if it sat beside a mobile element. In BacFlux's
+own runs the call over *dnaA* appeared in all 16 genomes checked, and the call over the
+helicase loader in about half of the benchmark genomes.
+
+**For *dnaA*, the gene's name is enough.** A call lying over a gene Bakta names *dnaA*
+goes to `{sample}_is_discarded.tsv` with the reason `overlaps_dnaA`. On the 16 genomes
+checked, this removed exactly one call per genome, the false one, and nothing else.
+The call often runs on into the next genes, *dnaN* and *recF*. It is still removed,
+because the test asks whether the call and the gene share at least half of whichever
+is shorter: a call that holds all of *dnaA* counts even when most of it lies outside.
+
+**For *dnaC* and *dnaI*, the name is not enough.** Bakta also gives those names to
+look-alike genes that really are on mobile elements: the helicase loaders of
+prophages, such as Gifsy-1 and Gifsy-2 in *Salmonella* LT2 (Słomiński et al. 2007),
+loaders carried by ICEs, and even the IstB of a real IS21 element. In *E. coli* and
+its relatives, every DnaC-type gene other than the chromosome's own sits inside a
+phage, transposon or IS21 element (Brézellec et al. 2016). Removing every call over a
+gene named *dnaC* or *dnaI* would have deleted 15 real calls in BacFlux's test data.
+
+**The fix: check the neighbour.** The chromosome's own loader sits next to a fixed
+partner gene:
+
+- *dnaC* shares an operon with *dnaT* (Masai & Arai 1988);
+- *dnaI* shares one with *dnaB*, and *nrdR* is the next gene along, 1–3 kb from
+  *dnaI* (Bruand & Ehrlich 1995; Elfmann et al. 2025).
+
+Phage and ICE loaders do not have that neighbour: in BacFlux's test data the nearest
+one was over 100 kb away. So a call is removed, with the reason
+`overlaps_helicase_loader`, only when all of these hold:
+
+- ISEScan calls it a partial IS21 element;
+- the call and a gene Bakta names *dnaC* or *dnaI* share at least half of whichever
+  is shorter;
+- that gene's partner lies within 5 kb of it;
+- no IS21 transposase (*istA*) lies within 5 kb, which would mean a real IS21
+  element.
+
+[Tuning](tuning.md#the-three-contig-end-windows) gives the exact test and where its
+settings live.
+
+**Examples**
+
+| Genome | Call over | Partner nearby? | Result |
+|---|---|---|---|
+| *E. coli* K-12, *K. pneumoniae* | *dnaC* | *dnaT*, right beside it | removed: a false call |
+| *B. subtilis* 168 | *dnaI* | *nrdR*, 1.6 kb away | removed: a false call |
+| *Salmonella* LT2 | its own *dnaC* | *dnaT*, right beside it | removed: a false call |
+| *Salmonella* LT2, Gifsy-1 and Gifsy-2 prophages | the phage's own loader, named *dnaC* | no | kept: it is on a mobile element |
+| *Shigella flexneri* virulence plasmid | the IstB of an IS21, named *dnaC* | no; *istA* 1.5 kb away | kept: a real IS21 element |
+| *Paenibacillus* | *dnaI* | no *nrdR* nearby; the genus has another gene order | kept: the partner cannot be checked |
+
+**What this rests on.** The protein family, the false hits and the gene order are
+published (see the references below). The partner test, its 5 kb windows and the
+figures that follow are BacFlux's own, measured on 176 datasets: 52 public benchmark
+genomes plus validation and test runs. There, the rule removed 59 calls, all of them
+false. It kept every one of the 57 real IS21 elements and every phage, ICE and
+plasmid loader, and it changed no ICE call, mobility tier or confidence. About 16
+false calls stay, in taxa where the partner gene is absent, such as *Paenibacillus*,
+*Clostridioides* and *Aquifex*, or where a fragmented draft put it on another contig.
+They stay in the IS table, as they would without the rule.
+
 ## Where to go next
 
 | Page | What it covers |
@@ -216,3 +283,53 @@ wrong. Which columns to read and what not to conclude:
 | [Tuning](tuning.md) | symptom to knob |
 | [Worked example](worked-example.md) | one genome end to end, with the real rows |
 | [Validation](validation.md) | the ICE and IME pilots, the negative control, the head-to-head against the EBI pipeline, and what the benchmark does not show |
+
+## References
+
+- Arias-Palomo, E. & Berger, J. M. (2015). An atypical AAA+ ATPase assembly controls
+  efficient transposition through DNA remodeling and transposase recruitment. *Cell*
+  162(4), 860–871. <https://doi.org/10.1016/j.cell.2015.07.037> — IstB's ATPase is
+  closest in structure to the helicase loaders DnaC/DnaI, then to DnaA.
+- Baba, T., et al. (2006). Construction of *Escherichia coli* K-12 in-frame,
+  single-gene knockout mutants: the Keio collection. *Molecular Systems Biology* 2,
+  2006.0008. <https://doi.org/10.1038/msb4100050> — no deletion mutant of *dnaA* or
+  *dnaC* could be made.
+- Brézellec, P., Vallet-Gely, I., Possoz, C., Quevillon-Cheruel, S. & Ferat, J.-L.
+  (2016). DciA is an ancestral replicative helicase operator essential for bacterial
+  replication initiation. *Nature Communications* 7, 13271.
+  <https://doi.org/10.1038/ncomms13271> — the conserved gene order around the
+  chromosome's loader, and the DnaC-type genes inside mobile elements.
+- Bruand, C. & Ehrlich, S. D. (1995). The *Bacillus subtilis dnaI* gene is part of the
+  *dnaB* operon. *Microbiology* 141(5), 1199–1200.
+  <https://doi.org/10.1099/13500872-141-5-1199>
+- Elfmann, C., Dumann, V., van den Berg, T. & Stülke, J. (2025). A new framework for
+  SubtiWiki, the database for the model organism *Bacillus subtilis*. *Nucleic Acids
+  Research* 53(D1), D864–D870. <https://doi.org/10.1093/nar/gkae957> — the gene order
+  *nrdR*–*dnaB*–*dnaI*.
+- Kobayashi, K., et al. (2003). Essential *Bacillus subtilis* genes. *Proceedings of
+  the National Academy of Sciences* 100(8), 4678–4683.
+  <https://doi.org/10.1073/pnas.0730515100>
+- Koonin, E. V. (1992). DnaC protein contains a modified ATP-binding motif and belongs
+  to a novel family of ATPases including also DnaA. *Nucleic Acids Research* 20(8),
+  1997. <https://doi.org/10.1093/nar/20.8.1997> — the first to place DnaC, IstB and
+  DnaA in one protein family.
+- Masai, H. & Arai, K. (1988). Operon structure of *dnaT* and *dnaC* genes essential
+  for normal and stable DNA replication of *Escherichia coli* chromosome. *Journal of
+  Biological Chemistry* 263(29), 15083–15093.
+  <https://doi.org/10.1016/S0021-9258(18)68149-9>
+- Nakajima, N., Jinnai, M., Okamura, A., Date, Y. & Furukawa, I. (2026). Fine-scale
+  structural diversification among closely related *Legionella pneumophila* isolates
+  from a bath-associated environmental reservoir. *Applied and Environmental
+  Microbiology* 92(9), e01127-26. <https://doi.org/10.1128/aem.01127-26> — removed
+  ISEScan calls over the *dnaA* region as artefacts.
+- Puterová, J. & Martínek, T. (2021). digIS: towards detecting distant and putative
+  novel insertion sequence elements in prokaryotic genomes. *BMC Bioinformatics* 22,
+  258. <https://doi.org/10.1186/s12859-021-04177-6> — ISEScan's partial hits over
+  DnaA, DnaC and DnaI (Additional file 7), and the IS false-discovery rates quoted
+  above.
+- Słomiński, B., Całkiewicz, J., Golec, P., Węgrzyn, G. & Wróbel, B. (2007). Plasmids
+  derived from Gifsy-1/Gifsy-2, lambdoid prophages contributing to the virulence of
+  *Salmonella enterica* serovar Typhimurium: implications for the evolution of
+  replication initiation proteins of lambdoid phages and enterobacteria.
+  *Microbiology* 153(6), 1884–1896. <https://doi.org/10.1099/mic.0.2006/000802-0> —
+  the Gifsy prophages' loader is very similar to the host's DnaC.

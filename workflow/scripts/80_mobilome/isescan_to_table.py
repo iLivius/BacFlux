@@ -36,7 +36,7 @@ DnaA, so the IS21 profile matches DnaA itself. Bakta's annotation table
 reason overlaps_dnaA instead of into the table.
 
 The second is a partial IS21 call lying over the chromosome's own replicative
-helicase loader: dnaC in Enterobacterales, dnaI in Bacillota. IstB is related
+helicase loader: dnaC in E. coli and its relatives, dnaI in the Bacilli. IstB is related
 to these loaders as well, and the loader is just as essential. The gene name
 alone is not enough here, because phages, integrative elements and plasmids
 carry loaders of their own, and Bakta can name the IstB of a real IS21 element
@@ -214,9 +214,9 @@ BAKTA_COLUMNS_NEEDED = ["Sequence Id", "Type", "Start", "Stop", "Locus Tag",
 
 # ── A call that is not an insertion: one lying over the helicase loader ──────
 
-# The same IS21 profile also matches the chromosome's replicative helicase
+# Two of ISEScan's IS21 models also match the chromosome's replicative helicase
 # loader, the protein that places the replication helicase onto the DNA: DnaC in
-# Enterobacterales, DnaI in Bacillota (Firmicutes). IstB, the IS21 helper
+# E. coli, Salmonella, Klebsiella and their relatives, DnaI in the Bacilli. IstB, the IS21 helper
 # protein, is an ATPase of that same family. The loader is essential, so a call
 # lying over it cannot be a real insertion either, yet ISEScan reports a partial
 # IS21 there just as it does over dnaA.
@@ -245,12 +245,12 @@ HELICASE_LOADER_IS_FAMILY = "IS21"
 
 # The neighbour that marks a loader as the chromosome's own (condition 3).
 # Distances are the gap between the two CDS, 0 when they touch or overlap.
-#   - dnaT, directly beside dnaC in the dnaC-dnaT operon of Enterobacterales,
+#   - dnaT, directly beside dnaC in the dnaC-dnaT operon of E. coli and its relatives,
 #     0 to 2 bp away. It counts only when Bakta's product is exactly
 #     "primosomal protein DnaT": mobile elements carry DnaT-like proteins that
 #     Bakta also gives the symbol dnaT, but describes as "DnaT DNA-binding
 #     domain-containing protein", and those must not vouch for a loader.
-#   - nrdR, at the head of the nrdR-dnaB-dnaI cluster of Bacillota, about 1.2
+#   - nrdR, at the head of the nrdR-dnaB-dnaI cluster of the Bacilli, about 1.2
 #     to 3.2 kb from dnaI with dnaB in between. The symbol alone is enough.
 # 5 kb covers both with room to spare. The loaders carried by phages, ICEs and
 # plasmids sit far from either gene: in the genomes this test was checked on,
