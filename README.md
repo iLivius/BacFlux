@@ -10,9 +10,7 @@ _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <
 v2.1.0
 ```
 
-**One Snakemake workflow for bacterial genomes — Illumina, Nanopore, both, or an assembly —
-through decontamination, QC, taxonomy, annotation, AMR, plasmids, prophages and the mobility
-of resistance genes.**
+**A unified Snakemake workflow for Illumina, Nanopore, hybrid data or existing bacterial assemblies, integrating decontamination, quality control, taxonomy, annotation, AMR gene detection and mobilome analysis.**
 
 ![Snakemake](https://img.shields.io/badge/snakemake-%E2%89%A59.14.6-brightgreen.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
