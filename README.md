@@ -15,6 +15,7 @@ v2.1.0
 ![Snakemake](https://img.shields.io/badge/snakemake-%E2%89%A59.14.6-brightgreen.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11143917.svg)](https://doi.org/10.5281/zenodo.11143917)
+[![tests](https://github.com/iLivius/BacFlux/actions/workflows/tests.yml/badge.svg)](https://github.com/iLivius/BacFlux/actions/workflows/tests.yml)
 
 <!-- Workflow overview as a metro map, one coloured line per mode. GitHub shows the dark version to readers in dark mode and the light one otherwise. The detailed map is on the documentation home page (docs/index.md). -->
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/bacflux_overview_dark.png"><img src="docs/assets/bacflux_overview.png" alt="BacFlux v2.1.0 workflow overview as a metro map. One coloured line per mode (Illumina, hybrid, Nanopore, contigs) runs from the reads, or from an assembly, to one final genome; from there all four pass assembly QC, taxonomy, annotation, AMR, plasmids and prophages to a MultiQC report. A dashed red line is the optional mobilome module."></picture></p>

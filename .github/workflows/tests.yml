@@ -1,0 +1,84 @@
+# Runs BacFlux's test suite on a clean computer at every push to main and on every
+# pull request. The "tests" badge at the top of README.md shows the result of the
+# latest run on main; clicking it opens the list of runs.
+#
+# What happens on each run:
+#   1. GitHub checks out the repository on a temporary Ubuntu computer (a
+#      "runner"), used for this run only and then discarded.
+#   2. It installs conda (Miniforge, the conda-forge distribution of conda) with
+#      the channel order Bioconda asks for: conda-forge, then bioconda, strict.
+#   3. It creates the launcher environment and adds pytest with the same two
+#      commands docs/getting-started/installation.md gives users (sections 2 and
+#      4), so a change that breaks either documented command fails this run too.
+#   4. It runs the whole test suite: the unit tests of the helper scripts
+#      (workflow/scripts/) and the guard tests in miscellaneous/, which read the
+#      rule files and check the configuration, several of them by dry-running
+#      Snakemake on empty stub inputs.
+#
+# What a pass means. The tests need no database and no analysis tool, which is
+# why they can run here at all: a real run needs about 450 GB of databases, and a
+# runner has about 14 GB of disk. A green badge therefore says that the
+# configuration checks, the rule-file guards and the helper scripts behave as
+# their tests expect. It does not say that a genome went through the workflow.
+#
+# Three tests are reported as skipped, by design: they need a real GTDB download
+# and run only when BACFLUX_TEST_* environment variables point at one.
+
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch: # adds a "Run workflow" button to the Actions tab, for a run
+                     # without a new commit
+
+# This workflow only reads the repository; it never writes to it.
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-24.04
+    # Installing conda and Snakemake takes a few minutes, the tests well under one.
+    # A run still going after 30 minutes is stuck, so GitHub stops it instead of
+    # letting it run for the default six hours.
+    timeout-minutes: 30
+    defaults:
+      run:
+        # Every step runs in a login shell (-l), which reads the conda set-up the
+        # next action writes, so `conda activate` works; -e stops a step at its
+        # first failing command.
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install conda (Miniforge) with the Bioconda channels
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          channels: conda-forge,bioconda
+          channel-priority: strict
+          # Create no environment here: the next step creates it with the
+          # documented command, as a user would.
+          activate-environment: ""
+
+      # installation.md, section 2. -y answers conda's "Proceed?" question, which
+      # nobody is there to answer on a runner.
+      - name: Create the launcher environment
+        run: conda create -y -n snakemake -c conda-forge -c bioconda snakemake=9.14.6
+
+      # installation.md, section 4: pytest is not in the launcher environment.
+      - name: Add pytest
+        run: conda install -y -n snakemake -c conda-forge pytest
+
+      # The documented command, with -ra in place of -q: at the end, pytest lists
+      # every test that did not pass and why, so the three skipped GTDB tests are
+      # named in the log rather than only counted.
+      - name: Run the test suite
+        run: |
+          conda activate snakemake
+          # Record in the log which Snakemake ran the tests.
+          snakemake --version
+          pytest workflow/scripts miscellaneous -ra
