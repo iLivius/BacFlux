@@ -50,7 +50,7 @@ parameters:
     mode: auto
     auto_vote: bp
     discard_no_hit: true
-    long_read_mode: "off"
+    long_read_mode: off
     include_genera:
     include_genera_by_sample:
     exclude_genera:

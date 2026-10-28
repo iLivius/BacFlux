@@ -585,7 +585,7 @@ replicons for chromosome contiguity; say so in your methods. Full treatment:
     mode: auto                 # auto | include | exclude | off
     auto_vote: bp              # bp | contigs
     discard_no_hit: true
-    long_read_mode: "off"      # hybrid only: off | auto | include | exclude
+    long_read_mode: off        # hybrid only: off | auto | include | exclude
     include_genera:
     include_genera_by_sample:
     exclude_genera:

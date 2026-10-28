@@ -333,7 +333,7 @@ parameters:
                                #   organism name is counted the same way, over the
                                #   kept contigs.
     discard_no_hit: true       # discard contigs with no taxonomic hit
-    long_read_mode: "off"      # [hybrid] Options: off (default) | auto | include | exclude
+    long_read_mode: off        # [hybrid] Options: off (default) | auto | include | exclude
                                #   A SECOND screen, of the genome hybrid actually
                                #   delivers. `mode:` above screens the Illumina SPAdes
                                #   draft; the delivered genome is built afterwards from
