@@ -1,25 +1,22 @@
 # Tuning
 
-Every threshold in this module is a convention, not a biological constant, and the module
-says so in its own output: each filtering decision writes an audit row naming what
-happened, a short reason token, and the numbers behind it — usually the threshold that
-was applied next to the value that failed it.
+The mobilome module uses thresholds to select candidates and describe their context.
+These are operational choices, rather than biological constants. Start with the audit
+files to identify which rule affected a result before changing a parameter.
 
-That audit trail is the tuning method. It tells you *why* something was dropped and
-therefore *which* knob to reach for, and often that no knob will help. Changing a value
-before reading it is guessing.
+This page explains where settings are defined, which observations they affect and what
+was measured on the benchmark genomes. Retain the configuration and software version
+with each analysis so that results remain interpretable.
 
-This page is organised by what you saw, not by the parameter list.
-
-| You want to | Go to |
+| Task | Section |
 |---|---|
-| find out why something was dropped | [Start at the audit file](#start-at-the-audit-file) |
-| know where a given knob physically lives | [Three places a knob can live](#three-places-a-knob-can-live) |
-| match a symptom to a knob | [Symptom to knob](#symptom-to-knob) |
-| look a threshold up | [The knobs, one by one](#the-knobs-one-by-one) |
-| tighten for a dossier, or widen for a survey | [The two directions](#the-two-directions) |
-| tune against a fragmented assembly | [On a draft assembly](#on-a-draft-assembly) |
-| know whether a knob can fix this at all | [What no knob fixes](#what-no-knob-fixes) |
+| explain a filtering decision | [Audit files](#start-at-the-audit-file) |
+| locate a setting | [Where settings are defined](#three-places-a-knob-can-live) |
+| investigate an unexpected result | [Symptoms and relevant settings](#symptom-to-knob) |
+| check defaults and effects | [Parameter reference](#the-knobs-one-by-one) |
+| choose reporting criteria | [The two directions](#the-two-directions) |
+| account for fragmentation | [Draft assemblies](#on-a-draft-assembly) |
+| understand design limits | [Limits of tuning](#what-no-knob-fixes) |
 
 !!! abstract "Terms used on this page"
 
@@ -105,15 +102,16 @@ awk -F'\t' '$8=="no_mge_context" || $8=="tier_not_raised"' \
     `NA` so that R reads them straight into a logical column
     (`_tsv_bool` in `conjscan_to_ice.py`).
 
-## Three places a knob can live
+## Where settings are defined { #three-places-a-knob-can-live }
 
-They differ in how much you are signing up for.
+Some settings are exposed in the user configuration; others require changes to workflow
+rules or scripts.
 
-| Layer | Where | What it costs you |
+| Layer | Where | How to change it |
 |---|---|---|
-| **A** | `config/config.yaml`, `mobilome:` block | Nothing. Documented next to the key, survives a `git pull`. |
-| **B** | the `shell:` block of a rule in `workflow/rules/shared/80_mobilome.smk` | A repository edit. These are real, tested command-line flags that the scripts accept and the rules simply do not pass, so the script default stands. |
-| **C** | a constant at the top of a script in `workflow/scripts/80_mobilome/` | A source edit, plus probably a test edit. |
+| **A** | your user configuration, for example `config/config_custom.yaml`, under `mobilome:` | Edit the user copy. Keep the distributed template unchanged. |
+| **B** | the `shell:` block of a rule in `workflow/rules/shared/80_mobilome.smk` | Add a supported script argument to the rule; record the change and check it locally. |
+| **C** | a constant in `workflow/scripts/80_mobilome/` | Edit the source and review the relevant tests. |
 
 The Layer B flags, all on `rule conjscan_ice` unless noted: `--window-bp`,
 `--min-element-bp`, `--min-ime-element-bp`, `--max-element-bp`, `--boundary-bp`,
@@ -158,7 +156,7 @@ so expect to update a test alongside a deliberate change.
     the top of `80_mobilome.smk`): MacSyFinder accepts
     `--coverage-profile 30` and then finds nothing, which looks exactly like a genome
     with no conjugative system, so BacFlux exits at parse time instead — when Snakemake
-    reads the config, before any rule runs. The general lesson for any knob you add:
+    reads the config, before any rule runs. The general lesson for any parameter you add:
     check it there too, because "found nothing" is a plausible-looking answer.
 
 !!! note "Most thresholds reach the audit file only when they fire"
@@ -172,9 +170,9 @@ so expect to update a test alongside a deliberate change.
     with a `summary` / `tncentral_naming_complete` row naming both thresholds it applied.
     The parse-time banner prints only `max_composite_span_bp` and `contig_boundary_bp`
     (the `Mobilome module: ON` line, printed from `00_common.smk`). If you change a
-    Layer B knob, write the value down yourself.
+    Layer B parameter, write the value down yourself.
 
-## Symptom to knob
+## Symptoms and relevant settings { #symptom-to-knob }
 
 Every `reason` below is a literal string in the code — grep for it.
 
@@ -182,7 +180,7 @@ Every `reason` below is a literal string in the code — grep for it.
 
 Grep `{sample}_ice_discarded.tsv`:
 
-| Reason | What it means | Knob |
+| Reason | What it means | Parameter |
 |---|---|---|
 | `cluster_shorter_than_min` | the machinery span was below the size floor; `detail` gives the measured span and which floor applied | `--min-ime-element-bp` for IME/AICE architecture, `--min-element-bp` otherwise |
 | `cluster_longer_than_max` | anchors chained across the contig into one implausible element | `--max-element-bp`, or **lower** `--window-bp` so the chain breaks |
@@ -205,7 +203,7 @@ element's reported interval is the machinery span and your gene is in the cargo 
 it — a boundary problem, not a threshold one) or `nearest_mobile_element_too_far`
 (`IS_ADJACENT_MAX_BP`, Layer C).
 
-!!! warning "Read the audit before you turn the knob the literature points at"
+!!! warning "Read the audit before you turn the parameter the literature points at"
 
     A worked case. *Streptococcus salivarius* CP002888.1 carries the
     curated IME_Ssal57I_tRNAlys at 70,384–75,506. This clade is exactly the `T4SS_MOBT`
@@ -224,9 +222,9 @@ it — a boundary problem, not a threshold one) or `nearest_mobile_element_too_f
 
 | You see | Read | Then |
 |---|---|---|
-| interval much **smaller** than the published element | `boundary_method` | if `none`, the interval **is** the machinery span — a floor, by design. Compare `start`/`end` against `machinery_start`/`machinery_end`. `--att-flank-window-bp` is the knob, but see below |
+| interval much **smaller** than the published element | `boundary_method` | if `none`, the interval **is** the machinery span — a floor, by design. Compare `start`/`end` against `machinery_start`/`machinery_end`. `--att-flank-window-bp` is the parameter, but see below |
 | interval much **larger** | `n_anchors`, `anchor_classes`, and `evidence_recorded / system_merge_refused_too_long` | lower `--window-bp` (fuses less) or `--max-element-bp` (drops the chain) |
-| a de novo repeat found but the interval did not move | `kept_flagged / denovo_att_reported_not_applied` | working as intended — a de novo repeat is reported and never applied. No knob; this is a design decision, not a threshold |
+| a de novo repeat found but the interval did not move | `kept_flagged / denovo_att_reported_not_applied` | working as intended — a de novo repeat is reported and never applied. No parameter; this is a design decision, not a threshold |
 | ends resolved but at the wrong place | `att_length_bp`, `att_trna`, `attL`, `attR` | Layer C: `MIN_ATT_REPEAT_BP`, `MAX_ATT_COPIES_OUTSIDE_TRNA` |
 
 ### Everything comes out at medium confidence
@@ -237,7 +235,7 @@ Check which cap fired — the audit names one per rule:
 awk -F'\t' '$5=="kept_flagged"' 08.mobilome/S1/S1_ice_discarded.tsv | cut -f6 | sort | uniq -c
 ```
 
-| Cap reason | Meaning | Knob |
+| Cap reason | Meaning | Parameter |
 |---|---|---|
 | `few_anchor_classes` | fewer than 3 of the five anchor classes were present | `MIN_ANCHOR_CLASSES_FOR_HIGH` (Layer C, in `conjscan_to_ice.py`) — read the box first |
 | `machinery_not_intact` | low system wholeness, a decayed model, or a truncated relaxase/VirB4 | `WHOLENESS_INTACT_MIN` / `PROFILE_COVERAGE_INTACT_MIN` (Layer C, both 0.7, in `conjscan_to_ice.py`) |
@@ -247,29 +245,26 @@ awk -F'\t' '$5=="kept_flagged"' 08.mobilome/S1/S1_ice_discarded.tsv | cut -f6 | 
 | `boundary_not_resolved` / `boundary_denovo_only` | only fires when `require_trna_boundary_for_high` is on | turn that key off |
 | `contig_length_unknown` | no length for the contig, so it cannot be said whether the element runs off the end | fix the `--contig-lengths` input |
 
-!!! warning "An IME can never reach high confidence. That is the design, not a knob"
+!!! note "IME confidence on the benchmark"
 
-    High confidence needs at least **3 distinct anchor classes**
-    (`MIN_ANCHOR_CLASSES_FOR_HIGH = 3`). There are five — integrase, relaxase, coupling
-    protein, mating apparatus, and the AICE translocase that only the ICEscan layer
-    finds — although the audit's own sentence says "of the four anchor classes", which
-    is right for every conjugative call and understates an AICE one. An IME is *defined*
-    by having an integrase and a relaxase and **no mating apparatus of its own** — that
-    is what makes it mobilisable-with-a-helper rather than self-transmissible. So it
-    starts with two, and a coupling protein is the only route to three.
+    The confidence rule is the same for every class. High confidence requires at
+    least three distinct anchor classes (`MIN_ANCHOR_CLASSES_FOR_HIGH = 3`), intact
+    machinery and no other confidence cap. The five anchor classes are integrase,
+    relaxase, coupling protein, mating apparatus and AICE translocase. An IME has an
+    integrase and a relaxase; a third class can come only from a CONJscan coupling
+    protein, or from a VirB4 that CONJscan's MOB model lists as accessory. ICEscan's
+    coupling-protein and mating-pair hits are never used as anchors.
 
-    Measured: of the 26 IME rows across the whole benchmark, none is high. 25 have
-    exactly 2 anchor classes; one has 3 and is still medium. 18 of the 26 are
-    additionally flagged `machinery_degraded` for `low_system_wholeness` — an artefact
-    of CONJscan's MOB model describing more genes than an IME carries, so finding the
-    relaxase alone scores 0.333 wholeness. By contrast 30 of the 53 ICE rows are high.
+    None of the 26 IME rows in the benchmark reached high confidence: 25 had two
+    classes and one had three but remained medium. Eighteen also carried
+    `machinery_degraded` because of `low_system_wholeness`: a relaxase-only match to
+    a larger CONJscan model can score 0.333 wholeness even when the IME architecture
+    is expected. In comparison, 30 of 53 ICE rows were high confidence.
 
-    Lowering `MIN_ANCHOR_CLASSES_FOR_HIGH` to 2 does not lift the ceiling cleanly
-    either: only 8 of the 26 IME rows would become eligible, because 17 of the rest are
-    independently capped by `machinery_not_intact` and one by `at_contig_boundary`. The
-    change buys 8 relabelled rows and simultaneously makes every two-anchor ICE-like
-    cluster eligible for `high`. For an IME, medium is the ceiling, and `mobility` plus
-    `machinery_intact` are the columns carrying the information.
+    Lowering the anchor-class minimum to two would make only eight of the 26 IMEs
+    eligible: 17 others are also capped by `machinery_not_intact` and one by
+    `at_contig_boundary`. It would also change the criterion for two-anchor ICE-like
+    clusters. Read `mobility`, `machinery_intact` and the audit reasons together.
 
 ### Calls on a genome that should have none
 
@@ -278,17 +273,17 @@ Read the **class** before the count.
 | You see | Do |
 |---|---|
 | `evidence_level=profile_hits_only` | the module's weakest evidence: the profiles were seen, no system was assembled. Filter these out for reporting, or raise `coverage_profile` |
-| `mge_class=cime_or_island`, `mobility=passive` | no mobility claim and no tier, so not a false positive |
+| `mge_class=cime_or_island`, `mobility=passive` | no transfer capability is asserted and no tier is raised: a gene inside stays at tier 1 with the audit reason `inside_context_only_element`. The candidate interval still needs evaluation |
 | a call at medium or better with a real mobility claim | investigate before dismissing |
 | calls in an archaeon or a very distant lineage | the CONJscan and ICEscan models are bacterial. Treat any call as suspect on those grounds alone |
 
-## The knobs, one by one
+## Parameter reference { #the-knobs-one-by-one }
 
 Defaults are as shipped. "Measured" means there is a run behind the claim; where nothing
 has been swept, this page says so rather than offering a plausible-sounding
 recommendation.
 
-### `coverage_profile` — the one Layer A knob that changes what is detected
+### Profile coverage: `coverage_profile` { #coverage_profile-the-one-layer-a-knob-that-changes-what-is-detected }
 
 The fraction of an HMM profile a protein must align to before the hit is kept
 (`mobilome.coverage_profile`, default **0.5**, read into `MOBILOME_COVERAGE_PROFILE` at
@@ -336,7 +331,7 @@ do.
     anything. **Coverage sits upstream of a stronger constraint, and co-localisation is
     what binds.**
 
-### Element geometry — real knobs, but not config keys
+### Element geometry: script arguments { #element-geometry-real-knobs-but-not-config-keys }
 
 `rule conjscan_ice` passes none of these, so `conjscan_to_ice.py`'s own defaults are
 what every measured result in this project was produced at. They are Layer B.
@@ -345,7 +340,7 @@ what every measured result in this project was produced at. They are Layer B.
 |---|--:|---|---|
 | `--window-bp` | 15,000 | chains more machinery genes into one element; risks fusing two neighbouring systems | splits one operon into several candidates, each then too small to survive the size floor |
 | `--min-element-bp` | 8,000 | fewer, larger ICE candidates | admits short machinery spans; `cluster_shorter_than_min` stops firing |
-| `--min-ime-element-bp` | 2,000 | the knob with the largest measured effect — see below | admits sub-2 kb clusters, which cannot physically hold both a relaxase and an integrase |
+| `--min-ime-element-bp` | 2,000 | the parameter with the largest measured effect — see below | admits machinery spans below the empirical 2 kb floor |
 | `--max-element-bp` | 500,000 | admits runaway anchor chains | drops genuinely large ICEs |
 | `--boundary-bp` | 1,000 | more candidates flagged as probably truncated and capped at low | fewer caps, and you stop being told that a call ran into the end of its contig |
 | `--integrase-window-bp` | 50,000 | an integrase further from the machinery may still anchor the element | more `integrase_without_conjugation_machinery` orphans, so fewer ICE/IME calls |
@@ -387,14 +382,17 @@ positive.
 
 !!! note "The att search is always given the 8,000 bp floor"
 
-    Never the 2,000 bp IME one, and it refuses any repeat pair implying an element
-    outside its range. So an IME admitted at 3 kb can never have its boundaries
-    resolved, however clean the repeat pair: it keeps `boundary_method=none` and reports
-    the machinery span. Four of the five curated IMEs this module detects sit under that
-    floor. The deliberate reading is that an att pair implying a 3 kb element is mostly
-    noise; the honest reading is that IME boundaries are therefore largely unresolved.
-    Making the floors agree per class would change results, so it has not been done
-    quietly (the same note in `config/config.yaml`).
+    It uses the 8,000 bp ICE floor rather than the 2,000 bp IME machinery floor,
+    and rejects any repeat pair implying an element below 8 kb, for every candidate.
+    A small machinery span does not imply an element of the same length, but a
+    genuinely smaller element cannot have its own boundaries accepted. Three of the
+    five detected curated IMEs are shorter than 8 kb (IME_CdiR20291_ND 5,551 bp,
+    Tn*4451* 6,338 bp, MTn*Pi*10 7,591 bp), so a pair at their true ends would be
+    rejected; the search then ranks the remaining pairs, and a pair implying 8 kb or
+    more can still win. Neither floor is a configuration key, and a per-class *att*
+    floor has not been measured. Read `boundary_method` and the reported coordinates
+    rather than assuming that admission as an IME also means its complete extent was
+    resolved.
 
 `--integrase-window-bp` is deliberately much larger than `--window-bp`: conjugation
 machinery is an operon and clusters tightly, whereas the integrase sits at the element
@@ -430,15 +428,24 @@ Everything else in the co-localisation step is Layer C, in `colocalise.py`:
 | `ORIENTATION_EXEMPT_IS_FAMILIES` | `{IS6, IS26, …}` | families exempt from the same-orientation rule for composites |
 | `UNINFORMATIVE_FAMILY_VALUES` | `{"", NA, NEW, UNKNOWN, ISNCY, …}` | ISEScan family labels carrying no information about *which* element this is |
 
-!!! warning "Do not remove IS26 from `ORIENTATION_EXEMPT_IS_FAMILIES`"
+!!! warning "IS26: keep IS6 in `ORIENTATION_EXEMPT_IS_FAMILIES`"
 
-    IS*26* forms translocatable units with its copies in **direct** orientation, which
-    breaks the same-orientation rule the composite pattern otherwise depends on. Without
-    the exemption, the module misses the single most clinically important AMR
-    architecture.
+    For every other family, a flanking pair qualifies for tier 3 only when both
+    copies carry a strand and the strands agree (`same_orientation = yes`). Opposite
+    strands are rejected with `flanking_is_pair_inverted_orientation`, a missing strand
+    with `flanking_is_strand_unknown`, both under `tier_not_raised`; composites with
+    inverted IS copies, such as Tn*5* and Tn*10*, are therefore not called. Pairs of
+    family IS6, or copies named IS26, skip this test. Direct pairs pass it anyway; the
+    exemption adds inverted pairs (`same_orientation = no`) and pairs with an unknown
+    strand (`NA`). The family and span tests still apply, a partial flanking copy still
+    caps confidence at `medium` (`flanking_is_partial`), and every such composite
+    records `is26_orientation_exemption_applied`. Removing the family from
+    the set would drop IS26-bounded genes with inverted or strand-unknown copies below
+    tier 3. A matching IS pair is evidence of a candidate architecture; it does not
+    demonstrate active transposition.
 
-    `UNINFORMATIVE_FAMILY_VALUES` guards the opposite error: two IS both labelled "new"
-    must not be called a composite on family grounds.
+    `UNINFORMATIVE_FAMILY_VALUES` prevents two unclassified IS calls from supporting
+    a composite solely because both have the same uninformative label.
 
 None of the Layer C values here have been swept. They are documented so that you can see
 what a given audit reason is testing, not because there is evidence that a different
@@ -447,7 +454,7 @@ value is better.
 ### The naming thresholds
 
 Both naming layers are *optional* and stay off until you give each a source — see
-[Turning it on](enabling.md). Once on, four Layer A keys decide what gets a name.
+[Enabling the module](enabling.md). Once on, four Layer A keys decide what gets a name.
 
 | Key | Default | Source | Meaning |
 |---|--:|---|---|
@@ -456,9 +463,10 @@ Both naming layers are *optional* and stay off until you give each a source — 
 | `mobilome.iceberg.min_identity` | 80.0 | `ICEBERG_MIN_IDENTITY`, `00_common.smk` | identity floor for an ICE name |
 | `mobilome.iceberg.min_overlap_fraction` | 0.50 | `ICEBERG_MIN_OVERLAP`, `00_common.smk` | how much of *our* candidate the curated element must cover to be treated as the same thing. Lenient next to the transposon cascade, because ICEs are mosaic and their cargo varies between strains |
 
-Neither layer changes any gene's tier by loosening: `mobilome.iceberg.*` only labels the
-candidates already found, and `mobilome.tncentral.*` decides whether a curated element is
-named at all.
+ICEberg naming labels an existing candidate without changing any AMR gene's tier.
+TnCentral naming can affect tier 4: accepting a named transposon can raise the tier of
+a gene it contains when no higher-priority context applies. Changing these thresholds
+therefore affects more than names in the TnCentral branch.
 
 `min_reference_coverage` is the one with a measured story, and it is why tier 4 is hard
 to reach on a fragmented assembly. On a clinical hybrid run, every Tn*Ecp1.1* candidate
@@ -494,11 +502,12 @@ why the second window is ten times the first. Note that the first and third shar
 flag name `--boundary-bp` while meaning different things, and only the first is wired to
 a config key.
 
-A high `fraction_at_contig_boundary` means the assembly broke exactly where the IS
-elements are, and the located IS count should be read as a floor. For reference, the
-hybrid assemblies of the clinical *K. pneumoniae* isolates TUM24772 and K3, near-closed
-genomes, score 0: none of their 95 and 110 IS calls sits at a contig end. A short-read
-draft will be far higher.
+A high `fraction_at_contig_boundary` indicates that many IS calls lie at contig ends,
+where fragmentation may obscure further copies or context. The located count can
+underestimate the true count. For reference, the hybrid assemblies of the clinical *K.
+pneumoniae* isolates TUM24772 and K3, near-closed genomes, score 0: none of their 95 and
+110 IS calls sits at a contig end. A fragmented draft may have a higher value; inspect
+the sample-specific summary.
 
 ISEScan itself is run with **no** `--removeShortIS`, on purpose: partials are kept and
 tiered rather than discarded. `--min-length-bp` on `rule isescan_table` defaults to **0**
@@ -506,15 +515,15 @@ tiered rather than discarded. `--min-length-bp` on `rule isescan_table` defaults
 discard-below-500-bp convention applied to IS calls too.
 
 Two kinds of call are dropped for a biological reason rather than a threshold. The
-first is an IS call lying over the *dnaA* gene. *dnaA* is essential, so no living isolate carries an insertion
-inside it. ISEScan reports a partial IS21 there, most likely because IS21 elements
-carry IstB, a helper protein related to DnaA, so the IS21 profile matches DnaA itself.
-`rule isescan_table` reads Bakta's annotation table to find *dnaA*, and a call goes to
-`{sample}_is_discarded.tsv` with reason `overlaps_dnaA` when at least half of it lies
-inside a CDS Bakta calls *dnaA*, or at least half of that CDS lies inside the call. The
-second case is the call that runs on into *dnaN*, the next gene, because ISEScan's gene
-finder joined the two. That half is `DNAA_OVERLAP_FRACTION`, a constant in
-`isescan_to_table.py`, not a setting meant to be tuned.
+first is an IS call lying over the *dnaA* gene. *dnaA* is essential, so no living isolate
+carries an insertion inside it. ISEScan reports a partial IS21 there, most likely because
+IS21 elements carry IstB, a helper protein related to DnaA, so the IS21 profile matches
+DnaA itself. `rule isescan_table` reads Bakta's annotation table to find *dnaA*, and a
+call of any family goes to `{sample}_is_discarded.tsv` with reason `overlaps_dnaA` when
+at least half of it lies inside a CDS Bakta calls *dnaA*, or at least half of that CDS
+lies inside the call. The second case is the call that runs on into *dnaN*, the next
+gene, because ISEScan's gene finder joined the two. That half is
+`DNAA_OVERLAP_FRACTION`, a constant in `isescan_to_table.py`, not a configuration key.
 
 Two of ISEScan's IS21 models (IS21_259 and IS21_288) also match the chromosome's
 replicative helicase loader, DnaC in *E. coli*, *Salmonella*, *Klebsiella* and their close
@@ -554,7 +563,7 @@ isescan_table` says, for every *dnaC* and *dnaI*, which way it went and why. The
 
 ### Boundaries: the att search
 
-| Knob | Layer | Default | Source | Meaning |
+| Parameter | Layer | Default | Source | Meaning |
 |---|:-:|--:|---|---|
 | `mobilome.require_trna_boundary_for_high` | A | `false` | `MOBILOME_REQUIRE_TRNA_BOUNDARY`, `00_common.smk` | whether an element must have tRNA-anchored ends before it may be called **high** confidence |
 | `MIN_ATT_REPEAT_BP` | C | 15 | `att_search.py` | shortest exact repeat that may be an *att* site. Matches ICEfinder2; DBSCAN-SWA uses 12 |
@@ -575,7 +584,7 @@ warning sign rather than the norm.
 Either way, cargo is never assigned from an unresolved boundary: a de novo repeat is
 reported but never widens an element, so the interval stays the machinery span, a floor.
 
-!!! note "Two things about the att search that are easy to assume wrongly"
+!!! note "Limits and ranking of the att search"
 
     **The length floor is not the guard that does the work.** The chance-match
     calculation resolves to 18 bp at the shipped 50 kb window — and returned 18 at the
@@ -604,15 +613,16 @@ reported but never widens an element, so the interval stays the machinery span, 
 
 ### IS copy number and replicon calling
 
-| Knob | Layer | Default | Source | Meaning |
+| Parameter | Layer | Default | Source | Meaning |
 |---|:-:|--:|---|---|
 | `mobilome.isosdb.min_covered_percent` | A | 90.0 | `ISOSDB_MIN_COVERED`, `00_common.smk` | a database entry must be covered end to end before its depth is believed. A partially covered entry is usually a conserved domain shared with another family, and averaging it in inflates every estimate |
 | `mobilome.isosdb.min_copy_number` | A | 0.5 | `ISOSDB_MIN_COPIES`, `00_common.smk` | below this multiple of the genome baseline the element is treated as absent. Under 1.0 on purpose: a real single-copy IS sits near 1×, and sampling noise plus mapping loss routinely push it to 0.6–0.8× |
 | `--min-chromosome-bp` | B | 2,000,000 | `DEFAULT_MIN_CHROMOSOME_BP`, `platon_replicons.py` | above this length an unclassified contig may be called the chromosome |
 
-The copy-number leg is *optional* (`mobilome.isosdb.fasta_url`) and runs in Illumina and
-hybrid modes only, because it needs reads. It changes no AMR gene's tier and must not: it
-says nothing about *where* the extra copies are, only that they exist.
+The copy-number analysis is *optional* (`mobilome.isosdb.fasta_url`) and runs in
+Illumina and hybrid modes only, because it needs reads. It changes no AMR gene's tier
+and must not: it says nothing about *where* the extra copies are, only that their
+estimated abundance exceeds the located count.
 
 `--min-chromosome-bp` matters more than it looks. An ICE integrates into a chromosome by
 definition, so machinery on a contig called `plasmid` is a conjugative plasmid region,
@@ -625,28 +635,30 @@ confidence cap reflect that.
 
 ### Tightening for a dossier
 
-!!! warning "No knob tightens tier 6"
+!!! note "Tier 6 and stricter reporting"
 
-    The obvious framing — a false *predicted self-transmissible* is the expensive error,
-    so tighten the knobs — is not how the code works. Tier 6 is set by
-    exactly two things: an AMR gene inside an element classed `ice`, or a gene on a
-    plasmid Platon typed `conjugative`. **Nothing in Layer A or Layer B touches either.**
+    Tier 6 means the gene lies inside an element classed `ice` (at least 90% of the
+    gene inside the interval) or on a plasmid Platon typed conjugative. Settings that
+    change which ICE intervals exist, or how far they reach, change it: in Layer A
+    `coverage_profile` and `icescan.run`; in Layer B, on `rule conjscan_ice`,
+    `--window-bp`, `--min-element-bp`, `--max-element-bp`, `--integrase-window-bp`
+    and `--att-flank-window-bp`; and `--min-chromosome-bp` on
+    `rule mobilome_replicons`, because an ICE on a contig called a plasmid becomes a
+    conjugative region. `--min-ime-element-bp` acts only on IME and AICE clusters,
+    and the naming thresholds act on tier 4 (TnCentral) or on names alone (ICEberg).
+    A high-confidence tier-6 call rests on rules that are not settings: three anchor
+    classes, intact machinery, and the `spans_contigs` and `at_contig_boundary`
+    caps. No threshold provides a calibrated false-positive rate for this tier.
 
-    Measured on 40 benchmark genomes at coverage 0.5, the ICE calls are identical with
-    the ICEscan layer on and off — 37 rows in both arms, the same 16 high / 19 medium /
-    2 low, and not one row's confidence changes. `--min-ime-element-bp` acts only on
-    IME/AICE-architecture clusters, and the naming thresholds change names, not tiers.
-    So every lever tightens the **tier-5** branch or the naming layer.
+    In the 40-genome comparison at profile coverage 0.5, enabling ICEscan left the 37
+    ICE rows and their confidence labels unchanged: 16 high, 19 medium and two low.
 
-    What actually guards tier 6 is not tunable: three of the five anchor classes for `high`,
-    the absolute `spans_contigs` cap, the truncation check, and the
-    chromosome-versus-plasmid replicon rule. **Reporting less is not the same as
-    claiming less.** For a stricter dossier, filter the deliverable rather than turn a
-    knob:
+    For a report restricted to stronger tier-6 predictions, use explicit criteria
+    and disclose the excluded rows. For example, after confirming these columns
+    are present:
 
     ```bash
-    # Tier-6 rows you are willing to defend. Columns by name, not by number.
-    # This table writes booleans as yes / no / NA.
+    # The mobility table uses yes / no / NA for boolean fields.
     awk -F'\t' 'NR==1 {for (i = 1; i <= NF; i++) col[$i] = i; print; next}
                 $col["mobility_tier"] == 6 &&
                 $col["confidence"]    == "high" &&
@@ -654,15 +666,15 @@ confidence cap reflect that.
         08.mobilome/S1/S1_amr_mobility.tsv
     ```
 
-    Report the rows you dropped, with their reasons, alongside the ones you kept. That
-    is a defensible position; a narrower config is not.
+    This selects predictions meeting the stated criteria. It does not validate
+    transfer experimentally or establish a false-positive rate.
 
 The levers that do help, and what each costs:
 
 | Change | Effect | Measured cost |
 |---|---|---|
 | leave `coverage_profile: 0.5` | keeps MacSyFinder's own default | nothing measured supports going lower for a single isolate |
-| raise the naming thresholds (`tncentral.min_identity` to 95.0, `min_reference_coverage` to 0.9, `iceberg.min_identity` to 90.0) | a name is a claim, so demand more of it | not measured; changes names, not tiers |
+| raise the naming thresholds (`tncentral.min_identity` to 95.0, `min_reference_coverage` to 0.9, `iceberg.min_identity` to 90.0) | requires stronger similarity or coverage for a curated name | not measured; TnCentral changes can also affect tier 4 |
 | `--min-ime-element-bp 3000` (Layer B) | drops 5 of 28 small-machinery calls | **zero** curated IMEs on this evidence |
 | `--min-ime-element-bp 8000` (Layer B) | stops reporting the IME architecture | curated IME recall 5/12 → 1/12, 15 of 28 calls gone. Buys the removal of one IME call on the negative set |
 
@@ -694,7 +706,7 @@ mobilome:
 ```
 
 Turning the ICEscan layer on roughly doubles the IME rows and is the only way to get an
-AICE call at all; it needs its own source, which [Turning it on](enabling.md) covers.
+AICE call at all; it needs its own source, which [Enabling the module](enabling.md) covers.
 Measured against an otherwise unchanged configuration rather than a half-changed one — the
 "before" being CONJscan alone at 0.5 and the "after" the union at 0.4 — IMEs go 2/12 to
 6/12, ICEs stay at 15/18, and negative-set calls go 2 to 7.
@@ -719,9 +731,10 @@ material arrives already labelled weak.
 ## On a draft assembly
 
 Fragmentation is not a threshold problem, and almost nothing on this page fixes it. The
-measurement cut 40 benchmark genomes to three contiguities and re-ran the whole chain,
-and its result is one line: the **class** survives fragmentation, the **extent** does
-not. [Draft assemblies](draft-assemblies.md) has the full treatment; what follows is only
+benchmark cut 40 genomes to three contiguity levels and reran the analysis. Element
+classes were generally more stable than their reported boundaries in this experiment;
+individual predictions can still be lost or change class.
+[Draft assemblies](draft-assemblies.md) has the full treatment; what follows is only
 what changes about tuning.
 
 **Read the first row of the audit before anything else.** `{sample}_ice_discarded.tsv`
@@ -734,8 +747,8 @@ to sit *between* the two arms it separates, and detection held at the 50 kb arm.
 **Do not turn on `require_trna_boundary_for_high`.** On the 52 complete records it
 already demotes 23 of 30 high-confidence calls, because only 7 of them have
 tRNA-anchored ends. On a short-read draft, where the flanks are usually simply absent, it
-caps essentially everything, and a confidence column that always reads "medium" tells a
-reviewer nothing. Conservative does not mean "cap everything"; it means make the strong
+caps essentially everything, and a confidence column that always reads "medium" tells an
+assessor nothing. Conservative does not mean "cap everything"; it means make the strong
 claim rarer and better evidenced.
 
 **Expect `min_reference_coverage` to block tier 4, and do not lower it to unblock it.**
@@ -743,20 +756,23 @@ A curated element split across contigs fails the coverage test by construction �
 visible at 12% and 49% on 5- and 6-contig assemblies. Admitting the fragment names a
 transposon from half of it.
 
-**Check `fraction_at_contig_boundary` in `{sample}_is_summary.tsv` every time.** A high
-value means the assembly broke exactly where the IS elements are, so the located IS count
-is a floor. If reads are available, the *optional* copy-number leg
-(`mobilome.isosdb.fasta_url`) is what turns that warning into a number.
+**Check `fraction_at_contig_boundary` in `{sample}_is_summary.tsv`.** A high value
+indicates that fragmentation may affect the located IS count. With Illumina reads,
+the optional copy-number analysis (`mobilome.isosdb.fasta_url`) provides an independent
+abundance estimate. Its difference from the located count is not a direct measurement
+of assembly collapse.
 
-## What no knob fixes
+## Limits of parameter tuning { #what-no-knob-fixes }
 
 These are limits of the design and of the data, and a methods section should say so.
 
-**A 70.6% IME detection ceiling.** Measured over all 395 curated IMEs at production
-settings: 279 carry a relaxase that can be detected at all. The remaining 30% are not
-waiting behind a threshold — validated with a shuffled-protein control, which produces
-**0 of 395** hits at production settings. Size-matched, IMEs are detected as well as or
-better than ICEs in every size bin; the earlier appearance otherwise was a size confound.
+**Relaxase signal in 70.6% of the tested IMEs.** Measured over all 395 curated IMEs at
+production settings: 279 carry a relaxase that can be detected at all. The remaining
+entries had no detectable relaxase signal at these settings. A shuffled-protein control
+produced **0 of 395** hits at production settings. This measures the tested profiles on
+this dataset; it is not a universal biological ceiling or a measure of complete-element
+recovery. Size-matched, IMEs are detected as well as or better than ICEs in every size
+bin; the earlier appearance otherwise was a size confound.
 
 **Elements that carry no relaxase.** NBU1, NBU2, Tn*4555* and the MGI series are
 mobilised in *trans* by a co-resident element, so they encode no relaxase because they do
@@ -773,41 +789,43 @@ genes that happen to be adjacent in the file. Not a threshold, and not exposed.
 
 **Boundaries on fragmented assemblies.** If the flanking sequence is not on the contig,
 no parameter finds an *att* site. `boundary_method=none` is the correct answer, and the
-interval is honestly a floor.
+interval is explicitly a floor.
 
 ## Traps
 
 **Lowering a threshold changes what "detected" means.** A recall score that counts any
 overlap flatters a looser setting, because one large call can cover several curated
 elements and each counts as a hit. At `coverage_profile: 0.4` the internal scorer prints
-16/18 ICEs rather than 15/18 — the extra "detection" is a 3,187 bp call clipping the tail
-of a 161 kb element, 1.9% of it, and classed `ime` rather than `ice`. Honest ICE recall
-is 15/18 at every coverage value tested. Always report the recovered fraction and the
-class next to the count.
+16/18 ICEs rather than 15/18 — the extra "detection" is a 3,187 bp call clipping the
+tail of a 161 kb element, 1.9% of it, and classed `ime` rather than `ice`. ICE recovery
+with the expected class is 15/18 at every coverage value tested. Always report the
+recovered fraction and the class next to the count.
 
 **Whenever you loosen a threshold to see what you were missing, run the loosened setting
-over shuffled or decoy input as well.** A permissive HMM pass finds a relaxase hit in 373
-of 395 curated IMEs, which looks like a 94% ceiling until the shuffled control is run at
-the same setting: **277 of 395** shuffled sequences also produce a hit. The permissive
-pass is roughly 70% noise. Without the control you cannot tell recovery from noise.
+over shuffled or decoy input as well.** A permissive HMM pass finds a relaxase hit in
+373 of 395 curated IMEs, which looks like a 94% ceiling until the shuffled control is
+run at the same setting: **277 of 395** shuffled sequences also produce a hit. About 70%
+of the shuffled controls produced a hit. This is a control hit rate, not an estimate
+that 70% of the real calls are false. The comparison shows why additional permissive
+hits cannot be treated as recovered elements without evaluation.
 
 **A negative control must be inspected, not counted.** The negative set here included
-*Bacillus subtilis* 168 on the grounds of having no curated ICEberg entry, and the module
-called an ICE at 529,362–549,932. That is ICEBs1, discovered in *B. subtilis* 168
+*Bacillus subtilis* 168 on the grounds of having no curated ICEberg entry, and the
+module called an ICE at 529,362–549,932. That is ICEBs1, discovered in *B. subtilis* 168
 (Auchtung *et al.* 2005) — a true positive ICEberg has not curated, and it came close to
-being recorded as a false alarm. Expect the curated databases to be incomplete rather
-than the caller to be wrong.
+being recorded as a false alarm. An uncurated call may be a real element or a false
+prediction; inspect the evidence before assigning either label.
 
 **Say which arm and which build a before/after came from.** "15/18 ICEs, 5/12 IMEs, 2
 calls in 32.6 Mb" mixes arms: the pilot figures come from runs with the ICEscan layer on,
 while the "2 calls" figure comes from negative genomes that had no ICEscan directory. The
 like-for-like negative figure for that configuration is **5**, not 2.
 
-**Turning a knob makes a run non-comparable with the last one.** The audit records the
+**Turning a parameter makes a run non-comparable with the last one.** The audit records the
 value that was applied, but only per run, and a half-and-half result set is very hard to
 unpick later. If you change a threshold mid-project, re-run everything — and keep the
 `PROVENANCE.txt` each download rule writes, since the databases come from unversioned
-addresses ([Turning it on](enabling.md)).
+addresses ([Enabling the module](enabling.md)).
 
 ## Related pages
 
@@ -815,7 +833,7 @@ addresses ([Turning it on](enabling.md)).
 |---|---|
 | [Reading the output](output.md) | what every column of the mobility table means |
 | [Draft assemblies](draft-assemblies.md) | the full fragmentation measurement and which columns survive it |
-| [Turning it on](enabling.md) | the master switch and the four optional layers |
+| [Enabling the module](enabling.md) | the master switch and the four optional layers |
 | [The mobility ladder](mobility-ladder.md) | what each tier claims, and what it does not |
 | [Validation](validation.md) | the benchmarks these numbers come from, and what they do not show |
 | [Worked example](worked-example.md) | one genome end to end, with the "why not" trail |

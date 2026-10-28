@@ -1,8 +1,9 @@
-# Method reference: intrinsic versus acquired AMR, and what BacFlux can actually say
+# Method reference: interpreting intrinsic and acquired AMR { #method-reference-intrinsic-versus-acquired-amr-and-what-bacflux-can-actually-say }
 
-A regulator asking about a resistance gene wants to know one thing: did this strain
-always have it, or did it acquire it? This page covers what BacFlux can answer, and
-what it deliberately refuses to answer. For the short version, see
+For strain assessment, detecting a resistance-associated gene is only the first
+step. Its distribution in the species, genomic context and phenotypic effect also
+matter. This page explains which evidence BacFlux provides and which questions
+require population comparisons or laboratory testing. For the short version, see
 [The mobility ladder](mobilome/mobility-ladder.md).
 
 !!! abstract "Terms used on this page"
@@ -11,11 +12,11 @@ what it deliberately refuses to answer. For the short version, see
     |---|---|
     | **AMR** | antimicrobial resistance |
     | **intrinsic** | resistance shared by essentially all strains of a species — a property of the species, not of this isolate |
-    | **acquired** | resistance gained horizontally, from a plasmid or mobile element |
+    | **acquired AMR gene** | a resistance gene gained through horizontal transfer; it may be chromosomal or carried on another genetic element |
     | **EFSA** | European Food Safety Authority, whose guidance drives the intrinsic/acquired question |
     | **FEEDAP** | the EFSA panel that issues the guidance for feed additives |
-    | **QPS** | Qualified Presumption of Safety, EFSA's list of species accepted as safe |
-    | **MIC** | minimum inhibitory concentration — the lab measurement of resistance |
+    | **QPS** | Qualified Presumption of Safety, EFSA's framework for assessing listed taxonomic units subject to stated qualifications |
+    | **MIC** | minimum inhibitory concentration, interpreted against an appropriate cutoff |
     | **ANI** | average nucleotide identity, a genome-to-genome similarity measure |
     | **IS** | insertion sequence, the smallest kind of mobile element |
 
@@ -30,31 +31,34 @@ checklist:
 3. EFSA publishes a catalogue of AMR genes in *Bacillus*. Is that a new AMR
    database? Should BacFlux use it?
 
-Short answers: it is a fundamentally different question, not a stricter search;
-yes, and that is why BacFlux does not attempt it; and no, it is not a database
-and BacFlux does not use it.
+In brief, point-mutation screening interprets specific curated substitutions rather
+than overall gene similarity. Establishing intrinsic resistance requires an appropriate
+species-level comparison, not necessarily every genome in NCBI. The EFSA *Bacillus*
+catalogue is a prevalence table for five *Bacillus* species, not a detection database;
+BacFlux does not use it, and §3 describes how to consult it by hand.
 
 ---
 
-## 1. Two kinds of resistance, and why one is invisible to BLAST
+## 1. Gene detection and point-mutation screening { #1-two-kinds-of-resistance-and-why-one-is-invisible-to-blast }
 
-A bacterium becomes resistant in one of two ways.
+Two mechanisms relevant to genomic screening are gene acquisition and mutations
+affecting genes already present. They are not an exhaustive list of resistance mechanisms.
 
 **It acquires a gene it did not have.** A *bla*CTX-M or a *tet*(M) arrives by
 horizontal transfer. Before, the gene was absent; after, it is present.
 
 **It mutates a gene it already had.** A single amino-acid substitution in *gyrA*
-(fluoroquinolones), *rpoB* (rifampicin) or *rpsL* (streptomycin). These are
-essential genes, present in every strain of the species whether resistant or
-susceptible. One residue differs.
+(fluoroquinolones), *rpoB* (rifampicin) or *rpsL* (streptomycin). The genes themselves
+may be present in susceptible and resistant strains. A specific substitution, rather
+than gene presence, can distinguish the assessed alleles.
 
-ABRicate answers *"is this gene present?"* by BLAST, and reports identity and
-coverage. That question is exactly right for the first mechanism and structurally
-blind to the second: query a susceptible genome for *gyrA* and you get a hit at
-~99.9% identity; query a resistant one and you get a hit at ~99.9% identity. The
-substitution that decides the phenotype is averaged away inside the percentage.
-No threshold separates them, because the difference is not one of degree — it is
-one residue at one coordinate. Lowering the cutoff only adds noise.
+ABRicate uses BLAST to report gene matches, identity and coverage. Its summary does not
+perform curated resistance-mutation interpretation: query a susceptible genome for
+*gyrA* and you get a hit at ~99.9% identity; query a resistant one and you get a hit at
+~99.9% identity. The substitution that decides the phenotype is averaged away inside the
+percentage. A general identity cutoff is not a substitute for inspecting the relevant
+residue. BLAST alignments can contain substitution information; ABRicate's gene-presence
+summary does not provide the organism-specific interpretation.
 
 AMRFinderPlus with `--organism` asks a different question. It loads a curated set
 of *known resistance-conferring substitutions* for that species, aligns the query
@@ -67,17 +71,18 @@ Two further differences matter even where no mutation is involved:
 - **Per-gene curated cutoffs** rather than one blanket threshold. Gene families
   differ in natural diversity, so a single cutoff is either too permissive for
   conserved families or too strict for variable ones. This is why BacFlux applies
-  the EFSA 80%/70% thresholds to the **ABRicate leg only** — imposing them on
+  the EFSA 80%/70% thresholds to the **ABRicate analysis only** — imposing them on
   AMRFinderPlus would replace curation with a blunter rule.
 - **Structured output**: element type (AMR / STRESS / VIRULENCE), class and
   subclass, and a partial-at-contig-end flag. The mobilome module consumes these.
 
 ### Why this matters for the intrinsic/acquired question
 
-Point mutations *are* the chromosomal, non-transferable mechanism. So this is the
-one place a single genome can speak to the intrinsic side. Everything else the
-module does — replicon, mobile-element context, mobility tier — addresses the
-acquired and mobile side.
+A curated mutation call identifies a known resistance-associated substitution in
+the assessed organism. It does not establish species-wide intrinsic resistance or
+prove that the sequence cannot be transferred. Conversely, an acquired gene can be
+chromosomal. Mutation screening, replicon assignment and mobile-element context
+provide complementary evidence and should be interpreted separately.
 
 ### The caveat
 
@@ -145,13 +150,19 @@ distribution analysis, plus phenotypic testing (MIC against the relevant
 antimicrobial), per the decision tree
 in EFSA (2025) §3.2.1.
 
-Where BacFlux does align well: EFSA (2024a) requires the AMR search to run against
-**at least two** maintained/curated databases, at ≥80% identity and ≥70% length
-coverage. BacFlux runs ten database queries across three independent legs —
-ABRicate over eight databases (`argannot`, `card`, `ecoh`, `ecoli_vf`, `megares`,
-`ncbi`, `resfinder`, `vfdb`), AMRFinderPlus, and a BBMap→CARD read-mapping leg
-that is immune to assembly collapse — with those thresholds applied on the
-ABRicate leg.
+EFSA (2024a) requires the AMR search to run against at least two maintained, curated
+databases at ≥80% identity and ≥70% length coverage. BacFlux applies those cutoffs,
+fixed in the rule, to ABRicate only; AMRFinderPlus, which runs only when the mobilome
+module is enabled, keeps its curated per-gene cutoffs. ABRicate's eight databases
+(`argannot`, `card`, `ecoh`, `ecoli_vf`, `megares`, `ncbi`, `resfinder`, `vfdb`)
+include virulence and *E. coli* serotyping collections and overlap in content, so they
+are not eight independent AMR resources.
+
+The CARD read-mapping analysis runs in Illumina and hybrid modes. It provides evidence
+from reads that may be missing from the assembly, but remains subject to coverage,
+mapping ambiguity and database limitations. CARD queried twice is not two independent
+databases. Assess the enabled resources and applicable guidance rather than using a
+total query count as evidence of compliance.
 
 ---
 
@@ -207,12 +218,12 @@ with **tblastn** (protein queries) and **blastn** (nucleotide queries), E-value
 **≥80% identity / ≥70% coverage**, compute the frequency of strains matching each
 query, and the median identity and coverage. Python 3 with R 4.3.3 for plots.
 
-**Controls.** Every table carries internal positive controls — *rpoB*, *gyrA*,
-*gyrB* and 16S rRNA from the species' own reference genome, which should be
-near-universal — and a negative control, *fimA* from *Salmonella*, which should
-be absent. In the published tables the housekeeping
-genes return ~100% of genomes and *fimA* returns 0% every time. The pipeline
-demonstrates its own validity in each result table.
+**Controls.** Every table carries internal positive controls — *rpoB*, *gyrA*, *gyrB*
+and 16S rRNA from the species' own reference genome, which should be near-universal —
+and a negative control, *fimA* from *Salmonella*, which should be absent. In the
+published tables the housekeeping genes return ~100% of genomes and *fimA* returns 0%
+every time. These controls support the expected behaviour of the reported searches; they
+do not validate every query or every intrinsic/acquired interpretation.
 
 **Scale of the output** (Annex A): 358 raw matches across the five species,
 192 valid and non-duplicated, and **95 hits above threshold** actually analysed.
@@ -225,23 +236,24 @@ identity**:
 - *rphB* in *B. subtilis*: found above threshold in **85.3%** of genomes when
   queried as nucleotide, but **1.3%** when queried as protein — because most
   genomes sit at **79–79.9%** identity, just under the cutoff.
-- *rphC* behaves the same way in *B. amyloliquefaciens* (79.8% median) and
-  *B. velezensis* (79.8%): absent by the rule, near-universal in reality.
+- *rphC* behaves the same way in *B. amyloliquefaciens* (79.8% median) and *B.
+  velezensis* (79.8%): often below the protein identity cutoff despite evidence of
+  widespread homologues.
 - *satA* in *B. amyloliquefaciens*: ~91% of genomes by nucleotide, ~12–21% by
   protein, with a median identity of 79.2%.
 
 The same sequence is "present in nearly all strains" or "essentially absent"
 depending on whether it is queried as DNA or as protein. Since BacFlux applies the
-same 80%/70% EFSA thresholds on its ABRicate leg, the lesson transfers directly:
+same 80%/70% EFSA thresholds on its ABRicate analysis, the lesson transfers directly:
 **a gene just under the cutoff is not absent, and a borderline call should be read
 from the actual identity value, not from presence/absence.** This is a further
 argument for keeping AMRFinderPlus's per-gene curated cutoffs unmodified.
 
 Also instructive: *tet*L sits in ~63% of *B. subtilis* chromosomes — neither
 "vast majority" nor rare, i.e. genuinely undecidable by the intrinsic rule. Genes
-originating in other species (ANT(4′)-Ib from an *S. aureus* plasmid, *erm*B from
+reported from other species (ANT(4′)-Ib from an *S. aureus* plasmid, *erm*B from
 *E. faecium*, *cat* from a *Streptococcus* phage) appear in 1–4% of genomes, which
-is what a real acquired gene looks like.
+is consistent with acquisition but does not establish the history of every hit.
 
 ### Why it is not built into BacFlux
 
@@ -271,14 +283,14 @@ enough genomes — that, not the catalogue, is the reusable artefact.
 Not all of these carry the same weight, and the difference matters if any of this
 is quoted in a dossier.
 
-**Peer-reviewed EFSA guidance (highest standing)**
+**EFSA guidance and statements**
 
 - **EFSA Scientific Committee (2025).** *Guidance on the characterisation of
-  microorganisms in support of the risk assessment of products used in the food
-  chain.* EFSA Journal 23(11):e9705. doi:10.2903/j.efsa.2025.9705. Adopted
-  24 September 2025. Open access (CC BY-ND). **This is the current guidance**, and
-  its Appendix A lists the parts of the 2018 FEEDAP guidance it supersedes.
-  Definitions quoted above are from its Glossary; the AMR decision tree is §3.2.1.
+  microorganisms in support of the risk assessment of products used in the food chain.*
+  EFSA Journal 23(11):e9705. doi:10.2903/j.efsa.2025.9705. Adopted 24 September 2025.
+  Open access (CC BY-ND). The cited edition's Appendix A lists the parts of the 2018
+  FEEDAP guidance it supersedes. Definitions quoted above are from its Glossary; the AMR
+  decision tree is §3.2.1.
 - **EFSA BIOHAZ Panel (2023a).** *Statement on how to interpret the QPS
   qualification on 'acquired antimicrobial resistance genes'.* EFSA Journal
   21(10):8323. doi:10.2903/j.efsa.2023.8323. The method for discriminating
@@ -288,7 +300,7 @@ is quoted in a dossier.
   22(8):e8912. doi:10.2903/j.efsa.2024.8912. Source of the ≥2-databases
   requirement and the 80%/70% thresholds.
 
-**Technical report (lower standing — not a peer-reviewed panel opinion)**
+**Supporting technical report**
 
 - **EFSA (2024b).** *Catalogue of antimicrobial resistance genes in species of
   Bacillus used to produce food enzymes and feed additives.* EFSA Supporting
@@ -327,9 +339,9 @@ is quoted in a dossier.
 
 **Inference, not quoted from any source**
 
-- That ABRicate-style BLAST is *structurally* unable to resolve point mutations.
-  This follows from what the tools compute and is not a claim any of the cited
-  documents makes.
+- That a gene-presence summary is insufficient for curated point-mutation
+  interpretation. This concerns ABRicate's reported analysis, rather than a
+  general inability of BLAST alignments to reveal substitutions.
 - That the threshold-brittleness seen in the catalogue transfers to BacFlux's own
-  ABRicate leg. The mechanism is identical (same thresholds, same kind of search),
+  ABRicate analysis. The mechanism is identical (same thresholds, same kind of search),
   but no source states it about BacFlux.

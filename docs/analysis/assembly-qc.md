@@ -1,12 +1,13 @@
 # Assembly QC
 
-Three questions about the finished genome, one tool each:
+The assembly QC stage combines structural metrics, marker-based genome-quality
+estimates and read-mapping statistics:
 
 | Question | Tool | Answers with |
 |---|---|---|
-| Is the **assembly** any good? | QUAST 5.3.0 | contig count, N50, largest contig, total length, GC |
-| Is the **genome** complete, and is it one organism? | CheckM 1.2.5 | completeness %, contamination %, from lineage-specific single-copy markers |
-| Did the **reads** map back sensibly? | Qualimap 2.3 | mean depth, evenness, GC bias, mapping rate, insert size |
+| How contiguous is the **assembly**? | QUAST 5.3.0 | contig count, N50, largest contig, total length, GC |
+| What are the marker-based completeness and contamination estimates? | CheckM 1.2.5 | completeness %, contamination %, from lineage-specific single-copy markers |
+| How do the **reads** map to the assessed assembly? | Qualimap 2.3 | mean depth, evenness, GC bias, mapping rate, insert size |
 
 The first two need a genome; the third needs the BAM that
 [decontamination](decontamination.md#1-coverage-the-reads-mapped-back-onto-the-draft)
@@ -24,11 +25,16 @@ except Qualimap.
     | **N50** | the contig length at which half the assembly sits in contigs that long or longer |
     | **ONT** | Oxford Nanopore Technologies, the long-read sequencing platform |
 
-!!! note "Decontamination runs first, and has to"
+!!! note "Interpret QC with the filtering history"
 
-    CheckM is where a leftover contaminant contig shows up, as contamination *of the
-    isolate*. Screening the assembly before QC is what makes the CheckM number
-    meaningful.
+    Decontamination removes contigs according to `parameters.decontamination.mode`.
+    In `hybrid` it filters the Illumina SPAdes draft; the delivered ONT genome gets a
+    second screen that writes a verdict per contig and removes nothing
+    (`long_read_mode`, default `off`). Read
+    `contaminants/contig_taxonomy_decisions.tsv`, and in `hybrid` also
+    `contaminants/{sample}_final_contig_taxonomy_decisions.tsv`, beside the CheckM
+    numbers, since both retained contamination and removal of genuine sequence can
+    affect the estimates.
 
 ## Staging: one genome, or two
 
@@ -96,7 +102,8 @@ genes for that lineage, and counts them.
 - Markers present in **more copies than expected** → either contamination (more than
   one organism in the bin) or a genuine duplication.
 
-This is the standard pass/fail gate for an isolate genome.
+These estimates support genome-quality assessment; BacFlux does not turn them
+into a universal pass/fail decision.
 
 ```bash
 checkm lineage_wf -t {threads} -x fasta eval/genomes/ eval/checkm/
@@ -118,9 +125,9 @@ Reading the two numbers together is what makes them useful:
 | Completeness | Contamination | Usual meaning |
 |---|---|---|
 | high | low | a good isolate genome |
-| high | high | two organisms in one assembly — a mixed culture that decontamination did not resolve |
-| low | low | the decontamination filter probably removed genome, not contamination |
-| low | high | poor assembly *and* contamination; start from the read QC |
+| high | high | Possible retained contamination or marker duplication; inspect the supporting evidence |
+| low | low | Incomplete assembly, possibly including excessive filtering; review removed sequence |
+| low | high | Both estimates warrant investigation; review reads, assembly and filtering |
 
 The third row is the one to watch for after a large-removal warning from the
 [selector](decontamination.md#the-two-warnings).
@@ -164,10 +171,10 @@ nothing. It is a mode-specific absence, not a gap.
 !!! warning "In hybrid, this panel is Illumina coverage of the Illumina draft"
 
     The BAM comes from the short-read branch of decontamination: Illumina reads mapped
-    to the pre-decontamination SPAdes draft. The ONT reads are never mapped for QC. So
-    this is **not** coverage of the delivered ONT genome, and MultiQC labels the panel
-    `mapping Illumina QC` to say so. The QUAST, CheckM and GTDB-Tk panels are
-    technology-tagged for the same reason.
+    to the pre-decontamination SPAdes draft. This Qualimap panel does not assess ONT
+    read mapping. Therefore this is **not** coverage of the delivered ONT genome, and
+    MultiQC labels the panel `mapping Illumina QC` to say so. The QUAST, CheckM and
+    GTDB-Tk panels are technology-tagged for the same reason.
 
 ## Where the two hybrid assemblies get compared
 

@@ -1,9 +1,10 @@
 # The mobility ladder
 
-Every AMR gene the module assesses gets exactly **one** tier, from 1 to 6. The tier
-answers a single question — *if this gene can move, what would move it?* — and the
-label beside the number is written into the output table, so nobody reading the TSV has
-to look a number up.
+The module assigns a numbered tier to each assessable gene using the detected
+element and replicon context. The output includes both the tier and its label.
+The categories summarise the evidence selected by the decision rules; they are
+not measurements of transfer rate or probabilities of resistance spread.
+Genes without usable coordinates are reported as `not_assessable`.
 
 !!! note "The five terms the table uses"
 
@@ -31,16 +32,25 @@ to look a number up.
 
 | Tier | `mobility_tier_label` | Context | What it means |
 |:--:|---|---|---|
-| **1** | `intrinsic_candidate` | chromosomal, nothing mobile nearby | nothing was found that could move it |
-| **2** | `expression_modulation_not_mobilisation` | an IS sits upstream, on the gene's strand | the IS can supply an outward-reading ("hybrid") promoter and raise expression. **Not mobilisation** — the gene still cannot move |
-| **3** | `composite_mobilisable_within_cell` | the gene sits between two copies of the same IS family | a composite transposon: the whole block can hop within the cell |
+| **1** | `intrinsic_candidate` | chromosomal, nothing mobile nearby | no stronger mobile context was assigned by the enabled methods |
+| **2** | `expression_modulation_not_mobilisation` | an IS sits upstream, on the gene's strand | an upstream IS can be consistent with promoter-mediated expression changes; this context alone does not establish gene mobilisation |
+| **3** | `composite_mobilisable_within_cell` | the gene sits between two copies of the same IS family | a pattern consistent with a candidate composite transposon; activity is not experimentally established |
 | **4** | `named_element_mobilisable` | the gene sits inside a curated unit transposon or integron cassette | mobilisable, with an architecture somebody has characterised and named |
-| **5** | `mobilisable_needs_helper` | on a plasmid, or inside an IME | it can reach another cell, but only with a helper element |
+| **5** | `mobilisable_needs_helper` | on a plasmid, or inside an IME | an IME, or a plasmid typed mobilisable, can transfer only with a helper element; for other plasmids see the note below |
 | **6** | `predicted_self_transmissible` | inside an ICE, or on a conjugative plasmid | **predicted** self-transmissible |
+
+Tier 5 covers every plasmid that Platon did not type conjugative, so on the plasmid
+route it records plasmid context rather than demonstrated helper-dependent transfer.
+`mobility_tier_label` and `plasmid_mobility` separate the cases: an IME and a plasmid
+typed `mobilisable` (a relaxase or *oriT* hit) keep `mobilisable_needs_helper`; a
+plasmid typed `non_mobilisable` is labelled `on_plasmid_typed_non_mobilisable`; a
+plasmid without mobility typing (`unknown`, for example one called by geNomad alone)
+keeps the generic label at `medium` confidence, with the audit reason
+`plasmid_mobility_untyped`.
 
 ## How one tier is chosen
 
-The rungs are tested **from the top down, and the first match wins**. The order is
+The tiers are tested **from the top down, and the first match wins**. The order is
 written out here exactly as the code applies it:
 
 1. inside an ICE → **6**
@@ -59,11 +69,13 @@ a plasmid scores 5 or 6, not 4**, because the replicon evidence is tested first 
 is why tier 4 is reached only when a curated name is the *strongest* thing available,
 in practice on the chromosome.
 
-Where a lower rung's evidence existed but lost, it is not thrown away: it goes to the
-audit file (`named_element_overrides_composite_pattern`, and so on), and a curated name
-is still carried in `mge_name` even when a higher rung set the tier.
+Evidence for a lower tier is kept when a higher tier is assigned: it goes to the
+audit file (`named_element_overrides_composite_pattern`,
+`inside_named_element_but_higher_tier_applies` and others), and a curated transposon
+or integron containing the gene stays in `named_element` and `named_element_type`.
+`mge_name` names the element that set the tier.
 
-### The three windows that define the rungs
+### The three windows that define the tiers { #the-three-windows-that-define-the-rungs }
 
 None of them is a biological constant. Every row therefore reports the **measured**
 distance next to the tier, so a reader who disagrees with a threshold can re-judge the
@@ -89,13 +101,15 @@ being folded into a mobility call.
 
 ## Intrinsic versus acquired — the framing this exists to serve
 
-An AMR gene list tells you what an isolate can resist. It does not tell you whether that
-resistance can move. A chromosomal efflux pump that every member of the species carries,
-and a *bla*CTX-M on a conjugative plasmid, produce the same kind of line in an ABRicate
-table and mean very different things.
+An AMR gene list records genomic detection evidence. Phenotypic resistance and
+transfer potential require separate interpretation. Chromosomal location, species
+prevalence and mobile-element context answer related but distinct questions. A
+chromosomal efflux pump carried by every member of a species and a *bla*CTX-M gene
+on a conjugative plasmid give the same kind of line in an ABRicate table; only the
+second sits on an element that can transfer to another cell.
 
-That distinction is what the regulatory framing rests on, and the definitions are
-explicit:
+The regulatory framing rests on the distinction between intrinsic and acquired
+resistance, and the definitions are explicit:
 
 > **Intrinsic AMR gene** — "Gene inherent to strains of a bacterial species … An AMR
 > gene is considered 'intrinsic' when it is shared by the vast majority of wild type
@@ -137,22 +151,25 @@ The full argument, with sources, is in
 
 ### The one place a single genome speaks to the intrinsic side
 
-Point mutations. A substitution in *gyrA*, *rpoB* or *rpsL* is a change to a gene the
-strain already had — chromosomal and not transferable by definition. A BLAST screen
-cannot see it: query a susceptible genome for *gyrA* and you get ~99.9% identity, query a
-resistant one and you get ~99.9% identity, because the one residue that decides the
-phenotype is averaged away inside the percentage.
+AMRFinderPlus can assess curated substitutions in genes such as *gyrA*, *rpoB* or *rpsL*
+when an appropriate organism setting is available. A mutation call alone does not
+establish species-wide intrinsic resistance or absence of transfer. A gene-presence
+summary cannot distinguish the relevant substitutions: query a susceptible genome for
+*gyrA* and you get ~99.9% identity, query a resistant one and you get ~99.9% identity,
+because the one residue that decides the phenotype is averaged away inside the
+percentage.
 
 AMRFinderPlus with `--organism` asks the other question — not "is *gyrA* here" but "is
 residue 83 of GyrA a serine or a leucine" — and reports the hit with `Method: POINTX` or
 `POINTP`. That is why the module maps the GTDB-Tk call onto an AMRFinderPlus organism
 where it can, and why the mutations file is a separate deliverable
-([Turning it on](enabling.md)).
+([Enabling the module](enabling.md)).
 
-A `{sample}_amrfinderplus_mutations.tsv` with no mutation rows means **not assessed**,
-not "no mutations found": AMRFinderPlus curates point mutations for 30 mostly clinical
-organisms (in the AMRFinderPlus database that comes with the Bakta database), and the
-refusal, with its reason, is written to
+Without `--organism`, `{sample}_amrfinderplus_mutations.tsv` holds a single line
+stating that point-mutation screening was not available. That means **not
+assessed**, not "no mutations found": AMRFinderPlus curates point mutations for 30
+mostly clinical organisms (in the AMRFinderPlus database that comes with the Bakta
+database), and the reason no organism was passed is written to
 `{sample}_amrfinder_organism_audit.tsv`.
 
 ## Language discipline
@@ -165,7 +182,7 @@ no output of this module substitutes for one.
 ## How far to trust a tier
 
 Tiers 1, 2, 3 and 6 are the ones you will meet in practice, and they are the ones the
-benchmark exercises. Two rungs are rarer than their position in the table suggests.
+benchmark exercises. Two tiers are rarer than their position in the table suggests.
 
 **Tier 4 is structurally uncommon, not broken.** It needs three things at once: the
 opt-in [TnCentral naming layer](optional-layers.md) configured, a curated transposon or
@@ -195,12 +212,11 @@ put an AMR gene inside one.
 since been seen on draft assemblies too; the tier 5 IME route has not been exercised at
 all. Tier 4 counts need care either way: a curated element carrying a resistance cluster
 yields as many rows as it has genes, so a single run can report ten or fifteen tier 4
-rows that are all one transposon. Read the count as elements as much as genes.
-If either reaches something you are signing, check the evidence columns yourself rather
-than the tier alone — `named_element`, `mge_id`, `boundary_method` and
-`confidence` are all there for exactly this. The measured performance of the tiers that
-*are* benchmarked is on [Validation](validation.md), including the boundary caveat that
-applies to tier 1.
+rows that are all one transposon. Read the count as elements as much as genes. For
+reporting, assess the evidence columns alongside the tier — `named_element`, `mge_id`,
+`boundary_method` and `confidence` are all there for exactly this. The measured
+performance of the tiers that *are* benchmarked is on [Validation](validation.md),
+including the boundary caveat that applies to tier 1.
 
 One more thing to expect before reading a tier 4 count: the curated transposon catalogues
 are rich in mercury- and arsenic-resistance elements — the Tn*21* and Tn*5053* families —
@@ -211,6 +227,6 @@ is quite often a metal-resistance operon and not an antibiotic one, so read
 ## Next
 
 - [Reading the output](output.md) — the columns that carry the evidence behind a tier.
-- [Turning it on](enabling.md) — the switch, and what runs.
+- [Enabling the module](enabling.md) — the switch, and what runs.
 - [Worked example](worked-example.md) — every tier on one real genome.
 - [Draft assemblies](draft-assemblies.md) — what fragmentation does to a tier.

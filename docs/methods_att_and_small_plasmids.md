@@ -1,18 +1,14 @@
 # Method reference: att-site detection and small-plasmid recovery
 
-Two problems that look unrelated and are not. **Where does a mobile element stop?**
-and **why did a small plasmid vanish from the assembly?** Both come down to short
-repeated sequences.
-
-Every claim carries its source. Two are NEGATIVE results — questions the published
-literature does not answer — and they are flagged as such, because those are the ones
-to be careful with in a paper.
+This page explains two limitations relevant to interpreting mobile-element context:
+uncertain element boundaries and incomplete small-plasmid recovery. It describes the
+methods used in BacFlux, the supporting observations and the limits of those observations.
 
 !!! abstract "Terms used on this page"
 
     | | |
     |---|---|
-    | ***att* site** | the short repeated sequence left at each end of an element when it integrates into a genome. Finding the pair is how an element's true edges are established |
+    | ***att* site** | the short repeated sequence left at each end of an element when it integrates into a genome. A supported pair can help locate an element's boundaries |
     | **attL / attR** | the left and right copies of that repeat |
     | **ICE** | integrative and conjugative element — a mobile element that sits in the chromosome and can move itself to another cell |
     | **direct repeat** | two copies of a sequence in the same orientation |
@@ -32,15 +28,15 @@ failures on clinical *Klebsiella pneumoniae* hybrid data — isolates TUM24772
 
 ### The failure that prompted this
 
-BacFlux's att search took a **fixed 25 bp probe** from the 3′ end of a tRNA and
-looked for a second copy bracketing the candidate element. On two clinical
-ICE*Kp* elements it found nothing at 25 bp, but candidate pairs appeared at
-18 bp.
+BacFlux's att search took a **25 bp probe** from the 3′ end of a tRNA and looked for
+a second copy bracketing the candidate element, allowing one mismatch. On two clinical
+ICE*Kp* elements it found no pair.
 
-The reason is measured, not inferred: **the ICE*Kp* direct repeat is 17 bp**
-(`CCAGTCAGAGGAGCCAA`), reported by Lam *et al.* 2018.
-A 25 bp probe cannot match a 17 bp repeat under any mismatch budget. This was a
-structural defect, not a tuning problem.
+The reason is measured, not inferred: **the ICE*Kp* direct repeat has a 17 bp core**
+(`CCAGTCAGAGGAGCCAA`; Lam *et al.* 2018), of which only 16 bp lie inside the tRNA-Asn
+gene. A probe cut from the last 25 bp of the tRNA therefore extends 9 bp beyond the
+sequence the two copies share. With a variable-length search, the pair recovered on
+these isolates is a 23 bp exact repeat: the 17 bp core followed by `ATTTAA`.
 
 > Lam MMC *et al.* (2018) *Genetic diversity, mobilisation and spread of the
 > yersiniabactin-encoding mobile element ICEKp in Klebsiella pneumoniae
@@ -64,7 +60,7 @@ IslandViewer integrates Islander *specifically because* its own compositional
 predictors have poor boundary accuracy — so they offer no precedent for
 boundary calling.
 
-### Why a fixed length cannot work
+### Why repeat length is allowed to vary { #why-a-fixed-length-cannot-work }
 
 - Bacterial ICE direct repeats span roughly **10–60 bp**
   ([FEMS Microbiol Rev](https://academic.oup.com/femsre/article/41/4/512/3089980)),
@@ -73,30 +69,26 @@ boundary calling.
   sites (which ICE*Kp* is) sit at **20–45 bp** cores, **serine**-integrase
   elements go as low as **3–12 bp** ([DEPhT](https://pmc.ncbi.nlm.nih.gov/articles/PMC9303363/)).
 
-### Stepping the probe down: no precedent, and weaker anyway
+### Maximal repeats and local alignment { #stepping-the-probe-down-no-precedent-and-weaker-anyway }
 
-The obvious repair — try 25, then 24, 23 … and take the longest that works — has
-**no published precedent** in att-site or genomic-island detection. Nobody needs
-it: a maximal-repeat search (Vmatch) or a local alignment (BLAST) returns the
-longest repeat in a single pass. Exact k-mer stepping is also strictly *weaker*,
-because it cannot absorb the indels and mismatches an aligner handles automatically,
-and it yields no bitscore to weight confidence with.
+A maximal-repeat search avoids testing a sequence of fixed probe lengths: it
+returns matches that cannot be extended further. Local alignment is a different
+approach and can allow mismatches or gaps. An exact-repeat search, including
+BacFlux's, does not capture those imperfect matches. A BLAST bit score measures
+alignment support rather than the biological validity of an integration boundary.
 
-### Nobody has published a false-positive rate for boundary calling
+### Boundary-control measurements { #nobody-has-published-a-false-positive-rate-for-boundary-calling }
 
-There is **no published false-positive rate or statistical treatment specific to
-att-site detection**. Existing benchmarks measure genomic-island *calling*, not
-*boundary* calling. Islander's paper admits only "the few false positives", with
-no number.
-
-That gap is why the rate below can be stated as the best-characterised figure
-available: it is measured rather than borrowed. Measured on 300 randomly placed 15 kb non-ICE spans of a clinical
-*K. pneumoniae* chromosome, with the real IS mask applied: **22%** of them
-returned a confident de novo "boundary", falling to **16%** once the
+No published false-positive rate for *att*-site boundary calling was found when this
+method was developed (July 2026): benchmarks of genomic-island tools score island calls,
+not boundaries, and the Islander paper reports only "the few false positives", without a
+number. BacFlux therefore measured its own rate, on 300 randomly placed 15 kb non-ICE
+spans of a clinical *K. pneumoniae* chromosome, with the real IS mask applied: **22%**
+of them returned a confident de novo "boundary", falling to **16%** once the
 repeat-family guard was added, and to **~1%** reaching the AMR table once de novo
-repeats stopped being applied at all. Quote **16%** as the current de novo
-false-boundary rate — 22% is the *before* figure, and the two are easy to confuse
-because both appear in the code comments.
+repeats stopped being applied at all. Quote **16%** as the de novo false-boundary rate
+in this specific control experiment — 22% is the *before* figure, and the two are easy
+to confuse because both appear in the code comments.
 
 This is also why de novo repeats are **reported but not applied**: at a
 one-in-six error rate a de novo pair is a reasonable lead for a human to follow
@@ -168,66 +160,43 @@ How it works, and where each choice comes from:
   `tRNA` when the winning repeat has a copy in a tRNA, `denovo` when it does not,
   `none` when nothing survived.
 
-**No new dependency, and no external program**: the search is pure Python
-standard library.
+The implementation uses Python's standard library and requires no external repeat finder.
 
 ### Why not Vmatch
 
-Vmatch is available — `bioconda/vmatch 2.3.1` exists for linux-64 and osx-64, so
-packaging is not the obstacle; its licence is. The recipe declares
-`license: Unknown / OTHER` and vmatch.de was unreachable, so its terms cannot be
-verified (see
-[Licensing](about/licensing.md#what-this-repository-deliberately-does-not-contain)).
+Vmatch is packaged in Bioconda (2.3.1, linux-64 and osx-64). Its recipe declares
+`license: Unknown / OTHER`, and the upstream site could not be reached when this was
+checked in July 2026, so its terms could not be established. BacFlux therefore does
+not install it (see [Licensing](about/licensing.md)).
 
-There is now also a **measured** reason, which matters more than the licence one.
-Because the search above already computes vmatch's own semantics, a second
-implementation was built on vmatch's actual data structure — prefix-doubling
-suffix array, Kasai LCP array, cross-flank MEM enumeration — and run against ours
-on every real flank window in the benchmark.
+A separate check implemented the same intended exact-repeat search using a
+prefix-doubling suffix array, Kasai LCP array and cross-flank MEM enumeration. It
+replayed actual caller windows after IS masking, at the recorded coordinates and
+repeat-length floor. The check script is not distributed.
 
-The check script is not distributed. It does not generate windows of its own: it
-replays the actual caller (`conjscan_to_ice.py`) over the benchmark genomes with
-`find_maximal_repeats` wrapped in a recorder, so every window tested is one the
-pipeline genuinely searched — after IS masking, at the real element coordinates,
-at the real computed floor.
-
-**Result:** 52 benchmark genomes, 246 att
-searches, **180 distinct flank windows, 1,033 repeats, exact set equality on
-every window**. No window hit either implementation's internal cap. So the
-conclusion holds: **a vmatch-based search would find nothing that is not already
-found**, and leaving vmatch out costs no sensitivity.
-
-One related idea is disposed of by the same measurement: shipping both
-searches and treating their agreement as a confidence signal would be worthless.
-Two implementations of identical semantics are *expected* to agree exactly, so
-their agreement carries no information about whether a boundary is real. It tests
-the code, once, and that is all it is for.
+The two implementations returned identical sets on **52 benchmark genomes, 246 att
+searches, 180 distinct flank windows and 1,033 repeats**. Neither reached its internal
+cap. On those windows, a search with Vmatch's maximal-repeat semantics finds no repeat
+that BacFlux's search misses; the Vmatch executable itself was not run. Agreement
+between two implementations of one definition does not validate a biological
+boundary.
 
 ### Licensing note
 
-ICEfinder2 is **CC BY-NC-SA 4.0**. Its source was read only to establish the
-algorithm and its parameters: reading source to understand an algorithm is
-permitted, copying it is not (see
-[Licensing](about/licensing.md#what-this-repository-deliberately-does-not-contain)).
-**No code was copied.**
-
-What was taken from ICEfinder2 is **which algorithm to use and with what
-parameters**: maximal exact repeats between the flanks, with a 15 bp floor. Design
-decisions and thresholds like these are facts, not expression.
-The algorithm itself is not ICEfinder2's to license: maximal exact repeat search
-is standard published string processing (Vmatch, and REPuter before it), and
-`find_maximal_repeats` is an independent stdlib Python implementation written
-from that definition. Vmatch's own terms are a separate question and are the
-reason it is not installed — see above.
+ICEfinder2 is distributed under CC BY-NC-SA 4.0. Its source was read to establish which
+algorithm it uses and with which parameters — maximal exact repeats between the two
+flanks, with a 15 bp minimum — and no code was copied or adapted. Maximal exact repeat
+search is standard string processing (REPuter, Vmatch); `find_maximal_repeats` is an
+independent standard-library Python implementation written from that definition.
 
 ---
 
 ## Part 2 — Why small plasmids go missing, and what to do
 
-### It is not the assembler
+### Assembly method and small-plasmid recovery { #it-is-not-the-assembler }
 
-Flye is one of the **better** long-read assemblers for small plasmids, not an
-offender. Recovery of plasmids **<10 kb**
+Assembler choice can affect small-plasmid recovery. The cited comparison reported
+the following recovery of plasmids **<10 kb**
 ([Microbial Genomics 2023](https://pmc.ncbi.nlm.nih.gov/articles/PMC10272865/)):
 
 | assembler | <10 kb recovery |
@@ -244,7 +213,8 @@ Wick & Holt independently report NECAT "failed to assemble many plasmids",
 NextDenovo "performed poorly on plasmid assembly", and Raven "wasn't good with
 small plasmids"
 ([[Genome Biol]](https://pmc.ncbi.nlm.nih.gov/articles/PMC6966772/)).
-**Switching assemblers would mostly make this worse.**
+These results describe the tested versions and datasets; they do not establish
+that switching assemblers would improve or worsen a particular BacFlux run.
 
 > **Actionable side-finding:** `--nano-hq` is the *worst* of Flye's three modes
 > for small plasmids (67% vs 79% for `--nano-raw`), and BacFlux auto-selects the
@@ -258,7 +228,8 @@ small plasmids"
 ligation read sets by a mean factor of **~4**, and up to **>100-fold** for the
 smallest (one 2.4 kb plasmid). Unfragmented circular plasmids never receive a
 blunt-end adapter. **Rapid (transposase) prep shows no such bias.**
-This is unfixable *in silico*.
+A workflow cannot reconstruct a replicon reliably when the sequencing data do not
+contain enough supporting sequence.
 ([Microbial Genomics](https://pmc.ncbi.nlm.nih.gov/articles/PMC8549360/))
 
 **2. Our own read QC.** BacFlux hard-coded `--keep_percent 90 --length_weight 10`;
@@ -268,9 +239,10 @@ filtlong's own default for the second is 1. Filtlong scores reads as
 (Length^lw × MeanQ^mqw)^(1/(lw+mqw)) × WindowQ
 ```
 
-and `--keep_percent` deletes the bottom of that ranking. **A plasmid cannot
-produce reads longer than itself**, so its reads sit at the bottom by
-construction, and the more length dominates the score the further down they sit.
+and `--keep_percent` deletes the bottom of that ranking. Reads from small plasmids are
+often short and can be disadvantaged when length dominates the score. Concatemers can
+produce reads longer than one plasmid copy, so plasmid length is not an absolute upper
+bound on read length.
 
 Wick's Feb 2026 read-QC benchmark (5 genomes, 11 assemblers) found the same
 failure and is worth reading carefully, because it does **not** say what we first
@@ -324,8 +296,8 @@ read-length distribution. Reads per band, same sample — the raw ONT set holds
 `length_weight 10` empties the 1–3 kb band at **both** `keep_percent` values.
 Raising `keep_percent` rescues the 3–6 kb band, which is why it rescued this
 5.6 kb plasmid, but only lowering `length_weight` rescues 1–3 kb. So
-**`keep_percent` protects plasmids of a few kb; `length_weight` protects plasmids
-under ~3 kb**, and this one happened to sit in `keep_percent`'s range.
+the two settings affected different read-length bands in this sample. These
+measurements do not define universal plasmid-size ranges protected by either setting.
 
 Total bases barely moved across the arms (208 → 227 Mb), so none of this was ever
 about depth — only about *which* reads survived. At the old 90/10, 3.1% of kept
@@ -336,72 +308,72 @@ reads were ≤6 kb, against 47.0% of the raw set.
 `length_weight` reaches filtlong in **hybrid mode only** — the `nanopore` rule
 never passes `--length_weight`, so in two of the four modes the key does nothing.
 
-### The doubled-circle artifact
+### Tandem plasmid copies { #the-doubled-circle-artifact }
 
 Our 23,928 bp contig is the 11,970 bp Col plasmid **duplicated within one
 contig** (2 × 11,970 = 23,940). This is documented: start/end overlap in small
 plasmids produces ~200% contiguity, and the Plassembler paper names Flye
 specifically as having "multiplicated many small plasmids" on real data.
 
-**dnaapler does not fix this.** dnaapler only *rotates* contigs, which cures a
-few duplicated bases at a circular junction, not a whole-plasmid concatemer.
-`autocycler trim` does handle it, but cannot distinguish artifact from genuine
-duplication and expects to run inside the Autocycler pipeline.
+**dnaapler does not fix this.** dnaapler reorients a contig; rotation alone does not
+remove duplicated sequence or resolve a whole-plasmid concatemer. `autocycler trim` does
+handle it, but cannot distinguish artifact from genuine duplication and expects to run
+inside the Autocycler pipeline.
 
-### The options, and why only one of them ships
+### Options considered during development { #the-options-and-why-only-one-of-them-ships }
 
 | option | what it would require | verdict |
 |---|---|---|
 | **`keep_percent` 90 → 95** (and `length_weight` 10 → 1) | nothing — a config change | **This is what BacFlux ships.** Recovers 502 of the plasmid's 603 reads — but *not* the assembled plasmid |
-| **SPAdes rescue** | no new tool or database | Published recommendation, not a hack: small plasmids "usually appear as circular contigs" in a short-read graph ([Wick/Judd/Holt](https://pmc.ncbi.nlm.nih.gov/articles/PMC9980784/)). We already write `assembly_graph_with_scaffolds.gfa` |
+| **SPAdes rescue** | no new tool or database | Published approach: small plasmids "usually appear as circular contigs" in a short-read graph ([Wick/Judd/Holt](https://pmc.ncbi.nlm.nih.gov/articles/PMC9980784/)). We already write `assembly_graph_with_scaffolds.gfa` |
 | **Plassembler** | a new tool, and the PLSDB database | **MIT, bioconda 1.8.3**, purpose-built. Pools reads that do *not* map to the Flye contigs and hybrid-assembles them with Unicycler — exactly where a Flye-absent plasmid lands. Can **reuse our existing Flye assembly** (`--flye_directory`), and writes empty outputs when it finds nothing, so the DAG never breaks. Cost: PLSDB is mandatory (`-d`, no skip flag) and states **no licence at all** — handle exactly as TnCentral/ICEberg: opt-in, and never redistributed (see [Licensing](about/licensing.md#components-you-switch-on-yourself)) |
-| **Hybracter** | replacing the whole assembly stage | MIT, bioconda, wraps Plassembler — but replaces the *entire* assembly stage and nests Snakemake inside Snakemake, with two schedulers competing for cores |
-| **Autocycler** | replacing the whole assembly stage | **Would probably not have helped.** Aimed at chromosome consensus accuracy; its own paper reports the smallest plasmid tested (2.5 kb) was occasionally missed and needed manual curation. Its clustering discards any cluster seen in too few input assemblies — precisely the small-plasmid case. Its own docs say: *if small plasmids matter, add Plassembler* |
-| **Trycycler** | manual curation per genome | Unusable unattended; superseded by Autocycler |
-| **Union of multiple long-read assemblers** | running several assemblers per sample | Would probably not have helped — the failure is shared across assemblers and driven by the read set |
+| **Hybracter** | replacing the whole assembly stage | MIT, bioconda, wraps Plassembler — but replaces the *entire* assembly stage and nests Snakemake inside Snakemake, with resource coordination needed between the nested workflows |
+| **Autocycler** | replacing the whole assembly stage | Not evaluated as a rescue method in this experiment. Aimed at chromosome consensus accuracy; its own paper reports the smallest plasmid tested (2.5 kb) was occasionally missed and needed manual curation. Its clustering discards any cluster seen in too few input assemblies — precisely the small-plasmid case. Its own docs say: *if small plasmids matter, add Plassembler* |
+| **Trycycler** | manual curation per genome | Requires manual curation per genome; not part of BacFlux |
+| **Union of multiple long-read assemblers** | running several assemblers per sample | Not tested in this experiment; all assemblers remain limited by the available read set |
 
-### Why newer assemblers are not in the table
+### Scope of the assembler comparison { #why-newer-assemblers-are-not-in-the-table }
 
 Switching assembler is the obvious alternative to the options above, and it cannot
 be judged on evidence. The newer long-read assemblers — Myloasm, metaMDBG, LJA,
-hifiasm — have been benchmarked for accuracy through 2025 and 2026, but no
-head-to-head study reports **small-plasmid recovery** per assembler. That is the
+hifiasm — have been benchmarked for accuracy through 2025 and 2026, but no head-to-head
+measurement of **small-plasmid recovery** for these assemblers was found (literature
+checked in July 2026). That is the
 number this section turns on, so there is nothing to compare against and none of
 them can be recommended or ruled out here.
 
 ---
 
-## Part 3 — The compounding trap in our own pipeline
+## Part 3 — Decontamination and optional short-read guidance { #part-3-the-compounding-trap-in-our-own-pipeline }
 
-Independent of everything above, BacFlux has a second route to losing a plasmid,
-**upstream of the assembler**:
+When `parameters.hybrid.short_read_guidance: true`, decontamination can also affect
+which long reads reach Flye. Illumina reads selected by mapping to the retained draft
+contigs become the Filtlong reference. Long reads from a discarded contig can then
+lose support and be trimmed, split or removed.
 
-```
-decontamination selects contigs by genus
-        ↓
-only reads mapping to SELECTED contigs become SEL_R1/SEL_R2
-        ↓
-filtlong uses SEL_R1/SEL_R2 as its short-read reference
-        ↓
-ONT reads for unselected sequence score as low quality and are discarded
-        ↓
-Flye never sees the plasmid
-```
+This route is conditional: guidance is disabled by default. With guidance off, the
+selected Illumina reads still affect Polypolish, but they do not guide Filtlong.
+The final hybrid decontamination screen is advisory and does not remove sequence.
 
-This happens when a plasmid's best BLAST hit is a **different genus from the
-host** — which is not unusual, since plasmids cross genus boundaries constantly.
-On *K. pneumoniae* **ATCC BAA-2146**, `auto` mode dropped a genuine plasmid —
-pMYS, `NZ_CP006660.1`, 2,014 bp — because *E. coli* database entries outnumbered
-*Klebsiella* ones 58,709 to 16,253: BLAST bestsum follows database composition,
-not biology.
+A plasmid contig is removed when the genus with the highest summed BLAST bit score for
+it differs from the host's, which is not unusual because plasmids cross genus
+boundaries. In a `contigs`-mode run of *K. pneumoniae* **ATCC BAA-2146** with
+`mode: auto`, the 2,014 bp plasmid pMYS (`NZ_CP006660.1`) was assigned to
+*Escherichia* (summed bit score 58,709) rather than *Klebsiella* (16,253), and was
+removed, because `auto` keeps only the sample's majority genus. Each of up to 50
+database sequences hit adds its bit scores to its genus, so the sums reflect how well
+each genus is represented in `nt` as well as sequence similarity. In `contigs` mode
+the contig is removed directly; the guidance route above applies only to `hybrid`.
 
 **It did not cause the TUM24772 loss** — that plasmid survived decontamination
 (verified: present in `contigs_filt.fasta`), and was lost at the read-filtering
 step instead, to `keep_percent 90` and `length_weight 10` acting together. Both
 mechanisms must be ruled out separately.
 
-**How to check, then fix:** see the annotated `decontamination:` block in
-`config/config.yaml`. In short: read
-`contig_taxonomy_decisions.tsv` for a discarded plasmid-sized contig whose genus
-differs from the sample's; then re-run with `mode: include` naming both genera,
-or `mode: off`, or `discard_no_hit: false`. Snakemake redoes only what changed.
+**How to investigate:** inspect `contig_taxonomy_decisions.tsv` and the underlying
+taxonomic hits for any discarded plasmid-sized contig. If it belongs to the isolate,
+re-run with `mode: include` naming both genera, or `mode: off`, for that sample
+(`sample_overrides` allows a per-sample mode). `discard_no_hit: false` rescues only
+contigs with no BLAST hit, under `exclude` or `off`, so it would not have kept pMYS.
+
+Inspect a dry run to confirm which outputs will be rebuilt.

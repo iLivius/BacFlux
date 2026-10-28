@@ -1,13 +1,13 @@
 # Prophages
 
-Stage `07.phages` looks for viral sequence in the finished genome — free phage contigs and
-prophages integrated in the chromosome — and then grades what it found. It runs in all four
-modes, and both callers read the same `contigs_final.fasta`, so nothing here branches on the
-sequencing technology.
+Stage `07.phages` predicts viral sequences, including phage contigs and integrated
+prophages, in `contigs_final.fasta`. CheckV then estimates the quality of the
+predicted sequences. The stage is available in all modes; assembly quality still
+affects detection and boundary resolution.
 
-Two callers are wired in and exactly one of them runs, chosen by a single config key.
-[CheckV](https://bitbucket.org/berkeleylab/checkv/src/master/) v1.0.3 runs either way,
-because neither caller reports completeness or host contamination.
+Select one of the two supported callers with `phage.caller`.
+[CheckV](https://bitbucket.org/berkeleylab/checkv/src/master/) v1.1.1 runs either way,
+to provide a shared assessment of completeness and host contamination.
 
 ```yaml
 phage:
@@ -15,6 +15,14 @@ phage:
 ```
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+---
 flowchart TD
     F([contigs_final.fasta])
 
@@ -129,7 +137,7 @@ and `--cleanup` to delete the intermediates.
 | **Out** | `07.phages/genomad/{sample}/contigs_final_summary/` — `contigs_final_virus.fna` and `contigs_final_plasmid_summary.tsv` |
 | **Next** | CheckV (virus FASTA) and the plasmid concordance in stage 06 (plasmid summary) |
 
-!!! warning "Get the database yourself if you opt in"
+!!! note "Database source when using geNomad"
 
     `genomad download-database` is hard-coded to `portal.nersc.gov` — the same host whose
     outages forced the CheckV database onto a Zenodo mirror — and it has no `--url` option, so
@@ -176,12 +184,14 @@ and the rule itself never knows which one it got.
 own warnings. Under VirSorter2, treat a low-completeness, high-host-gene row as what the loose
 0.5 cutoff was expected to produce — the caller is deliberately sensitive.
 
-!!! note "A genome with no phage does not fail"
+!!! note "No predicted viral sequences"
 
     `checkv end_to_end` errors on an empty input, and a virus-free genome is a perfectly normal
     result. So the rule tests the caller's FASTA first: if it holds no sequences, it writes a
-    header-only `quality_summary.tsv` and skips CheckV. An empty table means "nothing was
-    called", not "something went wrong" — the log says which.
+    header-only `quality_summary.tsv` and skips CheckV. A header-only table therefore
+    means either that the caller returned no viral sequences, or that CheckV exited
+    with an error and the run continued; `logs/viral_quality_{sample}.log` says which.
+    Neither shows that the genome carries no prophage.
 
 The shipped default is `checkv-db-v1.5`, fetched from an unmodified Zenodo mirror
 (`links.checkv_link`) with its `.sha256` checked, or from CheckV's own downloader when that

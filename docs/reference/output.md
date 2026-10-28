@@ -1,20 +1,22 @@
 # Output files
 
-Everything a run writes goes under `directories.output_dir`. BacFlux resolves that
-to an absolute path before any job starts, so a relative value in the config still
-lands where you expect, and the workflow never changes its working directory.
+Everything a run writes goes under `directories.output_dir`. BacFlux resolves it to an
+absolute path before any job starts: a relative value is read against the directory
+Snakemake was launched from, not the configuration file, and the workflow never changes
+its working directory.
 
-Inside it the directories are numbered in the order the stages run, so a plain `ls`
-reads like the workflow itself. **The numbering is identical in all four modes.**
-Everything technology-specific is grouped under `01.reads` and `02.assembly`, and
-every shared stage below that gets the same number whichever front end produced the
-genome. A stage a mode cannot produce is simply absent — it is never renumbered.
+Inside it the numbered directories group the analysis stages. The numbers are an
+organisation scheme rather than an execution trace; independent jobs can overlap. **The
+numbering is identical in all four modes.** Everything technology-specific is grouped
+under `01.reads` and `02.assembly`, and every shared stage below that gets the same
+number whichever front end produced the genome. A stage a mode cannot produce is simply
+absent — it is never renumbered.
 
 !!! note "The stage numbers changed in 2.0.0"
 
     They differed per workflow before the four front ends were merged. The old-to-new
     map is on [Coming from v1](../getting-started/from-v1.md); this page describes only
-    what a 2.0.0 run writes.
+    the current output layout.
 
 !!! abstract "Terms used on this page"
 
@@ -24,7 +26,7 @@ genome. A stage a mode cannot produce is simply absent — it is never renumbere
     | **AMR** | antimicrobial resistance |
     | **GTDB** | Genome Taxonomy Database, the reference GTDB-Tk places each genome in |
     | **ANI** | average nucleotide identity, a genome-to-genome similarity measure |
-    | **EFSA** | European Food Safety Authority, whose reporting thresholds the ABRicate leg applies |
+    | **EFSA** | European Food Safety Authority, whose reporting thresholds the ABRicate analysis applies |
     | **ICE** | integrative and conjugative element — sits in the chromosome and can move itself to another cell |
     | **IME** | integrative mobilisable element — the same, but needs a helper element to move |
     | **COG, GO, KEGG, EC** | the ortholog, gene-ontology, pathway and enzyme classifications eggNOG assigns to a protein |
@@ -37,14 +39,14 @@ A full run leaves several thousand files. These are the ones that carry the resu
 
 | File | Answers | Modes |
 |---|---|---|
-| `02.assembly/{sample}/contigs_final.fasta` | The delivered genome. Every later stage works from this one file. | all |
+| `02.assembly/{sample}/contigs_final.fasta` | The final assembly used by shared stages, alongside their required reads and metadata. | all |
 | `02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv` | Which contigs were kept, which were dropped, and the reason for each. | all |
 | `02.assembly/{sample}/eval/checkm/{sample}_checkm_stats.tsv` | Completeness and contamination of that genome. | all |
-| `03.taxonomy/{sample}/classify/gtdbtk.*.summary.tsv` | What the isolate is. | all |
+| `03.taxonomy/{sample}/classify/gtdbtk.*.summary.tsv` | GTDB-Tk classification, reference matches and warnings. | all |
 | `04.annotation/bakta/{sample}/{sample}.tsv` | The gene calls, with products. | all |
 | `05.amr/abricate/{sample}/AMR_summary.txt` | AMR and virulence hits on the assembly, across eight databases. | all |
 | `05.amr/mapping/{sample}/{sample}_CARD_report.tsv` | AMR determinants found in the *reads*, classified by what kind of CARD entry each is. | `[illumina, hybrid]` |
-| `06.plasmids/{sample}/platon/verified_plasmids.txt` | Which contigs are plasmids. | all |
+| `06.plasmids/{sample}/platon/verified_plasmids.txt` | Contigs predicted as plasmids, with supplementary BLAST annotations. | all |
 | `07.phages/checkv/{sample}/quality_summary.tsv` | Predicted prophages and how complete each one is. | all |
 | `08.mobilome/{sample}/{sample}_amr_mobility.tsv` | For each AMR gene: the mobile-element context and a mobility tier. | all, opt-in |
 | `09.report/multiqc_report.html` | Read QC, assembly QC, completeness and taxonomy for the whole batch on one page. | all |
@@ -115,7 +117,7 @@ Absent entirely in `contigs` mode, which has no reads to QC.
 |---|---|---|
 | `{sample}/illumina/{sample}_fastp.html` | `trim_adapters` | fastp's adapter- and quality-trimming report, for a human. |
 | `{sample}/illumina/{sample}_fastp.json` | `trim_adapters` | The same numbers for MultiQC. |
-| `{sample}/illumina/{sample}_sel_R{1,2}.fastq` | `map_sel_contigs` | `[hybrid]` The Illumina pairs that mapped as proper pairs to the decontaminated Illumina assembly. Two rules read them: Filtlong scores the Oxford Nanopore reads against these pairs, so a contig dropped by the contamination screen takes its long reads with it; Polypolish then uses them to correct the final genome. Kept, not temporary — deleting them would force the whole short-read half to re-run. |
+| `{sample}/illumina/{sample}_sel_R{1,2}.fastq` | `map_sel_contigs` | `[hybrid]` The Illumina pairs that mapped as proper pairs to the decontaminated Illumina assembly. Polypolish uses these reads for correction. Filtlong also uses them when `parameters.hybrid.short_read_guidance: true`; that guidance is disabled by default. Kept, not temporary — deleting them would force the whole short-read half to re-run. |
 | `{sample}/ont/{sample}_filt.fastq` | `filter_long_reads` | The Oxford Nanopore reads Filtlong kept — what Flye assembled and what Medaka polished with. |
 | `{sample}/ont/raw_qc/`, `{sample}/ont/filt_qc/` | `raw_long_read_qc`, `filtered_long_read_qc` | NanoPlot read-length and quality profiles, before and after filtering: `{sample}_NanoPlot-report.html`, one interactive HTML file per plot, and `{sample}_NanoStats.txt`. Read side by side: the difference is what the filter did. The plots are HTML only, with no PNG copies, because NanoPlot needs a Chrome browser on the machine to draw static images. |
 
@@ -149,9 +151,10 @@ What it is differs by mode:
 | `nanopore` | the Medaka consensus of the decontaminated, reoriented Flye assembly | `contaminants/assembly_decontam.fasta` |
 | `hybrid` | the Oxford Nanopore assembly after Medaka and Polypolish | `contaminants/contigs_sel.fasta`, the decontaminated Illumina assembly, kept as the QC comparator and as Snippy's reference |
 
-Set `parameters.{nanopore,hybrid}.medaka_model: false` and the consensus step drops
-out of the last two rows: `nanopore` then delivers the decontaminated reoriented
-assembly as it stands, `hybrid` delivers that assembly after Polypolish alone.
+Set `parameters.{nanopore,hybrid}.medaka_model: false` and the consensus step drops out
+of the last two rows: `nanopore` then delivers the decontaminated reoriented assembly as
+it stands, `hybrid` delivers the reoriented Flye assembly after Polypolish alone; its
+final decontamination screen remains advisory.
 
 In `contigs` mode, what `contigs_filt.fasta` holds depends on the headers you fed in.
 The length and coverage filter reads both numbers out of the header itself, so it can
@@ -161,7 +164,7 @@ filtered and the headers are trimmed to their first token instead. Which branch 
 is the first line of `logs/filter_contigs_{sample}.log`.
 
 In `hybrid` the contamination screen runs on the Illumina draft while the delivered
-genome comes from the Oxford Nanopore leg, so those two FASTAs have entirely different
+genome comes from the Oxford Nanopore analysis, so those two FASTAs have entirely different
 contig names. That is not a bug and it is why the plasmid step gets its own BLAST
 table (below).
 
@@ -245,21 +248,22 @@ eggNOG is the slow tail of a BacFlux run. See [Annotation](../analysis/annotatio
 
 ## `05.amr`
 
-Two legs run independently, and they are meant to disagree at the edges: one sees the
-assembly, the other sees the reads.
+The assembly-based ABRicate screen runs in every mode. Illumina and hybrid modes
+also map reads against CARD. These analyses use different inputs and detection
+criteria, so disagreement should be investigated rather than treated as an error.
 
 ### `abricate/{sample}/`
 
 One TSV per database — `argannot`, `card`, `ecoh`, `ecoli_vf`, `megares`, `ncbi`,
 `resfinder`, `vfdb` — plus `AMR_summary.txt`, which collates a sample's eight tables.
-This leg carries the EFSA thresholds: a hit needs ≥80% identity and ≥70% gene-length
+This analysis carries the EFSA thresholds: a hit needs ≥80% identity and ≥70% gene-length
 coverage.
 
 ### `mapping/{sample}/` — `[illumina, hybrid]`
 
-Trimmed reads mapped onto CARD's protein homolog model. Reads are immune to assembly
-collapse, so this leg can see determinants that sit on a contig the assembler
-destroyed.
+Trimmed reads mapped onto CARD's protein homolog model. Read mapping can detect sequence
+not recovered in the assembly, but coverage, related references and ambiguous mapping
+affect the result.
 
 | File | Contents |
 |---|---|
@@ -267,7 +271,7 @@ destroyed.
 | `{sample}_covstats.tsv` | BBMap's raw coverage table, sorted by descending covered percent. The evidence behind the report. |
 | `{sample}_AMR_legend.tsv` | Every feature covered ≥70%, with its row from CARD's `aro_index.tsv`. |
 
-!!! warning "What this leg is actually screened at"
+!!! warning "What this analysis is actually screened at"
 
     BBMap is passed `minid=0.76`, its own default (`CARD_MIN_IDENTITY` in
     `workflow/rules/shared/00_common.smk`). Read this as a **sensitive screen**: its
@@ -314,7 +318,7 @@ See [Prophages](../analysis/phages.md).
 
 Written only when `mobilome.run: true`. That adds ten rules on the default path; the
 module's other twelve belong to four optional layers, each of which stays off until
-you configure a source for it. See [Turning it on](../mobilome/enabling.md).
+you configure a source for it. See [Enabling the module](../mobilome/enabling.md).
 
 Databases and model sets sit at the top of the stage, fetched once and shared by every
 sample: `conjscan_models/`, and — each only when its layer is configured —
@@ -326,8 +330,8 @@ Per sample, `08.mobilome/{sample}/` holds:
 |---|---|
 | `{sample}_amr_mobility.tsv` | **The deliverable.** One row per AMR gene: its mobile-element context, the element's identity where one is known, the contig-edge flags, a mobility tier from 1 to 6 and a confidence. |
 | `{sample}_amr_mobility_audit.tsv` | Why every gene that got no context got none. |
-| `{sample}_is_summary.tsv` | The honesty metric: how many insertion-sequence calls sit within `mobilome.contig_boundary_bp` of a contig end, and what fraction of the total that is. **Read this before the table above.** |
-| `{sample}_is_elements.tsv`, `{sample}_is_discarded.tsv` | One tidy row per insertion sequence, and the dropped rows with a reason — among them `overlaps_dnaA`, a call lying over the essential gene *dnaA*, and `overlaps_helicase_loader`, a partial IS21 lying over the chromosome's own helicase loader (*dnaC* or *dnaI* with its chromosomal partner beside it and no IS21 transposase near it). ISEScan reports both, but neither can be a real insertion. |
+| `{sample}_is_summary.tsv` | The contig-boundary summary: how many insertion-sequence calls sit within `mobilome.contig_boundary_bp` of a contig end, and what fraction of the total that is. **Read this before the table above.** |
+| `{sample}_is_elements.tsv`, `{sample}_is_discarded.tsv` | One row per insertion-sequence prediction, and the dropped rows with a reason — among them `overlaps_dnaA`, a call lying over the essential gene *dnaA*, and `overlaps_helicase_loader`, a partial IS21 lying over the chromosome's own helicase loader (*dnaC* or *dnaI* with its chromosomal partner beside it and no IS21 transposase near it). ISEScan reports both because its IS21 profiles also match DnaA and the loader, ATPases of the same family as the IS21 helper protein IstB. Neither call is an insertion: both genes are essential. |
 | `{sample}_ice_candidates.tsv`, `{sample}_ice_discarded.tsv` | ICE/IME candidates with their anchors, boundaries and class; and the discard trail. |
 | `{sample}_amrfinderplus.tsv`, `_amrfinderplus_mutations.tsv` | The AMR calls with coordinates and a method column; point mutations separately. |
 | `{sample}_amrfinder_organism.txt`, `_amrfinder_organism_audit.tsv` | Which AMRFinderPlus `--organism` the GTDB-Tk placement mapped to, or none, and why. |
@@ -336,19 +340,18 @@ Per sample, `08.mobilome/{sample}/` holds:
 | `isescan/`, `conjscan/` | The tools' own output trees, kept as raw evidence. `icescan/` joins them when that optional second model set is switched on. |
 | `{sample}_named_elements.tsv`, `{sample}_named_elements_discarded.tsv`, `{sample}_tncentral_blast.tsv` | *Optional.* Curated transposons and integrons — the layer that makes tier 4 reachable. |
 | `{sample}_ice_candidates_named.tsv`, `{sample}_ice_naming.tsv`, `{sample}_iceberg_blast.tsv` | *Optional.* Curated names put on the ICE/IME candidates. Labels only: this layer cannot change any gene's tier. |
-| `{sample}_is_copy_number.tsv`, `{sample}_is_copy_number_audit.tsv`, `{sample}_isosdb_covstats.tsv`, `{sample}_assembly_covstats.tsv` | *Optional, `[illumina, hybrid]`.* How many insertion-sequence copies the assembler collapsed, from read depth rather than from the assembly. |
+| `{sample}_is_copy_number.tsv`, `{sample}_is_copy_number_audit.tsv`, `{sample}_isosdb_covstats.tsv`, `{sample}_assembly_covstats.tsv` | *Optional, `[illumina, hybrid]`.* IS copy numbers estimated from read depth and compared with the located calls; the difference estimates the copies the assembly collapsed rather than counting them. |
 
 !!! warning "`conjscan_output_missing` means the search did not run"
 
-    A genome with no ICE or IME calls has usually been searched and found to carry no
-    conjugation machinery, which is the normal result for an environmental isolate. But
-    if the machinery search itself fails, the module records that and reports no
-    calls — so the two look identical in the results table.
+    An ICE/IME search that ran and found no conjugation machinery above the reporting
+    thresholds, and a search that did not run, both leave the results table without
+    calls.
 
     They are distinguished in `{sample}_ice_discarded.tsv`. If it carries the reason
-    `conjscan_output_missing`, nothing searched that genome: read the absence of ICE and
-    IME calls as **unknown**, not as absence. This is the same distinction the mobility
-    ladder makes between `not_assessable` and tier 1.
+    `conjscan_output_missing`, the expected search output was unavailable: read the
+    absence of ICE and IME calls as **unknown**, not as absence. This is the same
+    distinction the mobility ladder makes between `not_assessable` and tier 1.
 
 
 Every column of the mobility table, with real rows, is on
@@ -388,7 +391,8 @@ rule fails, and the only place some warnings go: the decontamination selector's
 written there rather than to the console.
 
 There is no `benchmarks/` directory: no rule declares Snakemake's `benchmark:`
-directive, so no runtime or memory record is written anywhere.
+directive, so the workflow does not produce per-rule benchmark files. Tool logs or scheduler
+records may still contain timing or memory information.
 
 ---
 
@@ -400,22 +404,23 @@ not a failure.
 
 | Gone by the end | Why it existed |
 |---|---|
-| `01.reads/{sample}/illumina/{sample}.{1,2}.fastq` and `{sample}_trim_R{1,2}.fastq` | The PhiX-free pairs and then the fastp-trimmed pairs. The trimmed ones survive until the last rule that reads them is done: the assembler, the coverage alignment, the CARD leg, and in `hybrid` the mapping that picks the Illumina pairs to keep. |
+| `01.reads/{sample}/illumina/{sample}.{1,2}.fastq` and `{sample}_trim_R{1,2}.fastq` | The PhiX-free pairs and then the fastp-trimmed pairs. The trimmed ones survive until the last rule that reads them is done: the assembler, the coverage alignment, the CARD analysis, and in `hybrid` the mapping that picks the Illumina pairs to keep. |
 | `02.assembly/{sample}/contaminants/{sample}_map.bam`, the BlobTools JSON and coverage file | Intermediates of the screen; the BlobTools *table* is kept. |
 | `02.assembly/{sample}/eval/genomes/` | Staging copies of the assemblies under their bin ids, for QUAST, CheckM and GTDB-Tk. |
 | `02.assembly/{sample}/polypolish/` contents | Alignments and the pre-correction draft. |
 | `04.annotation/eggnog/{sample}_tmp/` | emapper's scratch space. |
 | `05.amr/card.tar.bz2`, on the download path | The downloaded CARD archive, removed once it is unpacked into `05.amr/card_db/`, which is kept. |
-| `08.mobilome/{sample}/assembly_depth_ref/`, `isosdb_ref/` | BBMap indexes for the copy-number leg. |
+| `08.mobilome/{sample}/assembly_depth_ref/`, `isosdb_ref/` | BBMap indexes for the copy-number analysis. |
 | `09.report/multiqc_inputs/` | Relabelled CheckM and GTDB-Tk copies staged for MultiQC. |
 
 Nearly every tool directory on this page is a declared Snakemake **directory** output:
 the per-sample trees written by Bakta, eggNOG, antiSMASH, dbCAN, QUAST, CheckM,
 Qualimap, GTDB-Tk, Platon, the phage caller, CheckV, ISEScan and CONJscan, and every
 database directory the workflow fetches. Snakemake deletes a directory output before
-re-running the rule that makes it, so anything you put inside one will not survive
-that rule re-running. Keep your own files beside them, not in them. `09.report/` is
-the deliberate exception, which is why it is safe to drop things there.
+re-running the rule that makes it, so anything you put inside one will not survive that
+rule re-running. Keep your own files beside them, not in them. `09.report/` is the
+deliberate exception, although keeping your own analysis files outside generated outputs
+is easier to manage.
 
 ---
 

@@ -1,18 +1,26 @@
 # Pre-assembled contigs mode
 
-`mode: contigs` — the input is a genome somebody already assembled. There is no read
-QC and no assembler, so the whole front end is **one rule**, whose job is to hand the
-contamination screen a FASTA it can work with.
+Use `mode: contigs` for an existing bacterial assembly. BacFlux normalises or
+filters the input FASTA, screens its contigs, and runs the applicable shared
+analyses. It does not perform read QC or assembly.
 
 Use it for a genome from a collaborator, from a database, or from an earlier assembly.
-Every analysis stage still runs; the mode cannot re-examine evidence that only
-exists in reads.
+The mode supports shared genome analyses, with read-dependent steps omitted. It
+cannot re-examine evidence that exists only in the reads.
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+---
 flowchart LR
-    IN([sample.fasta<br/>a genome somebody already assembled])
-    FC[filter_contigs<br/>the whole front end, one rule]
-    SC[contamination screen<br/>BLAST, BlobTools, genus selector]
+    IN([sample.fasta<br/>an existing assembly])
+    FC[filter_contigs<br/>the whole front end]
+    SC[contamination screen<br/>BLAST, BlobTools,<br/>genus selector]
     OUT([contigs_final.fasta])
     IN --> FC --> SC --> OUT
 ```
@@ -56,16 +64,16 @@ The rule logs which branch it took, in the first line of
     filtering. The normalisation matters — Bakta, Platon, geNomad and the BLAST screen
     all join on that first token.
 
-## Decontamination does most of the work, with one hand tied
+## Decontamination without read-depth evidence { #decontamination-does-most-of-the-work-with-one-hand-tied }
 
 As in `illumina` mode, the screen's output is `contigs_final.fasta`. But BlobTools
 combines two signals — BLAST taxonomy and read coverage — and this mode has no reads.
 The contigs are mapped against themselves with minimap2 purely so BlobTools has a BAM
 to read, which gives a near-uniform depth that carries no information.
 
-So only the BLAST taxonomy leg is doing real work here. Every keep-or-drop decision
-still lands in `contaminants/contig_taxonomy_decisions.tsv` with its reason, and reading
-that file matters more in this mode than in any other. See
+Contig selection uses the BLAST-based genus assignment, as in the other modes.
+There is no independent read-depth evidence to support inspection. Each decision
+and its reason are recorded in `contaminants/contig_taxonomy_decisions.tsv`. See
 [Decontamination](../analysis/decontamination.md).
 
 ## What is absent, and why
@@ -76,7 +84,7 @@ that file matters more in this mode than in any other. See
 | `05.amr/mapping/` — the CARD read screen | it maps reads. ABRicate on the contigs still runs |
 | Qualimap | the only alignment is the contigs against themselves; a report on it would say nothing |
 | Circular-replicon information for Bakta | that comes from Flye's topology calls. Every sequence is annotated as linear |
-| IS copy number in the mobilome module | it is a read-mapping leg |
+| IS copy number in the mobilome module | it is a read-mapping analysis |
 
 Everything else — taxonomy, annotation, AMR and virulence screening, plasmids,
 prophages, the optional mobilome module and the report — runs exactly as in the other

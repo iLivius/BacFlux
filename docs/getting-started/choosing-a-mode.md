@@ -1,11 +1,9 @@
 # Choosing a mode
 
-BacFlux is one workflow with four front ends. The `mode` key picks the front end;
-everything downstream of the assembly is the same code in all four. That is what
-makes two isolates comparable when one was sequenced on Illumina and the other on
-Oxford Nanopore Technologies (ONT from here on).
-
-The choice follows from what is on disk, not from preference.
+Select `mode` according to the available input: Illumina paired-end reads,
+Oxford Nanopore Technologies (ONT) reads, both read types from the same isolate,
+or an existing assembly. The modes share analysis rules but differ in assembly
+processing and in the read-dependent analyses they can perform.
 
 !!! abstract "Terms used on this page"
 
@@ -29,7 +27,7 @@ one batch must share the same one — a directory holding both `.fastq` and
 extension in `contigs` mode. Sample names may contain underscores and dots;
 spaces and the characters `* # @ % ^ / ! ? & : ; | < >` are rejected.
 
-## The switch
+## Configure the input mode { #the-switch }
 
 Two keys in `config/config.yaml` pick the front end: `mode`, and the input
 directory or directories that mode reads. The input directories it does not read
@@ -65,27 +63,28 @@ The mode can be overridden for a single run with `--config mode=contigs`, but th
 matching `input.*_dir` almost always has to change with it, so editing the file is
 usually simpler.
 
-## What each front end does
+## Mode-specific input processing { #what-each-front-end-does }
 
 | | `illumina` | `nanopore` | `hybrid` | `contigs` |
 |---|---|---|---|---|
 | Read QC | PhiX removal with Bowtie2, then fastp | NanoPlot before and after, Filtlong | both of those | none |
 | Assembler | SPAdes `--isolate`, k chosen from read length | Flye | Flye, over the ONT reads | none |
 | After assembly | keep contigs ≥ 500 bp and ≥ 2× coverage | dnaapler reorientation, then Medaka (*optional* — `parameters.<mode>.medaka_model: false` skips it) | dnaapler and Medaka as in `nanopore`, then Polypolish correction with the Illumina reads | SPAdes-style headers: the same 500 bp / 2× filter, headers left as they are. Any other header: trimmed to its first whitespace token, nothing filtered |
-| Contamination screen | on the SPAdes draft, and its output *is* the delivered genome | on the reoriented assembly, before Medaka | on the **Illumina** draft only; the ONT leg is screened at the read level instead | on the supplied contigs, and its output *is* the delivered genome |
+| Contamination screen | SPAdes draft; retained contigs form the final assembly | Reoriented assembly, before optional Medaka polishing | Primary filter on the Illumina draft; optional short-read guidance for Filtlong; advisory screen of the final assembly | Supplied contigs; retained contigs form the final assembly |
 | Delivered genome | the screened SPAdes contigs | the Flye assembly, reoriented, screened and polished | the ONT assembly corrected by Polypolish | the screened input contigs |
 | Also produced | — | — | the Illumina draft, kept as a comparator, and a Snippy comparison of the two | — |
 
-`hybrid` assembles twice — SPAdes over the short reads and Flye over the long ones
-— so it is the most expensive mode to run. The Illumina draft is not a by-product:
-it is what the contamination screen screens, and the reads that map to the clean
-version of it become Filtlong's reference for scoring the ONT reads. The ONT leg
-has no contamination screen of its own.
+Hybrid mode assembles the Illumina reads with SPAdes and the Nanopore reads with
+Flye, so it requires more computation than either single-technology mode. Reads
+mapping to the decontaminated Illumina draft support Polypolish correction. They
+also guide Filtlong when `parameters.hybrid.short_read_guidance: true`; this option
+is disabled by default. The final assembly receives a separate advisory taxonomic
+screen that reports decisions without removing contigs.
 
 ## Everything after the assembly is shared
 
 Each front end ends by writing one file, `contigs_final.fasta`, and from there the
-run is identical in all four modes: assembly QC, completeness and contamination,
+shared analysis stages assess the final assembly: assembly QC, completeness and contamination,
 taxonomic placement, annotation, AMR and virulence screening, plasmids, prophages,
 the optional mobilome module, and one MultiQC report. See
 [Output files](../reference/output.md) for what each stage writes.
@@ -116,30 +115,31 @@ the DAG and nothing waits for it.
 The same table appears on [Modes](../modes/index.md), which is where it is maintained.
 Four consequences worth knowing before you choose:
 
-- **`contigs` mode cannot separate contaminants by coverage.** BlobTools needs a
-  BAM, and with no reads the contigs are mapped against themselves, which gives a
-  near-uniform depth that means nothing. Only the BLAST taxonomy leg is doing real
-  work in that mode. See [Decontamination](../analysis/decontamination.md).
-- **`nanopore` and `contigs` lose the read-based AMR leg.** Mapping reads to CARD
-  side-steps the assembly, so a resistance gene present in several copies, or
-  sitting on a repeat that broke the contig, can be visible in the reads and absent
-  from the assembly. Without reads there is no second chance; ABRicate on the
-  contigs still runs in every mode. See
-  [Antimicrobial resistance](../analysis/amr.md).
+- **`contigs` mode cannot separate contaminants by coverage.** BlobTools needs a BAM,
+  and with no reads the contigs are mapped against themselves, which gives a
+  self-alignment coverage value rather than independent sequencing depth. Taxonomic
+  evidence determines contig selection in all modes. See
+  [Decontamination](../analysis/decontamination.md).
+- **`nanopore` and `contigs` lose the read-based AMR analysis.** Mapping reads to CARD
+  side-steps the assembly, so a resistance gene present in several copies, or sitting on
+  a repeat that broke the contig, can be visible in the reads and absent from the
+  assembly. The separate CARD mapping analysis requires Illumina reads and is
+  unavailable in these two modes. ABRicate screening of the contigs still runs in every
+  mode. See [Antimicrobial resistance](../analysis/amr.md).
 - **Only the long-read modes know that a contig is circular.** Flye reports it per
   contig, and Bakta is told through `--replicons`, which lets the gene caller call
   a gene that runs across the origin — often *dnaA* itself. In `illumina` and
   `contigs` mode Bakta treats every sequence as linear.
-- **The mobilome module runs in all four modes, and is believable to different
-  degrees in each.** On a fragmented assembly the located insertion-sequence count
+- **The mobilome module is available in all four modes, with confidence affected
+  by assembly structure.** On a fragmented assembly the located insertion-sequence count
   is a floor rather than a count, because the elements being detected are a leading
   cause of the contig breaks. Every call therefore carries its distance to the
   contig end, and anything spanning contigs is capped at low confidence. In the
-  short-read modes, and only when an ISOSDB source is configured, a read-based
-  copy-number leg turns that warning into a number.
+  short-read modes, and only when an ISOSDB source is configured, read-based
+  analysis provides an additional copy-number estimate.
   See [Draft assemblies](../mobilome/draft-assemblies.md).
 
-## What a wrong mode does
+## Input-mode errors { #what-a-wrong-mode-does }
 
 Usually it stops within seconds, because the four filename conventions do not
 overlap. Pointing `illumina` at a directory of `{sample}_ont.fastq.gz`:
@@ -178,7 +178,7 @@ Each of these stops Snakemake with exit status 1, before any job has started.
     real sequence. But it means the only contigs that can leave the assembly are
     the ones the contamination screen drops. The rule logs which branch it took.
 
-## Picking one
+## Recommendations { #picking-one }
 
 - **Reads from one instrument** — use that instrument's mode. `hybrid` adds nothing
   to a dataset with only one technology.
@@ -186,9 +186,10 @@ Each of these stops Snakemake with exit status 1, before any job has started.
   directories in which every isolate appears in both. A sample present in only one
   of them stops the run rather than being silently dropped, so filter the
   directories to the complete isolates first.
-- **Closed replicons, plasmid topology, or an assembly that survives its own
-  repeats** — you need long reads, so `nanopore` or `hybrid`. This is also the only
-  route to the circular-replicon information Bakta uses.
+- **Assembly of repetitive regions or assessment of replicon topology** — use
+  `nanopore` or `hybrid` when suitable long reads are available. These modes use
+  Flye topology calls to provide circular-replicon information to Bakta.
+  Long reads do not guarantee a complete or correctly resolved assembly.
 - **A genome from a collaborator, a database, or an earlier assembly** — `contigs`.
   It runs every analysis stage, but cannot re-examine evidence that only exists in
   reads.

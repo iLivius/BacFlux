@@ -1,18 +1,12 @@
 # Installation
 
-BacFlux is a Snakemake workflow, not a program you install. The clone holds the
-rule files, the helper scripts and the configuration template, and nothing is
-written to a system directory. Only Snakemake has to be present before the first
-run: every analysis tool the workflow calls — SPAdes, Flye, Bakta, GTDB-Tk,
-Platon, VirSorter2 and the rest — is installed by conda while the run is already
-under way.
+To run BacFlux, obtain the repository, create a Snakemake environment and prepare
+the required reference databases. The repository contains the workflow rules,
+helper scripts and configuration template. Snakemake creates separate conda
+environments for the analysis tools used by the selected mode.
 
-Three things to put in place:
-
-1. the clone,
-2. a conda environment holding Snakemake, which is what you launch from,
-3. the reference databases BacFlux does not fetch for you — those have their own
-   page, [Reference databases](databases.md).
+The instructions below cover the repository and software setup. Prepare the
+[Reference databases](databases.md) before starting an analysis.
 
 !!! abstract "Terms used on this page"
 
@@ -55,10 +49,10 @@ the Snakefile declares it as the minimum: an older Snakemake stops at once, befo
 reading a single rule, with a message naming the version it needs. The pin in the
 command above gives you exactly the tested version.
 
-The environment is a launcher and nothing more. It reads the config, plans the
-run and starts jobs; it contains no analysis software. Adding Bakta or SPAdes to
-it does not help — a rule runs inside its own conda environment and will not see
-anything you put here.
+This environment only runs Snakemake, which reads the configuration, plans the run
+and starts jobs; it holds no analysis software. Snakemake builds each tool's
+environment from `workflow/envs/` itself, and a rule that has its own environment
+does not see tools added to this one.
 
 ## 3. What `--sdm conda` does
 
@@ -84,7 +78,7 @@ Two practical consequences:
   environments takes minutes. After that they are on disk and the workflow starts
   straight away.
 - **Tools never have to coexist.** GTDB-Tk, antiSMASH, VirSorter2 and MacSyFinder
-  each get their own environment, so an upgrade to one cannot break another. The
+  each get their own environment, which reduces dependency conflicts between tools. The
   environments are pinned to different degrees: some to an exact version because a
   parser downstream depends on the output columns (ISEScan 1.7.3, MacSyFinder
   2.1.6), others only loosely.
@@ -107,36 +101,51 @@ Two practical consequences:
 
 ## 4. The tools BacFlux expects to find, and does not install
 
-Eight of the workflow's rules declare no conda environment, and two more, `all` and
-`download_all`, are targets that run no command of their own. The eight run in the
-environment you launched Snakemake from and use whatever is on its `PATH`:
+Each analysis tool runs in a conda environment that Snakemake builds (section 3).
+Three things come from the computer instead, and BacFlux never installs them:
 
-| Group | Rules | Needs |
-|-------|-------|-------|
-| Filter, copy or stage a FASTA | `filter_contigs`, `finalize_contigs`, `stage_qc_genomes` | `awk`, `grep`, `head`, `cat`, `cp`, `mkdir`, `ls` |
-| Build a symlink view of a database you already hold | `download_amr_db_local`, `cazyme_db_local`, `secondary_metabolites_db_local`, `genomad_db_local`, `virsorter2_db_local` | `ln`, `mkdir`, `basename`, `dirname`, `find`, `sort`, `head` |
+- **conda and the launcher environment** with Snakemake (section 2);
+- **bash**, which Snakemake uses to run the commands of every rule;
+- **the standard Unix command-line utilities.** Rules call them for the small jobs
+  around the analysis tools — creating folders, copying and linking files, checking
+  a download — and, unless their own environment happens to include one, take them
+  from the system `PATH`. The complete list is `awk`, `basename`, `cat`, `chmod`,
+  `cp`, `cut`, `date`, `dirname`, `find`, `grep`, `head`, `ln`, `ls`, `md5sum`,
+  `mkdir`, `mv`, `rm`, `sed`, `sha256sum`, `sort`, `tail`, `tee`, `tr` and `wc`.
+  They belong to the coreutils, findutils, grep, sed and awk packages of every Linux
+  installation; only a stripped-down system, such as a minimal container image, may
+  lack some of them.
 
-All of them are standard Unix utilities, present on any Linux system that can run
-Snakemake, so there is nothing to install and nothing to check in advance.
+**Download tools are the exception.** A minimal Linux system can lack them — a
+minimal Debian or Ubuntu system has no `wget`, and a minimal Red Hat-family system
+no `tar` — so BacFlux provides them:
 
-Every other rule has a conda environment of its own, including two kinds that run
-small jobs:
+- `wget`, `tar`, `gzip` and `bzip2` come from `workflow/envs/download.yaml` (PhiX,
+  CARD, dbCAN, the ICEscan models) or from the tool's own environment (geNomad,
+  VirSorter2, CheckV);
+- `curl` and `unzip` come from `workflow/envs/tncentral.yaml`, for the optional
+  mobilome layers (TnCentral, ICEberg, ISOSDB);
+- the CheckM package downloads its reference data (about 275 MB) while conda builds
+  its environment, using the `wget`, `tar` and `gzip` in `workflow/envs/checkm.yaml`;
+  building that environment therefore needs internet.
 
-- **BacFlux's own helper scripts.** Twelve rules — `select_contigs`,
-  `screen_final_contigs`, `build_replicons` and nine rules of the mobilome module —
-  run their script in `workflow/envs/python.yaml`, a pinned Python with nothing
-  else in it. The scripts import only Python's standard library, so there is no
-  `pip install` step.
-- **The database downloads.** `wget`, `tar`, `gzip` and `bzip2` come from
-  `workflow/envs/download.yaml` (PhiX, CARD, dbCAN, the ICEscan models), or from
-  the tool's own environment, which carries the same tools (geNomad, VirSorter2,
-  CheckV). A minimal Linux system without `wget` runs them as they are. The small
-  utilities those commands call alongside, such as `sha256sum`, `awk` and `grep`,
-  come from the system, as they do for every rule.
-- **CheckM's reference data.** The CheckM package downloads its reference data
-  (about 275 MB) while conda builds its environment, so building that environment
-  needs internet. It uses the `wget`, `tar` and `gzip` in `workflow/envs/checkm.yaml`,
-  so here too nothing has to be installed on the computer.
+The download recipes on [Reference databases](databases.md), which you run yourself,
+use the `wget` and `tar` of your own system.
+
+**Rules without an environment.** Eight rules declare no conda environment, and two
+more, `all` and `download_all`, are targets that run no command of their own. The
+eight run in the environment you launched Snakemake from and use only utilities from
+the list above:
+
+| Group | Rules | Uses |
+|-------|-------|------|
+| Filter, copy or stage a FASTA | `filter_contigs`, `finalize_contigs`, `stage_qc_genomes` | `awk`, `grep`, `head`, `cat`, `cp`, `mkdir`, `ls`, `dirname`, `tee` |
+| Build a symlink view of a database you already hold | `download_amr_db_local`, `cazyme_db_local`, `secondary_metabolites_db_local`, `genomad_db_local`, `virsorter2_db_local` | `mkdir`, `ln`, `basename` |
+
+**BacFlux's own helper scripts.** Twelve rules — `select_contigs`,
+`screen_final_contigs`, `build_replicons` and nine rules of the mobilome module — run
+their script in `workflow/envs/python.yaml`, a pinned Python with nothing else in it.
+The scripts import only Python's standard library, so there is no `pip install` step.
 
 The helper scripts' unit tests need nothing but Python and `pytest`, so they run
 from the launcher environment. `pytest` is not in the environment created above, so
@@ -144,7 +153,7 @@ add it first:
 
 ```bash
 conda install -n snakemake -c conda-forge pytest
-pytest workflow/scripts miscellaneous -q    # all pass; two are skipped unless pointed at real GTDB files
+pytest workflow/scripts miscellaneous -q    # three tests skip unless BACFLUX_TEST_* variables name real GTDB files
 ```
 
 `miscellaneous/` holds the workflow's own guard tests. They read the rule files and
@@ -159,12 +168,11 @@ and the rest BacFlux fetches itself on the first run that needs them, or all at
 once with the `download_all` target. Sizes, download recipes and the config keys
 that hold the paths are all on [Reference databases](databases.md).
 
-Delete one of the five required keys from your config and the run stops at parse
-time, in seconds, rather than an hour in. Leaving it as the empty string the
-template ships is not the same thing: the key is there, parsing carries on, and
-the rule that needs the path fails later. The six optional keys get the harder
-check — BacFlux confirms the directory exists *and* holds a file only that
-database has, so a path aimed at the wrong copy is caught before anything runs.
+Required database keys must exist and point to prepared databases. A missing
+key stops configuration parsing, whereas an empty or invalid path may fail later,
+when the database is used. For the six optional local-database paths, BacFlux
+also checks for an existing directory and database-specific files during planning.
+A successful dry run does not establish that every database is complete.
 
 ## Next
 

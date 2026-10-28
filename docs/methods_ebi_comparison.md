@@ -1,8 +1,8 @@
 # Comparing BacFlux's ICE/IME caller against the EBI Mobilome Annotation Pipeline
 
-The obvious question about any new caller is whether an established one does better.
-This page answers it directly: BacFlux's mobilome module and the EBI Mobilome
-Annotation Pipeline, run on the same genomes and scored by the same code.
+This page compares BacFlux's ICE/IME caller with the EBI Mobilome Annotation
+Pipeline on the same genomes, using one scoring procedure. It assesses curated
+element recovery, class assignment and boundaries within the tested configuration.
 
 The two callers share ancestry, so this is **not** an independent check —
 treating it as one would overstate what agreement between them proves.
@@ -31,17 +31,19 @@ treating it as one would overstate what agreement between them proves.
 ## 0. The two callers are not independent
 
 BacFlux's ICE/IME caller and the EBI Mobilome Annotation Pipeline (MAP) both find
-conjugation machinery by running **MacSyFinder with the ICEscan model set**. MAP
-does it inside its `ICEFINDER2_LITE` subworkflow; BacFlux does it in the
-`conjscan` / `icescan` rules of `workflow/rules/shared/80_mobilome.smk`. The
-versions differ slightly — MacSyFinder 2.1.4 in MAP's container, 2.1.6 in
-BacFlux's conda environment (`workflow/envs/macsyfinder.yaml`) — but the profile
-HMMs and the system definitions that decide *"is there a conjugation system here
-at all"* are the same models.
+conjugation machinery by running **MacSyFinder over closely related model sets**.
+MAP runs the ICEscan model set inside its `ICEFINDER2_LITE` subworkflow. BacFlux
+runs CONJScan 2.1.0, of which ICEscan is a fork, and on the 28 pilot genomes of this
+comparison the optional ICEscan layer as well, in the `conjscan` / `icescan` rules of
+`workflow/rules/shared/80_mobilome.smk`. The MacSyFinder versions differ slightly —
+2.1.4 in MAP's container, 2.1.6 in BacFlux's conda environment
+(`workflow/envs/macsyfinder.yaml`) — and the profile HMMs and system definitions that
+decide *"is there a conjugation system here at all"* overlap heavily without being
+identical.
 
 The consequence must not be glossed over:
 
-> **Agreement at the detection layer is partly tautological.** When both callers
+> **Detection agreement is not independent confirmation.** When both callers
 > find the same element, that is substantially the same engine agreeing with
 > itself. It is *not* two independent lines of evidence, and it must never be
 > reported as independent confirmation of detection.
@@ -51,7 +53,7 @@ measure:
 
 | Layer | Shared or independent? |
 |---|---|
-| Machinery detection (does a conjugation system exist here) | **Shared** — same models, same engine |
+| Machinery detection (does a conjugation system exist here) | **Largely shared** — overlapping model sets, same engine |
 | Clustering (which machinery genes belong to one element) | **Independent** — different code, different rules |
 | Boundary refinement (where does the element start and stop) | **Independent** — MAP runs `vmatch` plus an ICEfinder2-derived script; BacFlux runs its own exact maximal-repeat search |
 | Class assignment (ICE vs IME vs AICE) | **Partly independent** — same model vocabulary, different decision rules |
@@ -86,7 +88,7 @@ Nextflow, container-based, and carries optional functional-annotation branches
 **BacFlux's mobilome module** — an **AMR-mobility assessment on a single
 isolate**. It starts from the AMR genes actually detected in one characterised
 strain and asks, per gene, *is this gene inside a mobile element, and how
-transferable is that element*, placing each on a six-rung ladder from
+transferable is that element*, placing each on six mobility tiers from
 "chromosomal, intrinsic candidate" to "**predicted** self-transmissible". The
 regulatory framing is EFSA's intrinsic-versus-acquired distinction for strains
 entering the food and feed chain. The module is **off by default** and is one
@@ -106,8 +108,8 @@ named gene on a named replicon.
 A practical consequence for users: for a full
 mobilome inventory of an isolate, or for anything metagenomic, MAP is the right
 tool and BacFlux writes `{sample}_contigs.fna` and `{sample}.gbk` ready to feed it.
-Consuming MAP's `mobilome.gff.gz` carries no licensing consequence for BacFlux
-(§10).
+Using MAP's `mobilome.gff.gz` output does not incorporate MAP code into BacFlux;
+output and source-data terms should be considered separately (§10).
 
 ---
 
@@ -127,11 +129,11 @@ used as-is:
 Two accessions (`CP048437.1`, `NC_004668.1`) carry both a curated ICE and a
 curated IME, so 40 genomes yield **30 curated elements**. The negative set is
 three reduced endosymbionts, two streamlined marine genomes, a deep-branching
-thermophile, four full-size reference strains (*E. coli* K-12 MG1655, *B.
+thermophile, five full-size reference strains (*E. coli* K-12 MG1655, *B.
 subtilis* 168, *P. aeruginosa* PAO1, *S. aureus* N315, *S.* Typhimurium LT2) and
 an archaeon (*Halobacterium* sp. NRC-1). The archaeon is a **construction
 check**: CONJscan and ICEscan are bacterial models, so any call there would be
-spurious by definition.
+outside the models' intended scope and would require separate evaluation.
 
 Both callers were given **the same FASTA files**: the benchmark genomes, fetched by
 accession from the set files in `benchmark/mobilome/`. No re-assembly, no
@@ -145,14 +147,14 @@ Both callers' output was reduced to one table per genome,
 `work/{sample}/ice_elements.tsv`, with the columns `benchmark/mobilome/score.py`
 reads. `score.py` was then run **unmodified** over both. It:
 
-- takes the curated ICEberg interval as truth;
+- uses the curated ICEberg interval as the reference;
 - among a caller's calls on that genome, selects the one with the **largest
   overlap** with the curated interval;
 - reports start offset, end offset, and `recovered_fraction` = overlapping bp ÷
   curated length.
 
-Using the same scoring code on both sides is the point. Any bias in `score.py` —
-and there is at least one, see §7 — applies equally to both callers.
+Using one scorer makes the procedure consistent. Its limitations (§7) still apply
+and may affect callers differently depending on their output.
 
 ### 2.3 Which MAP, and the two environment fixes needed to run it
 
@@ -174,9 +176,8 @@ unprivileged user namespaces enabled. The conda package ships a `singularity` �
 `apptainer` symlink, which lets Nextflow's stock `singularity` profile work
 unmodified.
 
-**(b) `NXF_VER=24.10.6`.** On Nextflow 26.04.6 — the current release, and what a
-fresh conda install gives you — MAP v5.0.0 dies inside its own ICEfinder2-lite
-subworkflow:
+**(b) `NXF_VER=24.10.6`.** On the tested Nextflow 26.04.6 build, MAP v5.0.0 dies inside
+its own ICEfinder2-lite subworkflow:
 
 ```
 ERROR ~ Invalid method invocation `call` with arguments:
@@ -283,7 +284,8 @@ The converter reads MAP's merged GFF, then cross-checks against ICEfinder2-lite'
 own `{sample}_ices.tsv` — the same elements in a different layout. **All 40
 genomes agree**: 64 elements in the GFF, 64 rows in the TSV, decomposing as 32
 ICEs + 27 IMEs + 5 AICEs. All five AICE calls fall in *Streptomyces scabiei*,
-which is biologically correct — AICEs are the actinomycete class.
+which is consistent with the class's taxonomic scope but does not validate
+the individual calls.
 
 ---
 
@@ -303,14 +305,13 @@ The three BacFlux-only detections are **ICEVflInd1** (*Vibrio fluvialis*),
 **Tn4451** (*Clostridium perfringens*) and **MTnPi10** (*Prevotella intermedia*).
 In each, MAP's prescan produced no ICE candidate and no table.
 
-**MAP found nothing BacFlux missed.** Given §0, this is the strongest form the
-detection result can take: the difference cannot be explained by a better
-machinery model, because the machinery models are shared. It is attributable to
-what sits around the shared engine — candidate seeding, the class-aware size
-floor, and BacFlux's decision to report low-quorum machinery at low confidence
-rather than discard it.
+No curated element was found by MAP alone. BacFlux ran CONJScan 2.1.0 alongside
+ICEscan, while MAP runs ICEscan alone, so the machinery models overlap but are not
+identical. ICEVflInd1 rests on CONJScan profile hits alone, reported at low confidence
+because no system was assembled. Tn4451 and MTnPi10 carry hits to ICEscan's IME and
+CONJScan's MOB models, and MAP's prescan produced no candidate for either.
 
-**Honesty note on ICEVflInd1.** BacFlux detects the locus but classifies it
+**Class-assignment caveat for ICEVflInd1.** BacFlux detects the locus but classifies it
 `cime_or_island` — integrase + T4CP + T4SS, **no relaxase** — not `ice`. It is
 counted as detected because the scorer asks whether a call overlaps the curated
 interval, which it does (0.289 recovered). It is *not* a correct ICE class call,
@@ -322,12 +323,13 @@ Scored by `benchmark/mobilome/score.py` on the ICE and IME pilot sets:
 
 **ICE pilot: 15/18** — chromosomal 9/11, standalone 6/7.
 
-The **true ceiling is 17/18**, not 18/18. `SXT(HN1)` (AB450045) is a broken
-benchmark record: the deposit is **19,086 bp carrying 17 CDS** (verified by
-counting the Bakta `.faa`), standing in for a ~100 kb element, and contains **no
-relaxase and no T4SS**. No machinery-based caller can find a conjugation system
-that is not in the sequence, and MAP does not find it either. It should be
-removed from, or footnoted in, any future version of this benchmark.
+One of the 18 benchmark records does not contain the expected machinery. `SXT(HN1)`
+(AB450045) is a broken benchmark record: the deposit is **19,086 bp carrying 17 CDS**
+(verified by counting the Bakta `.faa`), standing in for a ~100 kb element, and contains
+**no relaxase and no T4SS**. No machinery-based caller can find a conjugation system
+that is not in the sequence, and MAP does not find it either. It is counted as a miss
+throughout, so the highest achievable score on this pilot is 17/18; it should be removed
+from, or footnoted in, any future version of this benchmark.
 
 The other two misses are real:
 
@@ -360,13 +362,12 @@ Of the 17 elements both callers found, the classes agree on **14** and differ on
 All three are ICEberg-curated **ICEs** that MAP called **IMEs**; BacFlux agrees
 with the curation on all three.
 
-This is not a cosmetic difference. ICE versus IME **is** the
-self-transmissible-versus-needs-a-helper distinction, which is rungs 6 and 5 of
-the mobility ladder and the exact axis the EFSA intrinsic/acquired framing rests
-on. Calling a self-transmissible element "mobilisable with a helper" understates
-transfer risk.
+ICE versus IME is the difference between tier 6 (predicted self-transmissible) and
+tier 5 (mobilisable, needs a helper). Calling a curated ICE an IME therefore lowers the
+predicted transferability of every AMR gene inside it. Neither label establishes
+whether a gene is intrinsic or acquired, and neither demonstrates transfer.
 
-**Two honesty notes.**
+**Limits of this comparison.**
 
 1. There is a fourth element, **TR2** (*Streptomyces scabiei*), where **both**
    callers say `ime` against an ICEberg **ICE** curation. It is not counted among
@@ -392,15 +393,18 @@ Across all 40 genomes:
 | BacFlux | 65 | 2,630,059 |
 | MAP | 64 | 2,881,859 |
 
-One call apart, and BacFlux claims **8.7% fewer** base pairs while recovering
-three more curated elements. **Neither caller achieves recall by volume** — the
-higher recall in §4 does not come from making many more calls.
+BacFlux's 65 calls are 63 on the 28 pilot genomes, run with the ICEscan layer on,
+and 2 on the 12 negative genomes, run with CONJScan alone. With the ICEscan layer on
+all 40 genomes, as in MAP, BacFlux makes 68 calls over 2,687,359 bp: four more calls
+than MAP and **6.7% fewer** base pairs, while recovering three more curated elements.
+**Neither caller achieves recall by volume** — the higher recall in §4 does not come
+from making many more calls.
 
 > **Provenance of these two rows.** BacFlux's row was recomputed over the same 40
 > samples after a fix to the att search. Three samples changed: `AL513382`
 > 95,548 → 145,727 bp; `GU725392` 2 calls / 57,721 bp → 1 call / 92,237 bp;
 > `NC_013929` 200,047 → 272,744 bp. **MAP's row is unchanged** — its run was never
-> re-done, so the comparison remains like for like.
+> re-done; its figures describe the same 40 genomes.
 
 ### 6.2 Negative controls
 
@@ -412,10 +416,14 @@ Twelve genomes with no curated ICEberg entry, 32,601,100 bp (listed in
 | *B. subtilis* 168 | `ice` 529,362–549,932 (20.6 kb) | `ice` 529,362–549,932 (20.6 kb) |
 | *S.* Typhimurium LT2 | `ime` 2,900,443–2,906,075 (5.6 kb) | — |
 | *S. aureus* N315 | — | `ime` 36,435–42,455 (6.0 kb) |
-| Other nine (incl. *E. coli* K-12, *P. aeruginosa* PAO1, *Halobacterium*) | — | — |
+| *Halobacterium* sp. NRC-1 | — (3 low-confidence `cime_or_island` with the ICEscan layer on) | — |
+| Other eight (incl. *E. coli* K-12, *P. aeruginosa* PAO1) | — | — |
 
-**Two calls each. The difference between the callers is one call each**, and they
-are on different genomes.
+**Two calls each, with BacFlux's default models. The difference between the callers
+is one call each**, and they are on different genomes. BacFlux's column comes from
+CONJScan alone; with the ICEscan layer on, as in MAP, BacFlux adds three low-confidence
+`cime_or_island` calls on the archaeon, built from integrase and type IV secretion
+profile hits with no assembled system.
 
 **The *B. subtilis* 168 call is the same element, found twice.** Both pipelines
 return **base-pair-identical coordinates**, the same 60 bp flanking repeat, the
@@ -435,11 +443,10 @@ bona fide IME is a domain question this benchmark cannot settle.
 
 **Two caveats, both mandatory when quoting these numbers.**
 
-> **This is an upper bound of 2 candidate calls, NOT a false-positive rate.**
+> **These are candidate calls, NOT a false-positive rate.**
 > "Absent from ICEberg" is not "contains no mobile element". ICEberg is a curated
-> catalogue, not an exhaustive one. The only quantity here that is genuinely
-> comparable is the *difference* between the two columns, because the imperfect
-> negative applies equally to both callers.
+> catalogue, not an exhaustive one. The counts describe call burden on the selected control genomes.
+> Interpreting individual calls still requires evidence beyond catalogue absence.
 
 > **Every call in a negative control must be examined, never merely counted.**
 > This set originally justified including *B. subtilis* 168 on the grounds that
@@ -483,7 +490,7 @@ beat ours, **zero** were cases where MAP found a repeat BacFlux could not. Two w
 repeats BacFlux found and then discarded through the defects above; two were
 candidate-extent differences with no repeats on either side. That is what §8 tests.
 
-> ### Honesty note: what the 0.94 figure covers
+> ### Denominator of the 0.94 figure { #honesty-note-what-the-094-figure-covers }
 >
 > The standalone median of **0.94** is computed over the **five** standalone ICEs
 > that **both** callers found — it is a like-for-like head-to-head figure and MAP's
@@ -510,8 +517,8 @@ machinery span was reported because no att pair was resolvable.
 
 Read these as constraints on every number above.
 
-1. **The callers share a detection engine.** §0. Detection agreement is partly
-   tautological. Never cite it as independent confirmation.
+1. **The callers share a detection engine.** §0. Detection agreement is based partly on
+   shared models. Never cite it as independent confirmation.
 2. **Small n.** 30 curated elements; 17 in the class comparison; 9 chromosomal and
    5 standalone in the boundary comparison. Medians over five to nine values move
    a long way on one element. Report directions, not rates, and never a
@@ -521,8 +528,8 @@ Read these as constraints on every number above.
    and one negative-control genome contains a real element ICEberg lacks (ICEBs1,
    §6.2). The first counts as a miss for both callers; the second scores a correct
    call as a false positive.
-4. **The negative control gives an upper bound on candidate calls, not a
-   false-positive rate.** §6.2.
+4. **The negative control counts candidate calls; it is not a false-positive
+   rate.** §6.2.
 5. **`score.py` selects the largest-overlap call.** Where a caller emits several
    calls on one genome, the metric rewards the biggest overlapping interval. A
    caller that emitted one enormous call per genome would score well on
@@ -530,9 +537,9 @@ Read these as constraints on every number above.
    call-burden table (§6.1) must be reported alongside recall, and it applies
    symmetrically to both callers.
 6. **Closed reference genomes, not draft assemblies.** These are single-contig
-   sequences. BacFlux's short-read entry point produces fragmented SPAdes
-   assemblies where IS elements themselves cause the contig breaks, and calls
-   there will be materially worse. Nothing in this comparison measures that. Any
+   sequences. BacFlux's short-read entry point produces fragmented SPAdes assemblies
+   where IS elements themselves cause the contig breaks, and fragmentation can reduce
+   recovery or boundary resolution. Nothing in this comparison measures that. Any
    element spanning contigs is capped at `low` confidence by design.
 7. **Different gene callers.** MAP uses Prodigal, BacFlux uses Bakta. That is a
    real difference contained in the comparison rather than controlled for, and it
@@ -543,45 +550,31 @@ Read these as constraints on every number above.
 9. **MAP was run with functional branches disabled.** Fair for a boundary
    comparison, but it means nothing here evaluates MAP's full output.
 10. **Bacterial models only.** ICEscan and CONJscan are bacterial. The archaeal
-    genome is a construction check, not coverage.
+    genome is a construction check, not coverage. With the ICEscan layer on,
+    BacFlux makes three low-confidence profile-only calls on it.
 
 ---
 
 ## 8. Why vmatch was evaluated and not adopted
 
-MAP refines boundaries with **vmatch**; BacFlux does not. When MAP's boundaries
-were measurably better (§6.3), the obvious hypothesis was that vmatch was the
-reason. It was tested rather than assumed, and the hypothesis was wrong twice
-over.
+MAP refines boundaries with Vmatch; BacFlux implements exact maximal-repeat search
+in Python (`workflow/scripts/80_mobilome/att_search.py`). On the four elements where
+MAP's boundaries were initially closer, MAP found no repeat that BacFlux missed. Two
+were repeats BacFlux had found and then discarded through ranking and search-window
+defects, since fixed; the other two were differences in candidate extent with no
+repeat on either side (§6.3).
 
-**First, the two searches are the same search.** BacFlux's att search has not used
-`blastn`; it computes **exact maximal repeats in standard-
-library Python** (`workflow/scripts/80_mobilome/att_search.py`), which is vmatch's
-own semantics. To test that properly rather than argue it, a second search was
-built on vmatch's actual data structure — prefix-doubling suffix array, Kasai LCP
-array, cross-flank MEM enumeration — and run against ours on every real flank
-window in the benchmark:
+A separate implementation using a suffix array, LCP array and cross-flank MEM
+enumeration was compared with BacFlux on **52 genomes, 246 att searches, 180 distinct
+flank windows and 1,033 repeats**. The repeat sets were identical on every window.
+The Vmatch executable itself was not run: on those windows, a search with Vmatch's
+maximal-repeat semantics finds no repeat that BacFlux's search misses. Agreement
+between two implementations of one definition does not validate an element boundary.
 
-> **52 benchmark genomes (more than the 40 compared here), 246 att searches, 180
-> distinct flank windows, 1,033 repeats, exact set equality on every window.**
-
-Two searches over the same DNA return the same set of repeats. vmatch would find
-nothing BacFlux does not already find. The same measurement also disposes of a
-related idea: **treating agreement between two repeat searches as evidence is empty**,
-because when the two searches have identical semantics the agreement is
-guaranteed and therefore carries no information.
-
-**Second, the boundary gap was not a repeat-finding gap at all.** Of the four
-elements where MAP's boundary beat ours, none involved a repeat MAP found and we
-could not (§6.3).
-
-**The licensing position is secondary but real.** vmatch is on bioconda
-(`bioconda/vmatch 2.3.1`, for linux-64 and osx-64), so packaging is not the
-obstacle; the licence is. The recipe declares `license: Unknown / OTHER` and
-vmatch.de is unreachable, so its terms **cannot be established**. For an MIT
-workflow that is weaker ground than a known-restrictive licence, because there is
-nothing to comply with. With no measured benefit on one side and unverifiable terms
-on the other, vmatch is not adopted.
+Vmatch is packaged in Bioconda (2.3.1), but its recipe declares `license: Unknown /
+OTHER` and the upstream site could not be reached when this was checked in July 2026,
+so its terms could not be established. With no measured gain and unverifiable terms,
+BacFlux does not use it.
 
 ---
 
@@ -592,10 +585,10 @@ on the other, vmatch is not adopted.
 | Are these independent callers? | **No.** Shared MacSyFinder + ICEscan detection engine. Boundaries and clustering are independent. |
 | Detection, 30 curated elements | BacFlux 20/30, MAP 17/30; MAP found nothing BacFlux missed |
 | Class, 17 shared elements | Agree on 14; all 3 differences are ICEberg ICEs that MAP called IMEs |
-| Call burden, 40 genomes | BacFlux 65 calls / 2.63 Mb; MAP 64 calls / 2.88 Mb |
-| Negative controls, 32.6 Mb | 2 candidate calls each; identical coordinates on the one shared call |
+| Call burden, 40 genomes | BacFlux 65 calls / 2.63 Mb (68 / 2.69 Mb with ICEscan on all 40); MAP 64 calls / 2.88 Mb |
+| Negative controls, 32.6 Mb | 2 candidate calls each (BacFlux 5 with ICEscan on); identical coordinates on the one shared call |
 | Boundaries | Comparable — chromosomal median \|start offset\| 5,141 bp vs MAP 7,427; standalone recovery 0.94 vs 0.94. §6.3 records that this comparison prompted two fixes to our att search |
-| Is vmatch needed? | No — exact set equality with our search on all 180 flank windows |
+| Is vmatch required by BacFlux? | No. Two implementations of the intended repeat search agreed on the 180 tested windows; this was not a direct Vmatch executable benchmark. |
 
 Nothing here supports a claim that either pipeline is better than the other. It
 supports three narrower claims: BacFlux's caller recovers the curated elements MAP
@@ -622,7 +615,7 @@ publication.
 - **EBI Mobilome Annotation Pipeline** — ebi-metagenomics/mobilome-annotation-pipeline,
   v5.0.0, **Apache-2.0**. EMBL-EBI Microbiome Informatics team.
   https://github.com/ebi-metagenomics/mobilome-annotation-pipeline
-- **ICEfinder2** — Wang J., *et al.* ICEberg 3.0: functional categorization and
+- **ICEfinder2** — Wang M., *et al.* ICEberg 3.0: functional categorization and
   analysis of the integrative and conjugative elements in bacteria. *Nucleic Acids
   Research* (2024). ICEfinder2 provides the ICEscan models and the boundary-
   refinement approach MAP's ICEfinder2-lite implements.
@@ -636,7 +629,7 @@ publication.
   de la Cruz F., Rocha E.P.C. Evolution of plasmid mobility: origin and
   fate of conjugative and non-conjugative plasmids. *Molecular Biology and
   Evolution* (2022).
-- **ICEberg** (curated coordinates used as truth) — Wang J. *et al.*, *NAR* (2024).
+- **ICEberg** (curated coordinates used as truth) — Wang M. *et al.*, *NAR* (2024).
 - **ICEBs1 discovery** (the negative-control lesson, §6.2) — Auchtung J.M.,
   Lee C.A., Monson R.E., Lehman A.P., Grossman A.D. Regulation of a *Bacillus
   subtilis* mobile genetic element by intercellular signaling and the global DNA
@@ -644,21 +637,16 @@ publication.
 
 ### Licensing position
 
-- **No code from EBI's pipeline was copied.** Three of its scripts
-  (`bin/ice_boundary_refinement.py`, `bin/map_tools/icefinder_process.py`,
-  `bin/prescan_to_fasta.py`) are ICEfinder2-derived and carry **CC BY-NC-SA 4.0**,
-  which is non-commercial and share-alike and therefore incompatible with
-  BacFlux's MIT licence. Share-alike attaches to distributed source, not to
-  execution, so a default-off flag would not cure it. Reading that code to
-  understand an approach is permitted and is how the ICEscan model set was found;
-  the separation between reading and copying was kept real.
-- **CONJScan and ICEscan model sets are both CC BY-NC-SA 4.0** (Institut
-  Pasteur/CNRS; ICEscan is an ICEfinder2 fork of CONJScan 2.0.1 by the same
-  authors). They are **fetched at runtime from a configured URL and never
-  vendored**, the mobilome module is **off by default**, and
-  `docs/about/licensing.md` carries the non-commercial notice — the same pattern
-  BacFlux already uses for every
-  licence-encumbered database.
-- **Consuming MAP's `mobilome.gff.gz` output carries no licensing consequence**
-  for BacFlux. Users who want a full mobilome census are pointed at MAP in the
-  README, and BacFlux writes `{sample}_contigs.fna` and `{sample}.gbk` ready for it.
+No code from the EBI pipeline was copied or adapted. Three of its scripts —
+`bin/ice_boundary_refinement.py`, `bin/map_tools/icefinder_process.py` and
+`bin/prescan_to_fasta.py` — derive from ICEfinder2 and carry CC BY-NC-SA 4.0 headers.
+Their NonCommercial and ShareAlike conditions are incompatible with distribution under
+BacFlux's MIT licence, and making such code optional would not change that.
+
+CONJScan and ICEscan models are fetched separately when enabled and are not bundled
+with BacFlux. Their attribution, NonCommercial and share-alike terms remain relevant
+to use and distribution. See [Licensing](about/licensing.md).
+
+Users can analyse the same assembly with MAP for a broader inventory. Check
+terms relevant to its outputs and source databases separately from the licence
+of BacFlux's implementation.

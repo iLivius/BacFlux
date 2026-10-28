@@ -1,9 +1,9 @@
 # Plasmids
 
-Stage `06.plasmids` asks which contigs of the finished genome are plasmids rather than
-chromosome. It runs in all four modes, and the caller reads only `contigs_final.fasta`, so
-the call itself does not depend on which front end produced the assembly. The
-supplementary BLAST line beside each call does — see below.
+Stage `06.plasmids` predicts plasmid contigs in `contigs_final.fasta` with Platon.
+It runs in all modes. An optional geNomad result provides an additional
+classification, and a supplementary BLAST lookup is reported alongside the calls.
+Assembly structure and the available evidence affect interpretation.
 
 [Platon](https://github.com/oschwengers/platon) v1.8 is the caller and always runs.
 [geNomad](https://github.com/apcamargo/genomad) v1.12.0 is an optional second opinion: it is
@@ -11,16 +11,19 @@ switched on from the *phage* stage, not from here, because one geNomad run calls
 and plasmids together.
 
 ```mermaid
-flowchart LR
-    F([contigs_final.fasta])
-    P[plasmid_search<br/>Platon]
-    VP([06.plasmids/sample/platon/<br/>verified_plasmids.txt])
-    F --> P --> VP
-
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+---
+flowchart TD
+    F([contigs_final.fasta]) --> P[plasmid_search<br/>Platon]
+    P --> VP([06.plasmids/sample/platon/<br/>verified_plasmids.txt])
     GN([07.phages/genomad/sample/<br/>..._plasmid_summary.tsv<br/>only when geNomad is opted in])
-
-    PC[plasmid_concordance]
-    VP --> PC
+    VP --> PC[plasmid_concordance]
     GN --> PC
     PC --> OUT([sample_plasmid_concordance.tsv])
 ```
@@ -108,11 +111,12 @@ centrally rather than per rule.
 
 *Rule `plasmid_concordance`, defined only when `phage.caller: genomad`.*
 
-geNomad classifies contigs from gene content against its own marker set — a different method
-with different failure modes — so genuine agreement between it and Platon is much stronger
-evidence than Platon agreeing with a BLAST screen that was run for another purpose. geNomad
-is licensed by Berkeley Lab for academic / non-commercial use; the terms of every tool are
-listed under [Licensing](../about/licensing.md).
+geNomad classifies contigs from gene content against its own marker set — a different
+method with different failure modes — so agreement with Platon provides additional
+support. The workflow's agreement labels are heuristic confidence categories, not
+calibrated probabilities, and the two methods can still share sources of error. geNomad
+is licensed by Berkeley Lab for academic / non-commercial use; the terms of every tool
+are listed under [Licensing](../about/licensing.md).
 
 The rule joins four files into one table: Platon's per-contig table, Platon's chromosome
 FASTA, `verified_plasmids.txt`, and geNomad's plasmid summary from stage 07. One row per
@@ -189,15 +193,15 @@ plasmid Platon missed does not silently become "chromosomal, intrinsic candidate
 
 !!! warning "Decontamination can remove a small plasmid before this stage sees it"
 
-    The `auto` selector keeps contigs whose assigned genus matches the sample's dominant genus.
-    A broad-host-range plasmid can be discarded precisely because it is mobile and its closest
-    database relatives sit in another genus — the measured case is the 2,014 bp plasmid pMYS
-    of the control genome above, dropped as *Escherichia*
+    The `auto` selector keeps contigs whose assigned genus matches the sample's dominant
+    genus. A genuine plasmid can be discarded when its database matches produce a genus
+    assignment different from the selected host genus — the measured case is the 2,014
+    bp plasmid pMYS of the control genome above, dropped as *Escherichia*
     ([Decontamination](decontamination.md#route-1-bestsum-follows-database-composition-not-biology)).
-    Check `02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv` before trusting an
-    absence. In `hybrid` mode with short-read guidance on there is a second route, worse than
-    the first: a contig dropped there takes its long reads with it, so the sequence is missing
-    from the assembly and not merely from the plasmid call
+    Check `02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv` before
+    trusting an absence. In `hybrid` mode with short-read guidance on there is a second
+    route, worse than the first: a contig dropped there takes its long reads with it, so
+    the sequence is missing from the assembly and not merely from the plasmid call
     ([Route 2](decontamination.md#route-2-in-hybrid-a-dropped-contig-takes-its-long-reads-with-it)).
 
 Small plasmids are also lost upstream of that, at read filtering and assembly. The settings

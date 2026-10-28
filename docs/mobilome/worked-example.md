@@ -1,14 +1,17 @@
 # Worked example
 
-One genome, end to end, with the real rows. The isolate was chosen because its answer is
-already known from the literature, so every call can be checked against something
-external.
+This example follows a closed reference genome through the mobilome analysis.
+It illustrates reported output rows and comparisons with published or curated
+elements. The examples explain the decision rules; they are not independent
+experimental validation of every prediction.
 
 **_Klebsiella pneumoniae_ ATCC BAA-2146** (`GCF_000364385.3`) — a complete assembly, one
-chromosome and four plasmids, carrying `blaNDM-1`, `blaCTX-M-15`, `blaOXA-1`, `blaTEM-1`,
-`blaCMY-6`, `rmtC` and a long list of aminoglycoside, sulfonamide, quinolone, macrolide
-and metal-resistance genes. Run as `mode: contigs` with `mobilome.run: true`, all four
-optional layers configured, and `phage.caller: genomad`.
+chromosome and four plasmids, carrying `blaNDM-1`, `blaCTX-M-15`, `blaOXA-1`,
+`blaTEM-1`, `blaCMY-6`, `rmtC` and a long list of aminoglycoside, sulfonamide,
+quinolone, macrolide and metal-resistance genes. Run as `mode: contigs` with
+`mobilome.run: true`, the ICEscan, TnCentral and ICEberg layers configured, and
+`phage.caller: genomad`. The fourth layer, ISOSDB copy number, needs reads and does not
+run in `contigs` mode.
 
 Many environmental isolates carry no acquired resistance, so they only ever exercise the
 bottom of the ladder. This genome exercises almost all of it.
@@ -35,18 +38,19 @@ ompK35_Q92Ter    tier=1  intrinsic_candidate  conf=high
 ramR_Y59CfsTer13 tier=1  intrinsic_candidate  conf=high
 ```
 
-**Point mutations**, not acquired genes: chromosomal changes in the bacterium's own
-*gyrA*, *parC*, *ompK35* and *ramR*. Nothing was acquired, so there is nothing to
-transfer.
+These four rows are point mutations (`Method` `POINTP` or `POINTX`) in the
+chromosome's own *gyrA*, *parC*, *ompK35* and *ramR*. No mobile element surrounds
+them, so they sit at tier 1. The call does not show how the allele arose or how
+common it is in the species.
 
 They appear at all only because the isolate resolved to `Klebsiella_pneumoniae`, one of
 AMRFinderPlus's curated organisms, so the run passed
 `--organism Klebsiella_pneumoniae`. Without that flag these rows would be **silently
-absent** ([Turning it on](enabling.md)).
+absent** ([Enabling the module](enabling.md)).
 
 ## Tier 2 — not reached in this genome
 
-No row scores tier 2 here. The rung is for a gene with an IS upstream on its own strand,
+No row scores tier 2 here. The tier is for a gene with an IS upstream on its own strand,
 where the IS can supply an outward-reading hybrid promoter and raise expression without
 making the gene mobile — a real situation, and the one this genome would have produced,
 since IS*Ecp1* sits 48 bp upstream of the chromosomal `blaCTX-M-15`.
@@ -62,8 +66,10 @@ qacEdelta1  tier=3  composite_mobilisable_within_cell  conf=high
 sul1        tier=3  composite_mobilisable_within_cell  conf=high
 ```
 
-Three genes flanked by two copies of the same IS family. `aadA2` + `qacEdelta1` + `sul1`
-is the classic **class 1 integron 3′ conserved segment**.
+Three genes flanked by two copies of the same IS family: an *aadA2* cassette followed
+by the 3′ conserved segment (*qacE*Δ1–*sul1*) of a class 1 integron. The tier is
+assigned from the flanking-IS pattern; it does not verify the complete integron
+architecture.
 
 ## Tier 4 — inside a named transposon
 
@@ -130,10 +136,12 @@ tet(A), mph(A), the pco/sil/ars metal-resistance clusters
     tier=5  on_plasmid_typed_non_mobilisable  conf=high
 ```
 
-Both are tier 5 because the gene *is* on a plasmid — acquired, which is the regulatory
-question. The second group carries a different label because tier 5's generic wording,
-`mobilisable_needs_helper`, would contradict our own evidence about a plasmid we had just
-typed **non**-mobilisable.
+Both are tier 5 because the genes are on a plasmid. Under the EFSA definition quoted on
+[The mobility ladder](mobility-ladder.md), an intrinsic gene is restricted to the
+chromosome, so a plasmid-borne gene is not an intrinsic candidate whether or not the
+plasmid can transfer. The second group carries a different label because tier 5's
+generic wording, `mobilisable_needs_helper`, would contradict our own evidence about a
+plasmid we had just typed **non**-mobilisable.
 
 ## Tier 6 — predicted self-transmissible
 
@@ -156,7 +164,7 @@ machinery) are untouched and still `NA` in the machinery columns.
 
 `machinery_source` says `same_replicon`, not `containing_element`: the mating apparatus is
 elsewhere on the plasmid, not wrapped around this gene. That is still the right evidence —
-a mating apparatus makes the whole replicon transferable, and with it every gene on it —
+machinery on the same plasmid supports a prediction about transfer of that replicon —
 and the column says so rather than implying containment.
 
 ## The chromosomal ICE, scored against its curation
@@ -208,9 +216,10 @@ sequences; the mobilome saw four. `NZ_CP006660.1` (plasmid pMYS, 2,014 bp) was r
 the contamination screen as *Escherichia*, even though its single best BLAST hit was
 *K. pneumoniae* at 100% identity over the full length. BlobTools sums bitscores per taxon
 across all 95 hits, and *E. coli* is hugely over-represented in `nt`, so *Escherichia*
-summed to 58,709 against *Klebsiella*'s 16,253. The assignment followed database
-composition, not biology — and a broad-host-range plasmid can be discarded *precisely
-because* it is mobile. Check `contig_taxonomy_decisions.tsv` before trusting a plasmid's
+summed to 58,709 against *Klebsiella*'s 16,253. The assignment followed the
+composition of `nt`, not the plasmid's origin, and a plasmid shared across genera is
+the sequence most exposed to this: its mobility puts closely matching copies in other
+taxa. Check `contig_taxonomy_decisions.tsv` before trusting a plasmid's
 absence. See [Decontamination](../analysis/decontamination.md).
 
 **`genomad_fdr` is `NA`, deliberately.** geNomad computes an FDR only when its
@@ -230,8 +239,9 @@ geNomad's `plasmid_score` and is populated either way. See
 - Point mutations are reported (tier 1) — the category a homology screen cannot see.
 - Tier 2 is not reached: its one candidate, the chromosomal `bla`CTX-M-15 with IS*Ecp1*
   48 bp upstream, is lifted to tier 4 by its curated Tn*Ecp1.1* name.
-- A class 1 integron's 3′ conserved segment is recovered as a composite (tier 3).
-- Plasmid mobility is typed, and a non-mobilisable plasmid is labelled honestly (tier 5).
+- An *aadA2* cassette and a class 1 integron's 3′ conserved segment (*qacE*Δ1–*sul1*)
+  are recovered as a composite (tier 3).
+- Plasmid mobility is typed, and a non-mobilisable plasmid is labelled explicitly (tier 5).
 - `bla`NDM-1, on a conjugative plasmid, reaches tier 6 at high confidence — because
   CONJscan typed the mating apparatus rather than merely agreeing with a gene count.
 - The chromosomal ICE is recovered at 0.946 of its curated length with a tRNA-anchored

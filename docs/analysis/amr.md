@@ -1,27 +1,29 @@
 # Antimicrobial resistance
 
-BacFlux looks for resistance genes three times, with three methods that fail in
-different ways. Each one sees things the others cannot.
+BacFlux combines assembly-based screening, short-read mapping and optional
+AMRFinderPlus analysis. These methods use different inputs and detection criteria.
+Their outputs provide genomic evidence of resistance determinants, not a direct
+measurement of antimicrobial susceptibility.
 
-| Leg | Input | Database | Present when | Modes |
+| Analysis | Input | Database | Reporting criterion | Modes |
 |---|---|---|---|---|
 | **ABRicate** | the finished contigs | eight curated sets, one run each | ≥80% identity over ≥70% of the reference gene | all four |
 | **BBMap → CARD** | the trimmed read pairs | CARD protein homolog model | ≥70% of the reference gene's **length** covered by reads | `illumina`, `hybrid` |
 | **AMRFinderPlus** | Bakta's proteins + the contigs | NCBI's AMRFinderPlus database | AMRFinderPlus's own per-gene curated cutoffs | all four, *optional* |
 
-The first two are stage `05.amr` and always run. The third runs inside the
-mobilome module, so it appears only when `mobilome.run: true`, and its output
-lands in `08.mobilome` rather than `05.amr` — see
+The first two belong to stage `05.amr`; CARD mapping requires short reads. The third
+runs inside the mobilome module, so it appears only when `mobilome.run: true`, and its
+output lands in `08.mobilome` rather than `05.amr` — see
 [the mobilome module](../mobilome/index.md).
 
 **Why three.** Assembly collapses repeats, so a gene present in several copies —
 or one sitting on a repeat-rich mobile element that broke the assembly — can be
 under-represented or missing in the contigs while sitting plainly in the reads.
 Mapping side-steps the assembly entirely. ABRicate gives breadth across eight
-independently curated gene sets and is the leg carrying the EFSA reporting
+independently curated gene sets and is the analysis carrying the EFSA reporting
 thresholds. AMRFinderPlus gives each call a coordinate, a method label and a
 drug class, which is what the mobility analysis needs to intersect AMR genes with
-mobile elements, and it is the only leg that can report resistance-conferring
+mobile elements, and it is the only analysis that can report resistance-conferring
 **point mutations**.
 
 None of the three replaces another, and their counts are not meant to agree.
@@ -62,7 +64,7 @@ abricate --db card contigs_final.fasta --minid 80 --mincov 70 --nopath --quiet
 
 `--minid 80` and `--mincov 70` are the EFSA reporting thresholds: a hit must show
 at least 80% identity over at least 70% of the reference gene's length. They
-belong to **this leg only**. The CARD read leg below gates on reference-length
+belong to **this analysis only**. The CARD read analysis below gates on reference-length
 coverage instead, and AMRFinderPlus applies its own curated per-gene cutoffs; a
 blanket 80/70 across all three would fight that curation.
 
@@ -87,11 +89,14 @@ blanket 80/70 across all three would fight that curation.
 
 Short-read modes only — `illumina` and `hybrid`. The gate is a capability flag,
 "does this mode produce short reads", not a mode name, so `nanopore` and
-`contigs` get no CARD leg and never build the BBMap environment.
+`contigs` get no CARD analysis and never build the BBMap environment.
 
 The fastp-trimmed pairs are mapped straight onto CARD's
-`nucleotide_fasta_protein_homolog_model.fasta` — the CARD model that holds
-acquired resistance genes, as opposed to its mutation-based models. BBMap's
+`nucleotide_fasta_protein_homolog_model.fasta`, CARD's protein homolog model:
+reference sequences detected by presence, as opposed to its variant models, which
+detect resistance through specific mutations. It also holds efflux components,
+regulators and entries whose resistance comes from gene loss; see the report
+categories below. BBMap's
 `covstats` output then says, for every reference sequence, how much of it the
 reads actually covered. A gene is called present when **at least 70% of its
 length** is covered.
@@ -109,7 +114,7 @@ Set `links.card_link` to CARD's `broadstreet-*.tar.bz2` archive, or point
 !!! warning "The 0.99 identity claim was wrong. Do not quote it."
 
     Until v2.0.0 this rule passed BBMap `idfilter=0.99`, and the code and the
-    README both described the leg as screening reads at 99% identity. **It never
+    README both described the analysis as screening reads at 99% identity. **It never
     did.** `idfilter` does not filter the primary alignment of a properly-paired
     read: in BBMap 39.33's own source,
     `align2/AbstractMapThread.java::processIDFilter` clears the mapping only
@@ -126,12 +131,13 @@ Set `links.card_link` to CARD's `broadstreet-*.tar.bz2` archive, or point
     and it changes no output — it states what has always been running, using the
     flag that enforces it.
 
-The identity floor was deliberately **not** raised to 0.99. At a real 0.99 the
-same reads keep almost none of their alignments, so the one AMR leg that is
-immune to assembly collapse would report almost nothing.
+The identity floor was deliberately **not** raised to 0.99. At a real 0.99 the same
+reads keep almost none of their alignments, so this read-based analysis would report
+almost nothing in the tested dataset.
 
-The leg is a sensitive screen whose specificity comes from the ≥70%
-reference-length gate, not from per-read identity. A methods section can say
+This is a sensitive screen. Its specificity comes from the ≥70% reference-length
+gate, not from per-read identity; neither establishes phenotypic resistance, and
+closely related reference sequences can still share reads. A methods section can say
 "reads were mapped with BBMap at its default minimum identity (0.76) and a CARD
 sequence was reported when reads covered ≥70% of its length". It cannot claim a
 99% identity screen.
@@ -165,8 +171,12 @@ the table, and nothing is then dropped for what kind of entry it turned out to b
 | `regulator` | Regulates a resistance system rather than conferring resistance itself | CpxR, MexR |
 | `presence_indicates_susceptibility` | CARD's mechanism for the entry is "resistance by absence". Detecting it **by presence** indicates the opposite of resistance | mgrB, OmpK35, OmpK36, OprD, LamB, carO |
 
-The last category is a sign error, not a borderline call, which is why it gets
-its own label and a `note` column spelling out what the presence means.
+The last category covers CARD entries whose resistance mechanism is "resistance by
+absence": resistance arises when the gene is lost or inactivated. Reads covering such
+a gene show that a copy is present, which points away from that mechanism; the `note`
+column says so on every such row. Coverage cannot show whether the copy is
+functional — a point mutation or internal stop codon leaves it covered — so the row
+does not establish susceptibility either.
 
 The `regulator` label uses the long-standing convention that a name ending in R
 is the regulator of the operon named without it (MexR regulates *mexAB*). The
@@ -240,22 +250,20 @@ tool is in the Bakta conda environment and its database is inside the Bakta
 database — and the full report adds five things the mobility analysis needs:
 
 1. the `Method` column (`EXACTX`, `BLASTX`, `PARTIALX`, `HMM`, `POINTX`…), which
-   is a confidence tier straight from the tool;
-2. the `PARTIAL*` methods, which flag a hit truncated at a contig end — the
-   honest signal for a fragmented assembly;
+   records the detection method rather than a universal confidence score;
+2. the `PARTIAL_CONTIG_END*` methods, which flag a hit truncated at a contig end —
+   the explicit indication of a partial hit on a fragmented assembly; a bare
+   `PARTIAL*` hit is truncated inside the contig instead;
 3. element type and subtype (AMR / STRESS / VIRULENCE);
 4. drug class and subclass;
 5. resistance-conferring **point mutations**, when the organism is known.
 
-Point mutations are the one thing neither of the other legs can reach. ABRicate
-asks "is this gene present?" and answers by BLAST — exactly right for an acquired
-gene, and structurally blind to a mutated one. Query a susceptible genome for
-*gyrA* and you get a hit at ~99.9% identity; query a resistant one and you get a
-hit at ~99.9% identity. The substitution that decides the phenotype is averaged
-away inside the percentage, and no threshold separates them, because the
-difference is one residue at one coordinate. AMRFinderPlus with `--organism`
-loads a curated list of known resistance-conferring substitutions for that
-species and inspects the coordinate itself.
+AMRFinderPlus provides curated point-mutation interpretation for supported organisms.
+ABRicate reports gene matches, identity and coverage; its gene-presence summary does
+not interpret the phenotype associated with a particular residue. BLAST alignments
+can reveal substitutions, but a general identity cutoff does not replace curated
+organism-specific mutation rules. For example, susceptible and resistant *gyrA*
+alleles can both match at about 99.9% identity while differing at a relevant codon.
 
 ### `--organism`, and why it is usually absent
 
@@ -342,7 +350,7 @@ calls, so the rule refuses to guess — including when a hybrid sample's two ass
 disagree. Every decision, and its reason, lands in
 `{sample}_amrfinder_organism_audit.tsv`.
 
-!!! warning "A mutations file with no mutation rows means 'not assessed', never 'no mutations found'"
+!!! warning "Distinguish unassessed mutation screening from a negative result"
 
     When no organism matches, `{sample}_amrfinderplus_mutations.tsv` is written
     with a single line saying point-mutation screening was not available. Writing
@@ -352,7 +360,7 @@ disagree. Every decision, and its reason, lands in
 
 ## What BacFlux does not decide: intrinsic or acquired
 
-None of the three legs classifies a gene as intrinsic or acquired, and the
+None of the three analyses classifies a gene as intrinsic or acquired, and the
 mobilome module does not either. EFSA's definitions are population-level:
 
 > **Intrinsic AMR gene** — "Gene inherent to strains of a bacterial species … An
@@ -382,11 +390,13 @@ chromosomal AmpC and the acquired CTX-M.
 does not produce the judgement.** The confirmatory work is a species-wide
 distribution analysis plus phenotypic testing.
 
-Where the three legs do line up with the guidance: EFSA (2024a) requires the AMR
-search to run against at least two maintained, curated databases at ≥80% identity
-and ≥70% length coverage. BacFlux runs ten database queries across the three legs
-— eight through ABRicate, plus CARD by read mapping and AMRFinderPlus — with those
-thresholds applied on the ABRicate leg.
+Where the three analyses do line up with the guidance: EFSA (2024a) requires the AMR
+search to run against at least two maintained, curated databases at ≥80% identity and
+≥70% length coverage. BacFlux queries eight ABRicate resources covering AMR, virulence
+and serotyping; these are not eight independent AMR databases. CARD mapping is added
+when short reads are available, and AMRFinderPlus when the mobilome module is enabled.
+The 80%/70% thresholds apply to ABRicate; the other analyses use their stated criteria.
+These query counts alone do not establish compliance with a guidance document.
 
 For what happens to an AMR call once the mobilome module has it, see
 [the mobility ladder](../mobilome/mobility-ladder.md).
@@ -432,7 +442,7 @@ For what happens to an AMR call once the mobilome module has it, see
 - Seemann, T. ABRicate. <https://github.com/tseemann/abricate>
 - Bushnell, B. BBMap. <https://sourceforge.net/projects/bbmap/>
 
-The claim that a BLAST-style presence search is *structurally* unable to resolve
-point mutations is inference from what the tools compute, not a statement any of
-the sources above makes. The `idfilter` behaviour was read from BBMap's own source
+The statement that an identity cutoff cannot separate susceptible from resistant
+alleles is inference from what the tools compute, not a statement any of the sources
+above makes. The `idfilter` behaviour was read from BBMap's own source
 and confirmed by mapping one set of reads both as pairs and as single-end.

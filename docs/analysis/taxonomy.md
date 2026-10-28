@@ -1,14 +1,15 @@
 # Taxonomy
 
-Stage `03.taxonomy` answers one question — what is this isolate? — with one tool,
-GTDB-Tk 2.7.2 against GTDB **R232**.
+Stage `03.taxonomy` classifies the assembly with GTDB-Tk 2.7.2 and the GTDB
+**R232** reference. Use the reported lineage, ANI evidence and classification
+notes together when assessing the isolate's identity.
 
 `classify_wf` finds the ~120 bacterial marker proteins in the genome, aligns them and
 places them on the Genome Taxonomy Database reference tree, then refines the call with
 skani ANI comparisons against the closest reference genomes. The answer is a full
 lineage from domain to species with the ANI evidence behind it.
 
-That matters for a food- and feed-safety workflow: whether an AMR gene found later
+That matters for strain assessment: whether an AMR gene found later
 reads as intrinsic or acquired depends on having the species right; see
 [the mobility ladder](../mobilome/mobility-ladder.md).
 
@@ -63,8 +64,9 @@ summary comes back with two rows keyed by the staged basenames, `{sample}_illumi
 `02.assembly/{sample}/eval/{sample}_qc_genomes.tsv` records which of the two is the
 delivered genome.
 
-Two rows that disagree are worth a look. They are the same DNA sequenced two ways, so a
-disagreement points at one of the assemblies rather than at the taxonomy.
+Investigate disagreement between the hybrid classifications. Compare assembly
+quality, retained sequences and reference-match evidence; differences can reflect
+the assemblies, filtering or the evidence available to the classifier.
 
 ## GTDB names are not NCBI names
 
@@ -97,10 +99,12 @@ point at.
 
 ## Resources
 
-`--cpus` and `--pplacer_cpus` are both set to `min(resources.threads, 24)` — one knob,
+`--cpus` and `--pplacer_cpus` are both set to `min(resources.threads, 24)` — one parameter,
 and `--cores` caps what Snakemake grants on top of it. pplacer's
 **memory** scales with its thread count and can reach tens of GB, which is why the cap
-exists. Thread count changes speed and memory only, never the classification.
+exists. Thread count changes runtime and memory use, not any classification setting.
+Classifications from different runs are comparable only with the same GTDB-Tk version
+and reference release.
 
 This is the single most expensive step in a BacFlux run, which is also why a hybrid
 sample is classified in one invocation rather than two: `classify_wf` loads the
@@ -112,7 +116,9 @@ reference tree and the skani sketches on every call.
   reference genome and its ANI. A species-level call needs the ANI to clear GTDB's
   threshold; below it, the row stops at genus.
 - The genus here against `{sample}_composition.txt` from
-  [decontamination](decontamination.md#the-composition-report). A mismatch means the
-  contig filter and the classifier disagree about what the isolate is, and the
-  decontamination audit file is where to settle it.
+  [decontamination](decontamination.md#the-composition-report). A mismatch warrants
+  review of the per-contig assignments in
+  `02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv` and of the GTDB-Tk
+  call. Decontamination uses NCBI taxonomy and GTDB-Tk uses GTDB names, so part of a
+  mismatch can be nomenclature alone.
 - `09.report/multiqc_report.html` — the classification for the whole batch on one page.

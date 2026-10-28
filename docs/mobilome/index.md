@@ -1,13 +1,13 @@
 # Mobilome module
 
-Stage `08.mobilome` answers one question, once for every antimicrobial resistance
-gene BacFlux finds:
+Stage `08.mobilome` combines resistance-gene calls with predicted mobile genetic
+elements to describe genomic context and potential mobility. It reports one row
+per assessed gene, together with confidence fields and an audit of the supporting
+evidence.
 
-> **Is this gene embedded in a mobile genetic element, and if so, how transferable
-> is that element?**
-
-It is optional and off by default; everything below assumes you have switched it on
-([Turning it on](enabling.md)).
+The module is disabled by default. Enable it with `mobilome.run: true`; see
+[Enabling the module](enabling.md). Its predictions do not demonstrate transfer,
+phenotypic resistance or the intrinsic/acquired status of a gene.
 
 !!! note "Four terms this section uses constantly"
 
@@ -24,18 +24,19 @@ It is optional and off by default; everything below assumes you have switched it
     is a coding sequence, the stretch of DNA that codes for one protein; and **EFSA**
     is the European Food Safety Authority.
 
-## Why a gene's address matters as much as its name
+## Why genomic context matters { #why-a-genes-address-matters-as-much-as-its-name }
 
-An AMR gene list tells you what an isolate can resist. It does not tell you whether
-that resistance can move. A chromosomal efflux pump that every member of the species
-carries, and a *bla*CTX-M sitting on a conjugative plasmid, produce the same kind of
-line in an ABRicate table and mean very different things — only the second can end up
-in another bacterium. That is the distinction regulators ask about: **intrinsic**
-resistance versus **acquired**.
+A gene-presence result identifies sequence evidence for a determinant. It does not
+establish resistance phenotype or transfer potential. A chromosomal efflux pump
+carried by every member of a species and a *bla*CTX-M gene on a conjugative plasmid
+give the same kind of line in an ABRicate table; only the second sits on an element
+that can transfer to another cell. Strain assessment asks exactly this: whether a
+resistance gene is **intrinsic** or **acquired**. Context informs that judgement but
+does not, by itself, establish intrinsic or acquired resistance.
 
-The module produces *supporting evidence* for that judgement, never the judgement
-itself. [The mobility ladder](mobility-ladder.md) sets out the framing, the EFSA
-definitions behind it, and why tier 1 says *candidate*.
+The module supplies supporting genomic evidence for the judgement, not the judgement
+itself. [The mobility ladder](mobility-ladder.md) explains the six categories, the
+EFSA definitions behind them, their decision order and interpretation limits.
 
 ## The mobility ladder
 
@@ -51,9 +52,18 @@ next to the number, so nobody reading the TSV has to look a tier up.
 | **5** | `mobilisable_needs_helper` | on a plasmid, or inside an IME |
 | **6** | `predicted_self_transmissible` | inside an ICE, or on a conjugative plasmid |
 
-The rungs are tested top down and the first match wins, so a curated transposon *on a
+Tier 5 covers every plasmid that Platon did not type conjugative, so on the plasmid
+route it records plasmid context rather than demonstrated helper-dependent transfer.
+`mobility_tier_label` and `plasmid_mobility` separate the cases: an IME and a plasmid
+typed `mobilisable` (a relaxase or *oriT* hit) keep `mobilisable_needs_helper`; a
+plasmid typed `non_mobilisable` is labelled `on_plasmid_typed_non_mobilisable`; a
+plasmid without mobility typing (`unknown`, for example one called by geNomad alone)
+keeps the generic label at `medium` confidence, with the audit reason
+`plasmid_mobility_untyped`.
+
+The tiers are tested top down and the first match wins, so a curated transposon *on a
 plasmid* scores 5 or 6 rather than 4. That order, the three distance windows behind
-it, and how far to trust each rung — tier 4 is measured on two genomes, tier 5's IME
+it, and how far to trust each tier — tier 4 is measured on two genomes, tier 5's IME
 route on none — are all on
 [The mobility ladder](mobility-ladder.md).
 
@@ -64,18 +74,26 @@ configuration**. The other 12 belong to four optional layers, each of which stay
 until you give it a source ([Optional layers](optional-layers.md)).
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 25
+---
 flowchart LR
     C([contigs_final.fasta<br/>02.assembly])
-    FAA([bakta .faa, .gff3 and .tsv<br/>04.annotation])
+    FAA([Bakta annotation<br/>04.annotation])
     TAX([GTDB-Tk call<br/>03.taxonomy])
     PLA([Platon calls<br/>06.plasmids])
 
     CL[contig_lengths]
-    IS[isescan<br/>insertion sequences]
+    IS[isescan<br/>IS elements]
     IST[isescan_table]
     AFP[amrfinderplus]
-    ORG[amrfinder_organism<br/>unlocks point mutations]
-    CJ[conjscan<br/>relaxase, coupling protein,<br/>mating apparatus]
+    ORG[amrfinder_organism<br/>picks the organism]
+    CJ[conjscan<br/>conjugation genes]
     CJI[conjscan_ice<br/>ICE and IME calls]
     REP[mobilome_replicons]
 
@@ -87,15 +105,13 @@ flowchart LR
     TAX --> ORG --> AFP
     PLA --> REP
 
-    CO[amr_mge_colocalisation]
+    CO[amr_mge_colocalisation<br/>sample_amr_mobility.tsv<br/>and its _audit.tsv]
     CL --> CO
     IST --> CO
     AFP --> CO
     CJI --> CO
     REP --> CO
 
-    CO --> O1([sample_amr_mobility.tsv])
-    CO --> O2([sample_amr_mobility_audit.tsv])
 ```
 
 Three things follow from that picture:
@@ -112,7 +128,7 @@ Three things follow from that picture:
   and Platon's replicon calls from `06.plasmids`.
 
 The ICE/IME caller, the composite-transposon test and the *att*-site search run in
-**all four modes**, including `illumina`. The one leg that is mode-restricted is the
+**all four modes**, including `illumina`. The one analysis that is mode-restricted is the
 optional ISOSDB copy-number layer, which maps reads and therefore needs them —
 `illumina` and `hybrid` only.
 
@@ -133,16 +149,15 @@ whether the element is mobile.
 | `06.plasmids`, `07.phages` | what replicons and prophages are in this genome? (detection) | always |
 | `08.mobilome` | is each AMR gene in a mobile element, and how transferable? (interpretation), plus IS, transposon, integron and ICE detection | opt-in |
 
-Renaming `08.mobilome` was considered and deliberately rejected in favour of
-explaining it. See [Plasmids](../analysis/plasmids.md) and
-[Prophages](../analysis/phages.md) for the detection stages.
+For the detection stages, see [Plasmids](../analysis/plasmids.md) and
+[Prophages](../analysis/phages.md).
 
 ## Why it is off by default
 
-**Scope.** Most characterisation rounds want the AMR gene list, not the mobility
-argument behind it. The always-on AMR legs — ABRicate on the contigs, and the CARD
-read screen in the modes that have short reads — are unaffected by this switch
-([Antimicrobial resistance](../analysis/amr.md)).
+**Scope.** Enable the module when the analysis requires genomic context and predicted
+mobility in addition to gene detection. The always-on AMR analyses — ABRicate on the
+contigs, and the CARD read screen in the modes that have short reads — are unaffected by
+this switch ([Antimicrobial resistance](../analysis/amr.md)).
 
 **Cost.** Ten extra rules on the default path, three of them per-sample tool runs at
 up to 8 threads, plus a one-off model download.
@@ -187,10 +202,10 @@ re-annotated and re-run end to end:
 | median called ÷ true element length | 0.55 | 0.45 | 0.34 | 0.22 |
 | ICE/IME calls at `confidence: high` | 24% | 19% | 10% | 3% |
 
-The **class** survives fragmentation; the **extent** does not. A low-confidence call
-on a draft means the assembly could not support a stronger claim, not that the call is
-wrong. Which columns to read and what not to conclude:
-[Draft assemblies](draft-assemblies.md).
+On this benchmark the class of an element survived fragmentation better than its
+extent. A low-confidence call on a draft means the assembly could not support a
+stronger claim, not that the call is wrong. Which columns to read and what not to
+conclude: [Draft assemblies](draft-assemblies.md).
 
 ## False IS21 calls over replication genes
 
@@ -229,8 +244,8 @@ its relatives, every DnaC-type gene other than the chromosome's own sits inside 
 phage, transposon or IS21 element (Brézellec et al. 2016). Removing every call over a
 gene named *dnaC* or *dnaI* would have deleted 15 real calls in BacFlux's test data.
 
-**The fix: check the neighbour.** The chromosome's own loader sits next to a fixed
-partner gene:
+**Filtering criterion: conserved neighbouring genes.** The chromosome's own loader sits
+next to a fixed partner gene:
 
 - *dnaC* shares an operon with *dnaT* (Masai & Arai 1988);
 - *dnaI* shares one with *dnaB*, and *nrdR* is the next gene along, 1–3 kb from
@@ -276,11 +291,11 @@ They stay in the IS table, as they would without the rule.
 | Page | What it covers |
 |---|---|
 | [The mobility ladder](mobility-ladder.md) | the six tiers in full, the IS-inside-CDS case, and the intrinsic-versus-acquired framing with its references |
-| [Turning it on](enabling.md) | the one switch, and what each of the four optional layers needs before it will run |
+| [Enabling the module](enabling.md) | the one switch, and what each of the four optional layers needs before it will run |
 | [Optional layers](optional-layers.md) | what each layer adds, what it costs, and where its data comes from |
 | [Reading the output](output.md) | every column of `{sample}_amr_mobility.tsv`, the audit trail, and the rest of `08.mobilome/` |
 | [Draft assemblies](draft-assemblies.md) | what fragmentation does to a call, and which columns still hold |
-| [Tuning](tuning.md) | symptom to knob |
+| [Tuning](tuning.md) | symptoms, relevant settings and measured trade-offs |
 | [Worked example](worked-example.md) | one genome end to end, with the real rows |
 | [Validation](validation.md) | the ICE and IME pilots, the negative control, the head-to-head against the EBI pipeline, and what the benchmark does not show |
 

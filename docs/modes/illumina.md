@@ -1,7 +1,9 @@
 # Illumina mode
 
-`mode: illumina` — Illumina paired-end reads in, a decontaminated SPAdes assembly
-out. Six rules, in `workflow/rules/illumina/`.
+Use `mode: illumina` for bacterial isolate paired-end reads. BacFlux removes PhiX
+reads, trims adapters and low-quality sequence, assembles with SPAdes, and screens
+the contigs before downstream analysis. The mode-specific rules are in
+`workflow/rules/illumina/`.
 
 !!! abstract "Terms used on this page"
 
@@ -10,6 +12,17 @@ out. Six rules, in `workflow/rules/illumina/`.
     | **AMR** | antimicrobial resistance |
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+    subGraphTitleMargin:
+      top: 8
+      bottom: 20
+---
 flowchart TD
     subgraph FE["mode: illumina, rules in workflow/rules/illumina/"]
         direction TB
@@ -40,10 +53,10 @@ flowchart TD
 
 ## 1. PhiX removal
 
-An Illumina lane carries a PhiX spike-in — a small bacteriophage genome added as a
-sequencing control. Left in, it assembles into a ~5.4 kb contig that is not part of
-the isolate and skews the coverage statistics BlobTools later uses to separate
-organisms.
+PhiX is a bacteriophage whose library is commonly spiked into Illumina runs as a
+sequencing control. If present, its reads can produce an approximately 5.4 kb contig unrelated
+to the bacterial isolate. BacFlux removes matching reads before assembly. The
+later decontamination selector uses taxonomy; coverage is recorded for inspection.
 
 `download_phix` fetches the reference named by `links.phix_link`, `build_phix`
 indexes it, and `map_phix` runs `bowtie2 --local` per sample keeping the pairs that
@@ -61,20 +74,21 @@ time rather than at the first job.
 `trim_adapters` runs fastp with `--detect_adapter_for_pe` (the adapter is inferred
 from the pairing itself), `--cut_front` and `--cut_right` for sliding-window quality
 trimming, and `--length_required 100`. Adapter read-through and low-quality tails
-create false k-mers, which SPAdes turns into short spurious contigs; 100 bp is the
-length below which a read stops helping a 127-mer assembly.
+can introduce erroneous k-mers and complicate assembly. fastp then discards reads
+shorter than 100 bp (`--length_required 100`, fixed in the rule rather than a
+configuration key). The SPAdes k-mer selection is separate, as described below.
 
 It writes `{sample}_fastp.html` for a human and `{sample}_fastp.json` for MultiQC.
 Both are kept; the trimmed FASTQs are temporary and survive only until the last rule
-that reads them is finished — the assembler, the coverage alignment, the CARD leg
+that reads them is finished — the assembler, the coverage alignment, the CARD analysis
 and, when the mobilome copy-number layer is on, the two BBMap depth rules.
 
 ## 3. Assembly
 
-`illumina_assembly` runs one SPAdes per sample in `--isolate` mode, which is tuned for
-a single high-coverage bacterial culture. The multi-k sweep resolves low-complexity and
-repeat-rich regions in one pass, and by default **SPAdes chooses the k-mer ladder
-itself** from the read length it measures:
+`illumina_assembly` runs one SPAdes per sample in `--isolate` mode, which is tuned for a
+single high-coverage bacterial culture. The assembler uses several k-mer sizes to
+construct the assembly. By default, **SPAdes chooses the k-mer sizes** from the measured
+read length:
 
 | read length | ladder SPAdes picks |
 |---|---|
@@ -104,12 +118,11 @@ memory are left uncapped.
 
 ## 4. Length and coverage filter
 
-`filter_contigs` keeps contigs of **at least 500 bp and at least 2× coverage**,
-reading both numbers straight off SPAdes' own header
-(`>NODE_1_length_12345_cov_67.8`). A pure-isolate assembly has a long tail of tiny,
-low-coverage contigs — sequencing noise, chimeras, fragments of other DNA in the
-sample — which add nothing to the annotation but do inflate the contig count, the
-CheckM contamination estimate and the BLAST screening time.
+`filter_contigs` keeps contigs of **at least 500 bp and at least 2× coverage**, reading
+both numbers straight off SPAdes' own header (`>NODE_1_length_12345_cov_67.8`). This
+removes short or low-coverage sequences that can include assembly artefacts or
+low-abundance DNA. These thresholds can also remove genuine sequence, so consider them
+when assessing small replicons or absence of a feature.
 
 The result is `02.assembly/{sample}/contigs_filt.fasta`, the draft the contamination
 screen reads. Both cutoffs are fixed in the workflow, not config keys.
@@ -126,18 +139,18 @@ step can delete a real plasmid, is on
 
 ## What this mode cannot do, and what it gets instead
 
-- **No topology.** Nothing here can say a contig is circular, so Bakta is not handed a
-  `--replicons` table and treats every sequence as linear. A gene running across the
-  origin is annotated as two fragments.
+- **No circularity information is passed to Bakta.** The mode does not provide a
+  `--replicons` table, so annotation treats sequences as linear. Genes crossing a
+  sequence boundary may be split or missed.
 - **Fragmentation is the constraint on the mobilome module.** Insertion sequences are a
   leading cause of contig breaks — identical copies collapse in the assembly graph, so
   an AMR gene and its flanking IS often land on different contigs. The module runs
   here, reports every call's distance to the contig end, and caps anything spanning
   contigs at low confidence. See [Draft assemblies](../mobilome/draft-assemblies.md).
-- **The reads are a second chance.** Mapping reads onto CARD side-steps the assembly
-  entirely, so a determinant on a collapsed repeat can be visible in the reads and
-  absent from the contigs. That leg runs here and in `hybrid` only — see
-  [Antimicrobial resistance](../analysis/amr.md).
+- **Read-based AMR evidence complements the assembly.** Mapping reads onto CARD
+  side-steps the assembly entirely, so a determinant on a collapsed repeat can be
+  visible in the reads and absent from the contigs. That analysis runs here and in
+  `hybrid` only — see [Antimicrobial resistance](../analysis/amr.md).
 
 ## What it writes
 

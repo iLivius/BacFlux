@@ -1,40 +1,40 @@
 # Nanopore mode
 
-`mode: nanopore` — Oxford Nanopore Technologies (ONT) long reads in, a reoriented,
-polished Flye assembly out. Seven rules, in `workflow/rules/nanopore/`.
+Use `mode: nanopore` for Oxford Nanopore Technologies (ONT) reads. The workflow
+filters reads, assembles with Flye, reorients circular contigs and screens for
+contamination. Medaka polishing is optional. The mode-specific rules are in
+`workflow/rules/nanopore/`.
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+---
 flowchart TD
-    subgraph FE["mode: nanopore, rules in workflow/rules/nanopore/"]
-        direction TB
-        RAW([ONT reads as basecalled])
-        QC1[raw_long_read_qc<br/>NanoPlot, before]
-        FL[filter_long_reads<br/>Filtlong]
-        QC2[filtered_long_read_qc<br/>NanoPlot, after]
-        ASM[ont_assembly<br/>Flye]
-        FIX[fix_start<br/>dnaapler, reorient to dnaA]
-        POL[long_read_consensus<br/>Medaka]
-        FIN[finalize_contigs]
+    RAW([ONT reads as basecalled])
+    QC1[raw_long_read_qc<br/>NanoPlot, before]
+    FL[filter_long_reads<br/>Filtlong]
+    QC2[filtered_long_read_qc<br/>NanoPlot, after]
+    MK[check_medaka_model<br/>resolves the Medaka model<br/>before Flye starts]
+    ASM[ont_assembly<br/>Flye]
+    FIX[fix_start<br/>dnaapler, reorient to dnaA]
+    SC[contamination screen, shared<br/>BLAST, BlobTools, genus selector]
+    POL[long_read_consensus<br/>Medaka]
+    FIN[finalize_contigs]
+    OUT([contigs_final.fasta])
 
-        RAW --> QC1
-        RAW --> FL --> QC2
-        FL --> ASM --> FIX --> POL --> FIN
-    end
-
-    subgraph MC["checked before the assembler starts"]
-        direction TB
-        MK[check_medaka_model<br/>resolves the Medaka model]
-    end
+    RAW --> QC1
+    RAW --> FL --> QC2
     FL --> MK
+    FL --> ASM
+    MK --> ASM
+    ASM --> FIX --> SC --> POL --> FIN --> OUT
     MK --> POL
-
-    subgraph SH["shared, workflow/rules/shared/"]
-        direction TB
-        SC[contamination screen<br/>BLAST, BlobTools, genus selector]
-        OUT([contigs_final.fasta])
-        SC --> OUT
-    end
-    FIN --> SC
+    SC -.->|Medaka off| FIN
 ```
 
 There is no PhiX step: PhiX is an Illumina spike-in and does not exist in an ONT
@@ -48,18 +48,18 @@ seconds rather than an hour of assembly — see
     |---|---|
     | **CARD** | Comprehensive Antibiotic Resistance Database |
 
-## 1. Read filtering, and why it is the biggest lever in this mode
+## 1. Read filtering { #1-read-filtering-and-why-it-is-the-biggest-lever-in-this-mode }
 
-An ONT run produces reads of wildly varying length and quality, and far more data
-than a bacterial isolate needs. Assembling everything is slower and worse: short,
-poor reads add errors without adding contiguity. `filter_long_reads` runs Filtlong
-with three settings:
+ONT read length, quality and depth vary between datasets. Filtlong reduces the
+input according to length, quality and total bases. Filtering can reduce assembly
+cost, but may also remove reads from small plasmids. The rule
+`filter_long_reads` uses these settings:
 
 | Flag | From | Default | What it does |
 |---|---|---|---|
-| `--min_length` | `parameters.long_read_qc.min_length` | 1000 | drops reads too short to span a repeat, which is ONT's whole advantage |
+| `--min_length` | `parameters.long_read_qc.min_length` | 1000 | removes reads shorter than the threshold |
 | `--keep_percent` | `parameters.long_read_qc.keep_percent` | 95 | keeps the best N% of the remaining bases, by Filtlong's own score |
-| `--target_bases` | fixed at 5×10⁸ | — | stop at ~100× for a 5 Mbp genome; more costs Flye time and buys nothing |
+| `--target_bases` | fixed at 5×10⁸ | — | limits input to about 100× for a 5 Mbp genome |
 
 !!! warning "`keep_percent` is what decides whether a small plasmid survives"
 
@@ -123,8 +123,9 @@ different one, are in [The Medaka polishing model](../methods_medaka_model.md).
 ## 3. Assembly and reorientation
 
 `ont_assembly` runs Flye with `--iterations 5` of its own internal long-read
-polishing. Long reads span the repeats that break a short-read assembly, so Flye
-usually closes a bacterial chromosome into one circular contig.
+polishing. Long reads can span repeats that fragment short-read assemblies. The resulting
+contiguity and circularity depend on read quality, depth and genome structure;
+check Flye's topology calls and assembly QC rather than assuming closure.
 
 A circular sequence has no natural start, and Flye's arbitrary one makes two
 assemblies of the same isolate look different. `fix_start` runs `dnaapler all`, which
@@ -149,7 +150,7 @@ geNomad and the BLAST screen all join on that token.
 
 The contamination screen runs on the **reoriented** assembly, and Medaka polishes the
 **decontaminated** one. Polishing a contaminant contig with this isolate's reads would
-waste effort and could smear real differences.
+use computation on sequence intended for removal.
 
 Medaka runs with `-x`, which rebuilds its two index files of the draft (`.fai` and
 `.map-ont.mmi`, written beside the draft in `contaminants/`) every time it runs. The
@@ -170,12 +171,12 @@ which one it copied. That one line is the provenance of the delivered genome.
 
 ## What it gives up
 
-- **No read-based CARD screen.** That leg needs short reads. ABRicate on the contigs
+- **No read-based CARD screen.** That analysis needs short reads. ABRicate on the contigs
   still runs ([Antimicrobial resistance](../analysis/amr.md)).
 - **No length or coverage filter on the contigs.** The reoriented assembly reaches the
   screen as Flye left it.
 - **Residual base errors** are what Medaka fixes; switching it off leaves them in.
-  Indels in homopolymers frameshift genes and ruin an annotation.
+  Residual indels, including those in homopolymers, can disrupt gene prediction.
 
 ## What it writes
 

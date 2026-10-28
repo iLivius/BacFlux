@@ -3,12 +3,12 @@
 Five bacterial isolates with published, high-accuracy reference genomes, run end to end
 through `hybrid` mode with every optional layer enabled. The genomes come from the
 Autocycler benchmark, where each was sequenced deeply on ONT and Illumina and assembled
-to a curated reference — which makes them the rare case where BacFlux's output can be
-checked against a known answer rather than against another prediction.
+to a curated reference — providing an external reference for assessing assembly content
+and sequence.
 
 Two things came out of it: a measurement of when short-read correction of long reads
 helps and when it does harm, and an end-to-end picture of what the workflow delivers on
-genomes whose true content is known.
+genomes with curated reference assemblies.
 
 !!! abstract "Terms used on this page"
 
@@ -35,20 +35,17 @@ IS density is counted by the mobilome module on each finished assembly, so it is
 number the workflow produces rather than one taken from the literature. It counts every
 ISEScan call, including the one or two look-alike calls described under Mobilome below.
 
-!!! warning "The published depth is not a realistic depth"
+!!! note "The experiment used the published 50× ONT subsets"
 
-    The ONT sets published with these isolates run to **306×–1,070×**, because they were
-    sequenced for an assembler benchmark. A sequencing facility multiplexing bacterial
-    isolates on one flow cell delivers a small fraction of that, and nobody outside a
-    methods study will see these depths.
+    The full ONT sets published with these isolates reach **306×–1,070×**, far deeper
+    than routine isolate sequencing. The full-depth runs had short-read guidance on, and
+    with guidance on `hybrid` passes Filtlong no `--target_bases` cap: Flye reported
+    `Assembled 0 disjointigs` on all five genomes. The runs described here therefore use
+    the **50× subsets** published alongside the full sets, which is also the depth the
+    original benchmark assembled.
 
-    That difference is not cosmetic. `hybrid` mode applies **no coverage cap** to its ONT
-    reads — the short reads are expected to guide the assembly instead — and at these
-    depths Flye assembles nothing at all, reporting `Assembled 0 disjointigs` on all five
-    genomes. The runs described here therefore use the **50× subsets** published
-    alongside the full sets, which is also the depth the original benchmark assembled.
-
-    If you are running `hybrid` on unusually deep ONT data, subsample it first.
+    With guidance off, the default, Filtlong caps the ONT reads at 500 Mb with
+    `--target_bases`. With guidance on, subsample unusually deep ONT data before the run.
 
 ## Short-read correction of long reads: it can help, and it can lose a replicon
 
@@ -75,9 +72,10 @@ filtering before them:
 | *Klebsiella pneumoniae* | 5 | 4c, +2,274 | 4c, +2,281 | 4c, −1,234 |
 | *Shigella flexneri* | 8 | **40c, −35,210** | 6c, +22,974 | 6c, +21,340 |
 
-The unguided arm tracks the unfiltered arm on every genome. Filtlong's own length and
-quality filtering is therefore harmless; **the entire effect comes from the short-read
-guidance**, and the mechanism is visible in the flags. `--split` severs a read wherever
+The unguided and unfiltered arms produced the same contig counts on all five
+genomes. This comparison points to the guidance options as the main source of the
+observed differences; it does not establish that length and quality filtering are
+harmless on other datasets. `--split` severs a read wherever
 1,000 consecutive bases lack short-read support, and the regions where support thins are
 repeats and IS elements — the same regions whose spanning reads hold an assembly
 together. The severed fragments still pass `--min_length`, so mean read length and N50
@@ -95,15 +93,18 @@ short reads — it was the only arm to recover both replicons.
     the one genome that was neither. Both quantities are measurable before assembly for
     the short reads, and only after assembly for IS density.
 
-    The practical reading: **treat short-read guidance as unsafe on repeat-rich genomes
-    and on shallow short-read data.** A fragmented ONT assembly next to a much less
-    fragmented short-read assembly of the same isolate is the signal that it has bitten.
+    The practical reading: short-read guidance warrants particular scrutiny on
+    repeat-rich genomes or shallow Illumina data. It is disabled by default. A
+    fragmented ONT assembly should prompt comparison of the filtering arms and read
+    support; fragmentation alone does not identify its cause.
 
 ## What the workflow delivered
 
 Assemblies, against the published references. These runs had short-read guidance
-**on**, so the numbers below are the `guided` column of the table above; the mobilome
-results that follow were produced from these same assemblies.
+**on**. The table measures the delivered genomes, after polishing, whereas the arm
+comparison above measured the Flye assemblies, so total lengths differ from the
+`guided` column by up to 40 bp. The mobilome results that follow were produced from
+these delivered genomes.
 
 | genome | contigs | assembled | difference |
 |---|--:|--:|--:|
@@ -113,22 +114,26 @@ results that follow were produced from these same assemblies.
 | *Enterobacter hormaechei* | 3 | 5,293,335 | −91,412 bp |
 | *Shigella flexneri* | 40 | 4,793,237 | −35,250 bp |
 
-*Providencia* is four bases from a reference built with Trycycler, Medaka, Polypolish and
-Pypolca. Two failure modes account for the rest, and both are worth recognising in your
-own data.
+*Providencia* differs in total assembly length by four bases from a reference built
+with Trycycler, Medaka, Polypolish and Pypolca. Equal or similar total length does
+not establish sequence accuracy. Two failure modes account for the rest, and both are
+worth recognising in your own data.
 
 **Small plasmids go missing.** *Klebsiella*'s reference carries a 1,240 bp plasmid and
 *Enterobacter*'s an 80,745 bp one; neither survived. This is the documented small-plasmid
 loss of long-read assembly, described in
 [att sites and small plasmids](methods_att_and_small_plasmids.md).
 
-**Small plasmids also arrive doubled.** On *Shigella*, three of the six small plasmids
-assembled as exact tandem concatemers — 2 × 6,790, 3 × 3,181 and 4 × 3,835 bp, matching
-whole multiples to within 9 bp. A read longer than a small circle wraps it more than
-once, and the assembler represents that as a tandem repeat. The consequence is not
-cosmetic: the replicon looks several times its true size and its genes appear more than
-once, so gene content and copy number read from it are wrong. Four of the eight replicons
-were recovered exactly, three as concatemers, two lost.
+**Small plasmids also arrive doubled.** In the unguided arm, three of *Shigella*'s six
+small plasmids assembled as tandem concatemers — 2 × 6,790, 3 × 3,181 and 4 × 3,835 bp,
+matching whole multiples to within 9 bp. A read longer than a small circle wraps it more
+than once, and the assembler represents that as a tandem repeat. The replicon then
+appears several times its true size and its genes more than once, so gene content and
+copy number read from it are wrong. Aligned against the reference, that assembly
+recovered three of the eight replicons as single contigs (the chromosome, the 222 kb
+plasmid and the 5,057 bp plasmid), three as concatemers, and lost the two smallest
+plasmids (2,088 and 1,240 bp). Total assembly length cannot separate these outcomes;
+only a per-replicon alignment can.
 
 ### Mobilome
 
@@ -148,10 +153,11 @@ helicase loader, which the module removes before anything reads the IS table (se
 On these genomes that is one call fewer for *Providencia* and two fewer for each of the
 other four. No AMR gene's tier and no ICE/IME candidate depends on those calls.
 
-The distribution matches what is known about these organisms. *Listeria innocua* is a
-non-pathogen and returns two AMR genes, both intrinsic candidates. *Klebsiella* returns
-44 genes as predicted self-transmissible. *Shigella*'s 392 IS elements are 4× the next
-genome's and are the direct cause of its fragmented assembly.
+In these runs, *L. innocua* returned two tier-1 intrinsic candidates; this label
+does not establish species-wide intrinsic resistance. *Klebsiella* returned 44 genes
+with predicted self-transmissible context. *Shigella* had 392 IS calls, roughly four
+times the next-highest count. Repeat density is consistent with its assembly difficulty,
+but the count alone does not establish the cause of each contig break.
 
 *Enterobacter* produced **15 tier 4 rows**, all fifteen genes inside a single curated
 transposon, Tn*SMR478*, on the chromosome — a stress- and metal-resistance cluster. Tier
@@ -173,8 +179,8 @@ The isolates, the sequencing, the reference genomes and the read subsets are the
 Ryan Wick, Benjamin Howden and Timothy Stinear, published with the Autocycler paper and
 released on Figshare. BacFlux assembles with Flye alone and is not a competitor to a
 consensus assembler; where an assembly matters more than the analysis that follows it,
-Autocycler is the better tool, and its output can be fed to BacFlux through `contigs`
-mode.
+a consensus assembly approach such as Autocycler may be appropriate. Its output
+can be analysed by BacFlux in `contigs` mode.
 
 > Wick RR, Howden BP, Stinear TP (2025). *Autocycler: long-read consensus assembly for
 > bacterial genomes.* **Bioinformatics** 41(9), btaf474.

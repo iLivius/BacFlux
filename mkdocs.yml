@@ -56,6 +56,11 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences:      # nested code blocks, and Mermaid diagrams
+      # Keep tab characters inside code blocks. The sample_overrides and
+      # include_genera_by_sample examples on the decontamination page are TSV
+      # files: without this the tabs become spaces, and a copied example is
+      # rejected by the selector.
+      preserve_tabs: true
       # Without this block a ```mermaid fence is syntax-highlighted as text
       # instead of drawn. Material ships the Mermaid runtime itself, so no
       # extra JavaScript or plugin is needed.
@@ -105,7 +110,7 @@ nav:
   - Mobilome module:
       - mobilome/index.md
       - The mobility ladder: mobilome/mobility-ladder.md
-      - Turning it on: mobilome/enabling.md
+      - Enabling the module: mobilome/enabling.md
       - Optional layers: mobilome/optional-layers.md
       - Reading the output: mobilome/output.md
       - Draft assemblies: mobilome/draft-assemblies.md

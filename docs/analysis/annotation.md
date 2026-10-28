@@ -1,10 +1,9 @@
 # Annotation
 
-Stage `04.annotation` turns the finished genome into gene calls and functional labels.
-Four tools run here, in all four modes, all of them in
-`workflow/rules/shared/40_annotation.smk`. Every front end has already converged on one
-canonical assembly (`02.assembly/{sample}/contigs_final.fasta`), so nothing in this
-stage branches on the sequencing technology.
+Stage `04.annotation` predicts genes and assigns functional annotations to
+`02.assembly/{sample}/contigs_final.fasta`. Four tools provide complementary
+outputs through `workflow/rules/shared/40_annotation.smk`. The stage is available
+in all modes, with circular-replicon information supplied in the long-read modes.
 
 Bakta goes first and the other three read its output, not the contigs, so one gene
 set underlies every functional layer: a CAZyme cluster, a biosynthetic cluster and an
@@ -15,7 +14,7 @@ orthologous group all sit on the same coordinates.
 | [Bakta](https://github.com/oschwengers/bakta) | 1.12.1 | where the genes are, and what they are called | `04.annotation/bakta/{sample}/` |
 | [eggNOG-mapper](https://github.com/eggnogdb/eggnog-mapper) | 2.1.15 | what each protein's orthologous group is known to do | `04.annotation/eggnog/{sample}/` |
 | [antiSMASH](https://github.com/antismash/antismash) | 8.0.4 | which biosynthetic gene clusters the genome carries | `04.annotation/antismash/{sample}/` |
-| [run_dbcan](https://github.com/bcb-unl/run_dbcan) | 5.1.2 | which sugars and polysaccharides it can process | `04.annotation/dbcan/{sample}/` |
+| [run_dbcan](https://github.com/bcb-unl/run_dbcan) | 5.1.2 | predicted carbohydrate-active enzymes, clusters and substrates | `04.annotation/dbcan/{sample}/` |
 
 Three of the four are terminal products — you read them, nothing downstream does.
 Bakta is the exception: MultiQC summarises it, and the optional mobilome module reads
@@ -63,17 +62,18 @@ Bakta writes an organism name into its GFF3, GenBank, EMBL and JSON files and in
 title of its plot. The rule therefore passes it a genus, as `--genus X --species sp.`, where X is
 the one line of `02.assembly/{sample}/contaminants/{sample}_kept_genus.txt`.
 
-Decontamination writes that file. It holds the genus of the contigs that were
-**kept**, chosen by the same count `auto` mode votes with: by default, the kept genus
-holding the most DNA. So the genus Bakta receives is always one that is actually in
-the delivered genome, and in `auto` mode it is the genus the vote kept (see
+Decontamination writes that file. It holds the genus of the contigs that were **kept**,
+chosen by the same count `auto` mode votes with: by default, the kept genus holding the
+most DNA. This genus reflects taxonomic assignments among the retained contigs, and in
+`auto` mode it is the genus the vote kept (see
 [how `auto` picks the genus](decontamination.md#how-auto-picks-the-genus)). Contigs
 BLAST could not place never count, so the genus is never `no-hit`.
 
-It is a label and nothing more: Bakta's gene calls and annotations do not depend on it,
-so a wrong genus mislabels the files and changes no result. When no kept contig has a genus, the file is empty and Bakta runs without
-one. That happens only when every kept contig is unplaced, which needs
-`discard_no_hit: false` or `mode: off`.
+The genus is organism metadata only: Bakta's gene calls and annotations do not depend on
+it, so a wrong genus mislabels the files and changes no result. Compare it with the
+GTDB-Tk classification in `03.taxonomy` before submitting the annotation. When no kept
+contig has a genus, the file is empty and Bakta runs without one. That happens only when
+every kept contig is unplaced, which needs `discard_no_hit: false` or `mode: off`.
 
 The first line of `logs/annotation_{sample}.log` records the genus used, as
 `Annotating {sample} as genus: X`, or says that there was none.
@@ -105,7 +105,7 @@ EC number.
 |---|---|
 | **In** | `{sample}.faa` from the Bakta directory |
 | **Out** | `04.annotation/eggnog/{sample}/` with the `{sample}.emapper.*` tables |
-| **Next** | nobody — you. MultiQC does not read it |
+| **Next** | User interpretation; MultiQC does not read these tables |
 
 The search runs in DIAMOND mode (`-m diamond`) against `directories.eggnog_db`. A
 scratch directory is written alongside the results and deleted by Snakemake when the
@@ -126,10 +126,10 @@ reach into a directory you keep.
 
 ### `--dbmem`: the RAM trade-off
 
-This is the slowest part of a BacFlux run, and usually the last rule still going. The
-reason is the annotation phase: it does random-access lookups into a 39 GB SQLite
-database, once per seed ortholog. `--dbmem` loads that database wholly into memory so
-the lookups become in-memory ones, and releases it when eggNOG-mapper exits.
+eggNOG-mapper can be a major runtime contributor, particularly when its SQLite database
+is on network storage. During the annotation phase, it does random-access lookups into a
+39 GB SQLite database, once per seed ortholog. `--dbmem` loads that database wholly into
+memory so the lookups become in-memory ones, and releases it when eggNOG-mapper exits.
 
 ```yaml
 parameters:
@@ -156,12 +156,12 @@ parameters:
     switch. The DIAMOND search is only ~150 s of that; over 90% of the default
     runtime is the seed-ortholog lookup phase, which is what the flag removes.
 
-    The size of the win depends on your storage. These timings were taken with
-    `eggnog.db` on network storage (**NFS**), where every cache miss is a network
-    round-trip — the worst case for random access, and the best case for this flag.
-    On a local SSD expect a smaller gain. The three `dbmem` runtimes barely differ
-    despite a 65% spread in protein count: once the database is resident, the fixed
-    ~39 GB load dominates, so the saving grows with genome size and with the number of
+    The measured speed-up depends on database storage and workload. These timings were
+    taken with `eggnog.db` on network storage (**NFS**), where every cache miss is a
+    network round-trip — the worst case for random access, and the best case for this
+    flag. On a local SSD expect a smaller gain. The three `dbmem` runtimes barely differ
+    despite a 65% spread in protein count: once the database is resident, the fixed ~39
+    GB load dominates, so the saving grows with genome size and with the number of
     genomes in the batch.
 
 Two things happen when you switch it on, both at parse time, before any job starts:
@@ -198,7 +198,7 @@ closest known relative.
 |---|---|
 | **In** | `{sample}.gbff` from the Bakta directory; the antiSMASH reference database |
 | **Out** | `04.annotation/antismash/{sample}/` |
-| **Next** | nobody — you |
+| **Next** | User interpretation |
 
 It runs with `--taxon bacteria` and `--genefinding-tool none`. The second flag tells
 antiSMASH not to re-predict genes but to reuse Bakta's calls, which travel inside the
@@ -231,7 +231,7 @@ Clusters, and predicts the substrate each cluster acts on.
 |---|---|
 | **In** | `{sample}.faa` and `{sample}.gff3` from the Bakta directory; the verified dbCAN database |
 | **Out** | `04.annotation/dbcan/{sample}/` |
-| **Next** | nobody — you |
+| **Next** | User interpretation |
 
 Four `run_dbcan` sub-commands run in sequence, all writing into that one directory:
 

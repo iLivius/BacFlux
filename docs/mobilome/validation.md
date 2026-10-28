@@ -1,21 +1,23 @@
 # Validation
 
-The mobilome module's ICE/IME caller has been measured three ways: against a set of
-curated elements with published coordinates, head-to-head against the EBI Mobilome
-Annotation Pipeline on the same genomes and with the same scoring code, and on
-deliberately fragmented copies of those genomes to find out what a draft assembly
-costs. This page is that work — what was tested, what it showed, and [what it does
-not show](#what-the-benchmark-does-not-show).
+This page describes three evaluations of the ICE/IME caller: recovery of curated
+elements, comparison with the EBI Mobilome Annotation Pipeline, and sensitivity to
+simulated assembly fragmentation. The results describe the tested datasets and software
+versions. Read them alongside the [limitations](#what-the-benchmark-does-not-show),
+especially when interpreting AMR mobility tiers.
 
-Terms used throughout. An **ICE** (integrative and conjugative element)
-integrates into the chromosome and carries its own conjugation machinery, so it can
-move itself into another cell. An **IME** (integrative mobilisable element)
-integrates and carries a relaxase — the enzyme that nicks the DNA to start transfer —
-but no apparatus of its own, so it needs a helper element to move. An ***att* site**
-is the short direct repeat left at each end of an element when it integrates; finding
-the pair is how an element's true edges are established. **AMR** is antimicrobial
-resistance, an **MGE** is a mobile genetic element of any class, and an **AICE** is an
-actinomycete integrative and conjugative element.
+Terms used throughout. An **ICE** (integrative and conjugative element) integrates into
+the chromosome and carries its own conjugation machinery, so it can move itself into
+another cell. An **IME** (integrative mobilisable element) integrates and carries a
+relaxase — the enzyme that nicks the DNA to start transfer — but no complete conjugation
+apparatus of its own, so it needs a helper element. BacFlux calls an element `ime` only
+when it finds an integrase and a relaxase without a typed mating-pair system; elements
+mobilised without an encoded relaxase are outside what it detects
+([Tuning](tuning.md#what-no-knob-fixes)). An ***att* site** is the short direct repeat
+left at each end of an element when it integrates; a supported pair can help locate an
+element's boundaries. **AMR** is antimicrobial resistance, an **MGE** is a mobile
+genetic element of any class, and an **AICE** is an actinomycete integrative and
+conjugative element.
 
 !!! warning "Everything the module reports is a prediction from sequence"
 
@@ -33,17 +35,17 @@ yield 30 curated elements.
 | Set | Genomes | What it is |
 |---|--:|---|
 | ICE pilot | 18 | Deposits carrying an ICE with curated coordinates in ICEberg, across 14 genera |
-| IME pilot | 12 | The same for IMEs, 10 genera, sizes deliberately straddling the module's size floor (522 bp to 110 kb) |
+| IME pilot | 12 | The same for IMEs, 10 genera, sizes deliberately straddling the 8,000 bp ICE floor (522 bp to 110 kb) |
 | Negative control | 12 | Closed genomes with **no** curated ICEberg entry, 32,601,100 bp in total |
 
 Every accession, with the reason it was chosen, is listed under
 [the benchmark genomes](#the-benchmark-genomes) below. The negative set spans reduced
-endosymbionts, streamlined marine genomes, a deep-branching thermophile, five
-full-size reference strains and one archaeon — the archaeon being a construction
-check, since the machinery models are bacterial and any call there would be spurious
-by definition.
+endosymbionts, streamlined marine genomes, a deep-branching thermophile, five full-size
+reference strains and one archaeon — the archaeon being a construction check, since the
+machinery models are bacterial and a call there would require separate evaluation
+outside the models' intended scope.
 
-**How a call is scored.** ICEberg's curated interval is taken as truth. Among a
+**How a call is scored.** ICEberg's curated interval is used as the reference. Among a
 caller's calls on that genome the scorer keeps the one with the largest overlap, and
 reports the start offset, the end offset, and the **recovered fraction** — overlapping
 base pairs divided by the curated length. Recovered fraction is a recall measure and
@@ -62,9 +64,9 @@ the negative control and the call-burden count below have to be read alongside i
 ## The benchmark genomes
 
 Every genome is a public GenBank deposit, used as downloaded. The sets were chosen
-deliberately rather than sampled — the IME set in particular is stacked with elements
-below the module's size floor, which is why its recall is the lowest number on this
-page.
+deliberately rather than sampled — the IME set includes small elements and architectures
+that challenge the caller. Its recovery rate should not be extrapolated to an unselected
+population of IMEs.
 
 ### ICE pilot — 18 genomes
 
@@ -93,16 +95,18 @@ Six are classic positive controls; the rest widen the set to 14 genera.
 
 ### IME pilot — 12 genomes
 
-Sizes deliberately straddle `min_element_bp` (8,000 bp): six of the twelve sit **below**
-the floor, so they are expected misses that measure what the floor costs.
+The selection straddles the 8,000 bp ICE size floor: six of the twelve elements are
+smaller. IME-architecture clusters are admitted from a 2,000 bp machinery span, and
+element length and machinery-span length are different quantities, so the six are not
+all misses: with the ICEscan layer on, three of them are detected.
 
 | Accession | Organism | Curated element | Length | Why this one |
 |---|---|---|--:|---|
-| `AE009948` | *Streptococcus agalactiae* | IME_Sag2603_rpmG | 522 bp | extreme sub-floor: 522 bp, 15x below min_element_bp; smallest IME in ICEberg |
+| `AE009948` | *Streptococcus agalactiae* | IME_Sag2603_rpmG | 522 bp | extreme sub-floor: 522 bp; smallest of the 395 IMEs in ICEberg 3.0 (`ground_truth.tsv`) |
 | `CP001103` | *Alteromonas mediterranea* | MGIAmaMed1 | 1,248 bp | deep sub-floor: 1.2 kb MGI, Gram-negative counterpart to the 522 bp case; genus diversity: Alteromonas |
 | `CP002888.1` | *Streptococcus salivarius* | IME_Ssal57I_tRNAlys | 5,123 bp | modal sub-floor architecture: S. salivarius tRNALys ~5.1 kb family, 11 near-identical copies in ICEberg |
 | `NC_013316.1` | *Clostridioides difficile* | IME_CdiR20291_ND | 5,551 bp | sub-floor, no named integration site (ND) so no tRNA hint for the att search; genus diversity: Clostridioides |
-| `U15027` | *Clostridium perfringens* | Tn4451 | 6,338 bp | named IME control: tnpX serine recombinase + oriT, no T4SS = the IME row of the [classification table](output.md#an-ice-cannot-sit-on-a-plasmid) (integrase and relaxase, no T4SS); 1.7 kb below the floor |
+| `U15027` | *Clostridium perfringens* | Tn4451 | 6,338 bp | named IME control: tnpX serine recombinase + oriT, no T4SS; curated IME used to test the [classification rules](output.md#an-ice-cannot-sit-on-a-plasmid); 1.7 kb below the 8,000 bp ICE floor (`--min-element-bp`) |
 | `NC_017860` | *Prevotella intermedia* | MTnPi10 | 7,591 bp | floor edge case: 7591 bp, only 409 bp below min_element_bp; sits on a 580 kb second chromosome |
 | `NC_004668.1` | *Enterococcus faecalis* | IME_EfalV583_rpsI | 9,405 bp | just above the floor; same chromosome as ICE pilot entry ICE_EfalV583_tRNALys, so it tests ICE vs IME discrimination in one genome |
 | `CP011419.1` | *Streptococcus suis* | IME_SsuNSUI002_NS | 11.1 kb | above floor, no named integration site; genus diversity: Streptococcus suis |
@@ -124,7 +128,7 @@ Genomes with **no** curated ICEberg entry. Any call here is a candidate false po
 | `NC_007516.1` | *Synechococcus* sp. CC9605 | marine picocyanobacterium, no curated ICE |
 | `NC_000918.1` | *Aquifex aeolicus* VF5 | deep-branching thermophile, 1.55 Mb |
 | `NC_002745.2` | *Staphylococcus aureus* N315 | well-characterised clinical isolate, no ICEberg entry |
-| `NC_000913.3` | *Escherichia coli* K-12 MG1655 | the reference lab strain; its mobilome is fully described and holds no ICE |
+| `NC_000913.3` | *Escherichia coli* K-12 MG1655 | the reference lab strain; well-characterised genome with no curated ICEberg entry in this benchmark |
 | `NC_002516.2` | *Pseudomonas aeruginosa* PAO1 | reference strain, extensively studied |
 | `NC_000964.3` | *Bacillus subtilis* 168 | **Mis-assigned when the set was built.** ICE*Bs1* is present in 168 — it was discovered there (Auchtung 2005) — but ICEberg has no entry for it. The caller finds it, so this is a true positive scored as a false alarm. It is left in place rather than quietly removed |
 | `NC_003197.2` | *Salmonella Typhimurium* LT2 | reference strain, no curated ICEberg entry |
@@ -135,8 +139,9 @@ Genomes with **no** curated ICEberg entry. Any call here is a candidate false po
 That is 9 of the 11 with real chromosomal context, and 6 of the 7 where the deposited
 record *is* the element and there is no flanking sequence for an *att* site to sit in.
 
-**The true ceiling is 17 of 18**, because one of the three misses is the broken
-curated record. Each miss has a stated cause:
+One of the three misses cannot be found by any caller: the deposited `SXT(HN1)` record
+carries no relaxase and no conjugation apparatus, so 17 of 18 is the ceiling on this
+set. Each miss has a stated cause:
 
 | Miss | Size | Why |
 |---|--:|---|
@@ -154,8 +159,8 @@ and the two are [not interchangeable](#the-094-figure-is-not-the-0669-figure).
 
 ## IME pilot — 5 of 12
 
-Median recovered fraction 0.69. **This is the weaker half of the module and is
-described that way everywhere it appears.**
+The median recovered fraction is 0.69. IME recovery was lower than ICE recovery in
+these selected pilot sets.
 
 The misses concentrate at the small end — 522 bp, 1,248 bp and 5,123 bp — and at SGI1
 (42 kb) and MGI*Vvu*Tai1 (19 kb). Elements under about 2 kb rarely give any relaxase
@@ -163,25 +168,28 @@ signal. The 5.1 kb element is lost to integrase assignment instead: a nearer int
 joins the machinery cluster, and the element's own integrase is left with nothing to
 attach to (see [Tuning](tuning.md#an-element-you-know-is-there-was-not-reported)).
 
-There is a second, structural limit on this half of the module, and it is visible in
-the code rather than in the score. The *att* search is always given the 8 kb ICE floor
-and refuses any repeat pair implying an element smaller than that, while an IME is
-admitted at 2 kb. Four of the five detected IMEs have machinery spans of 3,840,
-4,959, 5,942 and 6,252 bp, all under the *att* floor, so **their boundaries can never
-be resolved however clean the repeat pair is** — they keep `boundary_method = none`
-and report the machinery span. The deliberate reading is that an *att* pair implying a
-3 kb element is mostly noise; the honest reading is that IME extents are largely
-unresolved. Both floors are constants in the script rather than config keys; see
-[Tuning](tuning.md).
+The boundary search uses the 8 kb ICE floor even for candidates admitted under the
+2 kb IME machinery floor: it rejects every repeat pair implying an element shorter than
+8 kb. Three of the five detected curated IMEs are shorter than that (5,551, 6,338 and
+7,591 bp), so a pair at their true ends would be rejected. An unresolved call retains
+its machinery span and `boundary_method=none`. Neither floor is a configuration key,
+and a per-class *att* floor has not been measured. See [Tuning](tuning.md) for the two
+separate thresholds.
 
-## Negative control — 2 calls in 32.6 Mb
+## Negative control — 2 calls in 32.6 Mb, ICEscan layer off { #negative-control-2-calls-in-326-mb }
 
 Ten of the twelve genomes returned nothing at all, including *E. coli* K-12 MG1655,
 *P. aeruginosa* PAO1 and *S. aureus* N315 — three large, well-annotated genomes dense
-with recombinases, prophages and insertion sequences. The archaeon is among them,
-which is the construction check passing.
+with recombinases, prophages and insertion sequences. With the default models the
+archaeon is among them, which is the construction check passing; with the ICEscan layer
+on it is not (below).
 
-Two calls were made, and neither survives as an error.
+With the default machinery models alone, two calls were made. One corresponds to a
+known ICE; the other remains unresolved. With the ICEscan layer on, the same genomes
+gave five: the same two plus three low-confidence `cime_or_island` calls on the archaeon
+*Halobacterium* sp. NRC-1, built from integrase and type IV secretion profile hits with
+no assembled system (`evidence_level=profile_hits_only`). Both arms, re-run with the
+v2.1.0 code and models, give the same calls at the same coordinates.
 
 **_B. subtilis_ 168 → ICE*Bs1*, a real element ICEberg has not catalogued.** Called at
 529,362–549,932, so 20,571 bp against an element of about 20.5 kb; all four anchor
@@ -193,13 +201,16 @@ call in the whole validation.
 **_S._ Typhimurium LT2 → an open question, not an answer.** An integrase sits beside a
 protein Bakta labels only "DNA-binding protein", which the `T4SS_MOBM` relaxase profile
 hits at i-evalue 1.8 × 10⁻⁸⁴ over 98.6% of the profile — a near-full-length relaxase
-match. A strong relaxase beside an integrase is what an IME is. Whether this locus is
-a *bona fide* IME or two co-located genes is a domain question, not a software one.
+match. A strong relaxase match beside an integrase supports an IME candidate, but does not
+establish a functional element. Further examination is needed to distinguish an IME
+from co-located genes.
 
-!!! warning "This is an upper bound of 2 candidate calls, not a false-positive rate"
+!!! warning "These are candidate calls, not a false-positive rate"
 
-    "Absent from ICEberg" is not "contains no element". The honest reading is **2
-    candidates in 12 genomes, of which 0 are confirmed errors**.
+    "Absent from ICEberg" is not "contains no element". With the default models the
+    result is **two candidates in 12 genomes: one known element and one unresolved
+    candidate**.
+    This does not establish a zero false-positive rate.
 
     The set originally justified including *B. subtilis* 168 on the grounds that
     ICE*Bs1* is absent from 168 itself. **That is false — ICE*Bs1* was discovered in
@@ -210,7 +221,7 @@ a *bona fide* IME or two co-located genes is a domain question, not a software o
 
 ## What the second model set adds
 
-The optional ICEscan layer ([Turning it on](enabling.md)) supplies the integrase and
+The optional ICEscan layer ([Enabling the module](enabling.md)) supplies the integrase and
 IME/AICE models that the default machinery model set has no equivalent for. It was
 measured as a controlled two-arm experiment over the 28 pilot genomes: both arms
 identical, the only difference being whether the ICE caller was given ICEscan's
@@ -234,8 +245,11 @@ now adds three IMEs: the two below, and `IME_SsuNSUI002_NS`, now recovered as a
 4,959 bp call starting 63 bp from its curated start.
 
 **No element gained a self-transmissible claim.** Every net-new call in the ICEscan
-arm is an IME or an AICE — tier 5 or no tier at all. The layer can add elements at the
-mobilisable end of the ladder; it cannot promote anything to the top rung.
+arm is an IME or an AICE — tier 5 or no tier at all — and both arms hold 36 `ice`
+calls. ICEscan cannot supply a mating apparatus, because its mating-pair and
+coupling-protein hits are never used as anchors. Its integrase or relaxase hits can
+complete an ICE that the default models alone left as a conjugative region or island;
+on these 28 genomes that did not happen.
 
 The two new detections of the original run fit the curated element closely rather than
 being oversized intervals that merely contain it: Tn*4451* at 0.94 of its curated length
@@ -254,7 +268,8 @@ question, not a settled one.
 
 The same 40 genomes were run through the EBI Mobilome Annotation Pipeline v5.0.0, its
 output converted into the same table layout, and **the same unmodified scoring script**
-run over both. Any bias in that scorer applies equally to both callers. Two differences
+run over both. Using one scorer makes the evaluation procedure consistent, but does not remove
+its limitations or guarantee that they affect both callers equally. Two differences
 are contained in the comparison rather than controlled for: the two pipelines call
 genes with different tools (Prodigal there, Bakta here), which affects both the protein
 set the shared models search and the integrase annotation; and the other pipeline was
@@ -295,9 +310,9 @@ Over the 30 curated elements:
 
 The three are ICE*Vfl*Ind1, Tn*4451* and MTn*Pi*10; in each, the other pipeline's
 prescan produced no candidate at all. Because the machinery models are shared, the
-difference cannot be explained by a better model — it is attributable to what sits
-around the shared engine: candidate seeding, a class-aware size floor, and the
-decision to report low-quorum machinery at low confidence rather than discard it.
+difference is consistent with implementation choices around that engine, including
+candidate seeding, size floors and low-quorum reporting. Gene prediction and other
+version differences also remain part of the comparison.
 
 ICE*Vfl*Ind1 is detected but classified `cime_or_island` — integrase, coupling protein
 and apparatus, **no relaxase** — not `ice`. It counts as detected because its call
@@ -311,10 +326,10 @@ three are ICEberg-curated **ICEs that the other pipeline called IMEs**, and BacF
 agrees with the curation on all three: SPI-7, `ICE_EfalV583_tRNALys` and
 `ICE_Step12228_tRNAser`.
 
-This is not cosmetic. ICE versus IME **is** the self-transmissible-versus-needs-a-helper
-distinction — rungs 6 and 5 of the ladder, and the axis the intrinsic-versus-acquired
-framing rests on. Calling a self-transmissible element "mobilisable with a helper"
-understates transfer risk.
+ICE and IME labels imply different predicted transfer requirements and can affect
+tiers 6 and 5 when an AMR gene is assigned to the interval. They do not by themselves
+establish whether the gene was acquired, whether it is expressed, or whether transfer
+occurs under the conditions of interest.
 
 Two things keep this from being a claim that one caller is right about class in
 general. There is a fourth element, TR2, where **both** callers say IME against an
@@ -329,16 +344,21 @@ rate.
 | BacFlux | 65 | 2,630,059 |
 | EBI pipeline | 64 | 2,881,859 |
 
-One call apart, and BacFlux claims 8.7% fewer base pairs while recovering three more
-curated elements. Neither caller achieves recall by volume. This table has to be read
+BacFlux's 65 calls are 63 on the 28 pilot genomes with the ICEscan layer on and 2 on
+the 12 negative genomes with CONJScan alone. With the layer on all 40 genomes, as in the
+EBI pipeline, BacFlux makes 68 calls over 2,687,359 bp: 6.7% fewer base pairs than the
+EBI pipeline while recovering three more curated elements. Neither caller achieves
+recall by volume. This table has to be read
 next to the recall figures, because the scorer keeps a caller's *largest overlapping*
 call: a tool that emitted one enormous call per genome would score well on recovered
 fraction and badly on nothing the scorer measures.
 
 ### Negative set, and the one call both callers made
 
-Two calls each across the 32.6 Mb, on different genomes — BacFlux on *S.* Typhimurium
-LT2, the EBI pipeline on *S. aureus* N315 — plus the shared call on *B. subtilis* 168.
+With BacFlux's default models, two calls each across the 32.6 Mb, on different genomes
+— BacFlux on *S.* Typhimurium LT2, the EBI pipeline on *S. aureus* N315 — plus the
+shared call on *B. subtilis* 168. With the ICEscan layer on, BacFlux adds three
+low-confidence calls on the archaeon.
 
 On that shared call the two pipelines return **base-pair-identical coordinates, the
 same 60 bp flanking repeat, the same MOBT relaxase and the same mating-pair type**, by
@@ -415,8 +435,8 @@ assembly.
 | `boundary_method = none` | 30 (44%) | 49 (77%) | 55 (82%) | 54 (90%) |
 | Calls on the 12 negative controls | 5 | 4 | 3 | 2 |
 
-**Detection is flat down to 50 kb N50.** ICE recall is identical to the closed genomes
-at both 150 kb and 50 kb, and only breaks at 20 kb.
+**ICE detection was unchanged down to 50 kb N50 in this experiment.** ICE recall is
+identical to the closed genomes at both 150 kb and 50 kb, and only breaks at 20 kb.
 
 **The length collapses, but the caller is not what collapses it.** Against the true
 element, median recovered length falls from 0.55 to 0.22. Against the largest
@@ -424,7 +444,8 @@ surviving contig piece — the ceiling any per-contig caller can reach — it is
 better. The caller keeps recovering the same share of what is still visible; the
 missing bases are the assembly's.
 
-**Nothing is invented.** Across all 191 draft calls: no fabricated *att* sequence
+**No new sequence or high-confidence class promotion was observed in this sweep.**
+Across the 191 draft calls, no reported *att* sequence was absent from the closed genome
 (every *att* pair reported on a draft occurs at least twice in the corresponding
 closed genome), no class promoted at high confidence, no new false positive on a
 negative control. Calls on the negative controls went *down* under fragmentation, from
@@ -459,11 +480,12 @@ The helper scripts are importable Python and are tested outside Snakemake:
 pytest workflow/scripts
 ```
 
-All the tests pass; two are skipped unless pointed at real GTDB-Tk files, and most of
-them are the mobilome package's own. They test
-the code, not the biology — that a repeat planted at a known offset is found, that a
-confidence cap cannot be bypassed, that a malformed input is refused rather than
-silently parsed. Nothing in them says a call is correct.
+Three tests are skipped unless pointed at real GTDB-Tk and GTDB taxonomy files
+(`BACFLUX_TEST_GTDBTK_SUMMARY`, `_SAMPLE` and `_GENUS`, and
+`BACFLUX_TEST_GTDB_TAXONOMY`); most tests cover the mobilome helpers. These tests check
+software behaviour rather than biological validity — that a repeat planted at a known
+offset is found, that a confidence cap cannot be bypassed, that a malformed input is
+refused rather than silently parsed. Nothing in them says a call is correct.
 
 ## What the benchmark does not show
 
@@ -483,9 +505,13 @@ candidate"** — the opposite conclusion. `bla`IMP-8 on `CP021851.1` is the clea
 case: it lies well inside curated Tn*6397*, but 24,007 bp past the right-hand edge the
 caller drew, so it is reported as an intrinsic candidate.
 
-**A tier 1 call in a genome that has any ICE or IME call in it is therefore weaker
-evidence than a tier 1 call in a genome that has none.** Check the distance from the
-gene to the nearest element call before reading "intrinsic candidate" at face value.
+A tier-1 label means that the available evidence did not assign a stronger mobile
+context. It does not establish intrinsic resistance, whether or not another element
+was detected elsewhere in the genome. Only a gene within 5 kb of an element call is
+flagged (`mge_context = near_<class>`); `bla`IMP-8, 24 kb past the called edge, carries
+no flag. In a genome with any ICE or IME call whose `boundary_method` is `none`, check
+the distance from a tier-1 gene to the nearest call before reading "intrinsic
+candidate" at face value.
 
 ### Most calls report a machinery span, not the element's edges
 
@@ -510,13 +536,13 @@ Read `boundary_method` before quoting any coordinate.
 
 Checked against every one of ICEberg's 1,677 curated entries on the 28 pilot
 accessions, not just the 30 pilot elements: 17 of 51 calls (33%) without ICEscan, 21
-of 63 (33%) with it, overlap no curated element; 9 self-transmissible claims and 4
-high-confidence claims rest on nothing measurable in either arm.
+of 63 (33%) with it, overlap no curated element. In each arm, 9 predicted
+self-transmissible calls and 4 high-confidence calls overlap no curated element.
 
-This is an **upper bound on the error rate, not an error rate**. Every genome in both
-pilots was chosen *because* it contains a curated element, so a call overlapping
-nothing curated may be a genuine second element. Nothing in this benchmark can tell
-the difference, and its scorer contains no code that could.
+This is the **fraction without curated overlap, not a false-positive rate**. Every
+genome in both pilots was chosen *because* it contains a curated element, so a call
+overlapping nothing curated may be a genuine second element. Nothing in this benchmark
+can tell the difference, and its scorer contains no code that could.
 
 One class is unvalidated outright. **AICE** — the actinomycete class, which transfers
 double-stranded DNA through a translocase instead of a relaxase — is called twice on
@@ -554,15 +580,15 @@ Tier 6 and tier 1 carry the benchmark work above. The middle of the ladder does 
   "inside an IME" half of tier 5 is untested end to end — which matters, because the
   IME pilot is the weaker half of the module to begin with.
 
-Neither gap is a reason to distrust tiers 1 and 6. Both are a reason to treat a tier 4
-or tier 5 call as an unvalidated code path rather than a measured one, and to say so
-if it appears in a dossier.
+Validation coverage differs between routes. Tier 4 has limited end-to-end examples;
+the IME route to tier 5 has not been exercised with an assigned AMR gene in these runs.
+Report those gaps alongside the boundary-related limitations of tiers 1 and 6.
 
 ## On vmatch
 
-Reviewers ask why the *att*-site search does not use vmatch, the string-matching tool
-the reference ICE finders use for this step. The short answer is that BacFlux's own
-search computes the same thing.
+The *att*-site search does not use vmatch, the string-matching tool the reference ICE
+finders use for this step. BacFlux's own search targets the same class of exact maximal
+repeat.
 
 BacFlux's search finds **exact maximal repeats between the two flanking windows in
 standard-library Python** — vmatch's own semantics. To test that rather than assert it,
@@ -576,16 +602,15 @@ repeat-length floor:
 > 180 distinct flank windows, 1,033 repeats, exact set equality on every window.** No
 > window hit either implementation's internal cap.
 
-Two searches over the same DNA return the same set of repeats, so vmatch would find
-nothing that is not already found, and the search needs no external program at all.
-The same measurement disposes of a related idea: shipping both searches and treating
-their agreement as a confidence signal would be worthless, because identical semantics
-are *expected* to agree exactly.
+The two implementations returned the same set of repeats on every window tested.
+vmatch itself was not run: the comparison partner reimplements its method, so the
+result shows that the shipped search returns the exact maximal repeats it is defined
+to return. Agreement between two implementations of one definition says nothing about
+whether a boundary is biologically real.
 
-The licence position is secondary but real: bioconda's vmatch recipe declares
-`license: Unknown / OTHER` and vmatch.de is unreachable, so its terms cannot be
-established. With no measured benefit on one side and terms that cannot be read on the
-other, it is not adopted.
+The Bioconda recipe for vmatch 2.3.1 declares `license: Unknown / OTHER`, and no
+licence text could be retrieved from the upstream site when this was checked in July
+2026, so its terms could not be established. BacFlux does not use vmatch.
 
 !!! note "An earlier figure that should not be quoted"
 
@@ -619,11 +644,11 @@ experiment), [att sites and small plasmids](../methods_att_and_small_plasmids.md
 *att* search and the vmatch measurement), [Draft assemblies](draft-assemblies.md) (the
 fragmentation sweep) and the [Worked example](worked-example.md) (the end-to-end run).
 
-Call totals differ slightly between measurements — 51 and 63 in the two-arm
-experiment over the 28 pilot genomes, 65 in the call-burden table over all 40, 68 in
-the fragmentation sweep's closed baseline — because they were taken at different
-commits over different subsets. The negative-control count moves the same way: 2 calls
-in the head-to-head, 5 in the sweep's closed-genome row. Each figure is labelled with
+Call totals depend on the genome set and on the ICEscan layer. On the 28 pilot
+genomes: 51 calls without ICEscan and 63 with it. On all 40 genomes: 65 in the
+head-to-head with the EBI pipeline, where the pilot genomes ran with ICEscan and the 12
+negative genomes without it (2 calls), and 68 in the fragmentation sweep's closed
+baseline, all with ICEscan (5 negative-control calls). Each figure is labelled with
 what it was measured over; do not carry one into another's table.
 
 ## References

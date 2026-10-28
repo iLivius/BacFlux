@@ -1,68 +1,64 @@
 # Hybrid mode
 
-`mode: hybrid` — Illumina and ONT reads from the same isolate. Sixteen rules, in
-`workflow/rules/hybrid/`, and the most expensive mode to run: it assembles twice.
+Use `mode: hybrid` when Illumina and ONT reads are available for the same isolate.
+BacFlux assembles both read types, uses the Illumina draft as a comparator, and
+corrects the long-read assembly with short-read evidence. This requires more
+computation than either single-technology mode.
 
-The two technologies have opposite error profiles. Long reads span the repeats that
-break a short-read assembly but still get individual bases wrong, most often indels in
-homopolymers, which frameshift genes and ruin an annotation. Short reads cannot span a
-repeat but they get the base right. Hybrid mode builds the genome from the long reads
-and then corrects it with the short ones.
+The technologies provide complementary evidence: long reads can resolve repeats,
+while high-quality short reads support correction of residual sequence errors.
+Neither input is assumed to be error-free. The mode-specific rules are in
+`workflow/rules/hybrid/`.
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+    subGraphTitleMargin:
+      top: 8
+      bottom: 20
+---
 flowchart TD
-    subgraph SR["1. the short-read arm builds a comparator genome"]
+    subgraph SR["Illumina reads"]
         direction TB
         IR([Illumina R1 and R2])
-        PX[map_phix] --> TR[trim_adapters<br/>fastp]
-        IR --> PX
-        TR --> SA[illumina_assembly<br/>SPAdes --isolate]
-        SA --> SF[filter_contigs]
-        SF --> SSC[contamination screen]
-        SSC --> SEL([contigs_sel.fasta<br/>the clean short-read assembly])
-    end
-
-    subgraph LR2["2. the clean short reads then filter the long ones"]
-        direction TB
-        IDX[index_selected_contigs<br/>bowtie2-build]
-        MSC[map_sel_contigs<br/>keeps only pairs that match]
+        TR[map_phix<br/>trim_adapters<br/>PhiX removal, fastp]
+        SA[illumina_assembly<br/>filter_contigs<br/>SPAdes, then filtered]
+        SSC[contamination screen]
+        SEL([contigs_sel.fasta<br/>comparator genome])
+        MSC[index_selected_contigs<br/>map_sel_contigs<br/>pairs on the draft]
         SELR([SEL_R1 and SEL_R2])
-        IDX --> MSC --> SELR
+        IR --> TR --> SA --> SSC --> SEL --> MSC --> SELR
+        TR --> MSC
     end
-    SEL --> IDX
-    TR --> MSC
 
-    subgraph LA["3. the long-read arm assembles and is polished twice"]
+    subgraph LA["ONT reads"]
         direction TB
         OR([ONT reads])
-        Q1[raw_long_read_qc]
-        FL[filter_long_reads<br/>Filtlong, scored against the short reads]
-        Q2[filtered_long_read_qc]
+        FL[filter_long_reads<br/>Filtlong, NanoPlot QC;<br/>SEL reads if guided]
         ASM[ont_assembly<br/>Flye]
         FIX[fix_start<br/>dnaapler]
-        MED[long_read_consensus<br/>Medaka, long reads]
-        POL[short_read_correction<br/>Polypolish, short reads]
-
-        OR --> Q1
-        OR --> FL --> Q2
-        FL --> ASM --> FIX --> MED --> POL
+        MED[long_read_consensus<br/>Medaka]
+        POL[short_read_correction<br/>Polypolish]
+        OR --> FL --> ASM --> FIX --> MED --> POL
+        FIX -.->|Medaka off| POL
     end
-    SELR --> FL
     SELR --> POL
 
-    CMP[compare_hybrid_assemblies<br/>Snippy, long vs short]
-    POL --> CMP
-    SEL --> CMP
-
-    FSC[contamination screen]
-    OUT([contigs_final.fasta])
-    POL --> FSC --> OUT
+    POL --> OUT([contigs_final.fasta])
+    OUT --> FSC[contamination screen<br/>decision tables only]
+    OUT --> CMP[compare_hybrid_assemblies<br/>Snippy: each ONT stage<br/>against contigs_sel.fasta]
 ```
 
-Read it as three stages. The short reads are assembled **first**, not because that
-assembly is the product, but because a clean short-read assembly is the best available
-filter for the long reads: only the pairs mapping to it survive, and Filtlong then
-scores every ONT read by how much of it those pairs support.
+The Illumina draft is assembled and screened independently of the long-read
+assembly. Reads mapping to its retained contigs are used by Polypolish and, when
+`parameters.hybrid.short_read_guidance: true`, by Filtlong, which then waits for
+the screen; guidance is disabled by default. The final assembly receives a separate
+screen that reports decisions and removes no sequence.
 
 !!! abstract "Terms used on this page"
 
@@ -70,13 +66,13 @@ scores every ONT read by how much of it those pairs support.
     |---|---|
     | **ONT** | Oxford Nanopore Technologies, the long-read sequencing platform |
 
-## How the Illumina leg filters contamination
+## How the Illumina analysis filters contamination { #how-the-illumina-leg-filters-contamination }
 
 The contamination screen runs on the **Illumina draft**, and the Illumina reads that map
 as proper pairs back to the *decontaminated* draft are pulled out (`map_sel_contigs`,
-keeping SAM flag `0x2`). That read set is, by construction, reads from the organism the
-screen decided to keep — a contamination-filtered read set obtained without classifying
-a single read. Polypolish corrects the long-read assembly with it.
+keeping SAM flag `0x2`). This selects reads supported by the retained draft, without
+classifying each read independently. It does not prove that every selected read
+belongs to the intended organism. Polypolish uses these reads for correction.
 
 Whether it also filters the long reads is a setting, `parameters.hybrid.short_read_guidance`:
 
@@ -154,8 +150,10 @@ Polypolish always runs, whether or not Medaka did, so this mode needs no
 
 `compare_hybrid_assemblies` aligns **four** stages of the ONT genome against the
 Illumina assembly and counts the variants: the raw Flye assembly, the reoriented one,
-the Medaka consensus, and the Polypolish-corrected genome. A well-behaved run shows
-the count falling towards zero as polishing proceeds.
+the Medaka consensus, and the Polypolish-corrected genome. In a well-behaved run
+the variant count falls towards zero from the Flye assembly to the corrected
+genome. The Illumina assembly is a comparator, however, not an independently
+validated truth sequence.
 
 The digest is `02.assembly/{sample}/snps/SNPs_summary.txt`, with the four Snippy
 directories beside it. With Medaka off, stage `03` holds a `skipped.txt` instead.

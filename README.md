@@ -33,7 +33,7 @@ The detailed map, step by step, is on the [documentation home page](https://iLiv
 | [Choosing a mode](https://iLivius.github.io/BacFlux/getting-started/choosing-a-mode/) | which mode a dataset belongs in, and what a wrong one does |
 | [Modes](https://iLivius.github.io/BacFlux/modes/) | the four front ends, one page each |
 | [Analysis stages](https://iLivius.github.io/BacFlux/analysis/decontamination/) | decontamination, QC, taxonomy, annotation, AMR, plasmids, prophages |
-| [Mobilome module](https://iLivius.github.io/BacFlux/mobilome/) | AMR mobility: the ladder, the switch, the output, and its limits |
+| [Mobilome module](https://iLivius.github.io/BacFlux/mobilome/) | activation, mobility tiers, outputs and interpretation limits |
 | [Configuration](https://iLivius.github.io/BacFlux/reference/configuration/) | every key, which modes read it, its default and its trade-off |
 | [Output files](https://iLivius.github.io/BacFlux/reference/output/) | what each stage writes, and which files are the deliverables |
 | [Running BacFlux](https://iLivius.github.io/BacFlux/reference/running/) | dry runs, the CPU budget, restarting an interrupted run |
@@ -59,10 +59,15 @@ config file, `mode`, decides which of four front ends runs:
 | `hybrid` | Illumina and ONT reads from the same isolate | both front ends above, then the ONT assembly corrected with the short reads by `Polypolish`, and a `Snippy` comparison of the two assemblies |
 | `contigs` | A finished assembly (FASTA) | contig filtering only — no assembler |
 
-Every front end ends by writing one file, `contigs_final.fasta`, and from there the run is
-the same code in all four modes — so a result means the same thing whichever way the
-isolate was sequenced, and two isolates stay comparable when one was sequenced on Illumina
-and the other on ONT.
+BacFlux was developed to support the genomic characterisation of bacterial strains
+considered for biocontrol, biostimulant and biofertiliser applications. Its annotation
+and screening results help assess candidate strains, including the presence of
+resistance-associated and virulence-associated genes. These predictions support
+strain selection alongside phenotypic evidence and application-specific assessment.
+
+Each mode produces `contigs_final.fasta` for a shared set of downstream analyses.
+Common processing improves consistency across datasets, while sequencing quality,
+assembly fragmentation and available read types still affect the results.
 
 ```
   config: mode ──> ┌──────────┬──────────┬──────────┬──────────┐
@@ -92,19 +97,20 @@ and the other on ONT.
   * optional, set in the config          † modes that have short reads
 ```
 
-**The mobilome module** (`08.mobilome`, off by default) answers the question that usually
-comes after an AMR gene list: for each resistance gene, is it embedded in a mobile genetic
-element, and how transferable is that element? It reports a tier from *chromosomal, no
-mobile-element context — intrinsic candidate* up to *inside an ICE or on a conjugative
-plasmid — predicted self-transmissible*, with a reason recorded for every gene left without
-context. It stays off unless asked for: most characterisation rounds want the gene list
-rather than the mobility argument behind it, and it adds ten rules, two tools and a model
-download. See [the mobilome module](https://iLivius.github.io/BacFlux/mobilome/).
+**The mobilome module** (`08.mobilome`, disabled by default) assesses the genomic
+context and potential mobility of resistance genes. It combines AMRFinderPlus
+results with mobile-element evidence and assigns a tier from
+`intrinsic_candidate` to `predicted_self_transmissible`, and records the reason for
+every gene left without mobile-element context. These predictions require
+interpretation with their confidence fields and assembly limitations; they do not
+demonstrate transfer or establish intrinsic resistance. See
+[the mobilome module](https://iLivius.github.io/BacFlux/mobilome/).
 
-v2.0.0 brings together the four workflows that grew out of BacFlux — `BacFlux` for Illumina
-reads, `FastaFlux` for finished assemblies, `BacFluxL` for ONT reads and `BacFluxL+` for
-both — as one mode each. All four did their job; work published with them stays citable,
-and the retired repositories keep their DOIs. If you are coming from one of them, start at
+v2.0.0 brings together the four workflows that grew out of BacFlux — `BacFlux` for
+Illumina reads, `FastaFlux` for finished assemblies, `BacFluxL` for ONT reads and
+`BacFluxL+` for both — as one mode each. The earlier repositories retain their DOIs and
+remain citable for work performed with those versions. If you are coming from one of
+them, start at
 [Coming from v1](https://iLivius.github.io/BacFlux/getting-started/from-v1/).
 
 `BacFlux` belongs to the [BioFlux](https://github.com/stars/iLivius/lists/bioflux) family of pipelines.
@@ -133,12 +139,14 @@ snakemake --sdm conda --configfile config/config_custom.yaml --cores 24
 Run both commands from the repository root: `workflow/Snakefile` is found there
 automatically, which is why it never appears on the command line. Only Snakemake is
 installed by hand — `--sdm conda` (software-deployment-method) tells it to build each
-rule's own conda environment on first use, so every other tool is provisioned for you.
+rule's own conda environment on first use, so every analysis tool is provisioned for
+you. Standard Unix utilities such as `awk` and `grep` come from the system; see
+[Installation](https://iLivius.github.io/BacFlux/getting-started/installation/#4-the-tools-bacflux-expects-to-find-and-does-not-install).
 
-`--cores N` is the whole CPU budget and the only knob you need: every CPU-bound rule
-declares Snakemake's built-in `threads:`, so `--cores` enforces the ceiling by itself. **Do
-not also pass `--jobs`/`-j`** — for a local run it is an alias for `--cores`, and passing
-both lets rules oversubscribe the machine.
+For a local run, `--cores N` sets the CPU budget allocated through the rules'
+`threads:` declarations. Do not add `--jobs`/`-j`: for a local run Snakemake then
+stops enforcing the core budget. See
+[Running BacFlux](https://iLivius.github.io/BacFlux/reference/running/).
 
 Always dry-run first. Nearly all of BacFlux's validation happens while the plan is being
 built, so `-n` costs seconds and catches a wrong mode, a missing input directory or a bad
@@ -156,11 +164,12 @@ one release, for the workflow to fetch:
 | `directories.gtdbtk_db` | [GTDB](https://ecogenomics.github.io/GTDBTk/installing/index.html) | **R232** |
 | `directories.platon_db` | [Platon](https://github.com/oschwengers/platon?tab=readme-ov-file#database) | **v1.5.0** |
 
-Two of those versions are not yours to pick. The eggNOG release is fixed by the pinned
-eggnog-mapper 2.1.15, which builds its own download URL, so the database cannot drift away
-from the tool. And the Platon database is versioned separately from Platon itself — v1.5.0
-is the current database for every Platon from 1.5.0 onwards, including the 1.8 this
-workflow pins, so the two numbers are meant to differ.
+The database versions must remain compatible with the pinned tools. The eggNOG release
+is fixed by the pinned eggnog-mapper 2.1.15, which builds its own download URL, so the
+database cannot drift away from the tool. And the Platon database is versioned
+separately from Platon itself — v1.5.0 is the current database for every Platon from
+1.5.0 onwards, including the 1.8 this workflow pins, so the two numbers are meant to
+differ.
 
 Everything else — PhiX, CARD, CheckV, dbCAN, VirSorter2, antiSMASH, and the optional
 mobilome databases — is downloaded into `output_dir` on the first run that needs it, or
@@ -173,8 +182,8 @@ sizes and every optional key are on
 
 Everything lands under `directories.output_dir`, in one numbered directory per stage —
 `01.reads` through `09.report`, in the order they run, with the same numbering in all four
-modes. The delivered genome is always `02.assembly/{sample}/contigs_final.fasta`, and every
-stage from `03` onwards reads that one file. Beside it,
+modes. The delivered genome is always `02.assembly/{sample}/contigs_final.fasta`, and the
+shared stages from `03` onwards analyse that genome. Beside it,
 `contaminants/contig_taxonomy_decisions.tsv` records every contig that was kept or dropped
 and why — as does every other filtering step in BacFlux. What each stage holds, file by
 file, is on [output files](https://iLivius.github.io/BacFlux/reference/output/).

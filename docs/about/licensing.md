@@ -1,11 +1,12 @@
 # Licensing
 
-BacFlux is MIT licensed. Some of the tools, model sets and databases it can
-invoke are not, and this page is the one place their terms are written down.
+BacFlux is MIT licensed. The tools, model sets and databases it can invoke carry their
+own terms, and some are not open licences. This page records what each licensor
+published, as read on the dates given, and links to their own texts, which it does not
+replace.
 
-It records what each licensor publishes, and draws no conclusion about whether a
-particular use is permitted — that depends on who you are and what you are
-doing, and it is yours to establish with the licensor.
+It draws no conclusion about whether a particular use is permitted — that depends on who
+you are and what you are doing, and it is yours to establish with the licensor.
 
 !!! abstract "Terms used on this page"
 
@@ -18,7 +19,7 @@ doing, and it is yours to establish with the licensor.
 ## BacFlux's own code
 
 [MIT](https://github.com/iLivius/BacFlux/blob/main/LICENSE), © 2024 Livio
-Antonielli. Nothing you switch on below changes that.
+Antonielli. Third-party components retain their own terms.
 
 The repository contains no third-party database, model set or sequence file. It
 ships **code and URLs**. Every database a run needs is either one you already
@@ -34,16 +35,22 @@ mobilome layer uses too. See
 |---|---|---|
 | **What BacFlux distributes** | a URL in `config/config.yaml` | the file itself, in the repository |
 | **Who obtains it** | you, under your own agreement with the licensor | anyone who clones the repository |
-| **Does a config switch settle it?** | yes — nothing is shipped in the first place | **no** |
+| **What an enable/disable switch changes** | whether the workflow fetches or uses the resource; permission still depends on its terms | whether the code runs; any distributed code still carries its applicable terms |
 
-!!! note "Why default-off settles one and not the other"
+!!! note "Use, distribution and adaptation are separate questions"
 
-    A config switch controls what *runs*. It does not control what is
-    *distributed*. Share-alike terms — the "if you pass it on, pass it on under
-    the same terms" clause in CC BY-NC-SA — attach to source that ships in the
-    repository, so a CC BY-NC-SA file would carry its terms into BacFlux whether
-    or not any switch ever ran it. The only two remedies are to not copy it, or
-    to relicense the whole workflow. This project took the first.
+    A config switch controls what *runs*. It does not control what is *distributed*.
+    Share-alike terms — the "if you pass it on, pass it on under the same terms" clause
+    in CC BY-NC-SA — attach to source that ships in the repository, so a CC BY-NC-SA
+    file would carry its terms into BacFlux whether or not any switch ever ran it. The
+    effect depends on what is incorporated and how it is distributed; it does not follow
+    that every collection containing a separately licensed file must be relicensed as a
+    whole. BacFlux avoids the question: it contains no CC BY-NC-SA code, and none of the
+    ICEfinder2-derived scripts listed under
+    [What this repository deliberately does not contain](#what-this-repository-deliberately-does-not-contain)
+    was copied or adapted. See the
+    [CC licence](https://creativecommons.org/licenses/by-nc-sa/4.0/) and
+    [CC FAQ](https://creativecommons.org/faq/) for the applicable distinctions.
 
     Running such a tool is a different act from redistributing its source, and
     does not affect BacFlux's own licence.
@@ -83,7 +90,7 @@ the key in the middle column.
 | **ICEscan models** — the optional second model set, a fork of CONJScan distributed inside ICEfinder2's bundle | `mobilome.icescan.run: true` | **CC BY-NC-SA 4.0**, Institut Pasteur / CNRS — the same terms as the models it forks | the package's own `LICENSE` file |
 | **TnCentral** — names transposons and integrons | `mobilome.tncentral.url` or `.dir` | an **"All Rights Reserved"** notice, and **no terms page at all** | the publisher's site, checked 2026-07-28 |
 | **ICEberg 3.0** — names the ICE and IME candidates | `mobilome.iceberg.urls` or `.dir` | **no licence, terms or reuse statement anywhere**; every page carries only *"Copyright © 2023 All Rights Reserved by Microbial Bioinformatics Group in MML, SJTU."* | the publisher's site, checked 2026-07-28 |
-| **ISOSDB** — counts the IS copies the assembly collapsed | `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | **MIT**, in the pseudoR repository | the repository |
+| **ISOSDB** — estimates IS abundance from reads for comparison with located calls | `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | **MIT**, in the pseudoR repository | the repository |
 
 **MacSyFinder is not CONJScan**: the engine is GPLv3, the models it loads are
 CC BY-NC-SA 4.0, and it is the models that BacFlux fetches. **geNomad's bioconda
@@ -98,8 +105,8 @@ the file is what was read for the row above.
 
 ## ISfinder is not wired in
 
-ISfinder is the reference catalogue of bacterial insertion sequences. Its terms are
-stricter than any other resource BacFlux touches:
+ISfinder is the reference catalogue of bacterial insertion sequences. Its terms of use
+restrict both download and redistribution:
 
 > *"It is not permitted to download the ISfinder database without written
 > authorization. Moreover, it is also not permitted at any time to distribute the
@@ -112,7 +119,7 @@ mobilome module works the same way: the workflow ships a URL, you download under
 publisher's terms. For ISfinder there is no URL anywhere in the configuration, because
 supplying one would route around an authorisation only you can obtain.
 
-**This does not cost you anything.** ISEScan, which is how BacFlux actually finds
+**ISEScan does not require an ISfinder download.** ISEScan, which is how BacFlux actually finds
 insertion sequences, uses its own bundled profile HMMs and needs no ISfinder data.
 
 **Where it could still reach you.** TnCentral serves several endpoints, and three of
@@ -156,22 +163,22 @@ pattern, and the rule that a gene counts as inside an element only when at least
 expression. Reading source to understand an algorithm and then writing your own
 is not copying, and that is the line kept here.
 
-Consuming that pipeline's `mobilome.gff.gz` **output** carries no licence
-consequence, which is why it is offered as an escape hatch for deeper mobilome
-work.
+Using the output of EBI's pipeline (`mobilome.gff.gz`) does not bring any of its code
+into BacFlux; terms attached to that output and its source data apply separately.
 
 **No vmatch.** The *att*-site search computes maximal exact repeats in plain
-Python. bioconda's vmatch package declares `license: Unknown / OTHER` and
-vmatch.de is unreachable, so its terms cannot be established — which is weaker
-ground than a known-restrictive licence. That the substitute returns the same
-repeats was measured rather than assumed; see
-[Validation](../mobilome/validation.md).
+Python. Bioconda's vmatch recipe declares `license: Unknown / OTHER`, and the upstream
+site could not be reached when this was checked in July 2026, so its terms could not
+be established — weaker ground than a known restrictive licence. A second
+implementation of the same repeat definition returned the same repeats on every
+tested window; see [Validation](../mobilome/validation.md).
 
 ## Citing
 
-Licensing and citation are separate obligations: a permissive licence still
-expects the citation. [Citation](citation.md) covers how to cite BacFlux and the
-tools that do the work.
+Licensing and citation are separate obligations: research software and database authors
+should be credited in the scientific report, alongside any attribution required by their
+terms. [Citation](citation.md) covers how to cite BacFlux and the tools that do the
+work.
 
 ---
 

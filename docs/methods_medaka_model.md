@@ -1,28 +1,24 @@
 # The Medaka polishing model
 
-Why BacFlux polishes an ONT assembly with a bacterial methylation model when Dorado
-basecalled it with a canonical one.
+This page explains how BacFlux selects a Medaka model, why the bacterial model can
+be appropriate for canonical basecalls from native bacterial DNA, and what the cited
+benchmarks establish.
 
-!!! tip "If you read nothing else"
+!!! tip "Practical guidance"
 
-    - **You do not have to do anything.** `medaka_model: auto` is the default and
-      resolves to the bacterial methylation model. Confirmed on real R10.4.1 `sup`
-      reads: it selects `r1041_e82_400bps_bacterial_methylation_model`.
-    - **It is worth about 4x.** Against the standard model on the same ten genomes,
-      26 residual errors versus 100.
-    - **It is not a mismatch.** Methylation distorts the signal, so the canonical
-      basecaller makes the errors; the polisher corrects them. You polish with a
-      methylation-aware model *because* basecalling was not one.
-    - **Polish only structurally sound assemblies.** A missing plasmid makes its reads
-      misalign elsewhere, and Medaka then introduces errors rather than removing them.
-    - **Override in one case: amplified DNA.** PCR or whole-genome amplification erases
-      methylation, so pin the standard model instead — at roughly four times the
-      residual errors, which is the right trade there and nowhere else.
-    - **If you find advice to skip Medaka on `sup` reads**, it predates the bacterial
-      model and does not apply. See below.
+    - `medaka_model: auto`, the default, asks Medaka for the bacterial consensus
+      model compatible with the basecaller recorded in the reads. If none resolves,
+      the run stops before assembly.
+    - The cited ten-genome comparison reported 26 residual errors with the bacterial
+      model and 100 with the standard model. The benefit depends on the dataset.
+    - Check assembly structure before polishing: missing replicons and unresolved
+      circular overlaps can cause misleading read alignments.
+    - For amplified DNA, set `medaka_model` to the standard model matching the
+      basecaller (see [Overriding the model](#overriding-the-model)). This rests on
+      the bacterial model's stated scope; its effect on amplified libraries has not
+      been measured.
 
-Everything after this is the evidence for those six points, with sources, and a final
-section separating what is documented from what is inference.
+The sections below describe the implementation and evidence separately.
 
 !!! abstract "Terms used on this page"
 
@@ -74,7 +70,7 @@ and the polishing job itself needs no internet.
     only so the tool names in those posts do not read as a contradiction of this
     page; BacFlux stays on Medaka.
 
-## Why this is not a mismatch
+## Basecalling and polishing models { #why-this-is-not-a-mismatch }
 
 The objection assumes "methylation model" means the same thing at both stages. It
 does not — the two are different tools doing different jobs:
@@ -104,7 +100,7 @@ If it required methylation-aware basecalling, it would name those instead. Medak
 enforces this: an incompatible basecaller raises `RuntimeError` rather than
 silently polishing with the wrong model (`medaka/models.py`).
 
-## The point that resolves the paradox
+## Methylation-related consensus errors { #the-point-that-resolves-the-paradox }
 
 The methylation errors exist because the basecaller was *not*
 methylation-aware. Bacteria methylate their own genomes (6mA, 5mC, 4mC, largely via
@@ -126,13 +122,11 @@ material:
 ONT's own words: a **research model**, whose compatibility is deliberately broad —
 *"compatible with several basecaller versions for the R10 chemistries"*.
 
-**Corollary.** Had the run been basecalled *with* modified-base models, the A/C/G/T
-sequence would be unchanged. Dorado documents modified basecalling as "an extension
-to the normal `simplex` and `duplex` basecalling subcommands" whose output is
-"annotated in the SAM/BAM/CRAM output" through `MM`/`ML` tags — an annotation layer
-over the canonical calls rather than a re-derivation of them. You would gain
-methylation calls and keep exactly the same methylation-induced errors, so the same
-Medaka model would still be the right choice.
+In Dorado (checked against version 2.1.1 on 2026-08-21), modified-base calling writes
+modification probabilities beside the canonical calls and does not change which base
+is called. Basecalling with a modified-base model therefore leaves the same
+methylation-induced errors, and the same Medaka bacterial model still applies. The
+evidence and its limits are listed at the end of this page.
 
 ## Does it actually help?
 
@@ -149,10 +143,11 @@ assembled with Flye, Hybracter and Autocycler and polished with Medaka v2.
 > — Nagy *et al.* / NEKSUS Consortium (2026), *Microbial Genomics* 12(2):001631.
 > https://www.microbiologyresearch.org/content/journal/mgen/10.1099/mgen.0.001631
 
-It is the only published benchmark run on the configuration BacFlux actually uses:
-Wick's polishing comparisons are all on Autocycler assemblies or on deliberately
-degraded Raven drafts, never on Flye. In practice, expect Medaka to take out indels,
-and expect typing, AMR and virulence calls to come out the same either way.
+Of the benchmarks cited here, it is the only one run on Flye assemblies, which is what
+BacFlux polishes: Wick's polishing comparisons are on Autocycler assemblies or
+deliberately degraded Raven drafts. In that dataset, polishing gave small improvements
+in indels and none in SNVs, and the assessed annotations were equivalent. These results
+do not guarantee unchanged typing, AMR or virulence calls for another dataset.
 
 A smaller and earlier observation, on two bacterial genomes, compared Medaka v2 with
 the bacterial model against the previous release:
@@ -166,13 +161,13 @@ the bacterial model against the previous release:
 > https://rrwick.github.io/2024/10/17/medaka-v2.html
 
 Two genomes is a small sample, and the gain is variable — large on one, marginal on
-the other. Expect it to scale with how heavily methylated the organism is, not to be
-a fixed benefit.
+the other. The result does not establish a fixed benefit across organisms or preparations.
 
 The largest tally is 147 assemblies, where the bacterial model improved 129 and made
 6 worse ([Wick 2026](https://rrwick.github.io/2026/06/19/dorado-v2-polishing.html)).
-A strong default, not a guarantee: the cases that get worse are the ones covered by
-the structural warning below.
+The reported benefit was not universal. Assembly structure is one possible source
+of polishing errors, as described below; these counts alone do not establish the
+cause of every worsened assembly.
 
 !!! warning "An older recommendation said the opposite, and is still findable"
 
@@ -182,20 +177,19 @@ the structural warning below.
     it for sup/res reads"*
     ([post](https://rrwick.github.io/2023/10/24/ont-only-accuracy-update.html)).
 
-    That test used `r1041_e82_400bps_sup_v4.2.0` — the **standard** model. The
-    bacterial model did not exist yet. Measured against each other on the same ten
-    genomes, the standard model left 100 residual errors and the bacterial model 26,
-    which is the gap that reverses the advice. Polishing `sup` reads with the standard
-    model is still a bad idea; polishing them with the bacterial model is the current
-    recommendation.
+    That test used `r1041_e82_400bps_sup_v4.2.0` — the **standard** model. The bacterial
+    model did not exist yet. Measured against each other on the same ten genomes, the
+    standard model left 100 residual errors and the bacterial model 26, which is the gap
+    that reverses the advice. The comparison supports the bacterial model for the native
+    bacterial data tested. It does not establish a rule for every chemistry, basecaller
+    or DNA preparation.
 
-## A separate pitfall worth knowing
+## Assembly structure and polishing { #a-separate-pitfall-worth-knowing }
 
 Unrelated to model choice: **polish only structurally sound assemblies.** In the 2024
 post above, where small plasmids were absent from the assembly, their reads
 misaligned elsewhere and Medaka introduced over 100 erroneous changes. A missing
-replicon is therefore not merely an omission: it corrupts the sequence that is
-present.
+replicon can therefore affect the sequence of other assembled replicons during polishing.
 
 Wick broadened the warning in a 2025-02-25 revision of his assembly guide:
 
@@ -204,9 +198,9 @@ Wick broadened the warning in a 2025-02-25 revision of his assembly guide:
 > errors."
 > — https://rrwick.github.io/2020/10/30/guide-to-bacterial-genome-assembly.html
 
-So a missing plasmid is one case of a wider problem: an unresolved start–end overlap
-on a circular contig does the same. BacFlux's reorientation, plasmid-recovery and
-replicon-audit steps run before polishing partly for this reason.
+So a missing plasmid is one case of a wider problem: an unresolved start–end overlap on
+a circular contig can also cause polishing errors. BacFlux's reorientation,
+plasmid-recovery and replicon-audit steps run before polishing partly for this reason.
 
 ## Overriding the model
 
@@ -221,9 +215,9 @@ parameters:
     medaka_model: r1041_e82_400bps_sup_v4.2.0
 ```
 
-That is the standard, non-bacterial model, and on Wick's measurements it leaves roughly
-four times the residual errors the bacterial one does — still the right choice on
-amplified DNA, but a real cost.
+This is an example of a standard model; select one compatible with the actual
+basecaller. The 100-versus-26 comparison above was not an amplified-DNA benchmark
+and cannot quantify the cost or benefit of this choice on amplified libraries.
 
 `check_medaka_model` validates any explicit name against the installed Medaka's model
 list, fetches its weights, and fails early with a suggestion table if the name is
@@ -272,7 +266,8 @@ it with "At the time of writing"; nothing here verifies it since.
 
 **Verified against Dorado 2.1.1, 2026-08-21.** Modified-base calling does not feed back
 into which base is called, so it cannot repair a methylation-induced miscall and does
-not remove the need for this consensus model. Three independent lines establish it:
+not remove the need for this consensus model. Two independent lines establish it, and
+the SAM specification is consistent with it:
 
 - Dorado's basecall decoder emits only four symbols — `alphabet = {'A','C','G','T'}`
   in `basecall/decode/beam_search.cpp`. There is no symbol for a modified base. The
@@ -284,11 +279,13 @@ not remove the need for this consensus model. Three independent lines establish 
   ([dorado#1494](https://github.com/nanoporetech/dorado/issues/1494#issuecomment-3302392321),
   given as the reason for refusing a feature that would have let a modification
   probability alter the emitted base).
-- The SAM specification makes it structural rather than a matter of implementation:
+- The SAM specification describes how modification annotations relate to the primary sequence:
   base modifications are *"a series of edits from the primary unmodified sequence as
   originally reported by the sequencing instrument"*
   ([SAMtags](https://raw.githubusercontent.com/samtools/hts-specs/master/SAMtags.tex)),
-  counted against a `SEQ` field whose 4-bit alphabet has no code point for 5mC or 6mA.
+  counted against the primary `SEQ` field. This format describes the output
+  representation; it does not by itself prove how a basecaller uses modification
+  information internally.
 
 ONT's own documentation does not say this in words — it describes modified basecalling
 only as "an extension to the normal `simplex` and `duplex` basecalling subcommands"

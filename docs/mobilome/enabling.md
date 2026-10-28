@@ -1,11 +1,13 @@
-# Turning it on
+# Enabling the mobilome module { #turning-it-on }
 
 ```yaml
 mobilome:
   run: true
 ```
 
-That is the whole switch. **No database path has to be configured**, in any mode.
+Set `mobilome.run: true` in the configuration used for the run. The core module
+reuses the configured Bakta database and downloads CONJscan models as needed, so
+it requires no additional database path. Optional layers have separate sources.
 
 Everything else in the `mobilome:` block is either a threshold with a sensible default
 or one of the four optional layers, each of which stays off until you give it a source
@@ -36,8 +38,8 @@ Ten rules on the default configuration, of which three are per-sample tool runs 
 
 Two of those are new conda environments, both from bioconda. AMRFinderPlus is not new:
 it is already installed by Bakta, and reads its database from
-`{bakta_db}/amrfinderplus-db/latest` — which is why the module needs no download of its
-own.
+`{bakta_db}/amrfinderplus-db/latest` — so that AMRFinderPlus data do not need a separate
+download. CONJscan models are obtained separately on first use.
 
 Stage 08 **consumes** earlier stages rather than repeating them. It reads the delivered
 genome, the Bakta proteins, GFF3 and annotation table, the GTDB-Tk species call, and
@@ -57,35 +59,39 @@ The ICE/IME caller, the composite-transposon test and the *att*-site search run 
 not the sequencer — and every call carries the flags that say how contiguous the
 assembly under it was ([Draft assemblies](draft-assemblies.md)).
 
-The one mode-restricted leg is the optional **ISOSDB copy-number** layer, which maps
+The one mode-restricted analysis is the optional **ISOSDB copy-number** layer, which maps
 reads and therefore needs them: `illumina` and `hybrid` only.
 
 ## `--organism`, and why the taxonomy stage matters here
 
-AMRFinderPlus detects curated **point mutations** only when it is told which organism it
-is looking at. Those mutations are the intrinsic, chromosomal, non-transferable
-determinants that tier 1 rests on, and a homology screen cannot see them
-([The mobility ladder](mobility-ladder.md)).
+AMRFinderPlus checks curated **point mutations** when a supported organism is
+selected. This supplements gene-presence screening, which does not resolve the
+specific substitutions from a presence call alone. A mutation result does not
+itself establish intrinsic resistance or lack of transfer potential; see
+[The mobility ladder](mobility-ladder.md).
 
 So the module maps the GTDB-Tk call onto an AMRFinderPlus organism name and passes
 `--organism` when a confident mapping exists. There is no official convention for that
 translation — GTDB's own FAQ states there is no direct mapping to NCBI taxa — so BacFlux
-uses a hand-checked, project-local table. It is documented and audited, not
-authoritative:
+uses project-local, release-specific mapping tables and curated refusal rules.
+The mapping is documented and audited; it is not an authoritative reconciliation
+of the two taxonomies:
 
 - every decision, **including every refusal**, is written to
   `{sample}_amrfinder_organism_audit.tsv` with its reason;
 - a genome with no confident mapping gets **no** `--organism` rather than a guess;
-- a mutations file with no mutation rows therefore means *not assessed*, never *none
-  found*.
+- without `--organism`, `{sample}_amrfinderplus_mutations.tsv` holds a single line
+  stating that point-mutation screening was not available: *not assessed*, never
+  *none found*.
 
 Re-check the table when you change the GTDB release.
 
-!!! note "The other AMR legs are untouched"
+!!! note "The other AMR analyses are untouched"
 
-    ABRicate and the CARD read screen keep running exactly as before. The three legs are
-    complementary: reads are immune to assembly collapse, ABRicate brings breadth across
-    eight databases, and AMRFinderPlus brings the structured output this module needs.
+    ABRicate and the CARD read screen keep running exactly as before. The three
+    analyses are complementary: the CARD read screen detects genes the assembly
+    collapsed or broke, ABRicate screens eight databases, and AMRFinderPlus supplies
+    the structured gene and mutation output this module uses.
     See [Antimicrobial resistance](../analysis/amr.md).
 
 ## What it costs
@@ -121,7 +127,9 @@ mobilome:
 ICEscan is the only one of the four that ships a working URL, because it has a single
 canonical source — the bundle EBI publishes for ICEfinder2 — so `run: true` is all it
 needs. For the other three you paste a URL in yourself, and the commented `# e.g.` line
-beside each key is the address that was used to validate this module.
+beside each key is the address that was used to validate this module. Each of the
+four also takes a local `dir` instead, and `iceberg.dir` accepts the `iceberg_db`
+folder an earlier BacFlux run built.
 
 Two of them need explaining before a first run.
 

@@ -1,11 +1,9 @@
 # Quick start
 
-The shortest path from a clone to a finished genome. Five steps: clone, create the
-launcher environment, fill in a config, preview the plan, run it.
-
-The example on this page is **Illumina paired-end reads**, the default `mode`. The
-other three modes are the same five steps with a different input directory and one
-or two different keys — see [choosing a mode](choosing-a-mode.md).
+This example runs BacFlux on Illumina paired-end reads. Prepare the required
+databases, obtain the repository, create the Snakemake environment and edit a copy
+of the configuration. Check the plan with a dry run before starting the analysis.
+For other input types, see [Choosing a mode](choosing-a-mode.md).
 
 !!! abstract "Terms used on this page"
 
@@ -27,11 +25,7 @@ conda activate snakemake
 # 3. Make your own copy of the config, then edit the copy
 cp config/config.yaml config/config_custom.yaml
 
-# 4. Preview the plan without running anything
-snakemake --sdm conda --configfile config/config_custom.yaml --cores 24 -n
-
-# 5. Run it
-snakemake --sdm conda --configfile config/config_custom.yaml --cores 24
+# Continue with database preparation and configuration below before running BacFlux.
 ```
 
 Run these from the repository root. `workflow/Snakefile` is found there
@@ -137,12 +131,15 @@ accepted.
 
 ## Step 4 — the dry run
 
-`-n` (`--dry-run`) makes Snakemake work out everything it would do and then stop.
-It costs seconds, and it exercises nearly all of BacFlux's own validation, which
-runs while the plan is being built. Skipping it costs whatever the run manages
-first: building conda environments and downloading databases.
+After completing database preparation and configuration, preview the jobs:
 
-The header tells you what BacFlux understood. Read it before committing cores:
+```bash
+snakemake --sdm conda --configfile config/config_custom.yaml --cores 24 -n
+```
+
+`-n` (`--dry-run`) plans the analysis without executing jobs. It checks input
+discovery and the configuration conditions evaluated during planning. Inspect the
+header to confirm the selected mode, analysis options and samples:
 
 ```text
 … BacFlux banner …
@@ -159,10 +156,10 @@ the decontamination policy, and every database that is being downloaded rather t
 read from a copy you hold. When the mobilome module is on it announces itself here
 too.
 
-One line per sample means discovery worked; a count that does not match your
-sequencing run is a naming mismatch, not a lost file. Below the header, Snakemake
-lists the jobs. A single isolate through the default Illumina pipeline, into an
-empty output directory, plans **42 jobs**:
+Compare the discovered sample list with the intended input. A mismatch can indicate a
+naming-pattern problem, a missing input file or an incorrect directory. Below the
+header, Snakemake lists the jobs. A single isolate through the default Illumina
+pipeline, into an empty output directory, plans **42 jobs**:
 
 ```text
 Job stats:
@@ -222,11 +219,12 @@ A config with no `mode` at all stops with a `KeyError: 'mode'` from
 snakemake --sdm conda --configfile config/config_custom.yaml --cores 24
 ```
 
-`--cores` is the whole CPU budget and the only knob you need: every CPU-bound rule
-declares Snakemake's built-in `threads:`, so `--cores` enforces the ceiling by
-itself. **Do not also pass `--jobs`/`-j`** — for a local run it is an alias for
-`--cores`, and passing both can let rules oversubscribe the machine. The reasoning
-and the measurement are on [running BacFlux](../reference/running.md).
+For local execution, `--cores` is the whole CPU budget and needs no other setting:
+every CPU-bound rule declares `threads:`, so `--cores` enforces the ceiling by
+itself. Do not also pass `--jobs`/`-j`: for a local run Snakemake then stops
+enforcing the core budget, and rules can oversubscribe the machine. See
+[Running BacFlux](../reference/running.md) for the scheduling behaviour and
+resource measurements.
 
 A first run spends a long time on setup: a default Illumina run builds 21 of the 33
 conda environments in `workflow/envs/` and downloads the databases BacFlux fetches
@@ -234,9 +232,9 @@ for itself. Environments are created under `.snakemake/conda` in the directory y
 launched from, so launching from the same place each time is what stops them being
 rebuilt.
 
-The run is resumable. If it is interrupted, repeat the same command and Snakemake
-redoes only what is missing or out of date. Change a config value and only the
-steps downstream of it are recomputed.
+The run is resumable. If it is interrupted, repeat the same command and Snakemake redoes
+only what is missing or out of date. After changing the configuration, inspect a new dry
+run to confirm which jobs Snakemake schedules for recomputation.
 
 ## What lands in the output directory
 
@@ -292,13 +290,13 @@ once per output folder, and a sample added to the folder later runs without redo
 the finished ones ([why](../reference/running.md#what-survives-between-runs)). Set
 `directories.card_db` to a copy you hold to skip even the CARD download.
 
-The files most runs end at:
+Use these files to inspect the main results:
 
 | Question | File |
 |---|---|
 | The genome | `02.assembly/{sample}/contigs_final.fasta` |
 | Why was that contig kept or dropped? | `02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv` |
-| Is the assembly complete and clean? | `02.assembly/{sample}/eval/checkm/{sample}_checkm_stats.tsv` |
+| Completeness and contamination estimates | `02.assembly/{sample}/eval/checkm/{sample}_checkm_stats.tsv` |
 | Assembly statistics | `02.assembly/{sample}/eval/quast/` |
 | What species is it? | `03.taxonomy/{sample}/classify/gtdbtk.*.summary.tsv` |
 | What genes does it carry? | `04.annotation/bakta/{sample}/` |

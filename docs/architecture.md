@@ -1,8 +1,8 @@
 # Workflow architecture
 
-BacFlux is one workflow with four ways in. Whichever way you enter, you leave through
-the same nine numbered stages, and the `mode` key in the config decides nothing except
-how a set of contigs gets produced in the first place.
+BacFlux supports four input modes within one Snakemake workflow. The mode selects
+input processing and assembly; shared rules then analyse the final assembly.
+Read-dependent analyses run only when the required inputs are available.
 
 !!! abstract "Terms used on this page"
 
@@ -10,87 +10,81 @@ how a set of contigs gets produced in the first place.
     |---|---|
     | **ONT** | Oxford Nanopore Technologies — the long-read sequencing platform |
     | **AMR** | antimicrobial resistance |
-    | **EFSA** | European Food Safety Authority, whose thresholds the ABRicate leg applies |
+    | **EFSA** | European Food Safety Authority, whose thresholds the ABRicate analysis applies |
 
 ## The shape of a run
 
-The diagram is in two labelled halves. Everything in the first box changes with the
-mode you chose; everything in the second box is the same whichever mode ran. That is
-why there is one workflow instead of four.
+Two diagrams show the shape of a run: the first what changes with the mode, the second
+the analyses every mode shares. They are schematics rather than the execution DAG: the
+position of decontamination and the availability of individual rules depend on the
+selected mode. For the mode-specific sequence, see [Modes](modes/index.md) and
+[Decontamination](analysis/decontamination.md).
+
+**Part 1 — what changes with the mode you chose.**
 
 ```mermaid
-flowchart TD
-    subgraph P1["PART 1 &nbsp; what changes with the mode you chose"]
-        direction TB
-        I[illumina<br/>paired short reads]
-        N[nanopore<br/>ONT long reads]
-        H[hybrid<br/>short reads and long reads]
-        C[contigs<br/>an assembly you already have]
-
-        IF[fastp trimming, PhiX removal<br/>assembly with SPAdes]
-        NF[Filtlong, assembly with Flye<br/>Medaka polishing, dnaapler]
-        HF[both front ends, then Polypolish<br/>and a Snippy comparison]
-        CF[length filter only]
-
-        I --> IF
-        N --> NF
-        H --> HF
-        C --> CF
-
-        DRAFT([a draft assembly])
-        IF --> DRAFT
-        NF --> DRAFT
-        HF --> DRAFT
-        CF --> DRAFT
-    end
-
-    subgraph P2["PART 2 &nbsp; the same whichever mode ran"]
-        direction TB
-        DECON[02.assembly<br/>decontamination: BLAST, BlobTools, genus selector]
-        FINAL([contigs_final.fasta<br/>every stage below reads this one file])
-        DECON --> FINAL
-
-        TAX[03.taxonomy<br/>GTDB-Tk]
-        ANN[04.annotation<br/>Bakta, eggNOG, antiSMASH, dbCAN]
-        AMR[05.amr<br/>ABRicate, and BBMap against CARD]
-        PLA[06.plasmids<br/>Platon, optionally geNomad]
-        PHA[07.phages<br/>VirSorter2 or geNomad, then CheckV]
-        REP[09.report<br/>MultiQC]
-
-        FINAL --> TAX
-        FINAL --> ANN
-        FINAL --> AMR
-        FINAL --> PLA
-        FINAL --> PHA
-
-        MOB[08.mobilome<br/>OFF unless you switch it on<br/>ISEScan, CONJScan, AMRFinderPlus]
-        LADDER([mobility table<br/>one row per AMR gene, tier 1 to 6])
-
-        AMR --> MOB
-        PLA --> MOB
-        MOB --> LADDER
-
-        TAX --> REP
-        ANN --> REP
-        PHA --> REP
-    end
-
-    DRAFT --> DECON
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+---
+flowchart LR
+    I[illumina<br/>paired short reads] --> IF[PhiX removal, fastp<br/>SPAdes assembly]
+    N[nanopore<br/>ONT long reads] --> NF[Filtlong, Flye,<br/>dnaapler, Medaka]
+    H[hybrid<br/>short and long reads] --> HF[both front ends,<br/>Polypolish, Snippy]
+    C[contigs<br/>an existing assembly] --> CF[length filter only]
+    IF --> DRAFT([a draft<br/>assembly])
+    NF --> DRAFT
+    HF --> DRAFT
+    CF --> DRAFT
 ```
 
-Only `08.mobilome` is optional. Everything else runs on every sample, in every mode.
+**Part 2 — the same whichever mode ran.**
+
+```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+---
+flowchart LR
+    DECON[02.assembly<br/>decontamination<br/>of the draft] --> FINAL([contigs_final.fasta])
+    FINAL --> QC[02.assembly/eval<br/>QUAST, CheckM,<br/>Qualimap]
+    FINAL --> TAX[03.taxonomy<br/>GTDB-Tk]
+    FINAL --> ANN[04.annotation<br/>Bakta, eggNOG,<br/>antiSMASH, dbCAN]
+    FINAL --> AMR[05.amr<br/>ABRicate,<br/>CARD read mapping]
+    FINAL --> PLA[06.plasmids<br/>Platon,<br/>optionally geNomad]
+    FINAL --> PHA[07.phages<br/>VirSorter2 or<br/>geNomad, CheckV]
+    ANN --> MOB[08.mobilome<br/>optional<br/>ISEScan, CONJScan,<br/>AMRFinderPlus<br/>→ mobility tiers]
+    TAX --> MOB
+    PLA --> MOB
+    QC --> REP[09.report<br/>MultiQC]
+    TAX --> REP
+    ANN --> REP
+```
+
+The numbered output stages are shared across modes, but their individual rules
+can be conditional. `08.mobilome` and its optional layers are disabled by default.
+Medaka polishing runs by default in the long-read modes; `medaka_model: false` skips
+it. Read QC and CARD read mapping require the corresponding reads.
 
 !!! note "Why the entry points converge so early"
 
-    The four modes exist only because a genome can arrive as reads or as contigs, and
-    reads can be short, long or both. Once there is a decontaminated assembly, nothing
-    downstream cares how it was made — which is why Part 1 is short and Part 2 is
-    everything else. The four v1 workflows shared roughly two-thirds of their code and
-    had to be kept in step by hand; here that two-thirds exists once.
+    The modes differ in what arrives — short reads, long reads, both, or contigs.
+    Once a final assembly exists, the downstream rules are the same in every mode,
+    and steps that need reads run only where those reads exist. Shared
+    implementation also removes the maintenance differences between the earlier
+    separate workflows.
 
-    One thing does stay mode-aware: a short-read assembly is more fragmented, so every
-    mobilome call carries contig-edge flags and anything spanning contigs is capped at
-    low confidence — see [the mobilome overview](mobilome/index.md).
+    The mobilome module applies the same contig-edge flags and low-confidence caps
+    in every mode; a fragmented assembly, most often a short-read one, simply
+    triggers them more often — see [the mobilome overview](mobilome/index.md).
 
 ## What runs where
 
@@ -100,18 +94,28 @@ Only `08.mobilome` is optional. Everything else runs on every sample, in every m
 | `02.assembly` | all four | — |
 | `03.taxonomy` | all four | — |
 | `04.annotation` | all four | — |
-| `05.amr` | all four; the CARD read leg needs short reads | — |
+| `05.amr` | all four; the CARD read analysis needs short reads | — |
 | `06.plasmids` | all four | Platon always; the geNomad second opinion is opt-in |
 | `07.phages` | all four | always runs; VirSorter2 by default, geNomad optional |
 | `08.mobilome` | all four | **off by default** |
 | `09.report` | all four | — |
 
-## The three AMR legs, and why there are three
+## Complementary AMR analyses { #the-three-amr-legs-and-why-there-are-three }
 
-The one place BacFlux deliberately does the same job three times. Each leg fails in a
-different way, so the three together say more than any one of them.
+The three analyses use different inputs and detection methods. ABRicate screens
+the contigs, BBMap maps short reads to CARD, and AMRFinderPlus provides curated
+calls for the optional mobilome analysis. Their outputs are complementary and
+have different interpretation limits.
 
 ```mermaid
+---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+---
 flowchart LR
     R([trimmed reads])
     F([contigs_final.fasta])

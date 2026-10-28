@@ -1,19 +1,20 @@
 # Rationale
 
-Getting a bacterial isolate from raw sequencing data to a statement you can defend —
-what species it is, how complete the genome is, what the organism can do, what
-resistance it carries and whether that resistance can move — takes a dozen tools.
-Each has its own input format, its own reference database and its own defaults. Run
-by hand, the chain is slow, easy to get subtly wrong, and hard to repeat a year later.
+Characterising a microbial strain requires several linked analyses: assembly and
+quality assessment, taxonomic identification, functional annotation, and screening
+for resistance-associated genes, virulence factors and mobile elements. BacFlux was
+developed to support this work for candidate strains in biocontrol, biostimulant and
+biofertiliser research. Linking the tools in one workflow reduces manual processing
+and makes the analysis easier to repeat and inspect.
 
-BacFlux is that chain written down once, as a [Snakemake](https://snakemake.github.io/)
+BacFlux writes these analyses down once, as a [Snakemake](https://snakemake.github.io/)
 workflow. Every step declares its inputs and its outputs, and every step that calls an
 external tool declares its own conda environment, so a run can be resumed after an
-interruption, repeated on another machine, or handed to a colleague along with one
-config file and nothing else.
+interruption, repeated on another machine, or shared with a colleague. Reproduction also
+requires the same inputs, software and reference data; the configuration alone is not
+sufficient.
 
-That much is true of any workflow manager. What is specific to this repository is that
-there is now a single workflow where there used to be four.
+BacFlux v2 consolidates four related workflows while retaining their input modes.
 
 !!! abstract "Terms used on this page"
 
@@ -32,8 +33,9 @@ and work published with them stays citable — BacFluxL and BacFluxL+ are retire
 favour of this repository and their DOIs stay valid. See
 [Coming from v1](../getting-started/from-v1.md).
 
-They also had almost everything in common. Once an assembly exists, nothing downstream
-of it cares how it was produced. Taxonomic placement, annotation, AMR and virulence
+They also had almost everything in common. The downstream analyses share most of their
+processing once a final assembly exists, although available reads, assembly quality and
+mode-specific metadata still matter. Taxonomic placement, annotation, AMR and virulence
 screening, plasmid and prophage detection are the same tools, in the same order, at the
 same thresholds, whatever went in at the top; so is the decontamination screen, apart
 from the mapper that builds its coverage track — bowtie2 for short reads, minimap2 for
@@ -52,21 +54,19 @@ file, `mode`, chooses the front end; nothing else on the command line changes.
 
 Those four front ends are 30 rules between them. The analysis they feed is 62 rules in
 `workflow/rules/shared/` — 22 of them the optional mobilome module — written once
-instead of four times. [Choosing a mode](../getting-started/choosing-a-mode.md) covers
+instead of four times, plus six `_local` variants that link a database copy you
+already hold. [Choosing a mode](../getting-started/choosing-a-mode.md) covers
 which one a given dataset belongs in.
 
-## What writing a step once buys
+## Why the shared rules matter { #what-writing-a-step-once-buys }
 
-**Results become comparable across sequencing strategies.** The comparison that comes up
-most often is between technologies: the same isolate assembled from short reads and
-from long reads, or one collaborator's Illumina genome against another's ONT genome. When
-those two answers come out of two sets of rules, every difference between them is
-confounded by the code, and you cannot separate a real biological difference from a
-threshold that was changed in one copy and not the other. Out of one set, the difference
-is the data. Hybrid mode is the sharpest case: QUAST, CheckM and GTDB-Tk read both
-assemblies of the isolate, and Snippy counts the variants between the Illumina assembly
-and each stage of the ONT one. Those numbers mean something because the same code
-produced both sides.
+**Shared processing reduces one source of variation.** The same annotation, taxonomy
+and screening rules are used across modes wherever the required inputs are available.
+This reduces differences caused by maintaining separate copies of the analysis code.
+It does not remove effects of sequencing technology, filtering or assembly quality.
+In hybrid mode, QUAST, CheckM and GTDB-Tk assess the final assembly and the Illumina
+comparator, while Snippy compares four stages of the ONT assembly with the Illumina
+assembly.
 
 **A fix reaches every mode at once.** A re-run in July found that the CheckV database
 ships without a DIAMOND index, so the index in any shared copy was built by whichever
@@ -83,14 +83,13 @@ helpers. Across the four it would have been copied four times and maintained in
 parallel. That is what settled the order of work: merge first, then write the module.
 See [the mobilome module](../mobilome/index.md).
 
-## How the four modes actually share
+## What the four modes actually share { #how-the-four-modes-actually-share }
 
-**One hand-off file.** Whatever a front end ran, it finishes by writing
-`02.assembly/{sample}/contigs_final.fasta`, and every rule from `03.taxonomy` onwards
-reads that file and nothing else about the assembly. Exactly one shared rule feeding
-those stages looks further back — the one that reads Flye's own contig summary to tell
-Bakta which contigs are circular chromosomes — and it is gated so that it defines
-nothing in the two modes without long reads.
+**A common final assembly.** Each mode writes
+`02.assembly/{sample}/contigs_final.fasta`. Shared stages use this assembly together
+with the annotation, taxonomy, reads and metadata they require. Long-read topology
+information is supplied to Bakta separately. Hybrid mode also retains an Illumina
+assembly for comparison.
 
 **Fixed stage numbers.** All technology-specific work lives under `01.reads` and
 `02.assembly`, so every shared stage lands on the same number in every mode: taxonomy is
@@ -102,12 +101,14 @@ single largest reason "the same" rule was not literally the same file. See
 **Capability flags rather than mode names.** Where a shared step genuinely depends on the
 technology, it asks what the run *has*, not which mode it *is*: `HAS_SHORT_READS`,
 `HAS_LONG_READS`, `HAS_READS`, defined in `workflow/rules/shared/00_common.smk`. The CARD
-read-mapping leg is gated on `HAS_SHORT_READS` because it needs reads — not because of a
+read-mapping analysis is gated on `HAS_SHORT_READS` because it needs reads — not because of a
 hard-coded list of mode names that a fifth mode would have to be added to.
 
-**One environment set.** 31 files in `workflow/envs/`, one per tool, with the version
-pinned in the file — plus, in a few of them, a second pinned package the tool needs at
-run time (`diamond` alongside Bakta, `samtools` alongside bowtie2). The merge turned up
+**One environment set.** 33 files in `workflow/envs/`: one per tool, with the version
+pinned in the file, plus `download.yaml` (wget, tar, gzip and bzip2 for the download
+rules) and `python.yaml` (Python for the helper scripts). A few tool environments carry
+a second pinned package the tool needs at run time (`diamond` alongside Bakta,
+`samtools` alongside bowtie2). The merge turned up
 exactly one version drift across the four, fastp 1.0.1 against 1.1.0, which says the
 copies had been kept in step by hand — at a cost that does not show up anywhere in the
 results.
@@ -122,11 +123,11 @@ results.
     a `HAS_LONG_READS` gate instead. Code was shared where it is genuinely the same, and
     left alone where forcing it together would have made it harder to read.
 
-## The merge was checked, not assumed
+## Validation of the consolidation { #the-merge-was-checked-not-assumed }
 
-"Consolidation changed the plumbing, not the biology" is a testable claim, so it was
-tested. Each read-based mode was re-run on the same test data its predecessor had been
-run on, and the delivered genome compared byte for byte against the earlier result.
+The consolidation was evaluated by rerunning each read-based mode on its previous
+test dataset and comparing the delivered assemblies byte for byte. The table records
+those tests; it does not establish equivalence for every possible input.
 
 | Mode | Compared against | Genome chain |
 |---|---|---|
@@ -138,15 +139,16 @@ run on, and the delivered genome compared byte for byte against the earlier resu
 One downstream difference is deliberate and appears in the two long-read modes: Bakta
 gains or loses a single feature in each, because BacFlux now hands it a `--replicons`
 table declaring a closed chromosome circular. That makes Bakta's gene caller run in
-closed mode, which shifts a couple of marginal start codons anywhere in the genome. It
-is one feature in several thousand, and it is the better call.
+closed mode, which shifts a couple of marginal start codons anywhere in the genome. This
+change reflects different topology information supplied to the gene caller; the
+comparison alone does not establish which individual feature call is correct.
 
 The helper scripts that carry real logic — the decontamination selector, the Medaka
 model check, the replicon table, CARD reporting, plasmid concordance and the mobilome
 helpers — are plain Python and are tested without Snakemake:
 
 ```bash
-pytest workflow/scripts        # all pass; two are skipped without real GTDB-Tk files
+pytest workflow/scripts        # three tests skip unless BACFLUX_TEST_* variables name real GTDB files
 ```
 
 ## What did not change

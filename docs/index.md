@@ -1,13 +1,21 @@
 # Overview
 
 BacFlux is a [Snakemake](https://snakemake.github.io/) workflow for bacterial
-whole-genome sequencing. It carries one isolate from raw reads — or from a genome you
-already assembled — through assembly, decontamination, quality control, taxonomic
-placement, functional annotation, and screening for resistance genes, virulence
-factors, plasmids and prophages. It can also report, for each resistance gene found,
-whether it sits inside something that can move to another bacterium. A single key in
-the config file, `mode`, decides which of four front ends runs. This site documents
-version **v2.1.0**.
+isolate genome analysis. It accepts Illumina reads, Oxford Nanopore reads, both read
+types from the same isolate, or an existing assembly. The workflow combines
+assembly processing, decontamination, quality control, taxonomic classification,
+functional annotation, and screening for resistance genes, virulence factors,
+plasmids and prophages.
+
+BacFlux was developed to support the genomic characterisation of bacterial strains
+considered for biocontrol, biostimulant and biofertiliser applications. Its annotation
+and screening results help assess candidate strains, including the presence of
+resistance-associated and virulence-associated genes. These predictions support
+strain selection alongside phenotypic evidence and application-specific assessment.
+
+An optional mobilome module assesses the genomic context and potential mobility
+of detected antimicrobial resistance genes. The configuration key `mode` selects
+the input mode. This site documents version **v2.1.0**.
 
 BacFlux belongs to the [BioFlux](https://github.com/stars/iLivius/lists/bioflux)
 family of pipelines.
@@ -42,27 +50,29 @@ map to open it at full size.
 |                          | `illumina` | `nanopore` | `hybrid` | `contigs` |
 |--------------------------|------------|------------|----------|-----------|
 | **Input**                | Illumina paired-end reads | long reads from Oxford Nanopore Technologies (ONT) | Illumina and ONT reads from the same isolate | a finished assembly (FASTA) |
-| **Read QC**              | PhiX removal (`bowtie2`), then `fastp` | `NanoPlot` either side of `Filtlong` | both legs | none |
+| **Read QC**              | PhiX removal (`bowtie2`), then `fastp` | `NanoPlot` before and after `Filtlong` | both of the above | none |
 | **Assembly**             | `SPAdes` | `Flye`, reoriented by `dnaapler`, polished by `Medaka`\* | `Flye` as in `nanopore`, then corrected with the short reads by `Polypolish`; a `SPAdes` draft is kept as the comparator | no assembler |
 | **Contig filter**        | ≥500 bp and ≥2× coverage, read off SPAdes' own headers | none | the same cutoffs, on the SPAdes draft only | the same cutoffs when the headers are SPAdes-style; otherwise headers are trimmed and nothing is removed |
 | **Delivered genome**     | the screened SPAdes contigs | the polished Flye assembly | the Polypolish-corrected ONT assembly | the screened input contigs |
-| **Needs reads later on** | yes — the CARD read leg, and IS copy number if the mobilome module is on | no | yes, as `illumina` | no |
+| **Needs reads later on** | yes — the CARD read analysis, and IS copy number when the mobilome module and its ISOSDB layer are on | no | yes, as `illumina` | no |
 
-\* optional: `parameters.{nanopore,hybrid}.medaka_model: false` skips the polishing
-step. `hybrid` is the expensive mode — it assembles twice, and `Snippy` then counts how
-far the two assemblies still differ.
+\* Medaka polishing is optional. Set
+`parameters.{nanopore,hybrid}.medaka_model: false` to skip it. Hybrid mode requires
+more computation because it assembles both read types and compares the assemblies
+with Snippy.
 
-Each front end ends by writing one file,
-`02.assembly/{sample}/contigs_final.fasta`. Two shared stages sit either side of it:
-decontamination, which is the step that writes that file in `illumina` and
-`contigs` mode and runs just before the final polish in the two long-read modes; and
-assembly QC, which scores whatever came out (in `hybrid`, both genomes). From
-taxonomy onwards every rule reads `contigs_final.fasta` and nothing else — taxonomy,
-annotation, AMR, plasmids, prophages, the optional mobilome stage and the report
-exist in one copy each, so a result means the same thing whichever way the isolate
-was sequenced. See [Modes](modes/index.md) for the front ends and
-[Choosing a mode](getting-started/choosing-a-mode.md) for which one a dataset belongs
-in.
+Every mode produces `02.assembly/{sample}/contigs_final.fasta` for the shared analysis
+stages. The primary decontamination screen filters the draft assembly; in hybrid mode
+this is the Illumina draft, while a second screen of the final long-read assembly writes
+a verdict per contig and removes nothing. Assembly QC evaluates the final genome and, in
+hybrid mode, the Illumina comparator. See
+[Decontamination](analysis/decontamination.md).
+
+The shared downstream stages use the final assembly together with the annotation,
+taxonomy, reads or other inputs required by each analysis. This common processing
+improves consistency across datasets. Differences in read quality and assembly
+fragmentation still affect detection and interpretation. See [Modes](modes/index.md)
+and [Choosing a mode](getting-started/choosing-a-mode.md).
 
 ## One command, one config, one report
 
@@ -72,21 +82,21 @@ All four modes are launched the same way, from the repository root:
 snakemake --sdm conda --cores 16 --configfile config/config.yaml
 ```
 
-`--sdm conda` (short for `--software-deployment-method`) tells Snakemake to build
-each rule's own conda environment on first use, so only Snakemake itself has to be
-installed by hand. `--cores` is the single CPU knob: every CPU-bound rule declares
-its own `threads:`, so `--cores` already sets the ceiling and `--jobs` must not be
-added alongside it. The reasoning is on [Running BacFlux](reference/running.md).
+`--sdm conda` enables the conda environments specified by the workflow. Install
+Snakemake first; the analysis environments are then created as required.
+`--cores` sets the CPU budget for local execution. Use it without a separate
+`--jobs` setting for a local run. See [Running BacFlux](reference/running.md).
 
-The config file is required on the command line; BacFlux deliberately ships no
-default. Mode, input and output paths, database locations and every tunable
-parameter live in the file you pass, and a missing key stops the run at parse time —
-in seconds, before any job starts — rather than quietly falling back to a placeholder
-path. Every key is documented in [Configuration](reference/configuration.md).
+Pass the configuration file explicitly with `--configfile`. BacFlux supplies a template,
+but does not load it automatically. Use a copy to set the mode, input and output paths,
+database locations and analysis parameters. Required missing keys stop planning; an
+existing key with an invalid or empty path may fail later. See
+[Configuration](reference/configuration.md) and
+[Quick start](getting-started/quick-start.md).
 
-Every mode ends with one [MultiQC](https://multiqc.info/) page,
-`09.report/multiqc_report.html`, so a finished run can be read end to end from a
-single HTML file.
+Every mode produces a [MultiQC](https://multiqc.info/) overview at
+`09.report/multiqc_report.html`. Use it for the batch-level QC summary and read the
+stage-specific tables and reports for annotation, AMR and mobilome interpretation.
 
 !!! note "What has to be prepared in advance"
 
@@ -98,19 +108,18 @@ single HTML file.
 
 ## Where AMR mobility fits
 
-Stage `08.mobilome` is optional and off by default (`mobilome.run: false`). Turned
-on, it runs AMRFinderPlus over the annotated genome and, for every resistance gene it
-calls, reports the mobile-element context around that gene and a mobility tier, on a
-ladder from *chromosomal, no mobile-element context — intrinsic candidate* up to
-*inside an ICE or on a conjugative plasmid — predicted self-transmissible*. That
-distinction, intrinsic versus acquired, is the one regulators ask about, and a gene
-list alone cannot answer it.
+Stage `08.mobilome` is disabled by default (`mobilome.run: false`). When enabled,
+it uses AMRFinderPlus and mobile-element evidence to assign a context and mobility
+tier to each assessed resistance gene. The reported categories range from
+`intrinsic_candidate` to `predicted_self_transmissible`.
 
-Every call is a prediction and carries its own confidence tier and contig-edge flags,
-because on a fragmented assembly the structure being looked for is often what broke
-the assembly. Start at [the mobilome module](mobilome/index.md), and read
-[Draft assemblies](mobilome/draft-assemblies.md) before drawing conclusions from a
-short-read run.
+These categories describe genomic evidence and predicted transfer potential: the
+evidence for the intrinsic-versus-acquired question a strain assessment asks of each
+resistance gene, which a gene list alone cannot answer. They do not demonstrate
+transfer or establish that resistance is intrinsic or acquired.
+Interpret the tiers together with confidence fields, contig-edge flags and assembly
+quality. Start with [the mobilome module](mobilome/index.md) and
+[Draft assemblies](mobilome/draft-assemblies.md).
 
 ## Where to go next
 
@@ -121,9 +130,9 @@ short-read run.
 | [Quick start](getting-started/quick-start.md)         | the shortest path from a clone to a finished run                                  |
 | [Choosing a mode](getting-started/choosing-a-mode.md) | which mode a given dataset belongs in, and what a wrong one does                  |
 | [Coming from v1](getting-started/from-v1.md)          | the `mode:` key, the config that has to be rebuilt, and the renumbered output     |
-| [Modes](modes/index.md)                               | the four front ends, one page each                                                |
-| [Antimicrobial resistance](analysis/amr.md)           | the ABRicate and CARD legs, and what each is and is not evidence of               |
-| [The mobilome module](mobilome/index.md)              | AMR mobility: the ladder, the switch, the output, and its limits                  |
+| [Modes](modes/index.md)                               | input processing and assembly for each mode                                                |
+| [Antimicrobial resistance](analysis/amr.md)           | ABRicate screening, CARD read mapping and interpretation limits               |
+| [The mobilome module](mobilome/index.md)              | mobility tiers, activation, outputs and interpretation limits                  |
 | [Configuration](reference/configuration.md)           | every config key, which modes read it, its default and its trade-off              |
 | [Output files](reference/output.md)                   | what each numbered stage holds and which files are the deliverables               |
 | [Running BacFlux](reference/running.md)               | dry runs, CPU budget, restarting a run                                            |

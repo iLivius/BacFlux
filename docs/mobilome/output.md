@@ -1,6 +1,7 @@
 # Reading the output
 
-Everything lands in `08.mobilome/{sample}/`. Two files carry the result:
+The main outputs are written to `08.mobilome/{sample}/`. Read the mobility table
+with the audit file and the assembly-related flags:
 
 | File | What it is |
 |---|---|
@@ -43,7 +44,7 @@ Straight from AMRFinderPlus, which is why these columns exist rather than ABRica
 | `amr_element_type` | `AMR` / `STRESS` / `VIRULENCE` — the module reasons about all three |
 | `amr_class`, `amr_subclass` | drug class and subclass |
 | `amr_start`, `amr_end`, `amr_strand` | position on the contig |
-| `amrfinder_method` | `EXACTX`, `BLASTP`, `HMM`, `POINTX`, `PARTIAL_CONTIG_ENDX` … — a free confidence tier from the curator |
+| `amrfinder_method` | `EXACTX`, `BLASTP`, `HMM`, `POINTX`, `PARTIAL_CONTIG_ENDX` … — the detection method; interpret with identity, coverage and partial-hit fields |
 | `amr_pct_identity`, `amr_pct_coverage` | against the reference gene |
 | `amr_partial_at_contig_end` | `yes` when the method says the hit runs off the end of the contig. Caps confidence |
 
@@ -54,7 +55,7 @@ Straight from AMRFinderPlus, which is why these columns exist rather than ABRica
 | `mge_context` | `none`, `is_adjacent`, `composite`, `unit_transposon`, `integron`, `ice`, `ime`, `plasmid` — plus the context-only types (`conjugative_region`, `genomic_island`, `aice`) and their `near_*` variants, which report a nearby element without raising the tier |
 | `mge_id` | the element that set the context |
 | `mge_name` | its curated name, when a naming layer supplied one |
-| `named_element`, `named_element_type` | a curated transposon or integron **containing** the gene, kept even when a higher rung won the tier |
+| `named_element`, `named_element_type` | a curated transposon or integron **containing** the gene, kept when a higher tier is assigned |
 | `distance_bp` | the **measured** distance to that element. 0 when the gene is inside it |
 | `orientation` | the element's strand relative to the gene's: `same` / `opposite` |
 
@@ -66,7 +67,7 @@ Straight from AMRFinderPlus, which is why these columns exist rather than ABRica
 | `n_flanking_is` | IS copies on either side within the composite window |
 | `same_orientation` | whether the two flanking copies point the same way. `NA` when a strand is unknown |
 | `flanking_span_bp` | the measured span of a called composite — compare it against `mobilome.max_composite_span_bp` |
-| `is_inside_amr_cds` | `yes` = an IS has landed **inside** the coding sequence. Read as likely **inactivation**, never as mobilisation |
+| `is_inside_amr_cds` | `yes` = an IS covers at least half of the coding sequence, or lies within 25 bp of a hit AMRFinderPlus reports as truncated (a `PARTIAL` method other than `PARTIAL_CONTIG_END`, or under 90% reference coverage). Read as likely **inactivation**; the flag never raises the tier. A smaller overlap leaves `no` and caps confidence at `medium` (`is_partially_overlaps_amr_gene`) |
 | `is_amr_overlap_bp` | how much of the gene it overlaps |
 
 ### The conjugation machinery behind a tier 5 or 6 call
@@ -78,9 +79,9 @@ Straight from AMRFinderPlus, which is why these columns exist rather than ABRica
 | `relaxase_type` | e.g. `MOBH`, `MOBF` — CONJscan's typing |
 | `mpf_type` | the mating-pair apparatus type, e.g. `F`, `T` |
 | `machinery_intact` | `no` = truncated or degraded |
-| `machinery_source` | **read this one.** `containing_element:<id>` = the gene sits inside that element. `same_replicon:<id>` = the machinery is elsewhere on the same plasmid — still the right evidence, because a mating apparatus makes the whole replicon transferable, but it is not wrapped around this gene, and the column says so rather than implying containment |
+| `machinery_source` | **read this one.** `containing_element:<id>` = the gene sits inside that element. `same_replicon:<id>` = the machinery is elsewhere on the same plasmid — still the right evidence, because machinery on the same plasmid supports predicted replicon-level transfer potential, but it is not wrapped around this gene, and the column says so rather than implying containment |
 
-!!! note "Platon counts genes; CONJscan types the machine"
+!!! note "Platon and CONJscan provide different evidence"
 
     Platon counts hits to conjugation-related genes — cheap, always available, and not
     proof of a working apparatus. CONJscan asks whether a **complete, typed** mating-pair
@@ -120,8 +121,8 @@ chromosome, 300 randomly placed 15 kb non-ICE spans produced a confident de novo
 of rRNA operons, REP elements and paralogues. Requiring the repeat to occur exactly twice
 cut that to 16%, and refusing to *act* on one cuts what can reach the AMR table to 1%.
 Widening an element makes every gene inside it cargo, so a fabricated 50 kb boundary
-would turn a *gyrA* point mutation — the textbook non-transferable determinant — into
-"predicted self-transmissible".
+could place a chromosomal *gyrA* point mutation inside an ICE and report it at tier 6,
+`predicted_self_transmissible`.
 
 ### How much the assembly can support
 
@@ -129,7 +130,7 @@ would turn a *gyrA* point mutation — the textbook non-transferable determinant
 |---|---|
 | `contig_length` | the yardstick the next three are measured against |
 | `dist_to_contig_end` | bases from the gene to the nearer end of its contig |
-| `is_at_contig_boundary` | the context element runs into a contig end |
+| `is_at_contig_boundary` | `yes` when the gene lies within 1,000 bp of a contig end; caps confidence at `low` |
 | `spans_contigs` | the element's evidence is on more than one contig. **An absolute cap at low confidence**, whatever else the row says |
 
 ### The verdict
@@ -160,9 +161,9 @@ cut -f8,9 {sample}_amr_mobility_audit.tsv | sort | uniq -c | sort -rn
 | `input_assumed` | a table was present but missing an optional column, so a documented default was applied to all its rows |
 | `row_skipped` | an AMRFinderPlus row had no contig coordinates, so it gets no tier |
 | `no_mge_context` | the gene was assessed and nothing mobile was near it. A **result**, not a failure — this is what a tier 1 looks like |
-| `tier_not_raised` | evidence was found but did not meet the bar for the next rung. The commonest word in the file |
+| `tier_not_raised` | evidence was found but did not meet the bar for the next tier. The commonest word in the file |
 | `evidence_rejected` | a candidate structure was thrown out (IS inside the coding sequence, unusable element type …) |
-| `evidence_recorded` | kept as a note without changing the tier — e.g. a curated name that a higher rung outranked |
+| `evidence_recorded` | kept as a note without changing the tier — e.g. a curated name that a higher tier outranked |
 | `evidence_corroborated` | two independent tools agreed. Agreement is evidence and should be visible |
 | `tools_disagree` | two tools disagreed. **Never resolved silently** |
 | `confidence_capped` | the call was downgraded, and the reason says which guard fired |
@@ -196,7 +197,7 @@ organism can raise the threshold and re-run.
 | File | What it is for |
 |---|---|
 | `{sample}_is_summary.tsv` | how many IS calls sit within `mobilome.contig_boundary_bp` of a contig end, and what fraction that is. Read it first |
-| `{sample}_is_elements.tsv`, `_is_discarded.tsv` | one tidy row per insertion sequence, and the dropped rows with a reason. Two reasons are biological rather than technical: `overlaps_dnaA`, a call lying over the essential gene *dnaA*, and `overlaps_helicase_loader`, a partial IS21 lying over the chromosome's own helicase loader (*dnaC* with *dnaT* beside it, or *dnaI* with *nrdR* near it, and no IS21 transposase nearby). ISEScan reports both, but neither can be a real insertion |
+| `{sample}_is_elements.tsv`, `_is_discarded.tsv` | one tidy row per insertion sequence, and the dropped rows with a reason. Two reasons are biological rather than technical: `overlaps_dnaA`, a call lying over the essential gene *dnaA*, and `overlaps_helicase_loader`, a partial IS21 lying over the chromosome's own helicase loader (*dnaC* with *dnaT* beside it, or *dnaI* with *nrdR* near it, and no IS21 transposase nearby). Neither is a real insertion: the IS21 profile matches the replication protein itself ([False IS21 calls over replication genes](index.md#false-is21-calls-over-replication-genes)). The `detail` column gives the overlap and, for `overlaps_helicase_loader`, the partner gene and its distance |
 | `{sample}_ice_candidates.tsv`, `_ice_discarded.tsv` | ICE/IME candidates with anchors, boundaries, class and confidence — and the discard trail. The first row of the discard file records this assembly's own contig count and N50, with a sentence saying which contiguity band it falls in |
 | `{sample}_amrfinderplus.tsv`, `_amrfinderplus_mutations.tsv` | the raw AMR calls, and the point mutations separately |
 | `{sample}_amrfinder_organism.txt`, `_amrfinder_organism_audit.tsv` | which `--organism` the GTDB-Tk call mapped to, or none, and why |
@@ -220,14 +221,17 @@ organism can raise the threshold and re-run.
 The optional layers add their own tables — curated names, ICE names, IS copy number — and
 each is listed on [Optional layers](optional-layers.md).
 
-## An ICE cannot sit on a plasmid
+## Distinguishing integrated elements from conjugative regions { #an-ice-cannot-sit-on-a-plasmid }
 
 `{sample}_ice_candidates.tsv` reports elements on **every** replicon, because CONJscan
-runs over the whole proteome. A conjugative element found on a plasmid is typed
-`conjugative_region`, never `ice`, and that is a definition rather than a threshold: an
-**I**ntegrative and **C**onjugative **E**lement integrates into a chromosome, and
-something that is already its own replicon has nothing to integrate into. The classifier
-enforces it through the integrase requirement:
+runs over the whole proteome. On a contig the replicon table calls a plasmid, a
+conjugative element is typed `conjugative_region`, never `ice`, even when it carries an
+integrase: an ICE integrates into the chromosome by definition, and a plasmid is already
+a replicon of its own. The caller relabels such an element and records
+`ice_demoted_on_plasmid_replicon` in `{sample}_ice_discarded.tsv`; on a contig
+classified as neither chromosome nor plasmid, an `ice` call stands and is flagged
+`ice_on_unclassified_replicon`. A class label does not experimentally establish
+integration or excision. Otherwise the class follows the anchors:
 
 | Integrase | Relaxase | Mating apparatus | Class |
 |:-:|:-:|:-:|---|
@@ -255,5 +259,5 @@ treat an AICE call as a hypothesis ([Optional layers](optional-layers.md)).
 
 - [Worked example](worked-example.md) — every tier, on one genome, with the real rows.
 - [Draft assemblies](draft-assemblies.md) — which of these columns still hold on a draft.
-- [Tuning](tuning.md) — symptom to knob.
+- [Tuning](tuning.md) — symptom to parameter.
 - [Output files](../reference/output.md) — where stage 08 sits in the run.

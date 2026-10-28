@@ -65,10 +65,10 @@ repository root every time:
 
 ## Always dry-run first
 
-`-n` (or `--dry-run`) builds the job list and prints it without running anything
-or writing a file. It is worth the few seconds every time, because BacFlux does
-nearly all of its validation while the workflow is being *read* — before the
-first job starts. A dry run therefore catches, among others:
+`-n` (or `--dry-run`) resolves the workflow and prints the planned jobs without
+executing analysis commands. Before any job starts it checks configuration and
+planning conditions, among them those in the table below. It does not test tool
+execution, model downloads or the contents of every database:
 
 | Checked at parse time | Where the check lives in `00_common.smk` |
 |---|---|
@@ -106,14 +106,14 @@ eggNOG's `--dbmem` prints the exact flag to add (see [Memory](#memory)).
 ## `--sdm conda`
 
 `--sdm` is short for `--software-deployment-method`, and replaces the deprecated
-`--use-conda`. It tells Snakemake to build each rule's own environment from the
-YAML files in `workflow/envs/` and run that rule inside it. Only Snakemake
-itself is installed by hand; SPAdes, Flye, Bakta, GTDB-Tk and the rest are
-installed by the workflow on first use. The small steps get pinned environments
-too: BacFlux's own Python scripts run in `python.yaml`, and the download steps
-take `wget`, `curl`, `tar` and the unpackers from `download.yaml` or from the
-environment of the tool they serve, so the computer's own Python and download
-tools never matter.
+`--use-conda`. It tells Snakemake to build each rule's own environment from the YAML
+files in `workflow/envs/` and run that rule inside it. Only Snakemake itself is
+installed by hand; SPAdes, Flye, Bakta, GTDB-Tk and the rest are installed by the
+workflow on first use. The small steps get pinned environments too: BacFlux's own Python
+scripts run in `python.yaml`, and the download steps take `wget`, `curl`, `tar` and the
+unpackers from `download.yaml` or from the environment of the tool they serve, while
+some small Unix utilities still come from the host system. See
+[Installation](../getting-started/installation.md) for those requirements.
 
 The environments are built once and reused. By default they land in
 `.snakemake/conda/` under the launch directory. `--conda-prefix` moves them:
@@ -135,12 +135,13 @@ building them takes a while.
 
 ## Pin files: the exact environments
 
-Beside every environment file in `workflow/envs/` sits a `<name>.linux-64.pin.txt`.
-It lists every package in that environment, down to the exact build, as it was
-when the workflow was validated. On a linux-64 machine Snakemake finds it
-automatically and installs from it instead of solving the yaml, so two installs
-made months apart on different machines get identical environments. Nothing
-needs configuring; the run log shows `Using pinnings from ...` for each one.
+Beside every environment file in `workflow/envs/` sits a `<name>.linux-64.pin.txt`. It
+lists every package in that environment, down to the exact build, as it was when the
+workflow was validated. On a linux-64 machine Snakemake finds it automatically and
+installs from it instead of solving the yaml, so installations use the same recorded
+conda package builds where those packages remain available. External databases, host
+dependencies and pip-installed packages need their own provenance. Nothing needs
+configuring; the run log shows `Using pinnings from ...` for each one.
 
 On any other platform the pin file is ignored and the yaml is solved fresh. The
 Python version and the tool version are pinned there too, so the environment is
@@ -163,7 +164,7 @@ conda list --explicit -p <path to the built environment> > workflow/envs/<name>.
 
 ## `--cores` is the CPU budget
 
-`--cores N` is the one CPU knob, and it is enough on its own. Every rule that
+For local execution, `--cores N` sets the CPU budget used by Snakemake. Every rule that
 wants more than one core declares Snakemake's built-in `threads:`, which is the
 directive `--cores` enforces automatically; the two ABRicate rules declare none
 and count as one core each. Rules whose tool stops scaling ask for less, through
@@ -174,8 +175,8 @@ and count as one core each. Rules whose tool stops scaling ask for less, through
 |---|---|
 | `CPUS` (the full `resources.threads`) | `map_phix`, `illumina_assembly` (SPAdes), `ont_assembly` (Flye), `map_contigs`, `map_sel_contigs`, `map_final_contigs` |
 | `capped_cpus(24)` | BLAST screening, QUAST, CheckM, Qualimap, GTDB-Tk, Bakta, eggNOG, antiSMASH, dbCAN, BBMap→CARD, Platon, VirSorter2, geNomad, CheckV, Polypolish, Snippy, `fix_start`, Medaka **in nanopore mode** |
-| `capped_cpus(16)` | `trim_adapters` (fastp); the mobilome depth and ISOSDB mapping legs |
-| `capped_cpus(8)` | NanoPlot raw and filtered QC; Medaka **in hybrid mode** (the two long-read modes carry different values, kept as they were until timings say otherwise); the mobilome tool rules (AMRFinderPlus, ISEScan, CONJScan, ICEscan, the two BLAST naming legs); the two CheckV database rules |
+| `capped_cpus(16)` | `trim_adapters` (fastp); the mobilome depth and ISOSDB mapping analyses |
+| `capped_cpus(8)` | NanoPlot raw and filtered QC; Medaka **in hybrid mode** (the two long-read modes carry different values, kept as they were until timings say otherwise); the mobilome tool rules (AMRFinderPlus, ISEScan, CONJScan, ICEscan, the two BLAST naming analyses); the two CheckV database rules |
 | `capped_cpus(4)` | `virsorter2_db` |
 
 So `--cores 24` gives each rule its declared cap, and `--cores 8` caps every
@@ -186,8 +187,8 @@ correctly wins. Lowering `--cores` is how you run fewer heavy jobs side by side.
 
     For a local run `--jobs`/`-j` is an **alias** for `--cores`, not a second,
     independent "N jobs of M cores each" setting — a natural but wrong
-    assumption. Passing both switches the core budget off rather than adding a
-    cap on top of it. Measured: two rules each declaring `threads: 8`,
+    assumption. Passing both switches the core budget off rather than adding a cap
+    on top of it. Measured: two rules each declaring `threads: 8`,
     launched with `--jobs 2 --cores 8`, both received their full 8 threads and
     ran together — 16 real threads against a declared 8-core budget. The same
     rules with `--cores 8` alone ran one at a time. `--jobs` belongs on cluster
@@ -214,7 +215,7 @@ take it:
 |---|---|
 | `illumina_assembly` | SPAdes `-m`, a hard ceiling it aborts rather than exceed (the rule's `ram` resource, in `illumina/20_assembly.smk` and `hybrid/20_assembly.smk`) |
 | `map_evaluation` | Qualimap's Java heap, the most memory Java may use: `ram_gb` minus 4 GB, at most 64 GB and at least 1 GB (`QUALIMAP_HEAP_GB` in `00_common.smk`). The 4 GB are left for what Java needs beyond its heap |
-| `map_amr_db`, and the mobilome depth and ISOSDB legs | BBMap `-Xmx`, `min(ram_gb, 32)` GB (the `max_ram` value in each rule's `params:`) |
+| `map_amr_db`, and the mobilome depth and ISOSDB analyses | BBMap `-Xmx`, `min(ram_gb, 32)` GB (the `max_ram` value in each rule's `params:`) |
 
 Three rules also declare a memory figure as a named Snakemake `resource` — `ram`
 on SPAdes, `java_mem` on Qualimap, `mem_gb` on eggNOG — and Snakemake schedules
@@ -261,14 +262,15 @@ refused at parse time rather than allowed to fail on the first job.
 Snakemake rebuilds only what is missing or out of date, so an interrupted run is
 relaunched with the same command. Everything that finished cleanly is kept.
 
-An interruption leaves two kinds of debris.
+An interruption leaves two conditions to check.
 
 - **Part-written outputs.** A job killed mid-write leaves a file Snakemake marks
   incomplete. `--rerun-incomplete` (`--ri`) rebuilds those instead of trusting
   them.
 - **A locked working directory.** A run killed outright — `Ctrl-C` twice, a node
   failure, an OOM kill — can leave `.snakemake/` locked. Snakemake says so on the
-  next launch; `snakemake --unlock` clears it.
+  next launch; `snakemake --unlock` clears it. First confirm that no run is still using the
+  same working directory.
 
 Changing the config can be enough to mark a step out of date on its own.
 Snakemake compares more than file timestamps: a changed rule parameter, script or
@@ -281,8 +283,11 @@ code and environments, so the first run in an existing output directory plans
 to redo those steps and everything that depends on them, which can reach back to
 the assembly. Run `-n` first to see the plan. To keep the results you have and
 rebuild only what is missing or older than its inputs, add
-`--rerun-triggers mtime` to every run in that directory, or finish the project
-with the release it was started with.
+`--rerun-triggers mtime` to every run in that directory. Snakemake then ignores
+changes to rule code, parameters, input file lists and software environments,
+including your own configuration changes, so the directory can end up holding
+results made under different settings. Otherwise finish the project with the
+release it was started with, or use a new output directory for the updated workflow.
 
 !!! warning "`--ignore-incomplete` and `--keep-incomplete` are not resume flags"
 
@@ -311,7 +316,7 @@ assembly-depth step look like QC but feed later rules — GTDB-Tk, QUAST itself,
 the IS copy-number layer — so a failure there stops the run rather than letting
 a bad input flow downstream.
 
-For everything else, `--keep-going` (`-k`) is the flag to reach for: when one
+For other runtime failures, `--keep-going` (`-k`) lets independent jobs continue: when one
 sample's job fails, the other samples keep running to completion instead of the
 whole batch stopping. Fix the one sample, then resume with `--rerun-incomplete`.
 
@@ -364,8 +369,8 @@ BacFlux runs on a Slurm cluster in one of two ways:
 | Needs | the Slurm executor plugin; a login node on which Snakemake may run for many hours | one node with the cores, memory and time of the whole run |
 | Checked | the local rules by the test suite, and every job's requests by dry runs (`-n` prints them); not yet run on a Slurm cluster | as on a single computer |
 
-In short: A spreads the samples and steps over many nodes and keeps every
-download on the login node; B is a single-computer run inside one job. Both start
+Option A distributes jobs across nodes and runs download rules where Snakemake
+runs. Option B runs the workflow within one allocated node. Both start
 with the same preparation, and both need the same [shared storage](#cluster-storage).
 
 ### Preparation, on a computer with internet { #cluster-preparation }
@@ -510,7 +515,7 @@ single computer.
 The figures come from `HEAVY_MEM_MB`, `QUALIMAP_JOB_MB` and `LONG_RUNTIME_MINUTES`
 in `00_common.smk`, and a dry run prints each job's requests.
 
-In short: set `threads`, `ram_gb` and `runtime_hours` so that one job fits one
+Set `threads`, `ram_gb` and `runtime_hours` so that one job fits one
 node and one partition. GTDB-Tk alone needs about 55 GB, so give `ram_gb` at least
 about 60. A `ram_gb` well below the node's memory lets several heavy jobs share a
 node.
@@ -536,7 +541,7 @@ node.
 | Launch | inside the job, from the same folder, the usual command with `--cores N` ([script below](#cluster-batch-script)) |
 | Time limit | the whole run, plus the building of the environments and the downloads when they were not prepared. After a job is stopped at its time limit, submit the same script again ([Resuming an interrupted run](#resuming-an-interrupted-run)); if Snakemake asks for `--unlock`, run the command once with it first |
 
-In short: treat the node like a single computer. On one node Snakemake counts
+Treat the allocated node as a single computer. On one node Snakemake counts
 only threads: `resources.ram_gb` is then only the memory ceiling of SPAdes, the
 size of the Qualimap heap and the cap of BBMap, and `runtime_hours` is ignored.
 
@@ -601,7 +606,7 @@ them. The other way is to switch polishing off, with `medaka_model: false`.
 | every path in the configuration: the input folders, the five databases you provide, any `directories.*` database copy, the decontamination files | the steps read them; in A every job also runs the start-up checks again, which look at these paths |
 | your home folder, when Medaka could not write into its environment | Medaka then keeps the weights in `~/.medaka/data` |
 
-In short: on most clusters this means project space plus the home folder.
+On many clusters, project storage and the home directory provide these shared paths.
 
 - Put the environments on project space with one `--conda-prefix`, not on a home
   folder with a small quota: together they are tens of gigabytes.
@@ -676,8 +681,8 @@ environments without running them is not enough either: a package can install
 cleanly and still break at runtime.
 
 The check that catches these: a fresh clone, a fresh `--conda-prefix`, one small
-public genome, every mode. It takes an hour or two, and it is the only test that
-exercises what a new user actually gets.
+public genome, every mode. Its duration depends on the dataset and the machine. It
+exercises environment creation and tool execution as a new installation meets them.
 
 The version number is declared in five places, and they have to move together:
 

@@ -1,12 +1,15 @@
 # Reference databases
 
-BacFlux installs its own software but not its own reference data. Three groups:
+BacFlux requires reference databases in addition to its conda environments. Five
+core databases must be prepared before an analysis. Other databases are downloaded
+as required by the selected analyses, or can be supplied through local paths.
 
-| Group | Count | What you do |
-|---|---|---|
-| **Required** — too large or too tied to one release to fetch | 5 | download once, put the path in `directories:` |
-| **Fetched for you**, into `output_dir`, on the first run that needs it | 6 | nothing, unless a link needs changing |
-| **Fetched, but skippable** — the same six, minus PhiX | 5 (+1) | point `directories.*_db` at a copy you already hold |
+| Database group | Preparation |
+|---|---|
+| Bakta, NCBI nucleotide database, eggNOG, GTDB and Platon | Download the compatible releases and set the five required `directories.*_db` paths |
+| PhiX, CARD, dbCAN, antiSMASH, CheckV and the selected phage caller's database | Downloaded by the workflow when needed |
+| Existing local copies of CheckV, VirSorter2, antiSMASH, dbCAN, CARD or geNomad | Set the corresponding optional path to skip its download |
+| Optional mobilome layers | Configure each required source; see [Optional layers](../mobilome/optional-layers.md) |
 
 Nothing is written back into a database you supply. BacFlux reads your copy through a
 local symlink view and never modifies, moves or deletes it.
@@ -31,12 +34,12 @@ Two of those versions are requirements. Bakta 1.12.1 refuses a v5.x database, an
 GTDB-Tk 2.7.2 pins itself to one GTDB release and rejects R226 or older. There is no
 in-place upgrade for either.
 
-Two more are chosen for you rather than by you. The eggNOG release is fixed by the
-pinned eggnog-mapper 2.1.15, which builds its own download URL from `__DB_VERSION__`
-in the installed release, so the database cannot drift away from the tool. And the
-Platon database is versioned separately from Platon itself: v1.5.0 is current for
-every Platon from 1.5.0 onwards, including the 1.8 pinned here, so the database
-number trailing the tool number is expected.
+Two further compatibility requirements concern eggNOG and Platon. The eggNOG release is
+fixed by the pinned eggnog-mapper 2.1.15, which builds its own download URL from
+`__DB_VERSION__` in the installed release, so the database cannot drift away from the
+tool. And the Platon database is versioned separately from Platon itself: v1.5.0 is
+current for every Platon from 1.5.0 onwards, including the 1.8 pinned here, so the
+database number trailing the tool number is expected.
 
 ### Bakta
 
@@ -70,10 +73,11 @@ Note the archives are `.tar.xz` (hence `-xJf`), not `.tar.gz` as in earlier rele
     `{bakta_db}/amrfinderplus-db/latest`; it does not check the database's age and
     does not refresh it, so a stale copy stays stale until you run the command above.
 
-!!! note "This is also why the mobilome module needs no database of its own"
+!!! note "The mobilome module reuses the AMRFinderPlus database"
 
-    `{bakta_db}/amrfinderplus-db/` is where the module reads AMRFinderPlus from. A
-    working Bakta database is the whole prerequisite.
+    The module reads AMRFinderPlus data from `{bakta_db}/amrfinderplus-db/`.
+    CONJscan models are downloaded separately, and additional data sources are
+    needed for the optional layers described below.
 
 ### NCBI core nt
 
@@ -90,19 +94,13 @@ wget -c 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.acces
 gunzip nucl_gb.accession2taxid.gz
 ```
 
-!!! warning "rsync no longer works, and ftp:// is a liability"
+!!! note "Use the HTTPS download recipe"
 
-    NCBI has switched its rsync service off — `rsync://ftp.ncbi.nlm.nih.gov` now
-    answers `Connection refused`, so any recipe built on it fails outright.
-
-    `ftp://` still resolves, but it is worth avoiding anyway: sustained FTP transfers
-    from an institutional network are a common trigger for rate limiting at NCBI's
-    end, and the protocol is blocked outright on many campus networks. Every NCBI URL
-    here is `https://`, which is served from the same host and the same paths.
-
-    `update_blastdb.pl` is the route NCBI supports. It resolves the volume list
-    itself, so nothing needs updating here when the number of `core_nt` volumes
-    changes, and it verifies each volume's md5.
+    The commands above use HTTPS and `update_blastdb.pl`. The downloader resolves
+    the database volume list and checks the published MD5 values, so no
+    release-specific list of volumes has to be maintained. NCBI no longer serves
+    rsync: `rsync://ftp.ncbi.nlm.nih.gov` answers `Connection refused` (checked in
+    October 2026), so recipes built on it fail.
 
 `nodes.dmp` and `names.dmp` **must** sit in the same directory as the BLAST volumes.
 `parameters.nt_version` chooses which subfolder is searched: `core_nt` (default) or
@@ -174,9 +172,11 @@ short reads. An unset one stops the run at parse time, naming the key.
 
 Two defaults point at Zenodo mirrors rather than the publisher's own host: CheckV's
 official database lives on `portal.nersc.gov`, as does geNomad's downloader, and
-[NERSC](https://www.nersc.gov/) is unavailable often enough to cost real time. Both
-mirrors are unmodified copies. Change `links.genomad_md5` whenever you change
-`links.genomad_link` — a mismatch stops the run.
+[NERSC](https://www.nersc.gov/) is often unreachable, sometimes for a whole day. The
+CheckV default is an unmodified copy of the official archive, and the geNomad default
+is the Zenodo record published by geNomad's own authors. Change `links.genomad_md5`
+whenever you change `links.genomad_link`: a mismatch stops rule `genomad_db` before
+the archive is extracted.
 
 !!! note "The dbCAN pin"
 
@@ -233,9 +233,9 @@ Set any of these and the corresponding download is skipped entirely.
 | `directories.card_db` | an extracted CARD database | otherwise CARD is downloaded once into each output folder and kept there |
 | `directories.genomad_db` | the **inner** `genomad_db/` directory — the one holding `version.txt` and `genomad_db.dbtype` | its downloader hard-codes one host with no mirror option, so a local copy is the only fallback |
 
-Each of these gets a harder check than the five required paths: BacFlux confirms the
-directory exists **and** holds a file only that database has, so a path aimed at the
-wrong copy is caught at parse time rather than by the tool.
+For these optional local paths, BacFlux checks during planning that the directory
+exists and contains database-specific files. The five required paths have more
+limited checks, as described under Practical notes.
 
 **Switching to another release in an existing output folder.** A database the workflow
 downloaded, or linked from your copy, is kept in the output folder. Under
@@ -277,9 +277,11 @@ then caught by the dry run because they are named as rule inputs — a `blast_db
 that reaches the job table means the plan is sound, not that every database is
 complete.
 
-**Disk.** A full set is roughly 450 GB, dominated by `core_nt` and GTDB. The light
-Bakta database saves 80 GB at some cost in annotation depth. The databases BacFlux
-fetches into `output_dir` add about 20 GB.
+**Disk.** The five databases under [The five you download](#the-five-you-download)
+take about 530 GB with the full Bakta database and about 450 GB with the light one,
+mostly `core_nt` and GTDB; actual usage depends on the nucleotide database release.
+The light Bakta database costs some annotation depth. The databases BacFlux fetches
+into `output_dir` add about 20 GB, before any analysis output.
 
 ## Next
 

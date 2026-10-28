@@ -269,23 +269,28 @@ parameters:
   # The `mode` key below is the FILTERING policy — nothing to do with the
   # pipeline `mode` at the top of this file.
   decontamination:
-    # A trap worth knowing, especially in HYBRID mode: dropping a contig here
-    # can silently delete the ONT reads for it too, so the sequence disappears
-    # from the assembly rather than merely from the taxonomy table.
+    # A trap worth knowing in HYBRID mode with parameters.hybrid.short_read_guidance:
+    # true (default false): dropping a contig here can silently delete the ONT
+    # reads for it too, so the sequence disappears from the assembly rather than
+    # merely from the taxonomy table. With guidance off, filtlong never sees the
+    # short reads and this chain does not exist.
     #
-    # The chain: decontamination selects contigs by assigned genus → only the
-    # Illumina reads mapping to the SELECTED contigs become SEL_R1/SEL_R2 →
-    # filtlong is given SEL_R1/SEL_R2 as its short-read reference and scores ONT
-    # reads by how well they are covered by it. Sequence absent from that
-    # reference scores as low quality and is discarded before Flye ever sees it.
+    # The chain, with guidance on: decontamination selects contigs by assigned
+    # genus → only the Illumina reads mapping to the SELECTED contigs become
+    # SEL_R1/SEL_R2 → filtlong is given SEL_R1/SEL_R2 as its short-read reference
+    # and scores ONT reads by how well they are covered by it. Sequence absent
+    # from that reference scores as low quality and is discarded before Flye ever
+    # sees it.
     #
     # When this bites: a plasmid whose best BLAST hit is a DIFFERENT GENUS from
     # the host. That is not exotic — plasmids cross genus boundaries constantly,
     # which is the entire reason this module exists, and the reference databases
-    # are dense with near neighbours. `auto` mode uses BLAST bestsum, which
-    # follows database composition rather than biology: on K. pneumoniae ATCC
-    # BAA-2146 it dropped a genuine plasmid (pMYS, NZ_CP006660.1, 2,014 bp)
-    # because E. coli entries outnumbered Klebsiella ones 58,709 to 16,253.
+    # are dense with near neighbours. The contig's genus comes from BlobTools'
+    # bestsum rule, which sums BLAST bit scores per taxon and so follows database
+    # composition rather than biology: on K. pneumoniae ATCC BAA-2146 `auto`
+    # dropped a genuine plasmid (pMYS, NZ_CP006660.1, 2,014 bp) because the
+    # summed bit scores favoured Escherichia over Klebsiella, 58,709 to 16,253,
+    # although its single best hit was K. pneumoniae.
     #
     # How to check, in this order:
     #   1. Read 02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv
@@ -293,15 +298,17 @@ parameters:
     #      whose assigned_genus differs from the sample's GTDB genus.
     #   2. Compare the replicon count in 06.plasmids against what you expect.
     #   3. If a plasmid is missing from the ASSEMBLY rather than merely from the
-    #      plasmid call, this chain — not the assembler — is the likely cause.
+    #      plasmid call, this step (or, in hybrid with guidance on, the chain
+    #      above) — not the assembler — is the likely cause.
     #
     # How to fix, then re-run:
     #   * mode: include with include_genera listing BOTH the host genus and the
     #     genus the plasmid was assigned to; or
     #   * mode: off to keep everything (fine for a clean clinical isolate, and
     #     the safest choice when a plasmid is what you are after); or
-    #   * discard_no_hit: false, if the contig was dropped for having no hit
-    #     rather than the wrong one; or
+    #   * discard_no_hit: false together with mode: exclude (or off), if the
+    #     contig was dropped for having no hit rather than the wrong one; under
+    #     auto and include a no-hit contig is still removed; or
     #   * sample_overrides / include_genera_by_sample for a single awkward isolate.
     # Snakemake will redo only the affected steps.
     #
@@ -634,11 +641,11 @@ mobilome:
   #
   # What it buys you. Tier 3 is an INFERENCE: two IS copies of one family, the
   # right distance apart, a gene between them, so we call it a composite
-  # transposon. That inference has known blind spots — IS26 forms translocatable
-  # units with its copies in DIRECT orientation, breaking the same-orientation
-  # rule the pattern depends on. A TnCentral hit is not an inference: it matches
-  # an element somebody characterised, named and deposited, whose architecture is
-  # already known, so it gets IS26 right for free.
+  # transposon. That inference has known blind spots: copies in inverted
+  # orientation, or with no strand, fail the same-orientation test (IS6/IS26 is
+  # exempt from it, so Tn5- or Tn10-like structures are what it misses). A
+  # TnCentral hit is not an inference: it matches an element somebody
+  # characterised, named and deposited, whose architecture is already known.
   #
   # The intended case. Without this layer, blaCTX-M-15 on the K. pneumoniae
   # positive control (ATCC BAA-2146) scores tier 2 — "an IS is next to it, so
@@ -754,12 +761,17 @@ mobilome:
   # count is a FLOOR, not a count". True, but unquantified: you cannot tell
   # whether the floor is 2 short or 40 short. This leg puts a number on it.
   #
-  # Reads are immune to assembly collapse — every copy of an IS contributes its
-  # own reads whether or not the assembler kept them apart — so an IS present in
-  # five copies attracts about five times the read depth of the single-copy
-  # chromosome. Divide the two and you have the copy number:
+  # Reads do not collapse the way an assembly does — every copy of an IS
+  # contributes its own reads whether or not the assembler kept them apart — so an
+  # IS present in five copies attracts about five times the read depth of the
+  # single-copy chromosome. Divide the two and you have an estimate of the copy
+  # number:
   #
   #     copy number  ~=  depth over the IS  /  depth over the genome
+  #
+  # It is an estimate, and one-sided: mapping ambiguity and missing ISOSDB entries
+  # move it, and collapse_delta is reported only when it is at least the located
+  # count (NA otherwise).
   #
   # It changes NO AMR gene's tier, and must not: it says nothing about WHERE the
   # extra copies are, only that they exist. It is a quality metric on the IS
@@ -872,10 +884,12 @@ mobilome:
   # One asymmetry worth knowing, because it is not obvious and it is not a bug.
   # The att search is always given the 8,000 bp floor, never the 2,000 bp IME one,
   # and it refuses any repeat pair implying an element outside its range. So an
-  # IME admitted at 3 kb can never have its boundaries resolved, however clean the
-  # repeat pair: it keeps boundary_method=none and reports the machinery span.
-  # Four of the five curated IMEs this module detects (machinery spans 3,840 /
-  # 4,959 / 5,942 / 6,252 / 8,164 bp) sit under that floor. The deliberate reading
+  # IME shorter than 8 kb can never have its true boundaries accepted, however
+  # clean the repeat pair: either no pair survives and it keeps
+  # boundary_method=none at its machinery span, or a pair implying 8 kb or more
+  # wins instead. Four of the five curated IMEs this module detects have
+  # machinery spans under that floor (3,840 / 4,959 / 5,942 / 6,252 bp; the fifth
+  # 8,164 bp), and three are shorter than 8 kb in truth (5,551 / 6,338 / 7,591). The deliberate reading
   # is that an att pair implying a 3 kb element is mostly noise; the honest
   # reading is that IME boundaries are therefore largely unresolved. Making the
   # floors agree per class would change results, so it has not been done quietly.

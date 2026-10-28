@@ -2,9 +2,9 @@
 
 Each entry below gives the message you get, why it happens, and what to change.
 
-Run `-n` first, every time. BacFlux does most of its checking while the workflow
-is being *read*, so a dry run costs seconds and catches the config problems below
-before a single job starts — see
+Start with a dry run (`-n`). It checks workflow planning and many configuration
+errors before analysis jobs start, but does not validate all database contents or
+execute the tools — see
 [Always dry-run first](reference/running.md#always-dry-run-first).
 
 !!! abstract "Terms used on this page"
@@ -34,7 +34,8 @@ rather than letting BacFlux guess a front end. A config written for
 an earlier release will not have it, and `config/config_custom.yaml` is git-ignored
 — a `git pull` never updates yours.
 
-**Fix.** Start from the shipped example and copy your database paths across by
+**Fix.** Back up your current configuration, then start from the shipped example
+and copy your database paths across by
 hand. The block layout changed as well, so read it rather than paste into it:
 
 ```bash
@@ -100,7 +101,8 @@ again at run time if `--cores` is smaller (function `capped_cpus` in
 is still being killed there the lever is `resources.threads`, with `--cores` as a
 ceiling on top of it — see
 [How `threads` reaches a rule](reference/configuration.md#how-threads-reaches-a-rule).
-Thread count changes speed and memory only, never the classification.
+Lowering `threads` lowers pplacer's memory; it changes no classification setting
+that BacFlux passes to CheckM or GTDB-Tk.
 
 The two rules are also kept apart on purpose: `taxonomic_assignment` declares
 CheckM's stats file as an input purely as a scheduling edge, so they never run on
@@ -180,8 +182,9 @@ readable (chmod -R a+r), or point at a copy you own.
 **Cause.** `auto` runs `medaka tools resolve_model --auto_model consensus_bacteria`
 over the filtered reads, which reads the basecaller model out of the FASTQ headers.
 Guppy and Dorado stamp it there; older data, re-headered data and much public data
-do not carry it at all. Read filtering is not the cause: if the filtered reads lack
-the basecaller tag, the raw FASTQ lacked it too. For such data `auto` cannot work.
+do not carry it at all. Read filtering is not the cause: Filtlong copies each FASTQ
+header unchanged, comment included, so if the filtered reads lack the basecaller tag,
+the raw FASTQ lacked it too. For such data `auto` cannot resolve a model.
 
 The same check also stores the model's weights. Medaka ships the weights of only a
 few models and downloads the others from GitHub the first time they are needed.
@@ -290,19 +293,21 @@ Two independent steps can delete a real plasmid, and both have to be ruled out.
 
 | Step | Why | Where to look |
 |---|---|---|
-| Decontamination | `auto` follows BLAST bestsum, which follows database composition rather than biology. A 2,014 bp *K. pneumoniae* plasmid was dropped as *Escherichia* because *E. coli* entries outsummed *Klebsiella* 58,709 to 16,253 | `contaminants/contig_taxonomy_decisions.tsv` |
-| Long-read filtering | filtlong ranks reads by quality **and** length, and a plasmid cannot produce reads longer than itself, so its reads sit at the bottom by construction. Of the 603 ONT reads covering a 5,596 bp Col2 plasmid, `keep_percent: 90` with `length_weight: 10` keeps 93; the shipped `keep_percent: 95` and `length_weight: 1` keep 502 | `logs/filter_long_reads_{sample}.log` |
+| Decontamination | The contig's genus comes from BlobTools' `bestsum` rule, which sums BLAST bit scores per taxon and so follows database composition rather than biology. A 2,014 bp *K. pneumoniae* plasmid was dropped as *Escherichia* because the summed BLAST bit scores favoured *Escherichia* (58,709) over *Klebsiella* (16,253), despite the known host | `contaminants/contig_taxonomy_decisions.tsv` |
+| Long-read filtering | filtlong ranks reads by quality **and** length, and short plasmid-derived reads can be disadvantaged by length weighting. Of the 603 ONT reads covering a 5,596 bp Col2 plasmid, `keep_percent: 90` with `length_weight: 10` keeps 93; the shipped `keep_percent: 95` and `length_weight: 1` keep 502 | `logs/filter_long_reads_{sample}.log` |
 
 !!! warning "Recovering the reads is necessary, not sufficient"
 
     On that isolate **no** filtlong setting assembled the plasmid, raw unfiltered
     reads included. ONT ligation prep under-represents small circular plasmids by
     roughly four-fold, and no filter setting undoes that. `keep_percent` is the key
-    to reach for; `length_weight` only reaches filtlong in `hybrid` mode, because
-    the `nanopore` call caps its output with `--target_bases` instead.
+    to reach for; `length_weight` reaches filtlong only in `hybrid` mode, because
+    the `nanopore` rule does not pass it.
 
-The plasmid is missing from the **assembly**, not merely from the plasmid call, if
-it appears in neither. Both routes and their fixes are set out in
+A missing plasmid prediction does not establish that its sequence is absent from the
+assembly. Compare the assembly with an appropriate reference or inspect read and
+assembly-graph evidence before concluding that the replicon was lost. Both routes and
+their fixes are set out in
 [Decontamination](analysis/decontamination.md#5-two-ways-this-step-deletes-a-real-plasmid)
 and [Plasmids](analysis/plasmids.md#before-you-conclude-a-plasmid-is-absent).
 
@@ -335,7 +340,7 @@ This is the only download the module always makes; the naming layers are opt-in,
 and they come from ordinary web servers rather than GitHub. Their rules check what
 came back, because a redirect to an HTML error page arrives with a 200 and would
 otherwise be indexed as an empty database that silently names nothing — so each one
-fails loudly and prints the first bytes it received. Turning those layers on is
+stops with an error and prints the first bytes it received. Turning those layers on is
 covered in
 [Optional layers](mobilome/optional-layers.md#what-the-download-rules-do-besides-downloading).
 
@@ -348,8 +353,9 @@ usually the system Python, which has none of the tool's libraries, and the tool
 fails with an import error that looks like a broken install (QUAST reports a
 missing `joblib3`).
 
-Inside a run this never happens: Snakemake activates the environment before
-every command. To reproduce a step by hand, activate the environment first:
+For rules with a declared conda environment, Snakemake activates that environment before
+the command when `--sdm conda` is used. To reproduce a step by hand, activate the
+environment first:
 
 ```bash
 conda activate <path to the environment, under .snakemake/conda/ or your --conda-prefix>

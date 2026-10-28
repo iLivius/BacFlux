@@ -1,11 +1,16 @@
 # Configuration
 
-One YAML file describes a whole BacFlux run. There are no command-line switches
-for analysis parameters, so the config is a complete record of what was done —
-worth archiving next to the results.
+The YAML configuration selects the input mode, paths, resources and analysis
+settings. BacFlux has no command-line options of its own for analysis parameters,
+so this file records every analysis setting of a run, unless a value is overridden
+with Snakemake's `--config`. Keep it with the results, together with the BacFlux
+version, input identifiers and database provenance. A configuration alone does not
+preserve mutable reference data or guarantee reproducibility.
 
-The shipped template is `config/config.yaml`. It is a template: the empty strings
-are placeholders that must be filled in before anything runs. This page follows
+The shipped template is `config/config.yaml`. Fill in the input directory for your
+mode, `directories.output_dir`, the five required database paths and, for
+`illumina` and `hybrid`, `links.phix_link` and `links.card_link`. The other empty
+values belong to optional sources and layers and can stay empty when unused. This page follows
 the file's own order, and every section is tagged with the modes that read it —
 `[all modes]`, `[nanopore|hybrid]` and so on. Keys belonging to a mode that is
 not running are ignored entirely.
@@ -15,7 +20,7 @@ not running are ignored entirely.
     | | |
     |---|---|
     | **YAML** | the config file's plain-text format; indentation is significant and tabs are refused |
-    | **EFSA** | European Food Safety Authority, whose reporting thresholds the ABRicate leg applies |
+    | **EFSA** | European Food Safety Authority, whose reporting thresholds the ABRicate analysis applies |
     | **GTDB** | Genome Taxonomy Database, the reference GTDB-Tk places each genome in |
     | **AMR** | antimicrobial resistance |
     | **IS** | insertion sequence, the smallest kind of mobile element |
@@ -129,10 +134,10 @@ over-long ladder means the graph you deliver is the least supported one in the r
 
 ## What is checked before anything starts
 
-BacFlux validates the config while Snakemake is still reading the workflow —
-seconds in, before a single job is scheduled. A dry run (`snakemake -n`)
-therefore catches almost every config mistake. The checks, in the order the file
-lists the keys:
+BacFlux checks configuration structure and selected values while Snakemake reads the
+workflow. A dry run (`snakemake -n`) catches these errors and resolves declared inputs;
+it does not execute tools or validate all database contents. The checks, in the order
+the file lists the keys:
 
 | Key | Check | What happens |
 |---|---|---|
@@ -183,8 +188,13 @@ required key is reported by Python as a `KeyError` naming it.
     | any other key that takes a word: `mode`, `phage.caller`, `parameters.nt_version`, `spades_kmers`, `auto_vote`, `flye_input_mode` | stops, saying how YAML read the value and listing the words it accepts |
     | a block written as one value, e.g. `decontamination: off` or `mobilome: on` | stops. Decontamination is switched off with `mode: off` inside its block and the mobilome module with `run: false` inside its block; phage calling has no off switch |
 
-Database *contents* are not opened at parse time, so a placeholder path in
-`bakta_db` or `blast_db` passes a dry run and fails later. The optional
+`bakta_db`, `eggnog_db`, `gtdbtk_db` and `platon_db` are passed to their tools as
+written and are not checked before the run: a path that does not exist passes a dry
+run, and the error appears when Bakta, eggNOG-mapper, GTDB-Tk or Platon starts. A
+wrong `blast_db` is caught by a dry run, because the `names.dmp` and `nodes.dmp`
+files inside it are declared rule inputs; the `parameters.nt_version` subfolder is
+not checked. A successful dry run therefore does not prove that every required
+database is usable. The optional
 `directories.*_db` overrides are the exception — each is validated the moment it
 is set, which is why `config/config_v2_test_examples.yaml` leaves them out of its
 four minimal per-mode dry-run configs.
@@ -219,9 +229,9 @@ mode: illumina                 # illumina | nanopore | hybrid | contigs
 |---|---|---|---|
 | `mode` | Selects the front-end rules (`workflow/rules/<mode>/*.smk`) and the sample-discovery logic | `illumina` | Matched case-insensitively. Anything other than the four names stops the run at parse time. |
 
-The mode is never inferred from the data. Everything from taxonomy onwards is
-one shared set of rules, so the mode changes only how the genome is produced —
-see [choosing a mode](../getting-started/choosing-a-mode.md).
+The mode is never inferred from the data. Everything from taxonomy onwards is one shared
+set of rules, while the mode also determines which read-dependent analyses and metadata
+are available — see [choosing a mode](../getting-started/choosing-a-mode.md).
 
 ---
 
@@ -294,10 +304,9 @@ stops the run rather than quietly resolving to something wrong.
 |---|---|
 | `bakta_db` | A Bakta database, light or full. Also supplies the AMRFinderPlus database at `amrfinderplus-db/latest/`, which the mobilome module uses. |
 | `blast_db` | The directory holding the NCBI nucleotide database; the subfolder named by `parameters.nt_version` is what the contamination screen blasts against. |
-| `eggnog_db` | The eggNOG-mapper database directory. BacFlux pins eggnog-mapper 2.1.15, which annotates against **eggNOG 5.0**, database release **`emapperdb-5.0.2`**. The version is fixed by the tool rather than chosen by you: `download_eggnog_data.py` builds its URL from `__DB_VERSION__` in the installed release, so the database cannot drift away from the pin.
- |
+| `eggnog_db` | The eggNOG-mapper database directory. BacFlux pins eggnog-mapper 2.1.15, which annotates against **eggNOG 5.0**, database release **`emapperdb-5.0.2`**. The version is fixed by the tool rather than chosen by you: `download_eggnog_data.py` builds its URL from `__DB_VERSION__` in the installed release, so the downloader requests the release associated with that tool version. |
 | `gtdbtk_db` | A GTDB-Tk release directory. |
-| `platon_db` | The Platon plasmid database, release **v1.5.0** ([DOI 10.5281/zenodo.4066768](https://doi.org/10.5281/zenodo.4066768), 2020-10-05). It is versioned separately from Platon itself: v1.5.0 is the current database for every Platon from 1.5.0 onwards, including the 1.8 pinned here, so the database number trailing the tool number is expected rather than a sign of drift. |
+| `platon_db` | The Platon plasmid database, release **v1.5.0** ([DOI 10.5281/zenodo.4066768](https://doi.org/10.5281/zenodo.4066768), 2020-10-05). It is versioned separately from Platon itself: Platon's documentation lists database v1.5.0 for Platon 1.5.0 and later, including the 1.8 pinned here, so the database number trailing the tool number is expected rather than a sign of drift. |
 
 Versions and download recipes are on
 [reference databases](../getting-started/databases.md).
@@ -365,12 +374,12 @@ links:
 
 | Key | Required in | Default | Notes |
 |---|---|---|---|
-| `phix_link` | `illumina`, `hybrid` | unset | The PhiX genome Illumina spikes into nearly every lane. Those reads are real sequence from another organism and are mapped out before assembly. |
+| `phix_link` | `illumina`, `hybrid` | unset | The PhiX control genome, which may be present in Illumina sequencing data. Those reads are real sequence from another organism and are mapped out before assembly. |
 | `dbcan_link` | all modes | dbCAN 5.1.2 on Zenodo | Must be a `.tar.gz`: the checksum URL and the extracted folder name are both derived from it, so the folder always matches the release you pointed at. |
-| `card_link` | `illumina`, `hybrid` | unset | CARD, for the read-mapping AMR leg. Reads are immune to assembly collapse, so this leg sees determinants the contig-based leg can miss. |
+| `card_link` | `illumina`, `hybrid` | unset | CARD, for the read-mapping AMR analysis. Read mapping can detect sequences missing from an assembly, but remains subject to coverage and mapping ambiguity. |
 | `checkv_link` | *optional*, all modes | a Zenodo mirror of CheckV's own database | Empty means CheckV downloads its own. Ignored when `directories.checkv_db` is set — and BacFlux says so rather than ignoring the key silently. |
 | `genomad_link` | *optional*, `phage.caller: genomad` | the geNomad authors' own Zenodo copy | Must be the database archive (`genomad_db_v*.tar.gz`), not the HMM or MSA archive beside it on the same record. Empty falls back to geNomad's own downloader. |
-| `genomad_md5` | with `genomad_link` | the MD5 of the default archive | Zenodo publishes an MD5 rather than the `.sha256` sidecar the other mirrors carry, so it is configured rather than derived. **Change it whenever you change the link** — a mismatch stops the run, and a stale hash is worse than none. |
+| `genomad_md5` | with `genomad_link` | the MD5 of the default archive | Zenodo publishes an MD5 rather than the `.sha256` sidecar the other mirrors carry, so it is configured rather than derived. **Change it whenever you change the link.** A mismatch stops rule `genomad_db` before the archive is extracted; an empty value downloads without verification and says so in `logs/genomad_db.log`. |
 
 The CheckV and geNomad mirrors exist for one reason: both databases are served
 from `portal.nersc.gov` ([NERSC](https://www.nersc.gov/)), which is unreachable
@@ -443,11 +452,11 @@ makes a plain `--cores N` a real ceiling.
     the exact flag to add. `java_mem=N` also lowers each Qualimap heap to N GB,
     the way to give Qualimap less without lowering `ram_gb` for everything else.
 
-    The three BBMap legs (`map_amr_db`, `assembly_depth`, `isosdb_map`) take their
+    The three BBMap analyses (`map_amr_db`, `assembly_depth`, `isosdb_map`) take their
     `-Xmx` from a `params:` value rather than a resource, so `--resources` does not
     change it.
 
-    The heavy rules, the BBMap legs among them, also declare `mem_mb` and
+    The heavy rules, the BBMap analyses among them, also declare `mem_mb` and
     `runtime`. A cluster executor reads both. A single computer ignores `runtime`
     and uses `mem_mb` only when the launch line passes `--resources mem_mb=N`; each
     heavy step then counts as `ram_gb` × 1024 MB against N.
@@ -499,15 +508,16 @@ cores rather than by RAM. More on the annotation stage:
     length_weight: 1
 ```
 
-**This is the biggest lever on small-plasmid recovery.** Filtlong ranks reads by
+These settings can affect whether small-plasmid reads survive filtering. Filtlong ranks
+reads by
 
 ```text
 (Length^length_weight × MeanQuality^mean_q_weight)^(1/(lw+mqw)) × WindowQuality
 ```
 
-and `--keep_percent` deletes the bottom of that ranking. A small plasmid cannot
-produce reads longer than itself, so its reads sit near the bottom by
-construction and are discarded first.
+and `--keep_percent` deletes the bottom of that ranking. Short plasmid-derived reads can
+be disadvantaged by length weighting. Concatemers can produce reads longer than a single
+plasmid copy, so this is a tendency rather than an absolute length limit.
 
 | Key | What it does | Default | Reaches Filtlong in |
 |---|---|---|---|
@@ -527,7 +537,8 @@ surviving each setting pair:
 | `keep_percent: 90` (the old value) | 93 | 413 |
 | `keep_percent: 95` | 500 | 502 |
 
-**`keep_percent` is the key to reach for.** At the 95 that now ships, changing
+In this sample `keep_percent` had the larger effect, so it is the first key to change
+when a small plasmid's reads are missing. At the default of 95, changing
 `length_weight` is worth two reads; at the old 90 it was worth 320. The plasmid
 needed both old values together to disappear, and either change on its own brings
 most of it back.
@@ -543,10 +554,10 @@ classes. Reads per length band, same sample (the raw set holds 2,954 reads of
 | `keep_percent: 90`, `lw: 1` | 123 | 2,331 |
 | `keep_percent: 95`, `lw: 1` | 605 | 2,935 |
 
-`length_weight: 10` empties the 1–3 kb band whatever `keep_percent` says. So
-`keep_percent` protects plasmids of a few kb and `length_weight` protects
-plasmids under about 3 kb; this 5.6 kb one happened to sit in `keep_percent`'s
-range.
+In this sample, `length_weight: 10` removed the 1–3 kb reads at both tested
+`keep_percent` values. Raising `keep_percent` retained more 3–6 kb reads, whereas
+lowering `length_weight` also retained some 1–3 kb reads. These observations do not
+define universal plasmid-size ranges protected by either setting.
 
 !!! warning "Recovering the reads is necessary, not sufficient"
 
@@ -558,8 +569,10 @@ range.
 
 There is no spelling for "off". The number goes straight to Filtlong's
 `--keep_percent`, so a blank value arrives as the literal `None` and Filtlong
-refuses to start; set `100` to keep everything above `min_length`, which is the
-safest setting for plasmids. Raising them further rarely gains anything — total
+refuses to start. A value of `100` rejects no read by this percentage; `--min_length`
+still applies, as does the 500 Mb `--target_bases` cap (`nanopore`, and `hybrid` with
+`short_read_guidance: false`) or, with guidance on, trimming and splitting against the
+Illumina reads. Raising either key further rarely gains anything — total
 bases barely moved in the test (208 → 227 Mb), so what changes is *which* reads
 survive, not how many. If you raise `length_weight` you are trading small
 replicons for chromosome contiguity; say so in your methods. Full treatment:
@@ -605,7 +618,8 @@ judged, a second time, with `long_read_mode`, as a check that changes no contig.
 | `exclude_genera_file` | **A file path** to a genus list, one per line | unset | Blank lines and `#` comments are skipped. |
 | `sample_overrides` | **A file path** to a per-sample override TSV | unset | Columns `sample` and `mode` are required; `include_genera`, `exclude_genera` and `discard_no_hit` may follow. A row replaces the run-wide setting for that one sample. |
 
-The last three are **paths to files**, not mappings written inline. A YAML block
+`include_genera_by_sample`, `exclude_genera_file` and `sample_overrides` are
+**paths to files**, not mappings written inline. A YAML block
 written there would be stringified and the selector would try to open a file
 literally named `{}`.
 
@@ -614,28 +628,32 @@ literally named `{}`.
     Not "match nothing". A row must still carry the full set of tabs where fields
     are blank, or the columns shift and the wrong value is read.
 
-!!! warning "`auto` can delete a genuine plasmid, and in hybrid mode it takes the reads with it"
+!!! warning "Taxonomic selection can discard a genuine plasmid"
 
-    `auto` follows BlobTools' `bestsum`, which sums bitscores per taxon across
-    every hit — and that follows database composition rather than biology. On
-    *K. pneumoniae* ATCC BAA-2146 it discarded a real 2,014 bp plasmid
-    (pMYS, NZ_CP006660.1) as *Escherichia*, because *E. coli* entries outnumbered
-    *Klebsiella* ones 58,709 to 16,253. Broad-host-range plasmids are dropped
-    *precisely because* they are mobile and their nearest database relatives sit
-    in another genus.
+    BlobTools' `bestsum` rule gives each contig the genus with the largest sum of
+    BLAST bit scores over all its hits, so the call follows database composition as
+    well as similarity. Plasmid pMYS of *K. pneumoniae* ATCC BAA-2146 (2,014 bp;
+    NZ_CP006660.1) had *K. pneumoniae* as its single best hit, at 100% identity over
+    its full length, but its hits summed to 58,709 for *Escherichia* against 16,253
+    for *Klebsiella*. These numbers are bit-score sums, not counts of database
+    entries. `auto` kept *Klebsiella* and removed the plasmid
+    (`not_auto_genus:Klebsiella`). Broad-host-range plasmids are exposed to this,
+    because their closest database relatives often belong to another genus. In
+    `illumina`, `nanopore` and `contigs` mode a removed contig is absent from the
+    delivered genome.
 
-    In `hybrid` mode the loss compounds: only the Illumina reads mapping to the
-    **selected** contigs become the short-read reference Filtlong scores ONT reads
-    against, so sequence absent from that reference is discarded before Flye ever
-    sees it — the plasmid disappears from the assembly, not merely from the
-    taxonomy table.
+    In hybrid mode, this selection also affects the Illumina reads used by
+    Polypolish. It affects Filtlong only when `short_read_guidance: true`.
+    Guidance is disabled by default, and the final hybrid screen removes nothing.
 
     Check `02.assembly/{sample}/contaminants/contig_taxonomy_decisions.tsv` for
-    any discarded contig of plausible plasmid size whose assigned genus differs
-    from the sample's. The fixes are `mode: include` naming both genera,
-    `mode: off`, `discard_no_hit: false`, or a `sample_overrides` row for the one
-    awkward isolate. This is independent of `long_read_qc` above; both can delete
-    a plasmid, for different reasons, and both should be ruled out.
+    removed contigs of plasmid size whose `assigned_genus` differs from the
+    sample's genus. To keep them, set `mode: include` naming both genera,
+    `mode: off`, or a `sample_overrides` row for that isolate.
+    `discard_no_hit: false` cannot rescue such a contig: it only switches off the
+    no-hit prefilter, after which a contig BLAST could not place is still removed by
+    `auto` and `include` and kept by `exclude`. Long-read filtering
+    (`long_read_qc`, above) can lose a plasmid independently; rule out both.
 
 The selector's alias handling, the audit file's reason codes and the two routes
 by which a real plasmid is lost are on
@@ -658,6 +676,7 @@ by which a real plasmid is lost are on
     flye_input_mode: auto
     medaka_model: auto
     medaka_model_fallback_auto: false
+    short_read_guidance: false # hybrid only: optional Illumina guidance for Filtlong
 ```
 
 The block is namespaced per mode: a run reads only the block named after itself.
@@ -665,8 +684,9 @@ The block is namespaced per mode: a run reads only the block named after itself.
 | Key | What it does | Default | Notes |
 |---|---|---|---|
 | `flye_input_mode` | Which read model Flye assembles under | `auto` | `auto` gives `--nano-hq` unless an explicit *fast* Medaka model is named. |
-| `medaka_model` | Which Medaka consensus model polishes the assembly | `auto` | `auto`/`true`/empty infer it from the FASTQ headers; `false` skips Medaka entirely *(optional step, switched off here)*; anything else is taken as a model name. |
-| `medaka_model_fallback_auto` | What to do when an **explicit** model turns out to be invalid | `false` | `false` stops with a table of flowcell/device/accuracy suggestions. `true` falls back to inference — an opt-in, because an explicit choice should be honoured or reported, never silently swapped for a guess. |
+| `medaka_model` | Which Medaka consensus model polishes the assembly | `auto` | `auto`/`true`/empty infer it from the FASTQ headers; `false` skips Medaka entirely *(set `false` to skip this optional step)*; anything else is taken as a model name. |
+| `medaka_model_fallback_auto` | What to do when an explicit model is invalid | `false` | `false` stops with model suggestions. `true` attempts automatic inference. |
+| `short_read_guidance` | Hybrid only: use selected Illumina pairs to guide Filtlong, enabling trimming and splitting | `false` | With `false`, Filtlong uses long-read length/quality filtering and the target-base cap, and nothing screens the long reads before Flye; the second screen of the final assembly only reports. With `true`, no `--target_bases` cap is passed, and reads without support from the decontaminated Illumina reads are trimmed, split or discarded. Polypolish uses the selected Illumina reads in either case. |
 
 !!! warning "The two keys are coupled, and it changes the assembly"
 
@@ -731,7 +751,7 @@ mobilome:
 |---|---|---|---|
 | `run` | Master switch for the whole module | `false` | Adds 22 rules, two tools (ISEScan and CONJscan/MacSyFinder, both from bioconda), and a model download that needs network access on first use. Those models are non-commercial — see [licensing](../about/licensing.md). |
 | `max_composite_span_bp` | Two IS copies further apart than this are not called one composite transposon | `20000` | A convention, not biology. The measured distance is always reported next to the call, so a reader can disagree without re-running anything. |
-| `coverage_profile` | The fraction of an HMM profile a protein's alignment must cover before the hit is kept | `0.5` | MacSyFinder's own default, and the value every published result here was measured at. See below. |
+| `coverage_profile` | The fraction of an HMM profile a protein's alignment must cover before the hit is kept | `0.5` | MacSyFinder's own default, and the value at which every validation result in this documentation was measured; the sweep below also measured 0.4 and 0.3. |
 
 **Nothing else has to be set.** The module runs on the databases BacFlux already
 has, plus the CONJscan models it fetches itself. See [turning it
@@ -781,7 +801,7 @@ on merely because `run` is true.
 | `icescan` | `icescan.run: true` **and** a `url` or `dir` (the shipped `url` counts) | A second machinery model set, merged with CONJscan's hits | all |
 | `tncentral` | a `url` or `dir` | Curated transposon and integron names — the only thing that makes ladder tier 4 reachable | all |
 | `iceberg` | a `urls` entry or `dir` | Names the ICE/IME candidates CONJscan already found | all |
-| `isosdb` | `fasta_url` + `family_map_url`, or `dir` | Read-derived IS copy number: how many copies the assembly lost | `illumina`, `hybrid` |
+| `isosdb` | `fasta_url` + `family_map_url`, or `dir` | Read-derived IS abundance for comparison with located calls | `illumina`, `hybrid` |
 
 Every layer writes a `PROVENANCE.txt` beside what it fetched, recording the
 source, the fetch date, the observed checksum and how much arrived — sequences
@@ -829,28 +849,38 @@ own annotation join, clustering and att-site search. The measurements are on
 
 | Key | What it does | Default | Notes |
 |---|---|---|---|
-| `url` | A ZIP holding `tncentral.fa` — about 512 curated transposons, integrons and IS | unset (layer off) | The server rejects curl's default user-agent, so the download sends a browser one; if that ever stops working the rule fails loudly rather than building an empty database. |
+| `url` | A ZIP holding `tncentral.fa` — about 512 curated transposons, integrons and IS | unset (layer off) | The server rejects curl's default user-agent, so the download sends a browser one; if that ever stops working the rule stops with an error rather than building an empty database. |
 | `sha256` | Pins the release | unset | The endpoint is unversioned. Recorded either way in `tncentral_db/PROVENANCE.txt`. |
 | `dir` | A directory already holding `tncentral.fa` | unset | Beats `url`; nothing is fetched. |
 | `min_identity` | Percent identity a BLAST hit needs before it may confer a curated **name** | `90.0` | Below this the sequence may well be a relative of the element, but the name would claim more than the data shows. |
 | `min_reference_coverage` | Fraction of the **reference element** that must be present | `0.8` | Measured against the reference, not your contig: a 7 kb element inside a 300 kb contig covers 2% of the contig and 100% of itself. A fragment of a transposon is not that transposon. |
 
-Tier 3 is an inference — two IS copies of one family, the right distance apart,
-a gene between them. It has known blind spots: IS*26* forms translocatable units
-with its copies in *direct* orientation, breaking the same-orientation rule the
-pattern depends on. A curated hit is not an inference, so it gets IS*26* right
-where the pattern does not.
+Tier 3 is inferred from a pattern: two copies of one IS family within
+`max_composite_span_bp`, with the gene between them and both copies in the same
+orientation. The orientation test is not applied to the IS6 family (IS26), whose
+copies are accepted either way round; the mobility audit then records
+`is26_orientation_exemption_applied`. A TnCentral hit instead matches a
+characterised, named element: it places the gene inside a known transposon or
+integron, but does not show that the element is still active.
 
 !!! warning "Tier 4 is strict, and rarer than it looks"
 
-    Reaching it needs a URL **and** at least `min_reference_coverage` of the reference
-    element present **and** the gene to be somewhere no higher tier claims first. It has
-    been produced once, on a closed genome: `bla`CTX-M-15 inside Tn*Ecp1.1* at 87%
-    coverage ([Worked example](../mobilome/worked-example.md)). In that same genome six
-    other curated elements were named and none reached tier 4, because they sat on
-    plasmids. On fragmented clinical assemblies the same transposon was refused outright
-    at 12% and 49% coverage. Switching this on will name elements; it will not
-    necessarily produce a tier 4 row.
+    Tier 4 needs the TnCentral layer (`url` or `dir`), a hit of at least
+    `min_identity` covering at least `min_reference_coverage` of the reference
+    element, at least 90% of the gene inside that element, and no ICE, IME or
+    plasmid context claiming the gene first. A gene claimed first keeps the
+    element's name in `named_element`, with the audit reason
+    `inside_named_element_but_higher_tier_applies`. On ATCC BAA-2146 one gene
+    reaches tier 4, *bla*<sub>CTX-M-15</sub> inside Tn*Ecp1.1* at 87% of the
+    reference; the six other named elements sit on plasmids
+    ([Worked example](../mobilome/worked-example.md)). On *Enterobacter hormaechei*
+    fifteen rows come from one chromosomal transposon, Tn*SMR478*
+    ([Hybrid mode on five closed genomes](../methods_reference_genome_run.md)), so a
+    tier-4 count reflects elements as much as genes.
+
+    On fragmented clinical assemblies the same Tn*Ecp1.1* was refused at 12% and
+    49% reference coverage, below the threshold, so expect tier 4 far more often on
+    closed genomes than on drafts.
 
 #### `iceberg` — which ICE is it?
 
@@ -865,14 +895,14 @@ where the pattern does not.
 | Key | What it does | Default | Notes |
 |---|---|---|---|
 | `urls` | One or more FASTA URLs, concatenated into one BLAST database | `[]` (layer off) | A single URL written without a leading dash is accepted too. Note the host: the older `bioinfo-mml.sjtu.edu.cn` path serves the previous ICEberg release, not the current one. The larger file is ~100 MB and the server is slow. |
-| `dir` | A directory of `.fas` files you already hold | unset | Beats `urls`. |
+| `dir` | A directory of the downloaded ICEberg `.fas` files, or the `iceberg_db` folder an earlier BacFlux run built | unset | Beats `urls`; nothing is fetched. Checked when rule `iceberg_db` runs, not at start-up. |
 | `min_identity` | Identity floor for a name | `80.0` | Below this the elements are related but not the same, and the name would mislead. |
 | `min_overlap_fraction` | How much of **our** candidate the curated element must cover before the two are treated as the same thing | `0.5` | Deliberately lenient next to the transposon cascade: ICEs are mosaic and their cargo varies between strains, so demanding near-completeness would refuse to name exactly the divergent elements a name helps with most. |
 
-There is no `sha256` key here, unlike the other two layers: this is two files
-rather than one archive, and the big one has to be resumable over a slow link, so
-a single pinned digest is the wrong instrument. The observed checksum of the
-concatenated FASTA and the fetch date land in `iceberg_db/PROVENANCE.txt`.
+ICEberg has no configurable `sha256` key. The concatenated FASTA checksum and fetch
+date are recorded in `iceberg_db/PROVENANCE.txt`. This records the data used but does
+not ensure that a later fetch from a mutable URL will return identical bytes. Keep a
+versioned local copy when repeatability requires it.
 
 This layer only labels; it cannot change any gene's tier. Its real value is
 showing how far our boundaries fall short: on *K. pneumoniae* ATCC BAA-2146 the
@@ -881,7 +911,7 @@ of it, stopping 3,138 bp inside its far end. Any AMR gene in that last 3 kb is
 scored as though it were outside the ICE. That is the *good* case, a closed
 genome where the att search found a tRNA-anchored repeat.
 
-#### `isosdb` — how many IS copies did the assembly lose?
+#### `isosdb` — estimating IS abundance { #isosdb-how-many-is-copies-did-the-assembly-lose }
 
 ```yaml
   isosdb:
@@ -897,18 +927,25 @@ genome where the att search found a tRNA-anchored repeat.
 | Key | What it does | Default | Notes |
 |---|---|---|---|
 | `fasta_url` | 22,713 IS nucleotide sequences, already dereplicated at 95% identity | unset (layer off) | About 9.9 MB zipped. |
-| `family_map_url` | Entry → IS family (IS3, IS5, IS110 …) | unset | **Required whenever `fasta_url` is set.** Set one without the other and the run stops at parse time, rather than the download failing an hour in. |
+| `family_map_url` | Entry → IS family (IS3, IS5, IS110 …) | unset | **Required whenever `fasta_url` is set.** `fasta_url` without it stops the run at parse time, rather than the download failing an hour in; `family_map_url` on its own is ignored. |
 | `dir` | A directory already holding both files | unset | Beats the URLs. |
 | `min_covered_percent` | A database entry must be covered this far end to end before its depth is believed | `90.0` | A partially covered entry is usually a conserved domain shared with another family; averaging it in would inflate every estimate. |
 | `min_copy_number` | Below this multiple of the genome baseline the element is treated as absent | `0.5` | Deliberately under 1.0: a real single-copy IS sits near 1×, and sampling noise plus mapping loss routinely push it to 0.6–0.8×. |
 
-Elsewhere the module says the located IS count is a floor, not a count. True, but
-unquantified — you cannot tell whether the floor is 2 short or 40. Reads are
-immune to assembly collapse, so depth over an IS divided by depth over the genome
-gives the copy number. It changes no AMR gene's tier, and must not: it says
-nothing about *where* the extra copies are, only that they exist. Results are
-reported per family as well as per entry, because the family total is robust to
-which near-identical entry an ambiguous read happened to land on.
+The located IS count underestimates the copy number when repeated copies are not
+resolved in the assembly. The ISOSDB analysis estimates each family's copy number
+from read depth, relative to the length-weighted median depth over the sample's own
+contigs, and compares it with the located count. The difference estimates the
+copies the assembly collapsed rather than counting them: mapping ambiguity, related
+entries and coverage variation also affect it. `collapse_delta` is reported only
+when ISOSDB detected the family and the estimate is at least the located count;
+otherwise it is `NA` and `db_informative` is `FALSE`. A family with no close ISOSDB
+match therefore never yields a negative number: the estimate can show that copies
+were collapsed, never that ISEScan over-called.
+
+The result does not change an AMR gene's tier or locate additional copies. Family
+summaries reduce sensitivity to which related entry receives an ambiguous read,
+but do not remove every mapping or database limitation.
 
 ### Confidence and boundary flags
 
@@ -920,7 +957,7 @@ which near-identical entry an ambiguous read happened to land on.
 | Key | What it does | Default | Notes |
 |---|---|---|---|
 | `require_trna_boundary_for_high` | Also demands a tRNA-anchored att pair before an ICE/IME candidate may be labelled `high` confidence | `false` | Sensible on closed long-read assemblies, where an unresolved boundary really is a warning sign. |
-| `contig_boundary_bp` | How close to a contig end counts as "at the boundary" when flagging an **IS** call | `100` | Feeds the `at_contig_boundary` and `fraction_at_contig_boundary` columns of the IS summary. A high fraction means the assembly broke exactly where the IS elements are. |
+| `contig_boundary_bp` | How close to a contig end counts as "at the boundary" when flagging an **IS** call | `100` | Feeds the `at_contig_boundary` and `fraction_at_contig_boundary` columns of the IS summary. A high fraction indicates that many IS calls occur at contig ends, where context or further copies may be missing. |
 
 Left `false`, confidence answers "how sure are we this **is** an ICE?" — from the
 number of anchor classes, whether the machinery is intact, and whether it all
@@ -971,51 +1008,52 @@ the benchmark afterwards.
 |--:|---|
 | 15,000 bp | How far apart two machinery genes may sit and still be chained into one candidate element |
 | 8,000 bp | Floor on a candidate's length; below it the cluster is dropped with a reason |
-| 2,000 bp | The same floor for the IME/AICE architecture, which is genuinely smaller. The sharpest knob in the module |
+| 2,000 bp | The same floor for the IME/AICE architecture, which is genuinely smaller. A separate empirical floor for small machinery clusters |
 | 500,000 bp | Ceiling, so a runaway chain of anchors cannot cover a whole replicon |
 | 50,000 bp | How far from the machinery an integrase may sit and still be taken as the element's own |
 | 50,000 bp | How much sequence either side of the machinery the att-site search reads |
 
-!!! note "One asymmetry, which is deliberate"
+!!! note "Different size floors for admission and boundary search"
 
-    The att search is always given the 8,000 bp floor, never the 2,000 bp IME
-    one, and it refuses any repeat pair implying an element outside its range. So
-    an IME admitted at 3 kb can never have its boundaries resolved, however clean
-    the repeat pair — it keeps `boundary_method: none` and reports the machinery
-    span. Four of the five curated IMEs this module detects have machinery spans
-    under that floor (3,840 / 4,959 / 5,942 / 6,252 bp). The deliberate reading is
-    that an att pair implying a 3 kb element is mostly noise; the honest reading
-    is that IME boundaries are therefore largely unresolved. Making the floors
-    agree per class would change results, so it has not been done quietly.
+    The att search uses an 8,000 bp floor, while IME/AICE machinery clusters can
+    be admitted at 2,000 bp. Repeat pairs implying elements shorter than 8 kb are
+    rejected. A machinery span below 8 kb does not necessarily imply an element
+    of the same length, but this difference limits boundary resolution for
+    genuinely small elements. An IME whose only *att* pairs imply less than 8 kb keeps
+    `boundary_method: none` and is reported at its machinery span. Four detected
+    curated IMEs have machinery spans of 3,840, 4,959, 5,942 and 6,252 bp. Inspect
+    their `boundary_method` rather than assuming that detection resolved their
+    complete extent.
 
 ### Elsewhere in the workflow
 
 | Value | Where | What it is |
 |---|---|---|
-| `minid=0.76`, ≥70% of reference length covered | `CARD_MIN_IDENTITY` / `CARD_MIN_COVERED`, `00_common.smk` | The CARD read-mapping AMR leg. Read identity is BBMap's default; the specificity comes from the length-coverage gate. See below. |
-| 80% identity, 70% coverage | `rule amr_contigs`, `50_amr.smk` | ABRicate's EFSA reporting thresholds. Kept on that leg only — a blanket cutoff would fight AMRFinderPlus's curated per-gene ones. |
+| `minid=0.76`, ≥70% of reference length covered | `CARD_MIN_IDENTITY` / `CARD_MIN_COVERED`, `00_common.smk` | The CARD read-mapping AMR analysis. Read identity is BBMap's default; the reference-length coverage gate limits partial matches. See below. |
+| 80% identity, 70% coverage | `rule amr_contigs`, `50_amr.smk` | ABRicate's EFSA reporting thresholds. Kept on that analysis only — a blanket cutoff would fight AMRFinderPlus's curated per-gene ones. |
 | eight databases | `DATABASES`, `00_common.smk` | Which ABRicate databases run: argannot, card, ecoh, ecoli_vf, megares, ncbi, resfinder, vfdb. |
-| `--target_bases 500000000` | `rule filter_long_reads`, `nanopore/10_reads.smk` | The nanopore mode's total-output cap. The hybrid rule has no equivalent — the selected Illumina reads decide what is worth keeping there, and it passes `--trim`, `--split 1000` and `--length_weight` instead. |
+| `--target_bases 500000000` | `rule filter_long_reads`, `nanopore/10_reads.smk` and `hybrid/30_ont_reads.smk` (`FILTLONG_TARGET_BASES`, `00_common.smk`) | The nanopore mode's total-output cap. Hybrid mode also applies the cap when `short_read_guidance: false`. With guidance enabled it uses the selected Illumina reads, `--trim` and `--split 1000` instead; `--length_weight` is passed in hybrid mode. |
 | coverage ≥ 2×, length ≥ 500 bp | `FASTA_SEL_CMD`, `00_common.smk` | The contig filter, read out of the SPAdes header. Always applied in `illumina` and `hybrid`; in `contigs` mode only when the first header looks like SPAdes' own (it carries `length_…` or `cov_…`), since inventing a filter for an assembly from anywhere else would silently delete real sequence. |
 | 80% of the reference | `EXACT_NAME_REFERENCE_COVERAGE`, `name_ice_elements.py` | Below it, an ICEberg name is suffixed `-like`. Distinct from `iceberg.min_overlap_fraction`, which is measured against our candidate. |
 
-!!! warning "The CARD leg is a sensitive screen, not a high-identity one"
+!!! warning "The CARD analysis is a sensitive screen, not a high-identity one"
 
     Until 2026-08-15 this rule passed BBMap `idfilter=0.99`, and both the code and
     the documentation claimed results were screened at 99% identity. They were
     not. `idfilter` does not filter the primary alignment of a properly-paired
     read (BBMap 39.33, `align2/AbstractMapThread.java`: the guard reads
-    `if(!r.paired() && …)`), so every result the leg ever produced was screened at
+    `if(!r.paired() && …)`), so every result the analysis ever produced was screened at
     BBMap's default of 0.76. Mapping one set of reads both ways shows it. Run as
     pairs, nearly every alignment that `idfilter=0.99` kept was below 99% identity,
     some far below. Run as single-end, almost none survived.
 
     The rule now passes `minid=0.76` — which changes no output, and stops the code
     claiming a stringency it never applied. It is deliberately not raised: at a
-    real 0.99 the same reads keep almost none of their alignments, which would
-    disable the one AMR leg immune to assembly collapse. Specificity comes from requiring
+    real 0.99 the same reads keep almost none of their alignments, which would leave
+    this read-based screen with almost nothing to report. Specificity comes from requiring
     ≥70% of the reference gene's **length** to be covered, which is why the loose
-    identity floor is tolerable. There is no second pass and no divergent tier.
+    identity floor is used for screening. This gate does not establish a calibrated
+    specificity or demonstrate resistance. There is no second pass and no divergent tier.
     See [antimicrobial resistance](../analysis/amr.md).
 
 ---
@@ -1028,6 +1066,6 @@ the benchmark afterwards.
 | [Quick start](../getting-started/quick-start.md) | a fresh clone to a running job |
 | [Running BacFlux](running.md) | what `--cores` does, and how to restart a run |
 | [Output files](output.md) | what each numbered stage writes |
-| [Turning it on](../mobilome/enabling.md) · [Optional layers](../mobilome/optional-layers.md) · [Tuning](../mobilome/tuning.md) | the mobilome block in full, layer by layer |
+| [Enabling the module](../mobilome/enabling.md) · [Optional layers](../mobilome/optional-layers.md) · [Tuning](../mobilome/tuning.md) | the mobilome block in full, layer by layer |
 | [Coming from v1](../getting-started/from-v1.md) | which keys changed name or moved |
 | [Troubleshooting](../troubleshooting.md) | what to do when a run stops |

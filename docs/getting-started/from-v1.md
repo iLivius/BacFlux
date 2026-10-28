@@ -1,7 +1,7 @@
 # Coming from v1
 
-For anyone who ran BacFlux 1.x, FastaFlux, BacFluxL or BacFluxL+. Everything on this
-page is about what changed; nothing here is needed for a fresh install.
+This page explains migration from BacFlux 1.x, FastaFlux, BacFluxL or BacFluxL+.
+For a new installation, start with [Installation](installation.md).
 
 Version 2.0.0 brings the four workflows into one repository, one mode each. The
 analysis steps, the thresholds and the decontamination policy came across as they
@@ -35,14 +35,16 @@ and reproducible — cite the record you actually ran.
 without one:
 
 ```text
-KeyError in file ".../workflow/rules/shared/00_common.smk", line 81: 'mode'
+KeyError in file ".../workflow/rules/shared/00_common.smk", line …:
+'mode'
 ```
 
-That is the intended behaviour rather than a bug. `config/config_custom.yaml` is
-git-ignored, so it is your file and a `git pull` never touches it — which is also why
-an old one can still be sitting there.
+Version 2 requires an explicit mode. An existing `config/config_custom.yaml` is
+ignored by Git and may therefore still contain the older configuration. Back it
+up before creating a new copy of the current template:
 
 ```bash
+# If config_custom.yaml already exists, first save it under a separate name.
 cp config/config.yaml config/config_custom.yaml
 ```
 
@@ -104,7 +106,7 @@ of front-end stages, so the shared stages were numbered differently in each.
 | `09.report` | `09.report` |
 
 The delivered genome is now always `02.assembly/{sample}/contigs_final.fasta`,
-whichever mode produced it, and every stage from `03` onwards reads that one file.
+whichever mode produced it, and the shared stages from `03` onwards analyse that genome.
 
 **There is no in-place upgrade.** Point `output_dir` at a fresh directory rather than
 trying to reuse an old one. `workflow/scripts/clean_workdir.sh` recognises the four
@@ -127,8 +129,9 @@ cleaned down to results and archived.
 One downstream difference is deliberate and appears in the two long-read modes: Bakta
 gains or loses a single feature, because it is now handed a `--replicons` table
 declaring a closed chromosome circular. That makes its gene caller run in closed mode,
-which shifts a couple of marginal start codons. It is one feature in several thousand,
-and the better call.
+which shifts a couple of marginal start codons. It is one feature in several thousand
+in the comparison on [Rationale](../about/rationale.md). Changes in gene boundaries
+should be considered when comparing annotations across versions.
 
 ## Next
 

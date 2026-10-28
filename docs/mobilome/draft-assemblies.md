@@ -1,13 +1,13 @@
 # Draft assemblies
 
-Most BacFlux runs are short-read, and every validation this module originally had was
-done on closed genomes. This page is what happens in between.
+Fragmentation affects both mobile-element detection and boundary recovery. This
+page reports a simulated-fragmentation benchmark and explains which output
+fields to inspect on a draft assembly.
 
-**The one-sentence version:** on a fragmented assembly the module keeps telling you *what
-kind of element* it found and demotes honestly when the evidence breaks, but it stops
-telling you *how big* the element is. Read `mge_class` and `confidence` alongside
-`spans_contigs` and `at_contig_boundary`, read `boundary_method` before any coordinate,
-and expect more low-confidence calls than a closed genome would give.
+Read `mge_class` and `confidence` with `spans_contigs` and `at_contig_boundary`.
+Inspect `boundary_method` before interpreting coordinates or element length.
+The benchmark is informative about the tested assemblies; its N50 bands are not
+universal acceptance criteria.
 
 !!! abstract "Terms used on this page"
 
@@ -79,10 +79,11 @@ contig piece** — the ceiling any per-contig caller can reach — it is 0.55 �
 0.72, flat or better. The caller keeps recovering the same share of what is still
 visible. The missing bases are the assembly's.
 
-**Nothing is invented.** Across all 191 draft calls: no fabricated *att* sequence (every
-pair reported on a draft occurs at least twice in the corresponding closed genome), no
-class promoted at high confidence, no new false positive on a negative control, and not
-one violation of the caller's own confidence rules in 163 checks.
+**Checks within the simulated benchmark.** Across the 191 reported draft calls: no
+fabricated *att* sequence (every pair reported on a draft occurs at least twice in the
+corresponding closed genome), no class promoted at high confidence, no new false
+positive on a negative control, and not one violation of the caller's own confidence
+rules in 163 checks.
 
 ## Where the line is
 
@@ -90,8 +91,8 @@ Not between "good" and "poor" — between **classification** and **extent**.
 
 | N50 | What to do with the calls |
 |---|---|
-| **≥ 150 kb** | usable as-is. ICE detection identical to closed genomes; every high-confidence call was corroborated by the closed run |
-| **≈ 50 kb** | the **class** is still trustworthy (ICE 15/18, and 91% of calls land on some curated entry for these accessions). The **extent** is not: median 0.34× the true length, 82% of calls with `boundary_method=none`. *Read the class, ignore the length* |
+| **≥ 150 kb** | in this benchmark, ICE detection matched the closed runs; still inspect boundaries and individual evidence |
+| **≈ 50 kb** | class detection remained relatively robust in this benchmark (ICE 15/18, and 91% of calls land on some curated entry for these accessions). The **extent** is not: median 0.34× the true length, 82% of calls with `boundary_method=none`. *Read the class, ignore the length* |
 | **≈ 20 kb** | detection itself starts to go (12/18), 65% of calls are low confidence, and 59% of MacSyFinder's systems join genes from different contigs. Not *wrong*, but no longer informative |
 
 Each sample's own contig count and N50 are written as the **first row** of its
@@ -106,16 +107,16 @@ table beside it repeats the two contig flags under slightly different names —
 check the header of whichever file you have open
 (`head -1 file | tr '\t' '\n' | nl`).
 
-**These survive fragmentation and never over-claim:**
+**These fields support interpretation of the available evidence:**
 
 | Column | Why |
 |---|---|
-| `mge_class` | ICE / IME / AICE / passive island / conjugative region. Demotes honestly when evidence is lost — never promotes |
+| `mge_class` | ICE / IME / AICE / passive island / conjugative region. Class may change or be lost as evidence is fragmented; no high-confidence promotion was observed in this sweep |
 | `mobility` | the sentence that goes with the class. Always "**predicted** self-transmissible" |
 | `confidence` | every high call in the benchmark satisfied the documented rule and was corroborated by the closed genome |
 | `spans_contigs` | TRUE = the evidence is on more than one contig. **Absolute cap at low** — 72 TRUE calls in the sweep, 72 at low, no exceptions |
 | `at_contig_boundary` | TRUE = the element runs into a contig end. Also an absolute cap: 54 TRUE, 54 at low |
-| `boundary_method` | **read before any coordinate.** `tRNA` = real boundaries; `denovo` = a lead, never acted on; `none` = the interval is the machinery span only |
+| `boundary_method` | **read before any coordinate.** `tRNA` = ends taken from a tRNA-anchored *att* pair and applied to `start`/`end`; `denovo` = a lead, never acted on; `none` = the interval is the machinery span only |
 | `machinery_intact`, `n_anchor_classes` | what the class actually rests on |
 | `mpf_from_other_contig` | TRUE = this is an ICE only because the mating-pair genes are on a *different* contig |
 
@@ -129,10 +130,10 @@ are governed by your assembly, not by the biology.
 
 ## What a low-confidence call means
 
-**That the assembly could not support a stronger claim — not that the call is wrong.** Low
-confidence is set by exactly the guards above, and on a fragmented assembly those
-conditions are the normal state of affairs, which is why low-confidence calls go from 10%
-on closed genomes to 63% at 50 kb N50.
+Low confidence records limitations in the supporting evidence. It does not establish
+that a call is correct or incorrect. Confidence is set by the guards above, and on a
+fragmented assembly those conditions are the normal state of affairs, which is why
+low-confidence calls go from 10% on closed genomes to 63% at 50 kb N50.
 
 Evidence that the low tier is not simply noise: on the 12 negative controls the number of
 calls went **down** under fragmentation (5 → 4 → 3 → 2), none at high confidence, and not
@@ -228,16 +229,17 @@ the new flag and the ten boundary claims withdrawn below; every class, confidenc
 coordinate stayed the same.
 
 **1. A de novo repeat is now counted across the whole assembly, not just its contig.** A
-real integration scar exists in exactly two copies, *attL* and *attR*, so the *att*
-search already refused a repeat with three or more. But it counted the copies on the
-contig it was given. On a closed genome each contig is a whole replicon, so the two
-counts rarely differ. On a draft they often do. All 35 de novo repeats reported on the
-drafts had exactly two copies on their own contig, but 10 of them had 3 to 30 copies
-across the assembly — repeat families, not integration scars. The worst, an 89 bp repeat
-with 30 copies, was attached to a high-confidence call. Those ten boundary claims are
-now withdrawn: the *att* columns are cleared, `boundary_method` goes back to `none`, and
-`{sample}_ice_discarded.tsv` records the reason `denovo_att_is_a_repeat_family`. No
-coordinate moves, because a de novo repeat never widened an element in the first place.
+de novo search requires exactly two matching copies as an operational specificity rule,
+so the *att* search already refused a repeat with three or more. But it counted the
+copies on the contig it was given. On a closed genome each contig is a whole replicon,
+so the two counts rarely differ. On a draft they often do. All 35 de novo repeats
+reported on the drafts had exactly two copies on their own contig, but 10 of them had 3
+to 30 copies across the assembly — repeat families, not integration scars. The worst, an
+89 bp repeat with 30 copies, was attached to a high-confidence call. Those ten boundary
+claims are now withdrawn: the *att* columns are cleared, `boundary_method` goes back to
+`none`, and `{sample}_ice_discarded.tsv` records the reason
+`denovo_att_is_a_repeat_family`. No coordinate moves, because a de novo repeat never
+widened an element in the first place.
 
 The assembly-wide count is **not** yet applied to tRNA-anchored pairs: their copies are
 still counted on their own contig only. That matters, because a tRNA-anchored pair is

@@ -1,8 +1,8 @@
 # Method reference: running CONJScan and ICEscan together
 
 BacFlux can search for conjugation machinery with two model sets. This page explains
-why it runs **both and merges the results**, what the second set adds, and which parts
-of it are deliberately distrusted.
+how it combines their evidence when the optional ICEscan layer is enabled, what
+the second set added in the benchmark, and which profiles it excludes.
 
 !!! abstract "Terms used on this page"
 
@@ -13,7 +13,7 @@ of it are deliberately distrusted.
     | **MacSyFinder** | the engine both run on: it looks for a quorum of required genes, not single hits |
     | **ICE** | integrative and conjugative element — moves itself between cells |
     | **IME** | integrative mobilisable element — needs a helper element to move |
-    | **AICE** | actinomycete ICE, which replicates rather than conjugates in the usual way |
+    | **AICE** | actinomycete integrative and conjugative element, using a TraB-family translocase for DNA transfer |
     | **T4SS** | type IV secretion system, the mating apparatus |
     | ***att* site** | the short repeat marking an integrated element's ends |
     | **MGE** | mobile genetic element, the general term |
@@ -36,7 +36,9 @@ ICE caller was given ICEscan's table (`mobilome.icescan.run: true`).
 > headline figures are on [Validation](mobilome/validation.md) and
 > [Head-to-head vs the EBI pipeline](methods_ebi_comparison.md); the per-element
 > tables behind them are not in the repository. Both arms used the same *att*
-> search, so the two-arm comparison is unaffected.
+> search when §8.1–8.2 were measured, so the comparison between them holds for that
+> code. The census (§8.3), costs (§9) and uncurated-call table (§10) were re-measured
+> for both arms on 2026-08-02.
 
 **Short version.** ICEscan is not a second opinion — it is a fork of the tool we
 already run. We add it alongside CONJScan, take only two things from it (integrase
@@ -156,15 +158,17 @@ never use its system spans as element boundaries.
 ## 4. Four integrase profiles we deliberately do not trust
 
 ICEscan's `IME.xml` lists eight profiles as interchangeable integrases. Four are not
-element integrases. Each is excluded, and each exclusion is written to the audit TSV
-with its reason.
+the integrase of an integrative element, and BacFlux excludes them: a hit to any of
+them is used as no anchor of any kind, neither integrase nor mating-pair component.
+This is not a claim that the proteins never take part in DNA mobility. The audit TSV
+records each exclusion with its reason (§4.2).
 
 | profile | what the protein actually is | why it must not anchor an element |
 |---|---|---|
-| `TIGR02249` | **IntI1**, the class-1 **integron** integrase | An integron is cargo *inside* elements, not the element. Measured casualty on `CP042858.1`: an att-bounded **32,103 bp** tier-6 ICE became a **103,303 bp unbounded** one, at unchanged `high` confidence, anchored on IntI1. Fires 4× on this set, every time as IntI1. |
-| `TIGR02224` | **XerC**, chromosomal *dif*-site recombinase | Housekeeping. Resolves chromosome dimers at *dif*; has nothing to do with mobile elements. A XerC was measured being attached **43,639 bp** from a 945 bp relaxase cluster, producing an element 6× its annotated size. |
+| `TIGR02249` | **IntI1**, the class-1 **integron** integrase | An integron is cargo *inside* elements, not the element. Measured casualty on `CP042858.1`: an att-bounded **32,103 bp** tier-6 ICE became a **103,303 bp unbounded** one, at unchanged `high` confidence, anchored on IntI1. Fires 4 times in `best_solution.tsv` on this set, every time as IntI1. |
+| `TIGR02224` | **XerC**, chromosomal *dif*-site recombinase | Housekeeping: with XerD it resolves chromosome dimers at *dif*, and it is present in essentially every bacterial chromosome whether or not an element is, so a hit is no evidence of one. A XerC was measured being attached **43,639 bp** from a 945 bp relaxase cluster, producing an element 6× its annotated size. |
 | `TIGR02225` | **XerD**, the other half of the same *dif*-site pair | As XerC. |
-| `rve` | the **rve/DDE catalytic domain**, shared by IS transposases | Not an integrase family — a domain. Of its used hits, the overwhelming majority were proteins Bakta independently annotates as transposases (IS3 family ×16, IS6 IS15DIV ×14, IS6 IS1216E ×8). Anchoring on one turns any insertion sequence into a spurious element. |
+| `rve` | the **rve/DDE catalytic domain**, shared by IS transposases | A domain shared across different mobile-DNA proteins. Of its used hits, the overwhelming majority were proteins Bakta independently annotates as transposases (IS3 family ×16, IS6 IS15DIV ×14, IS6 IS1216E ×8). Anchoring on one turns any insertion sequence into a spurious element. |
 
 **We diverge from upstream on `rve` on purpose.** ICEscan's `IME.xml` lists `rve` as
 an exchangeable of `Phage_integrase`, so a reader comparing the two will find a real
@@ -190,8 +194,10 @@ Every excluded profile is an exchangeable of `Phage_integrase`, so **filtering o
 ### 4.2 What was actually discarded, and how we know
 
 Grepping the element table for profile names proves nothing — it never records them,
-so the grep returns zero either way. The evidence is the audit TSV, with 15
-`row_skipped | untrusted_integrase_profile` rows:
+so the grep returns zero either way. The evidence is the audit TSV. The caller writes
+one `row_skipped | untrusted_integrase_profile` row per genome in which an excluded
+profile matched, listing the hits per profile. On the 28 genomes of the ICEscan arm
+there are 15 such rows, recording 110 discarded hits:
 
 | profile | hits discarded |
 |---|---|
@@ -200,9 +206,9 @@ so the grep returns zero either way. The evidence is the audit TSV, with 15
 | `TIGR02224` (XerC) | 1 |
 | `TIGR02225` (XerD) | 1 |
 
-The damage was real, not theoretical: the un-filtered ICEscan output for this set
-contains 71 `rve` hits and 4 `TIGR02249` hits in `best_solution.tsv` alone, none of
-which reaches an element.
+Of these, 75 are rows of ICEscan's `best_solution.tsv` (71 `rve`, 4 `TIGR02249`). The
+other 35 are per-profile hits, which the caller reads on the three genomes where
+ICEscan assembled no system. None reaches an element.
 
 **Regression check, `CP042858.1`** — byte-identical in both arms:
 
@@ -290,7 +296,7 @@ not decided here.
 
 ---
 
-## 7. AICE — a third class, and an honest statement of its validation
+## 7. AICE: mechanism and validation { #7-aice-a-third-class-and-an-honest-statement-of-its-validation }
 
 An **AICE** (actinomycete integrative and conjugative element) is found in
 *Streptomyces* and relatives. It integrates into the chromosome like an ICE and
@@ -308,13 +314,13 @@ TraB generically; pSAM2's copy is TraSA.)
 > itself by rolling-circle replication *inside* one cell, and that intermediate is
 > single-stranded (te Poele *et al.* 2008, PMID 18523858).
 
-The [mobility ladder](mobilome/mobility-ladder.md) has no tier for this, for
-bookkeeping reasons rather than biological ones. Tiers 5 and 6 are **defined by
-machinery**: tier 5 is "a relaxase but no mating apparatus, so a helper must supply
-one", tier 6 is "a relaxase plus its own". An AICE carries neither protein, so
-neither tier measures anything about it — and with this branch's validation at nil
-(below), reading its transfer ability as tier 6 would be the worse error. It is
-reported as its own thing:
+Tiers 5 and 6 are defined by a relaxase, plus a type IV secretion system for tier 6.
+An AICE carries neither, so the ladder has no tier for it. This is a limit of the tier
+scheme, not evidence that an AICE cannot transfer: an AMR gene inside an AICE keeps the
+tier its other evidence gives it, and the AICE is reported as context. Neither pilot
+set scores an AICE. ICEberg curates two AICEs on the benchmark's *S. scabiei* genome;
+at coverage 0.5 neither is recovered, and neither AICE call overlaps a curated
+element. Its exact output fields are:
 
 | field | value |
 |---|---|
@@ -345,10 +351,11 @@ calls as hypotheses.
 
 ## 8. Full before/after results
 
-Both arms differ only by `--icescan-tsv`. "Ratio" is called length ÷ published
-length; "honest" means 0.4 ≤ ratio ≤ 2.0.
+Both arms differ only by `--icescan-tsv`. These are historical results from the
+original comparison. "Ratio" is called length ÷ published length; the descriptive
+band 0.4 ≤ ratio ≤ 2.0 is an evaluation convention, not proof of correct boundaries.
 
-### 8.1 ICE pilot — 15/18 → 15/18, honest 9 → 9
+### 8.1 ICE pilot — 15/18 → 15/18, within the ratio band 9 → 9 { #81-ice-pilot-1518-1518-honest-9-9 }
 
 | element | true bp | control bp | ratio | union bp | ratio | boundary | conf |
 |---|---:|---:|---:|---:|---:|---|---|
@@ -373,7 +380,7 @@ length; "honest" means 0.4 ≤ ratio ≤ 2.0.
 
 Exactly one scored element changes, and it changes **for the worse** — see §9.
 
-### 8.2 IME pilot — 3/12 → 5/12, honest 1 → 3 (original run)
+### 8.2 IME pilot — 3/12 → 5/12, within the ratio band 1 → 3 (original run) { #82-ime-pilot-312-512-honest-1-3-original-run }
 
 | element | true bp | control bp | ratio | union bp | ratio | conf |
 |---|---:|---:|---:|---:|---:|---|
@@ -390,10 +397,10 @@ Exactly one scored element changes, and it changes **for the worse** — see §9
 | SGI1 | 42,451 | — | — | — | — | missed |
 | IMEMlNZP2037-1 | 110,480 | 8,164 | 0.07 | 8,164 | 0.07 | medium |
 
-Both new detections are **honest** rather than oversized intervals that merely contain
-the curated element: Tn*4451* at ratio 0.94 (start offset +75 bp) and
-`IME_CdiR20291_ND` at 0.69 (start offset +37 bp) — the two best-bounded IME recoveries
-the caller has produced.
+Both new detections fall within the stated ratio band rather than being oversized
+intervals that merely contain the curated element: Tn*4451* at ratio 0.94 (start offset
++75 bp) and `IME_CdiR20291_ND` at 0.69 (start offset +37 bp) — the two best-bounded IME
+recoveries the caller has produced.
 
 With today's code the control arm (CONJScan alone) finds 2 of the 12, not 3. Its third
 detection, `IME_SsuNSUI002_NS`, was a 181,279 bp call laid over an 11,112 bp element.
@@ -442,8 +449,8 @@ Three of the four costs still hold; the fourth no longer occurs.
 `60,415–110,839`; recovered fraction 0.4988 → **0.4009**. With ICEscan on, an ICEscan
 `Recombinase` sits **0 bp** from the cluster and wins the "then the closest" tie-break
 over a Bakta product-text `Site-specific recombinase` **11,032 bp** away — and the
-*more distant* one was nearer the curated left edge. 0.4009 is about 1.1 kb from
-dropping out of the "honest" band.
+*more distant* one was nearer the curated left edge. 0.4009 is about 110 bp from
+dropping out of the stated ratio band.
 
 **2. One boundary loss of two.**
 
@@ -457,12 +464,12 @@ arms report `denovo`, so that element loses interval but not its boundary. `high
 `boundary_method=none` is 10 in both arms.
 
 **3. The nested double-report on `CP011419.1` no longer occurs.** The union arm once
-emitted a 179,889 bp `ime` blob (98,234–278,122, ratio 16.19) with the honest 4,959 bp
+emitted a 179,889 bp `ime` candidate (98,234–278,122, ratio 16.19) with the 4,959 bp
 call (246,807–251,765, ratio 0.45, start +63 bp) nested inside it. It now gives three
-clean, non-overlapping calls — that 4,959 bp element, a compact 2,407 bp `ime`
-elsewhere on the same contig, and an unrelated `ice` — and no blob. A MacSyFinder
-*loner* gene (one admitted without the normal co-localisation test) was being treated
-as grounds to merge two distant clusters; that merge rule has been corrected.
+clean, non-overlapping calls — that 4,959 bp element, a compact 2,407 bp `ime` elsewhere
+on the same contig, and an unrelated `ice` — and no oversized candidate. A MacSyFinder
+*loner* gene (one admitted without the normal co-localisation test) was being treated as
+grounds to merge two distant clusters; that merge rule has been corrected.
 
 **4. Unscored ICE intervals shrink by 10–20 kb.** Several loci not covered by either
 pilot move as ICEscan supplies a closer integrase — e.g. `NC_004668_1` 89,312 →
@@ -481,12 +488,12 @@ an att pair, is "then the closest" the right second key? It is what cost `CMGE` 
 ### There is no false-positive measurement, and this benchmark cannot produce one
 
 `score.py` computes **recall only** — no precision, false-positive or specificity code
-at all, as its own docstring says. This cannot be patched: **every genome in both
+at all, as its own docstring says. The scorer alone cannot resolve this: **every genome in both
 pilots was chosen *because* it contains a curated element**, so a call overlapping
 nothing curated may be a genuine second element rather than an error. Nothing here can
 tell the difference.
 
-Counting them anyway, as an upper bound on the error rate and not an error rate.
+The table reports calls without curated overlap, rather than a false-positive rate.
 **Measured** against all 1,677 of ICEberg's curated entries on these 28
 accessions, not just the pilots' 30 — the correct denominator for "does this call
 correspond to something curated":
@@ -496,12 +503,12 @@ correspond to something curated":
 | control | 51 | 17 (33%) | 9 | 4 |
 | union | 63 | 21 (33%) | 9 | 4 |
 
-**In both arms**, about a third of calls land on nothing curated, and 9
-self-transmissible / 4 high-confidence claims rest on nothing measurable. The union
+**In both arms**, about a third of calls land on nothing curated, and nine
+predicted self-transmissible and four high-confidence calls lack curated overlap. The union
 does not worsen that ratio; it adds unvalidated IME and AICE calls at medium/low
 confidence on top of it.
 
-### The negative control — 2 calls in 32.6 Mb, neither invented
+### The negative control: two calls in 32.6 Mb { #the-negative-control-2-calls-in-326-mb-neither-invented }
 
 A negative control needs genomes with no reported ICE. Twelve closed genomes were
 screened, each verified absent from all 1,677 ICEberg entries:
@@ -514,11 +521,15 @@ screened, each verified absent from all 1,677 ICEberg entries:
 | *Staphylococcus aureus* N315 | clinical isolate, prophages + transposons | **0** |
 | *Escherichia coli* K-12 MG1655 | the most-studied bacterial genome there is | **0** |
 | *Pseudomonas aeruginosa* PAO1 | 6.3 Mb reference strain | **0** |
-| *Halobacterium* sp. NRC-1 | an ARCHAEON — the models are bacterial, so any call would be spurious by construction | **0** |
+| *Halobacterium* sp. NRC-1 | an ARCHAEON — the models are bacterial, so a call would lie outside the intended bacterial-model scope | **0** (3 with ICEscan) |
 | *Bacillus subtilis* 168 | reference strain | **1** `ice` |
 | *Salmonella* Typhimurium LT2 | reference strain | **1** `ime` |
 
-**Total: 2 calls across 32,601,100 bp. Neither survives as an error.**
+**Total: two calls across 32,601,100 bp: one known ICE and one unresolved IME candidate.**
+These counts are from the default machinery models alone. With the ICEscan layer on,
+the same genomes gave five calls: the same two plus three low-confidence
+`cime_or_island` calls on *Halobacterium* sp. NRC-1, built from integrase and type IV
+secretion profile hits with no assembled system.
 
 *B. subtilis* 168 → **ICE*Bs1*, a real element**, and the best-evidenced call in this
 validation: 529,362–549,932 (20,571 bp; ICE*Bs1* is ~20.5 kb), all four anchor
@@ -535,17 +546,17 @@ in a negative control must be examined, never merely counted.
 
 *Salmonella* Typhimurium LT2 → 2,900,443–2,906,075 (5,633 bp): an integrase plus a
 protein Bakta labels only "DNA-binding protein", which CONJscan's `T4SS_MOBM` profile
-hits at **i-eval 1.8e-84, coverage 0.986** — a near-full-length relaxase match. A
-strong relaxase beside an integrase is what an IME *is*. Whether this locus is a
-*bona fide* IME or two co-located genes is a specialist question; it is listed among
-the open domain questions rather than scored either way.
+hits at **i-eval 1.8e-84, coverage 0.986** — a near-full-length relaxase match. This
+combination supports an IME candidate but does not by itself establish a functional
+element. Whether this locus is a *bona fide* IME or two co-located genes is a specialist
+question; it is listed among the open domain questions rather than scored either way.
 
-**What this does and does not establish.** The caller is not promiscuous: nine full
-genomes, three of them large, well annotated and dense with recombinases, prophages and
-IS elements, produced nothing at all. It does **not** give a false-positive rate —
+**Interpretation.** With the default models, ten of the twelve genomes produced no calls
+(nine with the ICEscan layer on), including large reference genomes containing
+recombinases, prophages and IS elements. It does **not** give a false-positive rate —
 "absent from ICEberg" is not "contains no element", ICEberg's curation being partial.
-The honest reading is an upper bound of **2 candidate false positives in 12 genomes,
-of which 0 are confirmed errors**.
+The measured result with the default models is **two candidate calls in 12 genomes, one
+explained by ICEBs1 and one unresolved**. It does not establish zero false positives.
 
 ### Boundaries
 
@@ -576,7 +587,7 @@ edges, and the residual error on bounded ones is measured in kilobases. Read
 proteins, no relaxase and no T4SS**, standing in for an element that is really ~100 kb.
 Both CONJScan and ICEscan return **zero** hits on it; no machinery-based caller can
 find machinery that is not in the record. It is counted as a miss throughout for
-consistency, but the ICE pilot's **real ceiling is 17/18, not 18/18**.
+consistency, so the highest achievable score on this pilot is 17/18.
 
 ### Other standing limitations
 
@@ -594,9 +605,9 @@ consistency, but the ICE pilot's **real ceiling is 17/18, not 18/18**.
 
 ## 11. Licensing
 
-The ICEscan models are **CC BY-NC-SA 4.0** (Institut Pasteur / CNRS) — academic,
-non-commercial use only. This is the same licence as the CONJScan models the module
-already fetches.
+The ICEscan models are **CC BY-NC-SA 4.0** (Institut Pasteur / CNRS) with a
+NonCommercial condition and attribution/share-alike requirements. This is the same
+licence as the CONJScan models the module already fetches.
 
 **BacFlux ships neither.** Both are fetched at run time from a URL in
 `config/config.yaml`, default `run: false`, exactly as BacFlux handles its other
@@ -613,7 +624,7 @@ CC BY-NC-SA-derived scripts has been copied or adapted (see CITATIONS.md).
 ## 12. Citations
 
 **ICEfinder2 / ICEscan model set**
-> Wang M, Goh Y-X, Tai C, Wang H, Deng Z, Ou H-Y. (2024)
+> Wang M, Liu G, Liu M, Tai C, Deng Z, Song J, Ou H-Y. (2024)
 > *ICEberg 3.0: functional categorization and analysis of the integrative and
 > conjugative elements in bacteria.* Nucleic Acids Research 52(D1):D732–D737.
 > <https://doi.org/10.1093/nar/gkad935>
@@ -641,8 +652,9 @@ CC BY-NC-SA-derived scripts has been copied or adapted (see CITATIONS.md).
 
 Reading their pipeline is how we learned that ICEscan existed, that it ships the IME
 and AICE models, and at what coverage threshold it is run. **No code was copied** —
-three of their scripts are CC BY-NC-SA-derived, and copying them would contaminate
-BacFlux's MIT licence (see
+three of their scripts are CC BY-NC-SA-derived, and copying them would bring
+CC BY-NC-SA's NonCommercial and ShareAlike conditions into BacFlux, which are
+incompatible with its MIT licence (see
 [Licensing](about/licensing.md#what-this-repository-deliberately-does-not-contain)).
 Adopting facts, parameters and design decisions is permitted, and is what was done.
 
@@ -651,13 +663,14 @@ Adopting facts, parameters and design decisions is permitted, and is what was do
 
 ---
 
-## 13. Bottom line
+## 13. Interpretation { #13-bottom-line }
 
-Adopt the union. ICE detection (15/18), predicted self-transmissible counts (36) and
-high-confidence counts (16) are untouched; IME detection goes 3/12 → 5/12 in the
-original run (2/12 → 5/12 with today's code, §8.2), with genuinely well-bounded new
-recoveries; all four integrase exclusions demonstrably fire; the `CP042858.1`
-regression check holds byte-identically in both arms.
+Combining the model sets left ICE detection (15/18), predicted self-transmissible
+counts (36) and high-confidence counts (16) unchanged; IME detection goes 3/12 → 5/12
+in the first run (2/12 → 5/12 with the current code, §8.2), with both new recoveries
+inside the 0.4–2.0 ratio band (0.94 and 0.69); all four integrase exclusions
+demonstrably fire; the `CP042858.1` regression check holds byte-identically in both
+arms.
 
 The integrase tie-break's second key ("then the closest", §9) is worth revisiting,
 and this benchmark still cannot measure a false-positive rate.

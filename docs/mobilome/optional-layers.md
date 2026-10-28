@@ -1,9 +1,9 @@
 # Optional layers
 
-`mobilome.run: true` is the whole switch for the module itself
-([Turning it on](enabling.md)). It is **not** the switch for the four layers
-described here. Each of them stays off until you give it a source of its own, and
-turning the module on changes none of them.
+Enable the core module with `mobilome.run: true`. The four optional layers below
+require their own settings and data sources. Choose them according to whether the
+analysis needs additional machinery models, curated element names or read-based
+IS copy-number estimates.
 
 !!! abstract "Terms used on this page"
 
@@ -24,7 +24,7 @@ turning the module on changes none of them.
 | **ICEscan models** | a second MacSyFinder model set run beside CONJscan: the AICE class, roughly twice as many IMEs, and integrase profiles CONJscan does not carry | `mobilome.icescan.run: true` | all | 2 |
 | **TnCentral** | curated transposon and integron **names** — the only thing that makes ladder tier 4 reachable | `mobilome.tncentral.url` or `.dir` | all | 3 |
 | **ICEberg 3.0** | curated **names** for the elements the ICE/IME caller already found. Changes no gene's tier | `mobilome.iceberg.urls` or `.dir` | all | 3 |
-| **ISOSDB copy number** | how many IS copies the assembler collapsed, from read depth. Changes no gene's tier | `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | `illumina`, `hybrid` | 4 |
+| **ISOSDB copy number** | read-depth estimates to compare with the located IS inventory. Changes no gene's tier | `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | `illumina`, `hybrid` | 4 |
 
 Twelve rules in total, against the ten the module runs on its own. Every layer is
 independent: any combination is valid, and a layer you leave alone is skipped in
@@ -123,16 +123,15 @@ table: the layer works by changing what the ICE/IME caller can see.
 Curated transposons and integrons, matched by `blastn` against the whole
 assembly, then merged into element copies and named.
 
-Tier 3 is an **inference**: two IS copies of one family, the right distance
-apart, a gene between them, so we call it a composite transposon. The pattern
-only stays right because of hand-written exceptions to it — IS*26* flanks its
-cargo in *direct* orientation, so it is exempted from the same-orientation test
-every other family has to pass, and without that exemption BacFlux would miss the
-most important architecture in clinical AMR. A TnCentral hit needs no such
-exception. It matches an element somebody characterised, named and deposited,
-whose architecture is already known. Where both fire on one gene the
-curated hit wins, and the composite call it displaced is written to the audit.
-This is the only route to [tier 4](mobility-ladder.md).
+Tier 3 is inferred from a pattern: two copies of one IS family within
+`max_composite_span_bp`, with the gene between them. A TnCentral hit instead matches
+a characterised, named element and needs no pattern rule. When an accepted element
+contains at least 90% of a gene and no ICE, IME or plasmid context applies, the gene
+is tier 4, the only route to that tier; a qualifying IS pair around the same gene is
+then recorded as `tier_not_raised` / `named_element_overrides_composite_pattern`.
+When a higher tier applies, the name stays in `named_element` and the audit records
+`inside_named_element_but_higher_tier_applies`. A named element shows where the gene
+sits, not that the element is still active.
 
 ```yaml
 mobilome:
@@ -240,13 +239,12 @@ as well.
 
 ## ISOSDB copy number
 
-On a fragmented assembly the located IS count is a **floor**, and an unquantified
-one: you cannot tell whether it is 2 short or 40 short. This layer puts a number
-on it.
+A fragmented assembly can undercount IS copies. This layer estimates abundance from
+Illumina read depth and compares it with the number of located IS calls.
 
-Reads are immune to assembly collapse — every copy of an IS contributes its own
-reads whether or not the assembler kept them apart — so an IS present in five
-copies attracts about five times the read depth of the single-copy chromosome:
+Under approximately uniform sampling and sufficiently specific mapping, an IS present
+in five copies is expected to have about five times the depth of a single-copy region.
+The approximation is:
 
 ```text
 copy number  ≈  depth over the IS  /  depth over the genome
@@ -283,7 +281,7 @@ The deliverable is one row per IS family:
 |---|---|
 | `located_copies` | copies ISEScan found on the contigs |
 | `estimated_copies` | copies the read depth implies |
-| `collapse_delta` | `estimated − located` — the assembler's collapse, measured |
+| `collapse_delta` | `estimated − located`, written only when `db_informative` is `TRUE` and `NA` otherwise, so never negative. An estimate: read-depth noise and multi-mapping also move it |
 | `db_informative` | `TRUE` only when ISOSDB detected the family *and* the estimate reached the located count |
 | `n_db_entries_detected`, `max_entry_copy_number`, `genome_baseline_depth` | the working behind the estimate |
 
@@ -294,7 +292,7 @@ split is not.
 
 !!! warning "This table changes no AMR gene's tier, and must not"
 
-    It says how many copies exist, never *where* they are, so it cannot place a
+    It estimates copy number without locating the additional copies, so it cannot place a
     gene inside anything. Nothing downstream reads it — it is a quality metric on
     the IS inventory, read by a person.
 
@@ -340,18 +338,16 @@ recoverable.
     upstream file changed. Set both once you have decided which release you are
     working with.
 
-    ICEberg and ISOSDB have **no `sha256` key**. ICEberg serves two files rather
-    than one archive and the large one has to be resumable over a slow link, so a
-    single pinned digest is the wrong instrument; ISOSDB comes from GitHub raw
-    paths, where the source repository's own history is the version record. For
-    both, the observed checksum is recorded after the fact — you can say later
-    what you used, but you cannot demand it up front.
+    ICEberg and ISOSDB have no configurable `sha256` key. Their observed
+    checksums are recorded after download. This documents the bytes used but
+    does not ensure that a later fetch returns the same data, particularly for
+    mutable URLs. Preserve a versioned local copy when reproducibility requires it.
 
 ## What the download rules do besides downloading
 
 - **They refuse an error page.** A bot block or a redirect arrives with a 200 and
   would otherwise be indexed as an empty database that silently names nothing.
-  Each rule tests the archive or the FASTA and fails loudly instead, printing the
+  Each rule tests the archive or the FASTA and stops with an error instead, printing the
   first bytes it received.
   TnCentral's server rejects curl's default user-agent, so the rule identifies as
   a browser; if that stops working the rule fails rather than producing an empty
@@ -391,7 +387,7 @@ ICEberg and `isosdb_db` for ISOSDB. So does a folder of the files as downloaded:
 `workflow/envs/download.yaml`, the small environment the CARD and dbCAN downloads also
 use. The other three download rules, and the BLAST searches that follow them, share
 one small conda environment carrying BLAST, `curl` and `unzip`, built on first use.
-The ISOSDB read mapping uses the same BBMap environment the CARD leg already
+The ISOSDB read mapping uses the same BBMap environment the CARD analysis already
 builds. Every download rule is a local rule, so on a cluster it runs on the computer
 that runs Snakemake.
 
@@ -405,7 +401,7 @@ hard to unpick later.
 
 | Page | Read it for |
 |---|---|
-| [Turning it on](enabling.md) | the master switch, and what the module does on the default configuration |
+| [Enabling the module](enabling.md) | the master switch, and what the module does on the default configuration |
 | [Reading the output](output.md) | what these layers change in `{sample}_amr_mobility.tsv`, column by column |
 | [Tuning](tuning.md) | the naming and coverage thresholds, with the measurements behind them |
 | [Validation](validation.md) | what each layer was measured to add, and what it did not |

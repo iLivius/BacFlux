@@ -7,7 +7,7 @@
     | **AMR** | antimicrobial resistance |
     | **WGS** | whole-genome sequencing |
     | **EFSA** | European Food Safety Authority |
-    | **QPS** | Qualified Presumption of Safety, EFSA's safety status for well-characterised microorganisms |
+    | **QPS** | Qualified Presumption of Safety, EFSA's assessment framework for listed taxonomic units subject to qualifications |
     | **ICE** | integrative and conjugative element — moves itself between cells |
     | **IME** | integrative mobilisable element — needs a helper element to move |
     | **MAG** | metagenome-assembled genome, a genome reconstructed from a mixed community |
@@ -34,17 +34,16 @@ GitHub and Zenodo read that file to build a citation for you.
 
 ## Cite the tools as well
 
-Almost all of the science BacFlux reports comes from other people's tools and
-databases, and the mobilome module in particular is an **integrator**: it decides
-how to combine other tools' calls, and every underlying detection belongs to
-somebody else.
+BacFlux combines established tools and reference databases with its own processing
+and interpretation rules. Cite the components that contributed to the reported
+results, as well as the workflow.
 
 Which references you need depends on the mode you ran and on which optional
 stages you switched on, so the tables below are grouped that way. The complete
 list, with the licensing notes attached, is in
 [`CITATIONS.md`](https://github.com/iLivius/BacFlux/blob/main/CITATIONS.md).
 
-### Every run, whatever the mode
+### Shared stages { #every-run-whatever-the-mode }
 
 | Step | Tool or database | Reference |
 |---|---|---|
@@ -61,7 +60,7 @@ list, with the licensing notes attached, is in
 | CAZymes | run_dbCAN 5.1.2 (dbCAN3) | 54 |
 | AMR and virulence on contigs | ABRicate 1.4.0 — plus the databases below | 47 |
 | Plasmids | Platon 1.8, with a supplementary BLAST+ line beside each call | 45, 7 |
-| Prophages | VirSorter2 2.2.4, with CheckV 1.1.1 grading what it found | 25, 38 |
+| Prophages | VirSorter2 2.2.4 (default) or geNomad 1.12.0 (`phage.caller: genomad`), then CheckV 1.1.1 to assess the predicted viral sequences | 25, 8, 38 |
 | Aggregated report | MultiQC 1.33 | 21 |
 
 **ABRicate's eight databases.** The screen runs once per database and the eight
@@ -89,9 +88,9 @@ tables are kept side by side, so cite the ones you actually read.
 
 **Short-read modes only.** `illumina` and `hybrid` also map the trimmed reads
 onto CARD v4.0.1 with BBMap 39.33 (refs 6, 2, 30). Read
-[Antimicrobial resistance](../analysis/amr.md) before quoting that leg: it is a
-sensitive screen, and its specificity comes from the reference-length coverage
-gate rather than from read identity.
+[Antimicrobial resistance](../analysis/amr.md) before quoting that analysis: it is a
+sensitive screen whose specificity comes from the reference-length coverage gate
+rather than from read identity; it does not confirm phenotypic resistance.
 
 ### Optional stages and layers
 
@@ -106,11 +105,13 @@ Each of these is off until you turn it on, and each brings its own citations.
 | `mobilome.iceberg.urls` or `.dir` | ICEberg 3.0 sequences, to name the ICE and IME candidates | 49 |
 | `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | ISOSDB read mapping with BBMap, for IS copy number | 31, 6 |
 
-The mobility ladder is built around EFSA's intrinsic-versus-acquired distinction
-(refs 19, 20). [Antimicrobial resistance](../analysis/amr.md) lists the two
-further EFSA documents — the 2024 WGS statement behind the 80%/70% reporting
-thresholds, and the *Bacillus* catalogue — and says what BacFlux may and may not
-claim from any of them.
+The mobility tiers are organised around EFSA's distinction between intrinsic and
+acquired resistance genes (refs 19, 20). They provide genomic-context evidence; they
+do not establish that a gene is intrinsic and do not demonstrate transfer.
+[Antimicrobial resistance](../analysis/amr.md) lists the two further EFSA documents —
+the 2024 WGS statement behind the 80%/70% thresholds, and the *Bacillus* catalogue —
+and the [intrinsic/acquired methods page](../methods_amr_intrinsic_acquired.md) sets
+out what the evidence supports.
 
 !!! note "ISfinder is not part of a standard run"
     TnCentral publishes further endpoints whose content carries ISfinder's terms.
@@ -124,7 +125,7 @@ claim from any of them.
     > <https://doi.org/10.1093/nar/gkj014>
 
     Terms for every optional layer are listed on [Licensing](licensing.md); what
-    each layer buys you is on
+    each layer adds is on
     [Optional layers](../mobilome/optional-layers.md).
 
 ## Acknowledgements
@@ -159,7 +160,7 @@ would not have been realistic without it.
 17. Doster, E., et al. (2020). MEGARes 2.0: a database for classification of antimicrobial drug, biocide and metal resistance determinants in metagenomic sequence data. *Nucleic Acids Research*, 48(D1), D561–D569. <https://doi.org/10.1093/nar/gkz1010>
 18. Eddy, S. R. (2011). Accelerated profile HMM searches. *PLoS Computational Biology*, 7(10), e1002195. <https://doi.org/10.1371/journal.pcbi.1002195> (the profile-HMM engine inside ISEScan, MacSyFinder, VirSorter2 and run_dbCAN)
 19. EFSA Panel on Biological Hazards (BIOHAZ). (2023). Statement on how to interpret the QPS qualification on 'acquired antimicrobial resistance genes'. *EFSA Journal*, 21(10), 8323. <https://doi.org/10.2903/j.efsa.2023.8323> (the method for telling intrinsic from acquired)
-20. EFSA Scientific Committee. (2025). Guidance on the characterisation of microorganisms in support of the risk assessment of products used in the food chain. *EFSA Journal*, 23(11), e9705. <https://doi.org/10.2903/j.efsa.2025.9705> (the guidance in force; its Appendix A lists what it supersedes in the 2018 FEEDAP guidance)
+20. EFSA Scientific Committee. (2025). Guidance on the characterisation of microorganisms in support of the risk assessment of products used in the food chain. *EFSA Journal*, 23(11), e9705. <https://doi.org/10.2903/j.efsa.2025.9705> (the cited 2025 edition; Appendix A describes its relationship to the 2018 FEEDAP guidance)
 21. Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. *Bioinformatics*, 32(19), 3047–3048. <https://doi.org/10.1093/bioinformatics/btw354>
 22. Feldgarden, M., et al. (2019). Validating the AMRFinder tool and resistance gene database by using antimicrobial resistance genotype–phenotype correlations in a collection of isolates. *Antimicrobial Agents and Chemotherapy*, 63(11), e00483-19. <https://doi.org/10.1128/AAC.00483-19>
 23. Feldgarden, M., et al. (2021). AMRFinderPlus and the Reference Gene Catalog facilitate examination of the genomic links among antimicrobial resistance, stress response, and virulence. *Scientific Reports*, 11, 12728. <https://doi.org/10.1038/s41598-021-91456-0>
