@@ -54,6 +54,9 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.11143917
     description: "Concept DOI — always resolves to the latest BacFlux release."
+  - type: doi
+    value: 10.5281/zenodo.23736124
+    description: "Version DOI — BacFlux v2.1.0."
 
 keywords:
   - bacterial genomics
