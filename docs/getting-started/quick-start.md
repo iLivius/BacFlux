@@ -55,7 +55,7 @@ environment: [installation](installation.md).
 Five references are too large, or too tied to one release, for the workflow to
 fetch for you. You download them once and give BacFlux the path:
 
-| Config key | Database | Version that is required |
+| Config key | Database | Required database version |
 |---|---|---|
 | `directories.bakta_db` | Bakta | **v6.0** (Bakta 1.12.1 refuses older ones) |
 | `directories.blast_db` | NCBI `core_nt` (or `nt_prok`, named in `parameters.nt_version`), plus the taxonomy files | — |

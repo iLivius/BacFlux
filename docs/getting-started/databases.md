@@ -22,7 +22,7 @@ local symlink view and never modifies, moves or deletes it.
 
 ## The five you download
 
-| Config key | Database | Version | Size on disk |
+| Config key | Database | Database version | Size on disk |
 |---|---|---|---|
 | `directories.bakta_db` | Bakta | **v6.0** | 3.9 GB light, 84 GB full |
 | `directories.blast_db` | NCBI `core_nt` (or `nt_prok`) with the taxonomy files | — | ~300 GB |

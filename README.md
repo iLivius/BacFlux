@@ -156,7 +156,7 @@ the decontamination policy and whether the mobilome module is on.
 **Five databases must be on disk before the first run.** They are too large, or too tied to
 one release, for the workflow to fetch:
 
-| Config key | Database | Version |
+| Config key | Database | Database version |
 |---|---|---|
 | `directories.bakta_db` | [Bakta](https://github.com/oschwengers/bakta?tab=readme-ov-file#database) | **v6.0** |
 | `directories.blast_db` | [NCBI core nt](https://ftp.ncbi.nlm.nih.gov/blast/db/) and taxonomic files | — |
