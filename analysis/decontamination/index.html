@@ -1,0 +1,3328 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../../modes/contigs/">
+      
+      
+        <link rel="next" href="../assembly-qc/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Decontamination - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#decontamination" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Decontamination
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-it-sits-in-each-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inputs and mode-specific behaviour
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure contig selection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configure contig selection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-auto-picks-the-genus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How auto picks the genus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-genus-aliases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Genus aliases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-keys-apply-to-every-sample-and-which-to-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings for a batch or an individual sample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-example-of-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2-taxonomy-megablast-against-ncbi-nt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Taxonomic assignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-coverage-the-reads-mapped-back-onto-the-draft" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-blobtools-joins-coverage-and-taxonomy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combining the evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-the-selector-keep-or-drop-with-a-reason-on-every-contig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applying the policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-second-blast-in-the-long-read-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BLAST of the final long-read assembly
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-second-screen-in-hybrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The second screen in hybrid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-check-afterwards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review the results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review the results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-composition-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Genus composition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-two-warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-nothing-survives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When nothing survives
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-two-ways-this-step-deletes-a-real-plasmid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations and plasmid retention
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Limitations and plasmid retention">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#route-1-bestsum-follows-database-composition-not-biology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plasmid assignment can differ from the host
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#route-2-in-hybrid-a-dropped-contig-takes-its-long-reads-with-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Short-read guidance can propagate a filtering error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Investigate a missing plasmid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-fix-then-re-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adjust the policy and reassess
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enabling the module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-it-sits-in-each-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inputs and mode-specific behaviour
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure contig selection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configure contig selection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-auto-picks-the-genus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How auto picks the genus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-genus-aliases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Genus aliases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-keys-apply-to-every-sample-and-which-to-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings for a batch or an individual sample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-example-of-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2-taxonomy-megablast-against-ncbi-nt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Taxonomic assignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-coverage-the-reads-mapped-back-onto-the-draft" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-blobtools-joins-coverage-and-taxonomy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combining the evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-the-selector-keep-or-drop-with-a-reason-on-every-contig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applying the policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-second-blast-in-the-long-read-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BLAST of the final long-read assembly
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-second-screen-in-hybrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The second screen in hybrid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-check-afterwards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review the results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review the results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-composition-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Genus composition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-two-warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-nothing-survives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When nothing survives
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-two-ways-this-step-deletes-a-real-plasmid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations and plasmid retention
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Limitations and plasmid retention">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#route-1-bestsum-follows-database-composition-not-biology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plasmid assignment can differ from the host
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#route-2-in-hybrid-a-dropped-contig-takes-its-long-reads-with-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Short-read guidance can propagate a filtering error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Investigate a missing plasmid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-fix-then-re-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adjust the policy and reassess
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/analysis/decontamination.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="decontamination">Decontamination<a class="headerlink" href="#decontamination" title="Permanent link">&para;</a></h1>
+<p>BacFlux screens the draft assembly for contigs assigned to genera other than the
+intended isolate. The purpose is to reduce contamination before taxonomic
+classification, annotation and downstream analyses. Contaminant sequences can
+affect completeness and contamination estimates, taxonomic assignments, and the
+reported genes, plasmids and prophages.</p>
+<p><strong>Contig selection is based on taxonomic assignment, not coverage.</strong> BacFlux
+combines BLAST-based taxonomy and mapping coverage in a BlobTools table. A
+configurable policy then determines which contigs to retain. Coverage is recorded
+for inspection but does not enter the selection decision. Each decision is written
+to an audit file.</p>
+<p>Genus-level assignment is evidence for filtering, rather than proof that a contig
+belongs to a contaminant. In particular, genuine plasmids can be assigned to a
+genus different from their host. Review the removed contigs before interpreting
+the final assembly or the absence of a gene or plasmid.</p>
+<h2 id="where-it-sits-in-each-mode">Inputs and mode-specific behaviour<a class="headerlink" href="#where-it-sits-in-each-mode" title="Permanent link">&para;</a></h2>
+<p>The primary screen runs in all four workflow modes. Its position and effect depend
+on the assembly being analysed.</p>
+<table>
+<thead>
+<tr>
+<th>Workflow mode</th>
+<th>Assembly screened</th>
+<th>Retained sequences</th>
+<th>Subsequent use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>illumina</code></td>
+<td>Filtered SPAdes draft, <code>contigs_filt.fasta</code></td>
+<td><code>contigs_final.fasta</code></td>
+<td>Final assembly for downstream analyses</td>
+</tr>
+<tr>
+<td><code>contigs</code></td>
+<td>Filtered input assembly, <code>contigs_filt.fasta</code></td>
+<td><code>contigs_final.fasta</code></td>
+<td>Final assembly for downstream analyses</td>
+</tr>
+<tr>
+<td><code>nanopore</code></td>
+<td>Flye assembly after reorientation with dnaapler</td>
+<td><code>contaminants/assembly_decontam.fasta</code></td>
+<td>Medaka polishing, if enabled, followed by finalisation as <code>contigs_final.fasta</code></td>
+</tr>
+<tr>
+<td><code>hybrid</code></td>
+<td>Illumina SPAdes draft</td>
+<td><code>contaminants/contigs_sel.fasta</code></td>
+<td>Illumina comparator for QC and Snippy; extraction of the short reads used for correction and, optionally, long-read filtering</td>
+</tr>
+</tbody>
+</table>
+<p>Paths in the table are relative to <code>02.assembly/{sample}/</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">The hybrid final assembly has a separate screen</p>
+<p>In <code>hybrid</code> mode, filtering the Illumina draft does not directly filter the
+final assembly, which is assembled from the Nanopore reads. A second screen
+reports taxonomic decisions for <code>contigs_final.fasta</code> without changing its
+sequence. See <a href="#the-second-screen-in-hybrid">the second screen in <code>hybrid</code></a>.</p>
+</div>
+<h2 id="the-policy">Configure contig selection<a class="headerlink" href="#the-policy" title="Permanent link">&para;</a></h2>
+<p>The settings are under <code>parameters.decontamination</code> in the configuration file.
+The defaults select a dominant genus by its total sequence length and remove
+contigs without a taxonomic assignment.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">decontamination</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">auto_vote</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bp</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">discard_no_hit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">long_read_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">off</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">include_genera</span><span class="p">:</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">include_genera_by_sample</span><span class="p">:</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">exclude_genera</span><span class="p">:</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">exclude_genera_file</span><span class="p">:</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">sample_overrides</span><span class="p">:</span>
+</code></pre></div>
+<p>The top-level <code>mode</code> selects the workflow input mode (<code>illumina</code>, <code>nanopore</code>,
+<code>hybrid</code> or <code>contigs</code>). <strong><code>parameters.decontamination.mode</code> selects the filtering
+policy.</strong> These are separate settings.</p>
+<table>
+<thead>
+<tr>
+<th>Filtering policy</th>
+<th>Selection rule</th>
+<th>Appropriate use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>auto</code></td>
+<td>Retain the dominant genus, selected using <code>auto_vote</code>, with the genus aliases described below</td>
+<td>An isolate expected to be dominated by one genus</td>
+</tr>
+<tr>
+<td><code>include</code></td>
+<td>Retain contigs assigned to the listed genera, including applicable aliases</td>
+<td>The target genus or genera are known</td>
+</tr>
+<tr>
+<td><code>exclude</code></td>
+<td>Remove contigs assigned to the listed genera; matching is exact</td>
+<td>Specific contaminant genera are known</td>
+</tr>
+<tr>
+<td><code>off</code></td>
+<td>Retain all contigs and still write the audit files</td>
+<td>Inspect assignments without removing sequence, or investigate possible over-filtering</td>
+</tr>
+</tbody>
+</table>
+<p>With <code>discard_no_hit: true</code>, contigs without a genus assignment are removed before
+the <code>auto</code>, <code>include</code> or <code>exclude</code> policy is applied. They are also excluded from
+the dominant-genus calculation in <code>auto</code> mode. The <code>off</code> policy retains all
+contigs, including unclassified ones.</p>
+<p>With <code>discard_no_hit: false</code>, unclassified contigs keep the label <code>no-hit</code> and are
+judged by the active policy like any other assignment. <code>exclude</code> retains them
+(reason <code>not_excluded_genus</code>); <code>auto</code> and <code>include</code> remove them
+(<code>not_auto_genus:&lt;genus&gt;</code>, <code>not_included_genus</code>), because <code>no-hit</code> matches no genus
+or alias. In <code>auto</code>, <code>no-hit</code> also takes part in the vote: if unclassified contigs
+hold the largest share, <code>no-hit</code> is selected, every classified contig is removed and
+<code>{sample}_kept_genus.txt</code> is empty. To retain unclassified contigs, combine
+<code>discard_no_hit: false</code> with <code>exclude</code>, or use <code>off</code>. An unclassified contig may be
+sequence with no close relative in <code>nt</code>, such as a small plasmid, rather than
+contamination.</p>
+<div class="admonition warning">
+<p class="admonition-title">Keep <code>discard_no_hit</code> explicit</p>
+<p>The supplied configuration sets <code>discard_no_hit: true</code>. Omitting the key
+entirely resolves to <code>false</code>, so deleting it changes the behaviour.</p>
+</div>
+<h3 id="how-auto-picks-the-genus">How <code>auto</code> picks the genus<a class="headerlink" href="#how-auto-picks-the-genus" title="Permanent link">&para;</a></h3>
+<p><code>auto_vote</code> determines how the dominant genus is selected from the BlobTools
+assignments.</p>
+<table>
+<thead>
+<tr>
+<th><code>auto_vote</code></th>
+<th>Measure</th>
+<th>Genus selected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bp</code> (default)</td>
+<td>Sum of contig lengths assigned to each genus</td>
+<td>Greatest total sequence length</td>
+</tr>
+<tr>
+<td><code>contigs</code></td>
+<td>Number of contigs assigned to each genus</td>
+<td>Greatest contig count</td>
+</tr>
+</tbody>
+</table>
+<p>For example:</p>
+<table>
+<thead>
+<tr>
+<th>Contig</th>
+<th>Assigned genus</th>
+<th style="text-align: right;">Length</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>contig_1</code></td>
+<td>GenusA</td>
+<td style="text-align: right;">5,000,000 bp</td>
+</tr>
+<tr>
+<td><code>contig_2</code></td>
+<td>GenusB</td>
+<td style="text-align: right;">60,000 bp</td>
+</tr>
+<tr>
+<td><code>contig_3</code></td>
+<td>GenusB</td>
+<td style="text-align: right;">45,000 bp</td>
+</tr>
+<tr>
+<td><code>contig_4</code></td>
+<td>GenusB</td>
+<td style="text-align: right;">8,000 bp</td>
+</tr>
+</tbody>
+</table>
+<p><code>bp</code> selects GenusA, with 5,000,000 bp compared with 113,000 bp for GenusB.
+<code>contigs</code> selects GenusB, with three contigs compared with one, and can therefore
+remove the chromosome. This is the reason for the length-based default. Either
+setting can remove genuine plasmids assigned to a different genus; see
+<a href="#route-1-bestsum-follows-database-composition-not-biology">plasmid retention</a>.</p>
+<p>An exact tie is resolved alphabetically by genus name. The calculation is made
+before applying genus aliases. With <code>discard_no_hit: true</code>, <code>no-hit</code> does not
+participate in the calculation.</p>
+<p>The log records the measure and selected genus, for example
+<code>Auto vote by bp: kept genus GenusA.</code> The composition report records both measures
+so that their agreement can be inspected.</p>
+<p>The same measure is applied to the retained, genus-assigned contigs to choose the
+genus written to <code>{sample}_kept_genus.txt</code>. This is passed to Bakta as a genus hint;
+see <a href="../annotation/#the-genus-hint">Annotation</a>. The log records it as
+<code>Genus given to Bakta: GenusA.</code></p>
+<h3 id="the-genus-aliases">Genus aliases<a class="headerlink" href="#the-genus-aliases" title="Permanent link">&para;</a></h3>
+<p>The selector uses a genus-alias table in <code>auto</code> and <code>include</code> modes to reduce
+removal of contigs assigned to certain closely related genera. Aliases do not
+apply to <code>exclude</code>: only the genera explicitly listed are excluded.</p>
+<p>This table is a filtering safeguard. It does not reconcile the taxonomies of
+NCBI, GTDB and LPSN, and should not be treated as a taxonomic classification.</p>
+<h3 id="which-keys-apply-to-every-sample-and-which-to-one">Settings for a batch or an individual sample<a class="headerlink" href="#which-keys-apply-to-every-sample-and-which-to-one" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Scope</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code></td>
+<td>All samples, unless overridden</td>
+<td>Primary filtering policy</td>
+</tr>
+<tr>
+<td><code>auto_vote</code></td>
+<td>All samples</td>
+<td>Dominant-genus measure; also used for the Bakta genus hint</td>
+</tr>
+<tr>
+<td><code>discard_no_hit</code></td>
+<td>All samples, unless overridden</td>
+<td>Handling of contigs without a taxonomic assignment</td>
+</tr>
+<tr>
+<td><code>long_read_mode</code></td>
+<td>All <code>hybrid</code> samples</td>
+<td>Decision policy for the second screen; does not modify the final assembly</td>
+</tr>
+<tr>
+<td><code>include_genera</code></td>
+<td>All samples, unless overridden</td>
+<td>Base list of genera to retain in <code>include</code> mode</td>
+</tr>
+<tr>
+<td><code>exclude_genera</code></td>
+<td>All samples, unless overridden</td>
+<td>Base list of genera to remove in <code>exclude</code> mode</td>
+</tr>
+<tr>
+<td><code>exclude_genera_file</code></td>
+<td>All samples, unless overridden</td>
+<td>File whose entries are added to <code>exclude_genera</code>; an override row's <code>exclude_genera</code> replaces both</td>
+</tr>
+<tr>
+<td><code>include_genera_by_sample</code></td>
+<td>Samples named in the file</td>
+<td>Entries are added to that sample's include list</td>
+</tr>
+<tr>
+<td><code>sample_overrides</code></td>
+<td>Samples named in the file</td>
+<td>Non-empty fields replace the corresponding settings for that sample</td>
+</tr>
+</tbody>
+</table>
+<p><code>include_genera</code> and <code>exclude_genera</code> accept inline lists such as
+<code>[Bacillus, Priestia]</code> or strings separated by semicolons, commas or tabs.
+Whitespace around separators is removed. The other three genus-list/override
+keys are <strong>file paths</strong>, not inline mappings.</p>
+<p>Settings are resolved in this order:</p>
+<ol>
+<li>Read the batch settings.</li>
+<li>Add entries from <code>include_genera_by_sample</code> for the current sample.</li>
+<li>Apply non-empty fields from its <code>sample_overrides</code> row.</li>
+</ol>
+<h3 id="one-example-of-each">Configuration examples<a class="headerlink" href="#one-example-of-each" title="Permanent link">&para;</a></h3>
+<p>The following examples show changes to make in a copy of the supplied
+configuration. They are not complete configuration files.</p>
+<p><strong>Retain known target genera throughout the batch.</strong> For one genus, supply a
+single name; for several, separate the names as shown.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">decontamination</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">include_genera</span><span class="p">:</span><span class="w"> </span><span class="s">"Bacillus;Priestia;Peribacillus"</span>
+</code></pre></div>
+<p><strong>Remove known contaminants.</strong> An optional file extends the inline list.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">decontamination</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">exclude</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">exclude_genera</span><span class="p">:</span><span class="w"> </span><span class="s">"Cutibacterium;Ralstonia"</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">exclude_genera_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/known_contaminants.txt</span>
+</code></pre></div>
+<p>The file contains one genus per line. Blank lines and comments beginning with <code>#</code>
+are ignored.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># Additional contaminant genera
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>GenusB
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>GenusC
+</code></pre></div>
+<p><strong>Add genera for selected samples.</strong> The file is tab-separated with columns
+<code>sample</code> and <code>genus</code>. A sample may appear on multiple rows or have several genera
+in one cell.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">decontamination</span><span class="p">:</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">include_genera</span><span class="p">:</span><span class="w"> </span><span class="s">"Bacillus"</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">include_genera_by_sample</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/extra_genera.tsv</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sample	genus
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>isolate1	Lysinibacillus
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>isolate2	Lysinibacillus;Brevibacillus
+</code></pre></div>
+<p><code>isolate1</code> retains <em>Bacillus</em> and <em>Lysinibacillus</em>; <code>isolate2</code> retains <em>Bacillus</em>,
+<em>Lysinibacillus</em> and <em>Brevibacillus</em>. Other samples retain <em>Bacillus</em> and its
+aliases, such as <em>Priestia</em>, <em>Peribacillus</em> and <em>Paenibacillus</em>.</p>
+<p><strong>Override a sample's policy or lists.</strong> In <code>sample_overrides</code>, <code>sample</code> and
+<code>mode</code> are required columns. <code>include_genera</code>, <code>exclude_genera</code> and
+<code>discard_no_hit</code> are optional. Non-empty cells replace the existing setting;
+empty cells leave it unchanged.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">decontamination</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">sample_overrides</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/overrides.tsv</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sample	mode	include_genera	exclude_genera	discard_no_hit
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>isolate3	off			
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>isolate4	include	Bacillus;Lysinibacillus		
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>isolate5	exclude		Cutibacterium	false
+</code></pre></div>
+<p><code>isolate3</code> retains all contigs. <code>isolate4</code> uses an include list containing
+<em>Bacillus</em> and <em>Lysinibacillus</em>, replacing any previous include list. <code>isolate5</code>
+removes only contigs assigned to <em>Cutibacterium</em> and retains unclassified contigs.
+Preserve the tab delimiters, including those around empty cells, when creating
+this file.</p>
+<div class="admonition example">
+<p class="admonition-title">Adding to a list and replacing it have different effects</p>
+<p>If the batch includes <em>Bacillus</em>, adding <em>Lysinibacillus</em> through
+<code>include_genera_by_sample</code> retains both genera for that sample. Setting
+<code>include_genera</code> to <em>Lysinibacillus</em> in <code>sample_overrides</code> replaces the list,
+so only <em>Lysinibacillus</em> and its applicable aliases are included.</p>
+</div>
+<h2 id="the-chain">Method<a class="headerlink" href="#the-chain" title="Permanent link">&para;</a></h2>
+<p>The primary screen is defined in <code>workflow/rules/shared/10_decontam.smk</code>. It
+combines taxonomic evidence and coverage, then applies the selection policy.</p>
+<pre class="mermaid"><code>---
+config:
+  themeVariables:
+    fontSize: 14px
+  flowchart:
+    nodeSpacing: 35
+    rankSpacing: 35
+---
+flowchart TD
+    D["Draft assembly"] --&gt; T["BLAST taxonomic evidence"]
+    D --&gt; M["Mapping coverage"]
+    T --&gt; B["BlobTools contig table"]
+    M --&gt; B
+    B --&gt; S["Taxonomy-based selection"]
+    S --&gt; F["Retained assembly"]
+    S --&gt; A["Decision and composition files"]</code></pre>
+<h3 id="2-taxonomy-megablast-against-ncbi-nt">Taxonomic assignment<a class="headerlink" href="#2-taxonomy-megablast-against-ncbi-nt" title="Permanent link">&para;</a></h3>
+<p>BLAST+ searches the draft contigs against the NCBI nucleotide database with
+<code>megablast</code>. The output contains the matching taxonomy IDs, alignment statistics
+and subject titles. <code>parameters.nt_version</code> selects the database subdirectory,
+<code>core_nt</code> or <code>nt_prok</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">nt_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">core_nt</span>
+</code></pre></div>
+<p>The reference database and NCBI taxonomy files must be prepared as described in
+<a href="../../getting-started/databases/">Reference databases</a>. BlobTools uses
+<code>nodes.dmp</code> and <code>names.dmp</code> to resolve taxonomic assignments. Missing taxonomy
+files stop the workflow before the corresponding jobs run.</p>
+<h3 id="1-coverage-the-reads-mapped-back-onto-the-draft">Coverage<a class="headerlink" href="#1-coverage-the-reads-mapped-back-onto-the-draft" title="Permanent link">&para;</a></h3>
+<p>Mapping the sample's reads to the draft assembly provides per-contig read depth.
+Differences in depth can help with inspection of possible contaminants, although
+the selector does not use this information.</p>
+<table>
+<thead>
+<tr>
+<th>Workflow mode</th>
+<th>Mapping method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>illumina</code>, <code>hybrid</code></td>
+<td>Bowtie2 mapping of the paired-end Illumina reads</td>
+</tr>
+<tr>
+<td><code>nanopore</code></td>
+<td>minimap2 with the <code>map-ont</code> preset</td>
+</tr>
+<tr>
+<td><code>contigs</code></td>
+<td>minimap2 alignment of the contigs against themselves</td>
+</tr>
+</tbody>
+</table>
+<p>The mapping output is <code>contaminants/{sample}_map.bam</code> and its <code>.bai</code> index. These
+are temporary files, retained until their dependent jobs finish. Where reads are
+available, the mapping also supports <a href="../assembly-qc/#mapping-quality-qualimap">Qualimap</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Self-alignment does not measure sequencing depth</p>
+<p>In <code>contigs</code> mode, reads are unavailable. BacFlux aligns the assembly against
+itself to generate the BAM file required by BlobTools. This alignment does
+not provide independent read-depth evidence, so its coverage values should
+not be interpreted as sequencing depth. This mode has no Qualimap report.</p>
+</div>
+<h3 id="3-blobtools-joins-coverage-and-taxonomy">Combining the evidence<a class="headerlink" href="#3-blobtools-joins-coverage-and-taxonomy" title="Permanent link">&para;</a></h3>
+<p>BlobTools combines contig length, GC content, coverage and taxonomic evidence.
+Its <code>bestsum</code> rule sums BLAST bit scores by taxon to assign contigs at each
+reported taxonomic rank. The selector uses the <strong>genus</strong> assignment from
+<code>contaminants/bestscore.blob.blobDB.table.txt</code>.</p>
+<p>This table is retained so that the evidence supporting the decisions can be
+examined. Neither the coverage values nor the GC content determine which contigs
+the selector retains.</p>
+<h3 id="4-the-selector-keep-or-drop-with-a-reason-on-every-contig">Applying the policy<a class="headerlink" href="#4-the-selector-keep-or-drop-with-a-reason-on-every-contig" title="Permanent link">&para;</a></h3>
+<p><code>select_contigs</code> runs
+<code>workflow/scripts/10_decontam/select_contigs_by_taxonomy.py</code>. The script reads the
+genus assignments, resolves the settings for each sample, applies the policy and
+records the result for each contig in <code>contig_taxonomy_decisions.tsv</code>.</p>
+<p>If no contigs are retained, the primary selection step fails. It writes the
+decisions file before failing, so the reasons can be inspected instead of passing
+an empty assembly to downstream analyses.</p>
+<h3 id="a-second-blast-in-the-long-read-modes">BLAST of the final long-read assembly<a class="headerlink" href="#a-second-blast-in-the-long-read-modes" title="Permanent link">&para;</a></h3>
+<p>In <code>nanopore</code> and <code>hybrid</code> modes, <code>blast_final_contigs</code> repeats the BLAST search on
+<code>contigs_final.fasta</code> and writes <code>{sample}_final_blastout</code>. This provides BLAST
+evidence with the contig identifiers used in the final assembly for the plasmid
+stage's supplementary check.</p>
+<p>In <code>hybrid</code> mode, the primary search used the Illumina draft, whose contig
+identifiers differ from those in the Nanopore assembly. In <code>nanopore</code> mode,
+polishing occurs after the primary search and may affect the headers. The second
+search avoids relying on identifiers from the earlier assembly. It also supplies
+the taxonomy for the hybrid final-assembly screen. In <code>illumina</code> and <code>contigs</code>
+modes, the plasmid stage reuses the primary BLAST table.</p>
+<h2 id="the-second-screen-in-hybrid">The second screen in <code>hybrid</code><a class="headerlink" href="#the-second-screen-in-hybrid" title="Permanent link">&para;</a></h2>
+<p>The final hybrid assembly is built from Nanopore reads, whereas the primary
+selection step filters the Illumina draft. With
+<code>parameters.hybrid.short_read_guidance: false</code> (the default), long-read filtering
+uses length and quality without the decontaminated Illumina reads as a reference.
+The primary taxonomic filter therefore does not remove contaminant long reads
+before assembly.</p>
+<p>A separate screen combines long-read coverage of <code>contigs_final.fasta</code> with the
+final-assembly BLAST results. It uses the same selector, genus lists, aliases,
+<code>auto_vote</code> and <code>discard_no_hit</code>, with its policy set by
+<code>parameters.decontamination.long_read_mode</code>.</p>
+<p><strong>This screen reports decisions without modifying <code>contigs_final.fasta</code>.</strong>
+Downstream analyses continue to use that assembly regardless of the reported
+decisions.</p>
+<table>
+<thead>
+<tr>
+<th><code>long_read_mode</code></th>
+<th>Reported decisions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>off</code> (default)</td>
+<td>All contigs are marked <code>keep</code> with reason <code>mode_off</code></td>
+</tr>
+<tr>
+<td><code>auto</code>, <code>include</code>, <code>exclude</code></td>
+<td>The decisions show which contigs the corresponding policy would retain or remove</td>
+</tr>
+</tbody>
+</table>
+<p>Sample overrides affect the genus lists and <code>discard_no_hit</code> in this screen,
+but do not replace <code>long_read_mode</code>. If its policy would remove all contigs, the
+screen logs the result and the run continues.</p>
+<p>Every hybrid run writes <code>{sample}_final_contig_taxonomy_decisions.tsv</code> and
+<code>{sample}_final_composition.tsv</code>. Inspect both before acting on a decision:
+long-read assemblies may contain only a few contigs, and one removal can affect
+an entire chromosome or plasmid.</p>
+<h2 id="output-files">Output files<a class="headerlink" href="#output-files" title="Permanent link">&para;</a></h2>
+<p>Unless indicated otherwise, the files are under
+<code>02.assembly/{sample}/contaminants/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents and use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>contig_taxonomy_decisions.tsv</code></td>
+<td>Contig genus assignments, retention decisions and reasons; the main audit file for the primary screen</td>
+</tr>
+<tr>
+<td><code>{sample}_composition.txt</code></td>
+<td>Each genus's share of assembly length and contig count, before filtering</td>
+</tr>
+<tr>
+<td><code>{sample}_kept_genus.txt</code></td>
+<td>Genus hint supplied to Bakta; empty if no retained contig has a genus assignment</td>
+</tr>
+<tr>
+<td><code>bestscore.blob.blobDB.table.txt</code></td>
+<td>BlobTools table supporting the primary decisions</td>
+</tr>
+<tr>
+<td><code>{sample}_blastout</code></td>
+<td>Primary BLAST results, in the 15-column format described below</td>
+</tr>
+<tr>
+<td><code>contigs.list</code></td>
+<td>Retained contig identifiers; not consumed by another rule</td>
+</tr>
+<tr>
+<td><code>contigs_sel.fasta</code></td>
+<td>Retained Illumina draft in <code>hybrid</code> mode</td>
+</tr>
+<tr>
+<td><code>assembly_decontam.fasta</code></td>
+<td>Retained assembly in <code>nanopore</code> mode, before optional polishing</td>
+</tr>
+<tr>
+<td><code>{sample}_final_blastout</code></td>
+<td>BLAST results for the final assembly; <code>nanopore</code> and <code>hybrid</code> only</td>
+</tr>
+<tr>
+<td><code>{sample}_final_contig_taxonomy_decisions.tsv</code></td>
+<td>Hybrid final-assembly decisions; does not change the assembly</td>
+</tr>
+<tr>
+<td><code>{sample}_final_composition.tsv</code></td>
+<td>Composition report for the final hybrid assembly</td>
+</tr>
+<tr>
+<td><code>bestscore_final.blob_final.blobDB.table.txt</code></td>
+<td>BlobTools table for the final hybrid assembly</td>
+</tr>
+</tbody>
+</table>
+<p>In <code>illumina</code> and <code>contigs</code> modes, retained sequences are written directly to
+<code>02.assembly/{sample}/contigs_final.fasta</code>.</p>
+<p>The mapping BAM and index, BlobTools JSON and coverage files, and Bowtie2 index
+files are temporary. The corresponding log is
+<code>logs/select_contigs_{sample}.log</code>.</p>
+<h2 id="what-to-check-afterwards">Review the results<a class="headerlink" href="#what-to-check-afterwards" title="Permanent link">&para;</a></h2>
+<h3 id="the-composition-report">Genus composition<a class="headerlink" href="#the-composition-report" title="Permanent link">&para;</a></h3>
+<p>The composition report summarises all contigs in the BlobTools input table,
+including those subsequently removed. It is sorted by sequence-length share.
+For example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>GenusA: bp 0.46  contigs 0.22
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>GenusB: bp 0.31  contigs 0.38
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>GenusC: bp 0.14  contigs 0.24
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>GenusD: bp 0.09  contigs 0.16
+</code></pre></div>
+<p><code>bp</code> is the fraction of total sequence length assigned to a genus; <code>contigs</code> is
+its fraction of the contig count. Here, GenusA has the largest length share and
+GenusB the largest contig count. The two <code>auto_vote</code> settings therefore select
+different genera.</p>
+<p>Several substantial genus assignments can indicate a mixed culture or taxonomic
+assignment of one genome across related genera. The report alone does not
+distinguish these explanations. It is provided for inspection and is not an
+input to a later analysis step.</p>
+<h3 id="the-two-warnings">Warnings<a class="headerlink" href="#the-two-warnings" title="Permanent link">&para;</a></h3>
+<p>The selector writes advisory warnings to <code>logs/select_contigs_{sample}.log</code>.
+These warnings do not alter the decisions.</p>
+<table>
+<thead>
+<tr>
+<th>Message begins</th>
+<th>Condition</th>
+<th>What to inspect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WARNING: &lt;N&gt; genera each hold at least 5% of this assembly</code></td>
+<td>At least two genera each account for at least 5% of assembly length</td>
+<td>Possible mixed culture or assignment of one genome across several genera</td>
+</tr>
+<tr>
+<td><code>WARNING: decontamination is discarding &lt;N&gt;% of the assembly</code></td>
+<td>More than 20% of assembly length is removed</td>
+<td>Possible excessive filtering; compare removed contigs and assembly QC</td>
+</tr>
+<tr>
+<td><code>WARNING: &lt;N&gt; contigs from BlobTools table were not found in FASTA.</code></td>
+<td>Contig identifiers in the BlobTools table are absent from the FASTA</td>
+<td>Input-table mismatch or rewritten contig headers</td>
+</tr>
+</tbody>
+</table>
+<p>The hybrid final-assembly screen logs to <code>logs/screen_final_contigs_{sample}.log</code>,
+where the removal warning reads <code>WARNING: this policy would discard &lt;N&gt;% of the
+assembly … Nothing is removed</code>.</p>
+<p>These are review thresholds, not calibrated criteria for accepting or rejecting
+an isolate. For example, the composition above can produce both composition and
+removal warnings: a GenusA-only selection would remove 54% of the sequence before
+considering aliases or unclassified-contig handling.</p>
+<p>CheckM completeness and contamination estimates help to interpret the first two
+warnings. A kept assembly that is incomplete but not contaminated suggests
+that genuine genome sequence was removed; one that is complete but heavily
+contaminated suggests that a second genome was kept. Read the estimates together
+with the contig decisions and the expected genome structure.</p>
+<h3 id="when-nothing-survives">When nothing survives<a class="headerlink" href="#when-nothing-survives" title="Permanent link">&para;</a></h3>
+<p>If primary selection retains zero contigs, use the <code>reason</code> column in the audit
+file to distinguish a mismatched policy from a lack of usable assignments. The
+primary rule fails rather than writing an empty FASTA. The hybrid final-assembly
+screen is advisory and does not fail the run for this condition.</p>
+<h2 id="5-two-ways-this-step-deletes-a-real-plasmid">Limitations and plasmid retention<a class="headerlink" href="#5-two-ways-this-step-deletes-a-real-plasmid" title="Permanent link">&para;</a></h2>
+<h3 id="route-1-bestsum-follows-database-composition-not-biology">Plasmid assignment can differ from the host<a class="headerlink" href="#route-1-bestsum-follows-database-composition-not-biology" title="Permanent link">&para;</a></h3>
+<p>A plasmid can have close database matches in several genera. Its BlobTools genus
+assignment reflects the BLAST evidence and database representation; it is not a
+direct determination of the plasmid's current host. Consequently, <code>auto</code> filtering
+can remove a genuine plasmid assigned to a genus other than the selected genus.</p>
+<p>In a BacFlux run on the complete assembly of <em>Klebsiella pneumoniae</em> ATCC BAA-2146
+(<code>mode: contigs</code>; see the <a href="../../mobilome/worked-example/">worked example</a>), the
+2,014 bp plasmid pMYS (<code>NZ_CP006660.1</code>) was removed by the default <code>auto</code> policy
+after assignment to <em>Escherichia</em>. Its
+single best hit was <em>K. pneumoniae</em> at 100% identity over the full sequence, but
+the summed bit scores favoured <em>Escherichia</em>:
+58,709 compared with 16,253 for <em>Klebsiella</em>. These values are <strong>summed bit scores,
+not counts of database entries</strong>.</p>
+<p>Genus-level filtering also cannot distinguish contaminants of the same genus
+from the intended isolate. Conversely, aliases or broad include lists can retain
+contaminants as well as genuine target sequence.</p>
+<h3 id="route-2-in-hybrid-a-dropped-contig-takes-its-long-reads-with-it">Short-read guidance can propagate a filtering error<a class="headerlink" href="#route-2-in-hybrid-a-dropped-contig-takes-its-long-reads-with-it" title="Permanent link">&para;</a></h3>
+<p>This additional risk applies only when
+<code>parameters.hybrid.short_read_guidance: true</code>.</p>
+<ol>
+<li>The primary screen removes an Illumina contig.</li>
+<li>Illumina reads mapping to that removed sequence are absent from the selected
+   short-read reference.</li>
+<li>Filtlong uses that reference to score the Nanopore reads.</li>
+<li>Nanopore reads without short-read support can be removed, reducing or
+   eliminating the sequence available to Flye.</li>
+</ol>
+<p>A mistaken plasmid assignment can therefore affect the final hybrid assembly.
+This particular mechanism does not apply with <code>short_read_guidance: false</code>.
+Long-read quality and length filtering can independently remove plasmid reads;
+see <a href="../../modes/nanopore/">Nanopore mode</a>.</p>
+<h3 id="how-to-check">Investigate a missing plasmid<a class="headerlink" href="#how-to-check" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Inspect discarded contigs in <code>contig_taxonomy_decisions.tsv</code>, including short
+   contigs that could represent plasmids. Compare their assigned genera with the
+   expected host genus and the GTDB-Tk classification. NCBI and GTDB names need
+   not be identical.</li>
+<li>Determine whether the sequence is absent from the assembly or is present but
+   has no plasmid call in <code>06.plasmids/</code>.</li>
+<li>In <code>hybrid</code> mode, check <code>short_read_guidance</code> and the final-assembly audit.</li>
+<li>Review long-read filtering and assembly results as well as the taxonomic
+   filter. Absence from the assembly does not by itself identify the cause.</li>
+</ol>
+<h3 id="how-to-fix-then-re-run">Adjust the policy and reassess<a class="headerlink" href="#how-to-fix-then-re-run" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Possible change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A genuine target contig was assigned to another genus</td>
+<td>Use <code>include</code> with both the host genus and the contig's assigned genus</td>
+</tr>
+<tr>
+<td>Taxonomic filtering is unsuitable for the current analysis</td>
+<td>Use <code>off</code> to retain all contigs, then assess contamination separately</td>
+</tr>
+<tr>
+<td>An unclassified contig was removed (reason <code>discarded_no_hit</code>)</td>
+<td>Set <code>discard_no_hit: false</code> and use <code>exclude</code> or <code>off</code>; under <code>auto</code> and <code>include</code> the contig is still removed</td>
+</tr>
+<tr>
+<td>One sample needs additional included genera</td>
+<td>Use <code>include_genera_by_sample</code></td>
+</tr>
+<tr>
+<td>One sample needs a different policy or replacement genus list</td>
+<td>Use <code>sample_overrides</code></td>
+</tr>
+</tbody>
+</table>
+<p>Inspect the dry-run plan after changing the configuration, then rerun and compare
+the decision files, retained assembly and QC results. Changing
+<code>long_read_mode</code> changes only the hybrid audit decisions; it does not restore or
+remove sequence in the final assembly.</p>
+<details class="info">
+<summary>Implementation details and BLAST output format</summary>
+<p>The primary screen uses the following rules and software:</p>
+<table>
+<thead>
+<tr>
+<th>Rules</th>
+<th>Software or environment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>blast_contigs</code>, <code>blast_final_contigs</code></td>
+<td>BLAST+ 2.17.0</td>
+</tr>
+<tr>
+<td><code>map_contigs</code>, <code>index_contigs</code> in short-read modes</td>
+<td>Bowtie2 2.5.5, <code>bowtie.yaml</code></td>
+</tr>
+<tr>
+<td>Long-read and contig self-alignment</td>
+<td>minimap2 2.31, <code>minimap.yaml</code></td>
+</tr>
+<tr>
+<td><code>blob_json</code>, <code>blob_table</code></td>
+<td>BlobTools 1.1.1</td>
+</tr>
+<tr>
+<td><code>select_contigs</code></td>
+<td>Standard-library Python in <code>workflow/envs/python.yaml</code></td>
+</tr>
+</tbody>
+</table>
+<p>The selector reads genus from column 22 of the BlobTools <code>--rank all</code> table.
+Rows with fewer than 22 fields are skipped; an empty genus field is read as
+<code>no-hit</code>. BlobTools uses:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>blobtools<span class="w"> </span>view<span class="w"> </span>--input<span class="w"> </span>blob.blobDB.json<span class="w"> </span>--out<span class="w"> </span>bestscore<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>--taxrule<span class="w"> </span>bestsum<span class="w"> </span>--rank<span class="w"> </span>all<span class="w"> </span>--hits
+</code></pre></div>
+<p>The BLAST command has this form, with paths and sample names supplied by
+the workflow:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nv">BLASTDB</span><span class="o">=</span>/path/to/blast_db<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>blastn<span class="w"> </span>-task<span class="w"> </span>megablast<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span>-query<span class="w"> </span>contigs_filt.fasta<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span>-db<span class="w"> </span>/path/to/blast_db/core_nt<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span>-outfmt<span class="w"> </span><span class="s1">'6 qseqid staxids bitscore pident evalue length qlen slen qcovs qcovhsp sskingdoms scomnames sscinames sblastnames stitle'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span>-evalue<span class="w"> </span>1e-5<span class="w"> </span>-max_target_seqs<span class="w"> </span><span class="m">50</span><span class="w"> </span>-max_hsps<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">  </span>-num_threads<span class="w"> </span><span class="o">{</span>threads<span class="o">}</span><span class="w"> </span>-out<span class="w"> </span><span class="o">{</span>sample<span class="o">}</span>_blastout
+</code></pre></div>
+<p><code>BLASTDB</code> identifies the parent database directory; <code>-db</code> identifies the
+selected database within it. <code>nodes.dmp</code> and <code>names.dmp</code> must be available in
+the configured database directory.</p>
+<p>Preserve the <code>-outfmt</code> columns when modifying the rule. The plasmid stage
+uses the final <code>stitle</code> column for its supplementary BLAST check. Changing
+its position makes that check fail without raising an error: every plasmid
+call is then reported as not verified by BLAST search.</p>
+<p>The hybrid final screen uses <code>map_final_contigs</code>, <code>blob_json_final</code>,
+<code>blob_table_final</code> and <code>screen_final_contigs</code>.</p>
+</details>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
