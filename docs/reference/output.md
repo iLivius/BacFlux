@@ -93,7 +93,8 @@ output_dir/
 |-- 04.annotation/
 |   |-- bakta/{sample}/   eggnog/{sample}/
 |   |-- antismash/{sample}/   + antismash/databases/
-|   `-- dbcan/{sample}/       + dbcan/<db version>/
+|   |-- dbcan/{sample}/       + dbcan/<db version>/
+|   `-- baktfold/{sample}/    + baktfold/databases/      only when baktfold.run: true
 |-- 05.amr/
 |   |-- abricate/{sample}/                       eight databases + a summary
 |   `-- mapping/{sample}/  + card_db/            [illumina, hybrid]
@@ -241,6 +242,8 @@ point-mutation detection. See [Taxonomy](../analysis/taxonomy.md).
 | `antismash/databases/` | The shared antiSMASH reference database: downloaded here, or a symlink view of a copy you already hold. |
 | `dbcan/{sample}/` | CAZyme calls, gene clusters and substrate predictions. Terminal. |
 | `dbcan/<db version>/` | The shared dbCAN database, likewise. The folder is named from the download URL, so the version is visible on disk. The empty `.verified.sha256` beside it is the marker written once the checksum matched, and its presence is what stops the download repeating. |
+| `baktfold/{sample}/` | Only with `baktfold.run: true`. Bakta's file set again, with names found by predicted structure for the proteins Bakta called hypothetical, plus `{sample}.inference.tsv` (the database hit behind each name) and one `baktfold_<database>_tophit.tsv` per database. Terminal: every other stage reads Bakta's annotation. |
+| `baktfold/databases/` | Baktfold's database and the ProstT5 model: downloaded here, or a symlink view of a copy you already hold. |
 
 eggNOG is the slow tail of a BacFlux run. See [Annotation](../analysis/annotation.md).
 

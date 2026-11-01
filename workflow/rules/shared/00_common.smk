@@ -185,6 +185,7 @@ _CONFIG_BLOCKS = (
     "parameters.eggnog", "parameters.long_read_qc", "parameters.decontamination",
     "parameters.nanopore", "parameters.hybrid",
     "phage",
+    "baktfold",
     "mobilome",
     "mobilome.icescan", "mobilome.tncentral", "mobilome.iceberg", "mobilome.isosdb",
 )
@@ -198,6 +199,9 @@ _CONFIG_BLOCK_HINTS = {
     "phage":
         "Phage calling has no off switch: one caller always runs. Choose it inside "
         "the block, with caller: virsorter2 (the default) or caller: genomad.",
+    "baktfold":
+        "To switch Baktfold on or off, write run: true or run: false indented "
+        "beneath it.",
     "mobilome":
         "To switch the module on or off, write run: true or run: false indented "
         "beneath it.",
@@ -1654,6 +1658,42 @@ if MOBILOME_RUN:
     )
 
 
+# ── Structure-based names for hypothetical proteins (Baktfold), opt-in ──
+# Off by default. When on, rule structure_annotation (shared/40_annotation.smk)
+# runs Baktfold on each sample's Bakta annotation: the proteins Bakta could only
+# call "hypothetical protein" are searched by predicted 3D structure, and a second,
+# Bakta-format annotation is written to 04.annotation/baktfold/{sample}/. No other
+# rule reads it, so switching the layer on adds jobs and changes no other result.
+#   BAKTFOLD_RUN    : the master switch, baktfold.run.
+#   BAKTFOLD_FAST   : baktfold.fast, which skips the search against AlphaFold
+#                     clusters, the slowest of Baktfold's four searches.
+#   BAKTFOLDDB      : directories.baktfold_db, a database the user already holds.
+#                     Checked only when the layer is on, so a stale path does not
+#                     stop a run that does not use it. "" means: download it.
+#   BAKTFOLD_DB_DIR : where the rules see the database, in BacFlux's own
+#                     04.annotation/baktfold/databases, filled either by the
+#                     download or by symlinks to the user's copy (the reason is
+#                     the same as for antiSMASH, in shared/40_annotation.smk).
+_baktfold_cfg = config.get("baktfold") or {}
+BAKTFOLD_RUN = _config_bool(_baktfold_cfg.get("run"), False)
+BAKTFOLD_FAST = _config_bool(_baktfold_cfg.get("fast"), False)
+BAKTFOLDDB = ""
+if BAKTFOLD_RUN:
+    BAKTFOLDDB = _resolve_optional_db_dir(
+        "baktfold_db", "swissprot.dbtype",
+        "Point it at the directory 'baktfold install -d <dir>' filled "
+        "(containing swissprot, AFDBClusters, pdb, cath, ...).",
+    )
+    if BAKTFOLDDB:
+        print(f"Using the local Baktfold database at '{BAKTFOLDDB}'. Nothing will be downloaded.")
+    print(
+        "Baktfold: ON. Bakta's hypothetical proteins are searched by predicted "
+        "structure; results in 04.annotation/baktfold/"
+        + (" (fast: the AlphaFold-clusters search is skipped)." if BAKTFOLD_FAST else ".")
+    )
+BAKTFOLD_DB_DIR = DIR_ANNOTATION + "/baktfold/databases"
+
+
 # ── eggNOG-mapper --dbmem (opt-in RAM acceleration) ──
 # emapper's annotation phase does random-access lookups into the 39 GB eggnog.db
 # SQLite once per seed ortholog. On a ~6000-protein genome that on-disk phase is
@@ -2396,6 +2436,11 @@ def _downstream_targets():
             # never built.
             *expand(DIR_AMR + "/mapping/{sample}/{sample}_CARD_report.tsv", sample=SAMPLES),
         ]
+    # Structure-based names (Baktfold) are opt-in and default OFF: baktfold.run is
+    # what puts one 04.annotation/baktfold/{sample} directory per sample in this
+    # list, and with it rule structure_annotation and its database rule.
+    if BAKTFOLD_RUN:
+        targets += expand(DIR_ANNOTATION + "/baktfold/{sample}", sample=SAMPLES)
     # Mobilome module (08.mobilome) is opt-in and default OFF: config.mobilome.run
     # is what puts its targets in this list, and therefore what puts its 22 rules
     # in the DAG at all.
@@ -2486,6 +2531,8 @@ def download_targets():
         targets.append(GENOMAD_DB_DIR)
     if not CHECKVDB:
         targets.append(CHECKV_DB_DIR)
+    if BAKTFOLD_RUN and not BAKTFOLDDB:
+        targets.append(BAKTFOLD_DB_DIR)
     if MOBILOME_RUN:
         targets.append(CONJSCAN_MODELS_DIR)
         if MOBILOME_ICESCAN:

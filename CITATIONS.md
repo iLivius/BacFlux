@@ -28,6 +28,21 @@ learning from its design:
   *Bakta: rapid and standardized annotation of bacterial genomes via alphanumerical identifiers.*
   Microbial Genomics 7(11):000685. <https://doi.org/10.1099/mgen.0.000685>
 
+- **Baktfold** (optional, `baktfold.run: true`) — Bouras G, Lim SW, Durr L, Vreugde S,
+  Goesmann A, Edwards RA, Schwengers O. (2026) *Baktfold: sensitive protein functional
+  annotation across the microbial tree of life using structural information.* bioRxiv
+  2026.03.31.715528. <https://doi.org/10.64898/2026.03.31.715528>
+  Baktfold runs **ProstT5** and **Foldseek**, cite both with it:
+  Heinzinger M, Weissenow K, Sanchez JG, Henkel A, Mirdita M, Steinegger M, Rost B.
+  (2024) *Bilingual language model for protein sequence and structure.* NAR Genomics
+  and Bioinformatics 6(4):lqae150. <https://doi.org/10.1093/nargab/lqae150>;
+  van Kempen M, Kim SS, Tumescheit C, Mirdita M, Lee J, Gilchrist CLM, Söding J,
+  Steinegger M. (2024) *Fast and accurate protein structure search with Foldseek.*
+  Nature Biotechnology 42:243–246. <https://doi.org/10.1038/s41587-023-01773-0>
+  Its database (<https://doi.org/10.5281/zenodo.17347516>) is built from SwissProt, the
+  AlphaFold Protein Structure Database, PDB and CATH; if you report which of them a name
+  came from, cite that database as well (Baktfold's README lists the papers).
+
 - **CheckM** — Parks DH, Imelfort M, Skennerton CT, Hugenholtz P, Tyson GW. (2015)
   *CheckM: assessing the quality of microbial genomes recovered from isolates,
   single cells, and metagenomes.* Genome Research 25:1043–1055.

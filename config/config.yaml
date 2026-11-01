@@ -80,8 +80,12 @@ directories:
                                #   portal.nersc.gov — the same host as CheckV's database, which is
                                #   frequently unreachable — and its downloader has NO mirror option,
                                #   so this path is the only fallback when that host is down.
+  baktfold_db:  ""             # OPTIONAL — a Baktfold database you already hold: the directory
+                               #   `baktfold install -d <dir>` filled (swissprot, AFDBClusters,
+                               #   pdb, cath and the ProstT5 model; about 22 GB). Read ONLY when
+                               #   baktfold.run: true; empty => downloaded into output_dir.
                                #
-                               # All four above follow the same rule as checkv_db: BacFlux only
+                               # All five above follow the same rule as checkv_db: BacFlux only
                                # ever READS these paths (via a local symlink view, never in place),
                                # and each one, when set, overrides the matching download entirely.
 
@@ -426,6 +430,24 @@ parameters:
 # links.genomad_link above. Why VirSorter2 is the default: docs/about/licensing.md.
 phage:
   caller: virsorter2           # Options: virsorter2 (default) | genomad (opt-in, non-commercial licence)
+
+# ── Structure-based names for hypothetical proteins (Baktfold) [all modes] ──
+# Opt-in, default OFF. Baktfold takes the proteins Bakta could only call
+# "hypothetical protein" and looks for a function by predicted 3D structure
+# instead of sequence: the ProstT5 protein language model turns each sequence into
+# Foldseek's structural alphabet, and Foldseek searches SwissProt, AlphaFold
+# clusters, PDB and CATH. It writes a second, Bakta-format annotation to
+# 04.annotation/baktfold/{sample}/. Bakta's own annotation stays the one every
+# other stage reads, so switching this on adds jobs and changes no other result.
+# A structure match is weaker evidence than a sequence match: read its names as
+# leads, with the database hit given beside each. Its database comes from
+# directories.baktfold_db, or is downloaded (about 22 GB) into output_dir on the
+# first run. Documentation: docs/analysis/annotation.md.
+baktfold:
+  run: false                   # master switch, default OFF.
+  fast: false                  # true: skip the search against AlphaFold clusters, the
+                               #   slowest of the four. Faster, but fewer proteins get a
+                               #   name. Default false.
 
 # ── Mobilome / AMR-mobility module (stage 08) [all modes] ──
 # Everything from here to the end of the file belongs to this block, and all of it

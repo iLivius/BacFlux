@@ -50,47 +50,47 @@ list, with the licensing notes attached, is in
 
 | Step | Tool or database | Reference |
 |---|---|---|
-| Workflow engine | Snakemake; Bioconda (one conda environment per rule) | 37, 24 |
-| Decontamination | BLAST+ against NCBI core nt; BlobTools | 7, 33 |
-| Coverage track for BlobTools | Bowtie 2 (short reads), minimap2 (long reads or contigs), SAMtools | 34, 35, 15 |
-| Assembly statistics | QUAST 5.3.0 | 27 |
-| Completeness and contamination | CheckM 1.2.5 | 42 |
-| Mapping QC (modes with reads) | QualiMap 2.3 | 40 |
-| Taxonomic placement | GTDB-Tk 2.7.2 against GTDB **R232** | 10, 43 |
-| Annotation | Bakta 1.12.1 (database **v6.0**) | 46 |
-| Functional annotation | eggNOG-mapper 2.1.15 against eggNOG 5.0.2 | 9, 28 |
+| Workflow engine | Snakemake; Bioconda (one conda environment per rule) | 39, 25 |
+| Decontamination | BLAST+ against NCBI core nt; BlobTools | 8, 35 |
+| Coverage track for BlobTools | Bowtie 2 (short reads), minimap2 (long reads or contigs), SAMtools | 36, 37, 16 |
+| Assembly statistics | QUAST 5.3.0 | 28 |
+| Completeness and contamination | CheckM 1.2.5 | 44 |
+| Mapping QC (modes with reads) | QualiMap 2.3 | 42 |
+| Taxonomic placement | GTDB-Tk 2.7.2 against GTDB **R232** | 11, 45 |
+| Annotation | Bakta 1.12.1 (database **v6.0**) | 48 |
+| Functional annotation | eggNOG-mapper 2.1.15 against eggNOG 5.0.2 | 10, 30 |
 | Secondary metabolites | antiSMASH 8.0.4 | 4 |
-| CAZymes | run_dbCAN 5.1.2 (dbCAN3) | 54 |
-| AMR and virulence on contigs | ABRicate 1.4.0 — plus the databases below | 47 |
-| Plasmids | Platon 1.8, with a supplementary BLAST+ line beside each call | 45, 7 |
-| Prophages | VirSorter2 2.2.4 (default) or geNomad 1.12.0 (`phage.caller: genomad`), then CheckV 1.1.1 to assess the predicted viral sequences | 25, 8, 38 |
-| Aggregated report | MultiQC 1.33 | 21 |
+| CAZymes | run_dbCAN 5.1.2 (dbCAN3) | 57 |
+| AMR and virulence on contigs | ABRicate 1.4.0 — plus the databases below | 49 |
+| Plasmids | Platon 1.8, with a supplementary BLAST+ line beside each call | 47, 8 |
+| Prophages | VirSorter2 2.2.4 (default) or geNomad 1.12.0 (`phage.caller: genomad`), then CheckV 1.1.1 to assess the predicted viral sequences | 26, 9, 40 |
+| Aggregated report | MultiQC 1.33 | 22 |
 
 **ABRicate's eight databases.** The screen runs once per database and the eight
 tables are kept side by side, so cite the ones you actually read.
 
 | `db` | Database | Reference |
 |---|---|---|
-| `argannot` | ARG-ANNOT | 26 |
-| `card` | CARD | 2, 30 |
-| `ecoh` | EcOH — *E. coli* O- and H-antigen loci | 29 |
-| `ecoli_vf` | *E. coli* virulence factors | ships with ABRicate — 47 |
-| `megares` | MEGARes 2.0 | 17 |
-| `ncbi` | NCBI AMRFinderPlus Reference Gene Catalog | 23 |
-| `resfinder` | ResFinder | 53 |
-| `vfdb` | VFDB | 11 |
+| `argannot` | ARG-ANNOT | 27 |
+| `card` | CARD | 2, 32 |
+| `ecoh` | EcOH — *E. coli* O- and H-antigen loci | 31 |
+| `ecoli_vf` | *E. coli* virulence factors | ships with ABRicate — 49 |
+| `megares` | MEGARes 2.0 | 18 |
+| `ncbi` | NCBI AMRFinderPlus Reference Gene Catalog | 24 |
+| `resfinder` | ResFinder | 56 |
+| `vfdb` | VFDB | 12 |
 
 ### What your mode adds
 
 | `mode:` | Front end | Reference |
 |---|---|---|
-| `illumina` | Bowtie 2 (PhiX removal), fastp 1.0.1, SPAdes 4.3.0 | 34, 12, 3 |
-| `nanopore` | NanoPlot 1.47.4 (NanoPack), Filtlong 0.3.1, Flye 2.9.6, dnaapler 1.4.0, Medaka 2.2.2 *(optional — `parameters.{nanopore,hybrid}.medaka_model: false` skips it)* | 16, 50, 32, 5, 41 |
-| `hybrid` | both front ends above — the short reads are assembled too, as the comparator genome — then BWA + Polypolish 0.7.1 to correct the ONT assembly with them, and Snippy 4.6.0 to compare the two | the two rows above, plus 36, 51, 48 |
-| `contigs` | no assembler — contig filtering only, with minimap2 self-mapping for the coverage track | 35 |
+| `illumina` | Bowtie 2 (PhiX removal), fastp 1.0.1, SPAdes 4.3.0 | 36, 13, 3 |
+| `nanopore` | NanoPlot 1.47.4 (NanoPack), Filtlong 0.3.1, Flye 2.9.6, dnaapler 1.4.0, Medaka 2.2.2 *(optional — `parameters.{nanopore,hybrid}.medaka_model: false` skips it)* | 17, 53, 34, 5, 43 |
+| `hybrid` | both front ends above — the short reads are assembled too, as the comparator genome — then BWA + Polypolish 0.7.1 to correct the ONT assembly with them, and Snippy 4.6.0 to compare the two | the two rows above, plus 38, 54, 50 |
+| `contigs` | no assembler — contig filtering only, with minimap2 self-mapping for the coverage track | 37 |
 
 **Short-read modes only.** `illumina` and `hybrid` also map the trimmed reads
-onto CARD v4.0.1 with BBMap 39.33 (refs 6, 2, 30). Read
+onto CARD v4.0.1 with BBMap 39.33 (refs 7, 2, 32). Read
 [Antimicrobial resistance](../analysis/amr.md) before quoting that analysis: it is a
 sensitive screen whose specificity comes from the reference-length coverage gate
 rather than from read identity; it does not confirm phenotypic resistance.
@@ -101,15 +101,16 @@ Each of these is off until you turn it on, and each brings its own citations.
 
 | Switch | What runs | Reference |
 |---|---|---|
-| `phage.caller: genomad` | geNomad 1.12.0 replaces VirSorter2 as the virus caller, and its plasmid calls are compared with Platon's | 8 |
-| `mobilome.run: true` | AMRFinderPlus, run from the Bakta environment against the AMRFinderPlus database that ships inside `bakta_db`; ISEScan 1.7.3 and MacSyFinder 2.1.6, both HMMER searches; and the **CONJscan** models MacSyFinder runs — cite all three CONJscan papers; they are the models that run | 23, 22, 52, 39, 18, 1, 13, 14 |
-| `mobilome.icescan.run: true` | the **ICEscan** model set, distributed with ICEfinder2 and itself a fork of CONJscan — so cite the ICEberg paper *and* the three CONJscan papers | 49, 1, 13, 14 |
-| `mobilome.tncentral.url` or `.dir` | TnCentral, to name curated transposons and integrons | 44 |
-| `mobilome.iceberg.urls` or `.dir` | ICEberg 3.0 sequences, to name the ICE and IME candidates | 49 |
-| `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | ISOSDB read mapping with BBMap, for IS copy number | 31, 6 |
+| `phage.caller: genomad` | geNomad 1.12.0 replaces VirSorter2 as the virus caller, and its plasmid calls are compared with Platon's | 9 |
+| `baktfold.run: true` | Baktfold 0.3.0, which translates Bakta's hypothetical proteins into Foldseek's structural alphabet with the ProstT5 language model, then searches them with Foldseek against SwissProt, AlphaFold Database clusters, PDB and CATH to suggest names — cite all three; if you report which database a name came from, cite that database as well (Baktfold's README lists the papers) | 6, 29, 51 |
+| `mobilome.run: true` | AMRFinderPlus, run from the Bakta environment against the AMRFinderPlus database that ships inside `bakta_db`; ISEScan 1.7.3 and MacSyFinder 2.1.6, both HMMER searches; and the **CONJscan** models MacSyFinder runs — cite all three CONJscan papers; they are the models that run | 24, 23, 55, 41, 19, 1, 14, 15 |
+| `mobilome.icescan.run: true` | the **ICEscan** model set, distributed with ICEfinder2 and itself a fork of CONJscan — so cite the ICEberg paper *and* the three CONJscan papers | 52, 1, 14, 15 |
+| `mobilome.tncentral.url` or `.dir` | TnCentral, to name curated transposons and integrons | 46 |
+| `mobilome.iceberg.urls` or `.dir` | ICEberg 3.0 sequences, to name the ICE and IME candidates | 52 |
+| `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | ISOSDB read mapping with BBMap, for IS copy number | 33, 7 |
 
 The mobility tiers are organised around EFSA's distinction between intrinsic and
-acquired resistance genes (refs 19, 20). They provide genomic-context evidence; they
+acquired resistance genes (refs 20, 21). They provide genomic-context evidence; they
 do not establish that a gene is intrinsic and do not demonstrate transfer.
 [Antimicrobial resistance](../analysis/amr.md) lists the two further EFSA documents —
 the 2024 WGS statement behind the 80%/70% thresholds, and the *Bacillus* catalogue —
@@ -149,55 +150,58 @@ would not have been realistic without it.
 3. Bankevich, A., et al. (2012). SPAdes: a new genome assembly algorithm and its applications to single-cell sequencing. *Journal of Computational Biology*, 19(5), 455–477. <https://doi.org/10.1089/cmb.2012.0021>
 4. Blin, K., et al. (2025). antiSMASH 8.0: extended gene cluster detection capabilities and analyses of chemistry, enzymology, and regulation. *Nucleic Acids Research*, 53(W1), W32–W38. <https://doi.org/10.1093/nar/gkaf334>
 5. Bouras, G., Grigson, S. R., Papudeshi, B., Mallawaarachchi, V., & Roach, M. J. (2024). Dnaapler: a tool to reorient circular microbial genomes. *Journal of Open Source Software*, 9(93), 5968. <https://doi.org/10.21105/joss.05968>
-6. Bushnell, B. (2014). *BBMap: a fast, accurate, splice-aware aligner.* <https://escholarship.org/uc/item/1h3515gn>
-7. Camacho, C., et al. (2009). BLAST+: architecture and applications. *BMC Bioinformatics*, 10, 421. <https://doi.org/10.1186/1471-2105-10-421>
-8. Camargo, A. P., et al. (2024). Identification of mobile genetic elements with geNomad. *Nature Biotechnology*, 42(8), 1303–1312. <https://doi.org/10.1038/s41587-023-01953-y>
-9. Cantalapiedra, C. P., Hernández-Plaza, A., Letunic, I., Bork, P., & Huerta-Cepas, J. (2021). eggNOG-mapper v2: functional annotation, orthology assignments, and domain prediction at the metagenomic scale. *Molecular Biology and Evolution*, 38(12), 5825–5829. <https://doi.org/10.1093/molbev/msab293>
-10. Chaumeil, P.-A., Mussig, A. J., Hugenholtz, P., & Parks, D. H. (2022). GTDB-Tk v2: memory friendly classification with the genome taxonomy database. *Bioinformatics*, 38(23), 5315–5316. <https://doi.org/10.1093/bioinformatics/btac672>
-11. Chen, L., Zheng, D., Liu, B., Yang, J., & Jin, Q. (2016). VFDB 2016: hierarchical and refined dataset for big data analysis — 10 years on. *Nucleic Acids Research*, 44(D1), D694–D697. <https://doi.org/10.1093/nar/gkv1239>
-12. Chen, S., Zhou, Y., Chen, Y., & Gu, J. (2018). fastp: an ultra-fast all-in-one FASTQ preprocessor. *Bioinformatics*, 34(17), i884–i890. <https://doi.org/10.1093/bioinformatics/bty560>
-13. Coluzzi, C., Garcillán-Barcia, M. P., de la Cruz, F., & Rocha, E. P. C. (2022). Evolution of plasmid mobility: origin and fate of conjugative and nonconjugative plasmids. *Molecular Biology and Evolution*, 39(6), msac115. <https://doi.org/10.1093/molbev/msac115> (CONJscan model set)
-14. Cury, J., Touchon, M., & Rocha, E. P. C. (2017). Integrative and conjugative elements and their hosts: composition, distribution and organization. *Nucleic Acids Research*, 45(15), 8943–8956. <https://doi.org/10.1093/nar/gkx607> (CONJscan model set)
-15. Danecek, P., et al. (2021). Twelve years of SAMtools and BCFtools. *GigaScience*, 10(2), giab008. <https://doi.org/10.1093/gigascience/giab008>
-16. De Coster, W., D'Hert, S., Schultz, D. T., Cruts, M., & Van Broeckhoven, C. (2018). NanoPack: visualizing and processing long-read sequencing data. *Bioinformatics*, 34(15), 2666–2669. <https://doi.org/10.1093/bioinformatics/bty149> (NanoPlot)
-17. Doster, E., et al. (2020). MEGARes 2.0: a database for classification of antimicrobial drug, biocide and metal resistance determinants in metagenomic sequence data. *Nucleic Acids Research*, 48(D1), D561–D569. <https://doi.org/10.1093/nar/gkz1010>
-18. Eddy, S. R. (2011). Accelerated profile HMM searches. *PLoS Computational Biology*, 7(10), e1002195. <https://doi.org/10.1371/journal.pcbi.1002195> (the profile-HMM engine inside ISEScan, MacSyFinder, VirSorter2 and run_dbCAN)
-19. EFSA Panel on Biological Hazards (BIOHAZ). (2023). Statement on how to interpret the QPS qualification on 'acquired antimicrobial resistance genes'. *EFSA Journal*, 21(10), 8323. <https://doi.org/10.2903/j.efsa.2023.8323> (the method for telling intrinsic from acquired)
-20. EFSA Scientific Committee. (2025). Guidance on the characterisation of microorganisms in support of the risk assessment of products used in the food chain. *EFSA Journal*, 23(11), e9705. <https://doi.org/10.2903/j.efsa.2025.9705> (the cited 2025 edition; Appendix A describes its relationship to the 2018 FEEDAP guidance)
-21. Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. *Bioinformatics*, 32(19), 3047–3048. <https://doi.org/10.1093/bioinformatics/btw354>
-22. Feldgarden, M., et al. (2019). Validating the AMRFinder tool and resistance gene database by using antimicrobial resistance genotype–phenotype correlations in a collection of isolates. *Antimicrobial Agents and Chemotherapy*, 63(11), e00483-19. <https://doi.org/10.1128/AAC.00483-19>
-23. Feldgarden, M., et al. (2021). AMRFinderPlus and the Reference Gene Catalog facilitate examination of the genomic links among antimicrobial resistance, stress response, and virulence. *Scientific Reports*, 11, 12728. <https://doi.org/10.1038/s41598-021-91456-0>
-24. Grüning, B., et al. (2018). Bioconda: sustainable and comprehensive software distribution for the life sciences. *Nature Methods*, 15, 475–476. <https://doi.org/10.1038/s41592-018-0046-7>
-25. Guo, J., et al. (2021). VirSorter2: a multi-classifier, expert-guided approach to detect diverse DNA and RNA viruses. *Microbiome*, 9(1), 37. <https://doi.org/10.1186/s40168-020-00990-y>
-26. Gupta, S. K., et al. (2014). ARG-ANNOT, a new bioinformatic tool to discover antibiotic resistance genes in bacterial genomes. *Antimicrobial Agents and Chemotherapy*, 58(1), 212–220. <https://doi.org/10.1128/AAC.01310-13>
-27. Gurevich, A., Saveliev, V., Vyahhi, N., & Tesler, G. (2013). QUAST: quality assessment tool for genome assemblies. *Bioinformatics*, 29(8), 1072–1075. <https://doi.org/10.1093/bioinformatics/btt086>
-28. Huerta-Cepas, J., et al. (2019). eggNOG 5.0: a hierarchical, functionally and phylogenetically annotated orthology resource based on 5090 organisms and 2502 viruses. *Nucleic Acids Research*, 47(D1), D309–D314. <https://doi.org/10.1093/nar/gky1085>
-29. Ingle, D. J., et al. (2016). In silico serotyping of *E. coli* from short read data identifies limited novel O-loci but extensive diversity of O:H serotype combinations within and between pathogenic lineages. *Microbial Genomics*, 2(7), e000064. <https://doi.org/10.1099/mgen.0.000064> (the `ecoh` database)
-30. Jia, B., et al. (2017). CARD 2017: expansion and model-centric curation of the Comprehensive Antibiotic Resistance Database. *Nucleic Acids Research*, 45(D1), D566–D573. <https://doi.org/10.1093/nar/gkw1004>
-31. Kirsch, J. M., Hryckowian, A. J., & Duerkop, B. A. (2024). A metagenomics pipeline reveals insertion sequence-driven evolution of the microbiota. *Cell Host & Microbe*, 32(5), 739–754.e4. <https://doi.org/10.1016/j.chom.2024.03.005> (pseudoR, the source of ISOSDB)
-32. Kolmogorov, M., Yuan, J., Lin, Y., & Pevzner, P. A. (2019). Assembly of long, error-prone reads using repeat graphs. *Nature Biotechnology*, 37(5), 540–546. <https://doi.org/10.1038/s41587-019-0072-8> (Flye)
-33. Laetsch, D. R., & Blaxter, M. L. (2017). BlobTools: interrogation of genome assemblies. *F1000Research*, 6, 1287. <https://doi.org/10.12688/f1000research.12232.1>
-34. Langmead, B., & Salzberg, S. L. (2012). Fast gapped-read alignment with Bowtie 2. *Nature Methods*, 9(4), 357–359. <https://doi.org/10.1038/nmeth.1923>
-35. Li, H. (2018). Minimap2: pairwise alignment for nucleotide sequences. *Bioinformatics*, 34(18), 3094–3100. <https://doi.org/10.1093/bioinformatics/bty191>
-36. Li, H., & Durbin, R. (2009). Fast and accurate short read alignment with Burrows–Wheeler transform. *Bioinformatics*, 25(14), 1754–1760. <https://doi.org/10.1093/bioinformatics/btp324> (BWA, the aligner Polypolish reads)
-37. Mölder, F., et al. (2021). Sustainable data analysis with Snakemake. *F1000Research*, 10, 33. <https://doi.org/10.12688/f1000research.29032.2>
-38. Nayfach, S., Camargo, A. P., Schulz, F., Eloe-Fadrosh, E., Roux, S., & Kyrpides, N. C. (2021). CheckV assesses the quality and completeness of metagenome-assembled viral genomes. *Nature Biotechnology*, 39(5), 578–585. <https://doi.org/10.1038/s41587-020-00774-7>
-39. Néron, B., Denise, R., Coluzzi, C., Touchon, M., Rocha, E. P. C., & Abby, S. S. (2023). MacSyFinder v2: improved modelling and search engine to identify molecular systems in genomes. *Peer Community Journal*, 3, e28. <https://doi.org/10.24072/pcjournal.250>
-40. Okonechnikov, K., Conesa, A., & García-Alcalde, F. (2016). Qualimap 2: advanced multi-sample quality control for high-throughput sequencing data. *Bioinformatics*, 32(2), 292–294. <https://doi.org/10.1093/bioinformatics/btv566>
-41. Oxford Nanopore Technologies. *Medaka.* <https://github.com/nanoporetech/medaka>
-42. Parks, D. H., Imelfort, M., Skennerton, C. T., Hugenholtz, P., & Tyson, G. W. (2015). CheckM: assessing the quality of microbial genomes recovered from isolates, single cells, and metagenomes. *Genome Research*, 25(7), 1043–1055. <https://doi.org/10.1101/gr.186072.114>
-43. Parks, D. H., Chuvochina, M., Rinke, C., Mussig, A. J., Chaumeil, P.-A., & Hugenholtz, P. (2022). GTDB: an ongoing census of bacterial and archaeal diversity through a phylogenetically consistent, rank normalized and complete genome-based taxonomy. *Nucleic Acids Research*, 50(D1), D785–D794. <https://doi.org/10.1093/nar/gkab776> (cite the release you ran — BacFlux expects **R232**)
-44. Ross, K., et al. (2021). TnCentral: a prokaryotic transposable element database and web portal for transposon analysis. *mBio*, 12(5), e02060-21. <https://doi.org/10.1128/mBio.02060-21>
-45. Schwengers, O., Barth, P., Falgenhauer, L., Hain, T., Chakraborty, T., & Goesmann, A. (2020). Platon: identification and characterization of bacterial plasmid contigs in short-read draft assemblies exploiting protein sequence-based replicon distribution scores. *Microbial Genomics*, 6(10), mgen000398. <https://doi.org/10.1099/mgen.0.000398>
-46. Schwengers, O., Jelonek, L., Dieckmann, M. A., Beyvers, S., Blom, J., & Goesmann, A. (2021). Bakta: rapid and standardized annotation of bacterial genomes via alignment-free sequence identification. *Microbial Genomics*, 7(11), 000685. <https://doi.org/10.1099/mgen.0.000685>
-47. Seemann, T. (2020). *ABRicate: mass screening of contigs for antimicrobial and virulence genes.* <https://github.com/tseemann/abricate>
-48. Seemann, T. *Snippy: rapid haploid variant calling and core genome alignment.* <https://github.com/tseemann/snippy>
-49. Wang, M., et al. (2024). ICEberg 3.0: functional categorization and analysis of the integrative and conjugative elements in bacteria. *Nucleic Acids Research*, 52(D1), D732–D737. <https://doi.org/10.1093/nar/gkad935> (also the paper to cite for ICEfinder2 / ICEscan)
-50. Wick, R. R. *Filtlong: quality filtering tool for long reads.* <https://github.com/rrwick/Filtlong>
-51. Wick, R. R., & Holt, K. E. (2022). Polypolish: short-read polishing of long-read bacterial genome assemblies. *PLoS Computational Biology*, 18(1), e1009802. <https://doi.org/10.1371/journal.pcbi.1009802>
-52. Xie, Z., & Tang, H. (2017). ISEScan: automated identification of insertion sequence elements in prokaryotic genomes. *Bioinformatics*, 33(21), 3340–3347. <https://doi.org/10.1093/bioinformatics/btx433>
-53. Zankari, E., et al. (2012). Identification of acquired antimicrobial resistance genes. *Journal of Antimicrobial Chemotherapy*, 67(11), 2640–2644. <https://doi.org/10.1093/jac/dks261> (ResFinder)
-54. Zheng, J., Ge, Q., Yan, Y., Zhang, X., Huang, L., & Yin, Y. (2023). dbCAN3: automated carbohydrate-active enzyme and substrate annotation. *Nucleic Acids Research*, 51(W1), W115–W121. <https://doi.org/10.1093/nar/gkad328>
+6. Bouras, G., et al. (2026). Baktfold: sensitive protein functional annotation across the microbial tree of life using structural information. *bioRxiv* (preprint). <https://doi.org/10.64898/2026.03.31.715528>
+7. Bushnell, B. (2014). *BBMap: a fast, accurate, splice-aware aligner.* <https://escholarship.org/uc/item/1h3515gn>
+8. Camacho, C., et al. (2009). BLAST+: architecture and applications. *BMC Bioinformatics*, 10, 421. <https://doi.org/10.1186/1471-2105-10-421>
+9. Camargo, A. P., et al. (2024). Identification of mobile genetic elements with geNomad. *Nature Biotechnology*, 42(8), 1303–1312. <https://doi.org/10.1038/s41587-023-01953-y>
+10. Cantalapiedra, C. P., Hernández-Plaza, A., Letunic, I., Bork, P., & Huerta-Cepas, J. (2021). eggNOG-mapper v2: functional annotation, orthology assignments, and domain prediction at the metagenomic scale. *Molecular Biology and Evolution*, 38(12), 5825–5829. <https://doi.org/10.1093/molbev/msab293>
+11. Chaumeil, P.-A., Mussig, A. J., Hugenholtz, P., & Parks, D. H. (2022). GTDB-Tk v2: memory friendly classification with the genome taxonomy database. *Bioinformatics*, 38(23), 5315–5316. <https://doi.org/10.1093/bioinformatics/btac672>
+12. Chen, L., Zheng, D., Liu, B., Yang, J., & Jin, Q. (2016). VFDB 2016: hierarchical and refined dataset for big data analysis — 10 years on. *Nucleic Acids Research*, 44(D1), D694–D697. <https://doi.org/10.1093/nar/gkv1239>
+13. Chen, S., Zhou, Y., Chen, Y., & Gu, J. (2018). fastp: an ultra-fast all-in-one FASTQ preprocessor. *Bioinformatics*, 34(17), i884–i890. <https://doi.org/10.1093/bioinformatics/bty560>
+14. Coluzzi, C., Garcillán-Barcia, M. P., de la Cruz, F., & Rocha, E. P. C. (2022). Evolution of plasmid mobility: origin and fate of conjugative and nonconjugative plasmids. *Molecular Biology and Evolution*, 39(6), msac115. <https://doi.org/10.1093/molbev/msac115> (CONJscan model set)
+15. Cury, J., Touchon, M., & Rocha, E. P. C. (2017). Integrative and conjugative elements and their hosts: composition, distribution and organization. *Nucleic Acids Research*, 45(15), 8943–8956. <https://doi.org/10.1093/nar/gkx607> (CONJscan model set)
+16. Danecek, P., et al. (2021). Twelve years of SAMtools and BCFtools. *GigaScience*, 10(2), giab008. <https://doi.org/10.1093/gigascience/giab008>
+17. De Coster, W., D'Hert, S., Schultz, D. T., Cruts, M., & Van Broeckhoven, C. (2018). NanoPack: visualizing and processing long-read sequencing data. *Bioinformatics*, 34(15), 2666–2669. <https://doi.org/10.1093/bioinformatics/bty149> (NanoPlot)
+18. Doster, E., et al. (2020). MEGARes 2.0: a database for classification of antimicrobial drug, biocide and metal resistance determinants in metagenomic sequence data. *Nucleic Acids Research*, 48(D1), D561–D569. <https://doi.org/10.1093/nar/gkz1010>
+19. Eddy, S. R. (2011). Accelerated profile HMM searches. *PLoS Computational Biology*, 7(10), e1002195. <https://doi.org/10.1371/journal.pcbi.1002195> (the profile-HMM engine inside ISEScan, MacSyFinder, VirSorter2 and run_dbCAN)
+20. EFSA Panel on Biological Hazards (BIOHAZ). (2023). Statement on how to interpret the QPS qualification on 'acquired antimicrobial resistance genes'. *EFSA Journal*, 21(10), 8323. <https://doi.org/10.2903/j.efsa.2023.8323> (the method for telling intrinsic from acquired)
+21. EFSA Scientific Committee. (2025). Guidance on the characterisation of microorganisms in support of the risk assessment of products used in the food chain. *EFSA Journal*, 23(11), e9705. <https://doi.org/10.2903/j.efsa.2025.9705> (the cited 2025 edition; Appendix A describes its relationship to the 2018 FEEDAP guidance)
+22. Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. *Bioinformatics*, 32(19), 3047–3048. <https://doi.org/10.1093/bioinformatics/btw354>
+23. Feldgarden, M., et al. (2019). Validating the AMRFinder tool and resistance gene database by using antimicrobial resistance genotype–phenotype correlations in a collection of isolates. *Antimicrobial Agents and Chemotherapy*, 63(11), e00483-19. <https://doi.org/10.1128/AAC.00483-19>
+24. Feldgarden, M., et al. (2021). AMRFinderPlus and the Reference Gene Catalog facilitate examination of the genomic links among antimicrobial resistance, stress response, and virulence. *Scientific Reports*, 11, 12728. <https://doi.org/10.1038/s41598-021-91456-0>
+25. Grüning, B., et al. (2018). Bioconda: sustainable and comprehensive software distribution for the life sciences. *Nature Methods*, 15, 475–476. <https://doi.org/10.1038/s41592-018-0046-7>
+26. Guo, J., et al. (2021). VirSorter2: a multi-classifier, expert-guided approach to detect diverse DNA and RNA viruses. *Microbiome*, 9(1), 37. <https://doi.org/10.1186/s40168-020-00990-y>
+27. Gupta, S. K., et al. (2014). ARG-ANNOT, a new bioinformatic tool to discover antibiotic resistance genes in bacterial genomes. *Antimicrobial Agents and Chemotherapy*, 58(1), 212–220. <https://doi.org/10.1128/AAC.01310-13>
+28. Gurevich, A., Saveliev, V., Vyahhi, N., & Tesler, G. (2013). QUAST: quality assessment tool for genome assemblies. *Bioinformatics*, 29(8), 1072–1075. <https://doi.org/10.1093/bioinformatics/btt086>
+29. Heinzinger, M., et al. (2024). Bilingual language model for protein sequence and structure. *NAR Genomics and Bioinformatics*, 6(4), lqae150. <https://doi.org/10.1093/nargab/lqae150> (ProstT5)
+30. Huerta-Cepas, J., et al. (2019). eggNOG 5.0: a hierarchical, functionally and phylogenetically annotated orthology resource based on 5090 organisms and 2502 viruses. *Nucleic Acids Research*, 47(D1), D309–D314. <https://doi.org/10.1093/nar/gky1085>
+31. Ingle, D. J., et al. (2016). In silico serotyping of *E. coli* from short read data identifies limited novel O-loci but extensive diversity of O:H serotype combinations within and between pathogenic lineages. *Microbial Genomics*, 2(7), e000064. <https://doi.org/10.1099/mgen.0.000064> (the `ecoh` database)
+32. Jia, B., et al. (2017). CARD 2017: expansion and model-centric curation of the Comprehensive Antibiotic Resistance Database. *Nucleic Acids Research*, 45(D1), D566–D573. <https://doi.org/10.1093/nar/gkw1004>
+33. Kirsch, J. M., Hryckowian, A. J., & Duerkop, B. A. (2024). A metagenomics pipeline reveals insertion sequence-driven evolution of the microbiota. *Cell Host & Microbe*, 32(5), 739–754.e4. <https://doi.org/10.1016/j.chom.2024.03.005> (pseudoR, the source of ISOSDB)
+34. Kolmogorov, M., Yuan, J., Lin, Y., & Pevzner, P. A. (2019). Assembly of long, error-prone reads using repeat graphs. *Nature Biotechnology*, 37(5), 540–546. <https://doi.org/10.1038/s41587-019-0072-8> (Flye)
+35. Laetsch, D. R., & Blaxter, M. L. (2017). BlobTools: interrogation of genome assemblies. *F1000Research*, 6, 1287. <https://doi.org/10.12688/f1000research.12232.1>
+36. Langmead, B., & Salzberg, S. L. (2012). Fast gapped-read alignment with Bowtie 2. *Nature Methods*, 9(4), 357–359. <https://doi.org/10.1038/nmeth.1923>
+37. Li, H. (2018). Minimap2: pairwise alignment for nucleotide sequences. *Bioinformatics*, 34(18), 3094–3100. <https://doi.org/10.1093/bioinformatics/bty191>
+38. Li, H., & Durbin, R. (2009). Fast and accurate short read alignment with Burrows–Wheeler transform. *Bioinformatics*, 25(14), 1754–1760. <https://doi.org/10.1093/bioinformatics/btp324> (BWA, the aligner Polypolish reads)
+39. Mölder, F., et al. (2021). Sustainable data analysis with Snakemake. *F1000Research*, 10, 33. <https://doi.org/10.12688/f1000research.29032.2>
+40. Nayfach, S., Camargo, A. P., Schulz, F., Eloe-Fadrosh, E., Roux, S., & Kyrpides, N. C. (2021). CheckV assesses the quality and completeness of metagenome-assembled viral genomes. *Nature Biotechnology*, 39(5), 578–585. <https://doi.org/10.1038/s41587-020-00774-7>
+41. Néron, B., Denise, R., Coluzzi, C., Touchon, M., Rocha, E. P. C., & Abby, S. S. (2023). MacSyFinder v2: improved modelling and search engine to identify molecular systems in genomes. *Peer Community Journal*, 3, e28. <https://doi.org/10.24072/pcjournal.250>
+42. Okonechnikov, K., Conesa, A., & García-Alcalde, F. (2016). Qualimap 2: advanced multi-sample quality control for high-throughput sequencing data. *Bioinformatics*, 32(2), 292–294. <https://doi.org/10.1093/bioinformatics/btv566>
+43. Oxford Nanopore Technologies. *Medaka.* <https://github.com/nanoporetech/medaka>
+44. Parks, D. H., Imelfort, M., Skennerton, C. T., Hugenholtz, P., & Tyson, G. W. (2015). CheckM: assessing the quality of microbial genomes recovered from isolates, single cells, and metagenomes. *Genome Research*, 25(7), 1043–1055. <https://doi.org/10.1101/gr.186072.114>
+45. Parks, D. H., Chuvochina, M., Rinke, C., Mussig, A. J., Chaumeil, P.-A., & Hugenholtz, P. (2022). GTDB: an ongoing census of bacterial and archaeal diversity through a phylogenetically consistent, rank normalized and complete genome-based taxonomy. *Nucleic Acids Research*, 50(D1), D785–D794. <https://doi.org/10.1093/nar/gkab776> (cite the release you ran — BacFlux expects **R232**)
+46. Ross, K., et al. (2021). TnCentral: a prokaryotic transposable element database and web portal for transposon analysis. *mBio*, 12(5), e02060-21. <https://doi.org/10.1128/mBio.02060-21>
+47. Schwengers, O., Barth, P., Falgenhauer, L., Hain, T., Chakraborty, T., & Goesmann, A. (2020). Platon: identification and characterization of bacterial plasmid contigs in short-read draft assemblies exploiting protein sequence-based replicon distribution scores. *Microbial Genomics*, 6(10), mgen000398. <https://doi.org/10.1099/mgen.0.000398>
+48. Schwengers, O., Jelonek, L., Dieckmann, M. A., Beyvers, S., Blom, J., & Goesmann, A. (2021). Bakta: rapid and standardized annotation of bacterial genomes via alignment-free sequence identification. *Microbial Genomics*, 7(11), 000685. <https://doi.org/10.1099/mgen.0.000685>
+49. Seemann, T. (2020). *ABRicate: mass screening of contigs for antimicrobial and virulence genes.* <https://github.com/tseemann/abricate>
+50. Seemann, T. *Snippy: rapid haploid variant calling and core genome alignment.* <https://github.com/tseemann/snippy>
+51. van Kempen, M., et al. (2024). Fast and accurate protein structure search with Foldseek. *Nature Biotechnology*, 42(2), 243–246. <https://doi.org/10.1038/s41587-023-01773-0>
+52. Wang, M., et al. (2024). ICEberg 3.0: functional categorization and analysis of the integrative and conjugative elements in bacteria. *Nucleic Acids Research*, 52(D1), D732–D737. <https://doi.org/10.1093/nar/gkad935> (also the paper to cite for ICEfinder2 / ICEscan)
+53. Wick, R. R. *Filtlong: quality filtering tool for long reads.* <https://github.com/rrwick/Filtlong>
+54. Wick, R. R., & Holt, K. E. (2022). Polypolish: short-read polishing of long-read bacterial genome assemblies. *PLoS Computational Biology*, 18(1), e1009802. <https://doi.org/10.1371/journal.pcbi.1009802>
+55. Xie, Z., & Tang, H. (2017). ISEScan: automated identification of insertion sequence elements in prokaryotic genomes. *Bioinformatics*, 33(21), 3340–3347. <https://doi.org/10.1093/bioinformatics/btx433>
+56. Zankari, E., et al. (2012). Identification of acquired antimicrobial resistance genes. *Journal of Antimicrobial Chemotherapy*, 67(11), 2640–2644. <https://doi.org/10.1093/jac/dks261> (ResFinder)
+57. Zheng, J., Ge, Q., Yan, Y., Zhang, X., Huang, L., & Yin, Y. (2023). dbCAN3: automated carbohydrate-active enzyme and substrate annotation. *Nucleic Acids Research*, 51(W1), W115–W121. <https://doi.org/10.1093/nar/gkad328>
 
 ## Design influence
 

@@ -8,7 +8,7 @@ as required by the selected analyses, or can be supplied through local paths.
 |---|---|
 | Bakta, NCBI nucleotide database, eggNOG, GTDB and Platon | Download the compatible releases and set the five required `directories.*_db` paths |
 | PhiX, CARD, dbCAN, antiSMASH, CheckV and the selected phage caller's database | Downloaded by the workflow when needed |
-| Existing local copies of CheckV, VirSorter2, antiSMASH, dbCAN, CARD or geNomad | Set the corresponding optional path to skip its download |
+| Existing local copies of CheckV, VirSorter2, antiSMASH, dbCAN, CARD, geNomad or Baktfold | Set the corresponding optional path to skip its download |
 | Optional mobilome layers | Configure each required source; see [Optional layers](../mobilome/optional-layers.md) |
 
 Nothing is written back into a database you supply. BacFlux reads your copy through a
@@ -166,6 +166,7 @@ same output directory across runs of a project and they are downloaded once.
 | CheckV | `07.phages/checkv_db/` | `links.checkv_link` | all |
 | VirSorter2 | `07.phages/vs2_db/` | — (`virsorter setup`) | unless `phage.caller: genomad` |
 | geNomad | `07.phages/genomad_db/` | `links.genomad_link` + `genomad_md5` | only when `phage.caller: genomad` |
+| Baktfold (about 22 GB, with the ProstT5 model) | `04.annotation/baktfold/databases/` | — (`baktfold install`) | only when `baktfold.run: true` |
 
 `phix_link` and `card_link` ship empty and are required in the two modes that have
 short reads. An unset one stops the run at parse time, naming the key.
@@ -232,6 +233,7 @@ Set any of these and the corresponding download is skipped entirely.
 | `directories.dbcan_db` | a dbCAN database matching the version in `links.dbcan_link` | avoids a repeat download per project |
 | `directories.card_db` | an extracted CARD database | otherwise CARD is downloaded once into each output folder and kept there |
 | `directories.genomad_db` | the **inner** `genomad_db/` directory — the one holding `version.txt` and `genomad_db.dbtype` | its downloader hard-codes one host with no mirror option, so a local copy is the only fallback |
+| `directories.baktfold_db` | the directory `baktfold install -d <dir>` filled | about 22 GB per output folder otherwise; only read when `baktfold.run: true` |
 
 For these optional local paths, BacFlux checks during planning that the directory
 exists and contains database-specific files. The five required paths have more

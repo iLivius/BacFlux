@@ -31,7 +31,7 @@ Four places in it matter:
 | `config/config.yaml` | The configuration template: every setting of a run, commented in place. Copy it and edit the copy — never this file. |
 | `workflow/Snakefile` | The entry point. It reads `mode` from your config and includes that mode's rule files plus the shared ones. |
 | `workflow/rules/` | The rules themselves, in `shared/` and one directory per mode (`illumina/`, `nanopore/`, `hybrid/`, `contigs/`). |
-| `workflow/envs/` | 33 conda environment specifications, one per tool stack. |
+| `workflow/envs/` | 34 conda environment specifications, one per tool stack. |
 
 A fifth directory, `.snakemake/`, appears in whatever directory you launch from:
 it holds the conda environments Snakemake builds and its own bookkeeping. It is
@@ -163,14 +163,14 @@ every download rule is a local rule.
 ## 5. Reference databases
 
 Five databases must be downloaded by hand before a run: Bakta, NCBI `core_nt`,
-eggNOG, GTDB and Platon. A further six may be pointed at a copy you already hold,
+eggNOG, GTDB and Platon. A further seven may be pointed at a copy you already hold,
 and the rest BacFlux fetches itself on the first run that needs them, or all at
 once with the `download_all` target. Sizes, download recipes and the config keys
 that hold the paths are all on [Reference databases](databases.md).
 
 Required database keys must exist and point to prepared databases. A missing
 key stops configuration parsing, whereas an empty or invalid path may fail later,
-when the database is used. For the six optional local-database paths, BacFlux
+when the database is used. For the seven optional local-database paths, BacFlux
 also checks for an existing directory and database-specific files during planning.
 A successful dry run does not establish that every database is complete.
 

@@ -1,0 +1,24 @@
+# Baktfold 0.3.0, for rules structure_annotation and structure_annotation_db
+# (shared/40_annotation.smk). The exact package builds are fixed by
+# baktfold.linux-64.pin.txt next to this file; Snakemake creates the environment
+# from that list.
+#
+# What it is for. Baktfold takes the proteins Bakta could only call "hypothetical
+# protein" and looks for a function by predicted structure instead of sequence:
+# the ProstT5 protein language model turns each sequence into Foldseek's
+# structural alphabet, and Foldseek searches SwissProt, AlphaFold clusters, PDB
+# and CATH. It brings Foldseek (GPL-3, run as a separate program) and a CPU build
+# of PyTorch with it.
+#
+# Python is pinned to 3.14, the version this was tested with; the pin list was
+# made on 2026-11-01 (conda 26.7.2) with
+#   CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY=false conda create -p <env> --override-channels \
+#       -c conda-forge -c bioconda python=3.14 baktfold=0.3.0
+# followed by conda list -p <env> --explicit.
+name: baktfold
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.14
+  - baktfold=0.3.0

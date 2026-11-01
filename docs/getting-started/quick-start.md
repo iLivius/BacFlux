@@ -66,7 +66,7 @@ fetch for you. You download them once and give BacFlux the path:
 Everything else — PhiX, CARD, CheckV, dbCAN, VirSorter2, antiSMASH — is downloaded
 by the workflow into `output_dir` on the first run. All of those but PhiX also have
 an optional `directories.*_db` key: point it at a copy you already hold and nothing
-is fetched. Download recipes, sizes and the six optional keys are on
+is fetched. Download recipes, sizes and the seven optional keys are on
 [reference databases](databases.md).
 
 ## Step 3 — the keys that decide a run

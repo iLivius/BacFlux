@@ -153,6 +153,7 @@ the file lists the keys:
 | `directories.output_dir` and the five required databases | present | Stops with a `KeyError` naming the key |
 | `directories.checkv_db` | holds exactly one `*/genome_db/checkv_reps.faa` | Stops, and says to give the parent directory |
 | `directories.vs2_db`, `antismash_db`, `dbcan_db`, `card_db`, `genomad_db` | a directory, holding a file only that database has | Stops naming the missing probe file |
+| `directories.baktfold_db` | the same check, made only when `baktfold.run` is true | Stops naming the missing probe file |
 | `directories.genomad_db` | every file readable by you; metadata table has the current column set | Stops listing unreadable files, or explaining the schema mismatch |
 | `links.dbcan_link` | set, and a `.tar.gz` | Stops |
 | `links.card_link`, `links.phix_link` | set whenever the mode has short reads | Stops naming the key and the mode |
@@ -317,7 +318,7 @@ Versions and download recipes are on
 
 ### Optional local copies of the downloaded databases
 
-Six databases the workflow can fetch itself. Point the matching key at a copy you
+Seven databases the workflow can fetch itself. Point the matching key at a copy you
 already hold and **nothing is downloaded** — the key overrides both the `links.*`
 entry and, where the tool has one, its own downloader. These paths are only ever
 read: BacFlux builds a local symlink view rather than touching your directory.
@@ -330,6 +331,7 @@ read: BacFlux builds a local symlink view rather than touching your directory.
 | `dbcan_db` | An extracted dbCAN database matching `links.dbcan_link` | all modes | `dbCAN.hmm` |
 | `card_db` | An extracted CARD database | `illumina`, `hybrid` | `aro_index.tsv` |
 | `genomad_db` | The `genomad_db/` directory `genomad download-database` produced | `phage.caller: genomad` | `version.txt` |
+| `baktfold_db` | The directory `baktfold install -d <dir>` filled (about 22 GB) | `baktfold.run: true` | `swissprot.dbtype` |
 
 !!! note "Why CheckV gets a local view rather than being used in place"
 
@@ -730,6 +732,24 @@ and plasmids together, so opting in also switches on the Platon + geNomad
 concordance in `06.plasmids`; on the default, that stage is Platon alone and
 geNomad never runs. Read [licensing](../about/licensing.md) before choosing, and
 [prophages](../analysis/phages.md) for what the choice does to the output.
+
+---
+
+## Baktfold `[all modes]` *— optional*
+
+```yaml
+baktfold:
+  run: false                   # true: name Bakta's hypothetical proteins by structure
+  fast: false                  # true: skip the AlphaFold-clusters search
+```
+
+| Key | What it does | Default | Notes |
+|---|---|---|---|
+| `run` | Searches the proteins Bakta called "hypothetical protein" by predicted structure, and writes a second annotation to `04.annotation/baktfold/{sample}/` | `false` | Bakta's annotation stays the one every other stage reads, so this adds jobs and changes no other result. The database comes from `directories.baktfold_db`, or about 22 GB is downloaded into the output folder on the first run. |
+| `fast` | Skips the search against AlphaFold clusters, the slowest of Baktfold's four searches | `false` | Faster, but fewer proteins get a name. |
+
+What the names mean, and how far to trust them, is under
+[Annotation](../analysis/annotation.md#baktfold).
 
 ---
 

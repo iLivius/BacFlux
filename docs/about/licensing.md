@@ -90,6 +90,7 @@ the key in the middle column.
 | **ICEscan models** — the optional second model set, a fork of CONJScan distributed inside ICEfinder2's bundle | `mobilome.icescan.run: true` | **CC BY-NC-SA 4.0**, Institut Pasteur / CNRS — the same terms as the models it forks | the package's own `LICENSE` file |
 | **TnCentral** — names transposons and integrons | `mobilome.tncentral.url` or `.dir` | an **"All Rights Reserved"** notice, and **no terms page at all** | the publisher's site, checked 2026-07-28 |
 | **ICEberg 3.0** — names the ICE and IME candidates | `mobilome.iceberg.urls` or `.dir` | **no licence, terms or reuse statement anywhere**; every page carries only *"Copyright © 2023 All Rights Reserved by Microbial Bioinformatics Group in MML, SJTU."* | the publisher's site, checked 2026-07-28 |
+| **Baktfold** — names Bakta's hypothetical proteins by predicted structure, with **Foldseek** and the **ProstT5** model | `baktfold.run: true` | **MIT** (Baktfold); **GPLv3** (Foldseek, run as a separate program); **MIT** (ProstT5); its database **CC BY 4.0** | the Bioconda recipes, the ProstT5 model card and the database's Zenodo record, checked 2026-11-01 |
 | **ISOSDB** — estimates IS abundance from reads for comparison with located calls | `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | **MIT**, in the pseudoR repository | the repository |
 
 **MacSyFinder is not CONJScan**: the engine is GPLv3, the models it loads are

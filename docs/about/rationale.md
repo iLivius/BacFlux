@@ -52,9 +52,9 @@ file, `mode`, chooses the front end; nothing else on the command line changes.
 | `hybrid` | both | both front ends, then Polypolish correction of the ONT assembly with the short reads, and a Snippy comparison of the two | 16 |
 | `contigs` | a finished assembly (FASTA) | contig filtering only | 1 |
 
-Those four front ends are 30 rules between them. The analysis they feed is 62 rules in
-`workflow/rules/shared/` — 22 of them the optional mobilome module — written once
-instead of four times, plus six `_local` variants that link a database copy you
+Those four front ends are 30 rules between them. The analysis they feed is 64 rules in
+`workflow/rules/shared/` — 22 of them the optional mobilome module and 2 the optional
+Baktfold layer — written once instead of four times, plus seven `_local` variants that link a database copy you
 already hold. [Choosing a mode](../getting-started/choosing-a-mode.md) covers
 which one a given dataset belongs in.
 
@@ -104,7 +104,7 @@ technology, it asks what the run *has*, not which mode it *is*: `HAS_SHORT_READS
 read-mapping analysis is gated on `HAS_SHORT_READS` because it needs reads — not because of a
 hard-coded list of mode names that a fifth mode would have to be added to.
 
-**One environment set.** 33 files in `workflow/envs/`: one per tool, with the version
+**One environment set.** 34 environment files in `workflow/envs/`: one per tool, with the version
 pinned in the file, plus `download.yaml` (wget, tar, gzip and bzip2 for the download
 rules) and `python.yaml` (Python for the helper scripts). A few tool environments carry
 a second pinned package the tool needs at run time (`diamond` alongside Bakta,

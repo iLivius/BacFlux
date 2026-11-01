@@ -2,8 +2,9 @@
 
 Stage `04.annotation` predicts genes and assigns functional annotations to
 `02.assembly/{sample}/contigs_final.fasta`. Four tools provide complementary
-outputs through `workflow/rules/shared/40_annotation.smk`. The stage is available
-in all modes, with circular-replicon information supplied in the long-read modes.
+outputs through `workflow/rules/shared/40_annotation.smk`, and a fifth, Baktfold,
+can be switched on. The stage is available in all modes, with circular-replicon
+information supplied in the long-read modes.
 
 Bakta goes first and the other three read its output, not the contigs, so one gene
 set underlies every functional layer: a CAZyme cluster, a biosynthetic cluster and an
@@ -15,10 +16,12 @@ orthologous group all sit on the same coordinates.
 | [eggNOG-mapper](https://github.com/eggnogdb/eggnog-mapper) | 2.1.15 | what each protein's orthologous group is known to do | `04.annotation/eggnog/{sample}/` |
 | [antiSMASH](https://github.com/antismash/antismash) | 8.0.4 | which biosynthetic gene clusters the genome carries | `04.annotation/antismash/{sample}/` |
 | [run_dbcan](https://github.com/bcb-unl/run_dbcan) | 5.1.2 | predicted carbohydrate-active enzymes, clusters and substrates | `04.annotation/dbcan/{sample}/` |
+| [Baktfold](https://github.com/gbouras13/baktfold), optional | 0.3.0 | a name, found by predicted structure, for proteins Bakta left "hypothetical" | `04.annotation/baktfold/{sample}/` |
 
 Three of the four are terminal products — you read them, nothing downstream does.
 Bakta is the exception: MultiQC summarises it, and the optional mobilome module reads
-its proteins, its GFF3 and its annotation table.
+its proteins, its GFF3 and its annotation table. Baktfold, when switched on, is
+terminal too: nothing reads it, so it changes no other result.
 
 !!! abstract "Terms used on this page"
 
@@ -273,6 +276,52 @@ the integrity claim holds for the download path alone.
     drops and 5.1.2 keeps. Calls backed by two or three methods are the same either
     way — so treat a single-method hit here with care.
 
+## Baktfold
+
+*Rules `structure_annotation_db` (or `structure_annotation_db_local`) and
+`structure_annotation`. Off by default; `baktfold.run: true` switches them on.*
+
+Bakta names a protein by sequence similarity. When nothing in its databases is
+similar enough, it writes "hypothetical protein". Protein structure is more conserved
+than sequence, so Baktfold looks at exactly those proteins again, by predicted 3D
+structure. The ProstT5 protein language model turns each sequence into Foldseek's
+structural alphabet, without predicting a full structure, and Foldseek searches four
+structure databases: SwissProt, AlphaFold clusters, PDB and CATH.
+
+| | |
+|---|---|
+| **In** | `{sample}.json` from the Bakta directory; the Baktfold database |
+| **Out** | `04.annotation/baktfold/{sample}/` |
+| **Next** | User interpretation |
+
+The output repeats Bakta's file set — `{sample}.tsv`, `.gff3`, `.gbff`, `.json`,
+`.faa` and the rest — with the new names in place. Every protein Bakta had already
+named keeps its Bakta annotation. Two kinds of file are added:
+
+- `{sample}.inference.tsv`: one row per protein Baktfold searched, giving the hit in
+  each database that supports its new name, blank where nothing was found.
+- `baktfold_<database>_tophit.tsv`, one per database: the best match per protein,
+  with its identity, coverage and e-value.
+
+Bakta's own annotation stays the one every other stage reads — eggNOG-mapper,
+antiSMASH, dbCAN, the AMR stage and the mobilome module — so switching Baktfold on
+adds jobs and changes no other result.
+
+!!! warning "A structure match is weaker evidence than a sequence match"
+
+    Proteins with a similar fold can do different things. Read a Baktfold name as a
+    lead: check the hit behind it in `{sample}.inference.tsv` and the tophit tables,
+    and prefer Bakta's name wherever Bakta gave one. Many hits are to proteins that
+    are themselves uncharacterised; Baktfold then keeps "hypothetical protein".
+
+`baktfold.fast: true` skips the AlphaFold-clusters search, the slowest of the four:
+it is faster and names fewer proteins. The rule runs on the CPU, and most of its time
+goes to the ProstT5 step, which grows with the number of hypothetical proteins.
+
+The database, about 22 GB with the four Foldseek databases and the ProstT5 model, is
+fetched by `baktfold install` on the first run, or taken from `directories.baktfold_db`
+when you already hold one, through a symlink view as for antiSMASH.
+
 ## Resources
 
 | Rule | Threads | Memory |
@@ -281,16 +330,18 @@ the integrity claim holds for the download path alone.
 | `functional_annotation` | capped at 24 | `mem_gb: 42`, only with `--dbmem` on |
 | `secondary_metabolites_analysis` | capped at 24 | none declared |
 | `cazyme_gene_cluster` | capped at 24 | none declared |
+| `structure_annotation` (optional) | capped at 24 | 16 GB requested from a cluster scheduler, or `ram_gb` if lower |
 
 "Capped at 24" means the rule requests `min(resources.threads, 24)`, so lowering
-`threads` lowers all four at once and nothing needs configuring per rule; `--cores N`
+`threads` lowers them all at once and nothing needs configuring per rule; `--cores N`
 caps the total at run time.
 
 The database rules ask for nothing in particular; they fetch or link, once, for the
 whole run. `cazyme_db_download` takes `wget` and `tar` from `workflow/envs/download.yaml`
 and needs only `sha256sum` and `awk` from the computer, both part of every Linux base
 system. It is a local rule: on a cluster it runs on the computer that runs Snakemake,
-which is the one with internet.
+which is the one with internet. So is `structure_annotation_db`, which fetches
+Baktfold's database with Baktfold's own installer.
 
 ## What to check afterwards
 
@@ -303,3 +354,6 @@ which is the one with internet.
 - `logs/cazyme_db_download.log` — the two downloads. If the rule failed, either a fetch
   did not complete or the tarball's checksum did not match; nothing was extracted
   either way.
+- With Baktfold on: `04.annotation/baktfold/{sample}/{sample}.inference.tsv`, for which
+  proteins got a name and from which database, and
+  `logs/structure_annotation_{sample}.log`.

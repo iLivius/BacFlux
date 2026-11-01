@@ -26,11 +26,20 @@
 # cazyme_gene_cluster            : run_dbcan over Bakta's .faa + .gff3 — CAZymes,
 #                                  the clusters they form, and each cluster's
 #                                  predicted substrate.
+# structure_annotation_db        : fetches Baktfold's database once (opt-in,
+#                                  baktfold.run).
+# structure_annotation_db_local  : same directory from a user-held copy.
+#                                  Mutually exclusive with the rule above.
+# structure_annotation           : Baktfold over Bakta's .json — names for the
+#                                  proteins Bakta called hypothetical, found by
+#                                  predicted structure (opt-in, baktfold.run).
 #
 # Every name used here — DIR_ANNOTATION, FINAL_CONTIGS, KEPT_GENUS,
 # BAKTA_REPLICON_INPUT, BAKTADB, DMNDDB, EGGNOG_DBMEM, EGGNOG_DBMEM_GB,
 # ANTISMASHDB, ANTISMASH_DB_DIR, DBCANDB, DBCAN_DB_DIR, DBCAN_SENTINEL,
-# DBCAN_LINK, DBCAN_SHA_URL, LOGS, capped_cpus, bakta_locus_tag — is defined once
+# DBCAN_LINK, DBCAN_SHA_URL, BAKTFOLD_RUN, BAKTFOLD_FAST, BAKTFOLDDB,
+# BAKTFOLD_DB_DIR, HEAVY_MEM_MB, LONG_RUNTIME_MINUTES, LOGS, capped_cpus,
+# bakta_locus_tag — is defined once
 # in 00_common.smk and inherited through the Snakefile include order. No path,
 # stage number or database version is re-derived here.
 #
@@ -545,3 +554,128 @@ rule cazyme_gene_cluster:
           --output_dir {output.dbcan_dir} \
           --db_dir {params.dbcan_db} >> {log} 2>&1
         """
+
+
+# ──────────── Structure-based names (Baktfold), opt-in ────────────
+# Bakta names a protein by sequence similarity. When nothing in its databases is
+# similar enough, it writes "hypothetical protein". Protein structure is more
+# conserved than sequence, so Baktfold looks again at exactly those proteins by
+# predicted 3D structure: the ProstT5 protein language model turns each sequence
+# into Foldseek's 3Di structural alphabet (no full structure prediction is
+# needed), and Foldseek searches SwissProt, AlphaFold clusters, PDB and CATH. A
+# hit gives the protein a name; the database and the alignment behind it are
+# reported beside it, because a structure match is weaker evidence than a
+# sequence match.
+#
+# All three rules exist only when baktfold.run is true. Like antiSMASH above, the
+# database comes from exactly one of two rules, never both: a download when
+# directories.baktfold_db is empty, or a symlink view of the user's own copy when
+# it is set. Both write only into BacFlux's own 04.annotation/baktfold/databases,
+# for the directory()-wipe reason given at secondary_metabolites_db.
+
+if BAKTFOLD_RUN and not BAKTFOLDDB:
+
+    # Fetches Baktfold's database and the ProstT5 model (about 22 GB) once per
+    # output folder. Where it runs: on the computer that runs Snakemake
+    # (localrule: True), so on a cluster the download never lands on a compute
+    # node without internet; download_all asks for it too.
+    rule structure_annotation_db:
+        localrule: True
+        output:
+            baktfold_db = directory(BAKTFOLD_DB_DIR),
+        conda:
+            "../../envs/baktfold.yaml"
+        log:
+            LOGS + "/structure_annotation_database.log"
+        shell:
+            # --threads: Baktfold uses it to make the download faster.
+            """
+            baktfold install --database {output.baktfold_db} --threads 4 > {log} 2>&1
+            """
+
+
+if BAKTFOLD_RUN and BAKTFOLDDB:
+
+    # Defined only when directories.baktfold_db is set, in place of the download
+    # above. Links each top-level entry of the user's database (the Foldseek
+    # databases and the ProstT5 model folder) into BacFlux's own directory, so no
+    # rule ever writes to, or deletes, the user's copy.
+    rule structure_annotation_db_local:
+        input:
+            src = BAKTFOLDDB,
+        output:
+            baktfold_db = directory(BAKTFOLD_DB_DIR),
+        log:
+            LOGS + "/structure_annotation_database_local.log"
+        shell:
+            """
+            mkdir -p {output.baktfold_db}
+            {{
+              echo "Building a local Baktfold database view"
+              echo "  source (read-only): {input.src}"
+              echo "  view:               {output.baktfold_db}"
+            }} > {log}
+            for f in "{input.src}"/*; do
+                ln -sfn "$f" "{output.baktfold_db}/$(basename "$f")"
+            done
+            """
+
+
+if BAKTFOLD_RUN:
+
+    # Takes in: the Bakta output DIRECTORY as the DAG edge (the shell reads
+    #           Bakta's {sample}.json from inside it: Baktfold needs the full
+    #           annotation, not just the proteins, to write Bakta-format files
+    #           back), and the Baktfold database directory from whichever of the
+    #           two rules above is defined.
+    # Does:     baktfold run on the CPU. Only the proteins Bakta called
+    #           hypothetical are searched; every other annotation is copied from
+    #           Bakta unchanged. --fast (baktfold.fast) skips the AlphaFold-
+    #           clusters search.
+    # Produces: 04.annotation/baktfold/{sample}/: the same file set as Bakta
+    #           ({sample}.tsv, .gff3, .gbff, .json, .faa, ...) with the new names,
+    #           plus {sample}.inference.tsv, one row per searched protein naming
+    #           the database hit behind its name, and one baktfold_<database>_
+    #           tophit.tsv per database with the alignment details (Baktfold keeps
+    #           that fixed prefix for these four files).
+    # Consumed by: nobody — you. Bakta's annotation stays the one eggNOG,
+    #              antiSMASH, dbCAN, the AMR stage and the mobilome module read, so
+    #              switching this on changes none of their results.
+    rule structure_annotation:
+        input:
+            bakta_dir = DIR_ANNOTATION + "/bakta/{sample}",
+            baktfold_db = BAKTFOLD_DB_DIR,
+        output:
+            baktfold_dir = directory(DIR_ANNOTATION + "/baktfold/{sample}"),
+        params:
+            # "--fast" when baktfold.fast is on, an empty string otherwise.
+            fast_flag = "--fast" if BAKTFOLD_FAST else "",
+        conda:
+            "../../envs/baktfold.yaml"
+        threads: capped_cpus(24)
+        resources:
+            # Cluster requests (00_common.smk §3a). Baktfold needs well under
+            # 16 GB on a bacterial genome, so it asks for no more; a smaller
+            # ram_gb wins.
+            mem_mb = min(HEAVY_MEM_MB, 16 * 1024),
+            runtime = LONG_RUNTIME_MINUTES,
+        log:
+            LOGS + "/structure_annotation_{sample}.log"
+        shell:
+            # The ProstT5 step runs in PyTorch, which by default starts a thread
+            # per core of the computer; OMP_NUM_THREADS and MKL_NUM_THREADS hold it
+            # to {threads}, the same budget Foldseek gets through --threads. The
+            # ProstT5 model is already in the database folder: HF_HUB_OFFLINE=1
+            # stops the job asking the Hugging Face hub for updates, so it runs on
+            # a compute node without internet.
+            """
+            export OMP_NUM_THREADS={threads} MKL_NUM_THREADS={threads} HF_HUB_OFFLINE=1
+            baktfold run \
+              --input {input.bakta_dir}/{wildcards.sample}.json \
+              --output {output.baktfold_dir} \
+              --prefix {wildcards.sample} \
+              --database {input.baktfold_db} \
+              --threads {threads} \
+              --cpu {params.fast_flag} \
+              --force > {log} 2>&1
+            """

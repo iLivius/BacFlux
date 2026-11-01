@@ -58,10 +58,10 @@ some cost you seconds, one costs you the length of the run up to that rule.
 | `directories.blast_db` | DAG build (so, a dry run) | `MissingInputException in rule blob_json … affected files: <blast_db>/names.dmp, <blast_db>/nodes.dmp` |
 | `directories.bakta_db`, `eggnog_db`, `gtdbtk_db`, `platon_db` | **not checked** | the tool fails when its own rule runs |
 
-Five of the six optional database keys share one check: a file that can only exist
+Six of the seven optional database keys share one check: a file that can only exist
 inside a real copy of that particular database — `Done_all_setup` for VirSorter2,
 `aro_index.tsv` for CARD, `version.txt` for geNomad, `dbCAN.hmm` for dbCAN,
-`clusterblast/` for antiSMASH (function `_resolve_optional_db_dir` in
+`clusterblast/` for antiSMASH, `swissprot.dbtype` for Baktfold (function `_resolve_optional_db_dir` in
 `00_common.smk`). A directory that exists but holds the wrong thing is therefore
 still caught. `checkv_db` is the exception, because it is the one key that points
 at the *parent* of the versioned database folder; it is checked for exactly one

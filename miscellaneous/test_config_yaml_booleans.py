@@ -406,6 +406,41 @@ class TestConfigYamlBooleans(unittest.TestCase):
         self.assertEqual(status, 0, output[-3000:])
         self.assertIn("Medaka disabled via config", output)
 
+    # ── The opt-in Baktfold layer ──
+
+    def test_baktfold_off_by_default_adds_no_job(self):
+        # The template ships baktfold.run: false, so no Baktfold rule is planned.
+        status, output = self.dry_run({}, extra_args=["-p"])
+        self.assertEqual(status, 0, output[-3000:])
+        self.assertNotIn("structure_annotation", output)
+
+    def test_baktfold_on_with_a_local_database_adds_its_jobs(self):
+        # With baktfold.run: true and a database the user holds, the plan gains the
+        # symlink view of that database and a Baktfold job per sample, on the CPU;
+        # baktfold.fast adds --fast. A stub folder holding the one file the
+        # start-up check looks for stands in for the real 22 GB database.
+        stub = os.path.join(self.tmp.name, "baktfold_db_stub")
+        os.makedirs(stub, exist_ok=True)
+        open(os.path.join(stub, "swissprot.dbtype"), "w").close()
+        status, output = self.dry_run(
+            {"baktfold.run": True, "baktfold.fast": True, "directories.baktfold_db": stub},
+            extra_args=["-p"],
+        )
+        self.assertEqual(status, 0, output[-3000:])
+        self.assertIn("rule structure_annotation_db_local", output)
+        self.assertIn("rule structure_annotation:", output)
+        self.assertIn("baktfold run", output)
+        self.assertIn("--cpu --fast", output)
+
+    def test_baktfold_database_path_is_checked_only_when_the_layer_is_on(self):
+        # A wrong directories.baktfold_db stops a run that uses Baktfold, and is
+        # ignored by a run that does not.
+        missing = os.path.join(self.tmp.name, "no_such_baktfold_db")
+        self.assert_stops({"baktfold.run": True, "directories.baktfold_db": missing}, None,
+                          "[BacFlux] directories.baktfold_db points at")
+        status, output = self.dry_run({"directories.baktfold_db": missing})
+        self.assertEqual(status, 0, output[-3000:])
+
 
 class ConfigBlockListTest(unittest.TestCase):
     """The block check covers every block the shipped template has.

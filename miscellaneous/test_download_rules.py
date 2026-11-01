@@ -51,8 +51,10 @@ from test_python_environments import REPO_ROOT, RULES_DIR, conda_path, read_rule
 #   conjscan_models           msf_data (MacSyFinder's model installer)
 #   check_medaka_model        medaka_model_check.py, which makes Medaka store the
 #                             weights of the model it uses
+#   structure_annotation_db   `baktfold install`, which fetches Baktfold's database
+#                             and the ProstT5 model itself
 OTHER_DOWNLOAD_RULES = {"secondary_metabolites_db", "virsorter2_db", "conjscan_models",
-                        "check_medaka_model"}
+                        "check_medaka_model", "structure_annotation_db"}
 
 # Programs a rule runs that its own shell text does not show. `virsorter setup` (rule
 # virsorter2_db) runs wget, gunzip and tar from VirSorter2's packaged setup rules.
