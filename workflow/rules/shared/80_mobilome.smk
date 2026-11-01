@@ -193,8 +193,17 @@
 # tables are UNIONED by the caller, so running them at different stringencies
 # would mean an element's class depended on which model set happened to be more
 # permissive, which nothing downstream could untangle.
-MOBILOME_COVERAGE_PROFILE = float(
-    (config.get("mobilome") or {}).get("coverage_profile", 0.5))
+#
+# Read with _config_number (00_common.smk, section 0): a blank value takes the
+# default, and a bare on/off or text stops the run first. float() would read on as
+# 1.0, which passes the range check below and silently demands that every hit cover
+# its whole profile, and off as 0.0, which the range check would report without
+# saying that YAML had read the word as a boolean.
+MOBILOME_COVERAGE_PROFILE = _config_number(
+    "mobilome.coverage_profile", (config.get("mobilome") or {}).get("coverage_profile"),
+    default=0.5, convert=float,
+    valid_number="a fraction greater than 0 and at most 1, such as 0.5",
+)
 
 # A fraction outside (0, 1] is a typo (a percentage, most likely). MacSyFinder
 # would accept 30 and then silently find nothing at all, which looks exactly

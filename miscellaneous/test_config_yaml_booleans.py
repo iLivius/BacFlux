@@ -6,9 +6,12 @@ the boolean True and an unquoted off, no or false is the boolean False, not a wo
 So `caller: off` reaches BacFlux as False. Left unchecked, several keys would
 quietly turn such a value into their default (`phage.caller: off` would run
 VirSorter2; `decontamination: off`, written as one value instead of a block,
-would run auto) and others would crash with a bare Python error. The checks in
-workflow/rules/shared/00_common.smk (section 0, and _stop_on_yaml_bool where each
-key is read) stop the run instead, with a [BacFlux] message and exit status 1.
+would run auto), number keys would read it as 1 or 0 (`contig_boundary_bp: off`
+would be a 0 bp window), and others would crash with a bare Python error. The
+checks in workflow/rules/shared/00_common.smk (section 0, and _stop_on_yaml_bool
+or _config_number where each key is read) stop the run instead, with a [BacFlux]
+message and exit status 1. A number key also takes its default when left blank,
+and stops on text that is not a number.
 
 How the test works: it builds a small illumina config from the shipped template,
 config/config.yaml, in a temporary directory that holds one empty stub sample
@@ -49,6 +52,20 @@ TEMPLATE = os.path.join(REPO, "config", "config.yaml")
 # safe form and not the mistake this test is about, so the word is put into the
 # file text afterwards instead.
 BARE_WORD_SLOT = "BARE_WORD_SLOT"
+
+# Every number key in the shipped template, by its dotted name. Each one must stop
+# the run on a bare on/off. ConfigNumberKeyListTest checks this list against the
+# template, and against the keys 00_common.smk and 80_mobilome.smk actually check.
+NUMBER_KEYS = (
+    "resources.threads", "resources.ram_gb", "resources.runtime_hours",
+    "parameters.long_read_qc.min_length", "parameters.long_read_qc.keep_percent",
+    "parameters.long_read_qc.length_weight",
+    "mobilome.max_composite_span_bp", "mobilome.coverage_profile",
+    "mobilome.tncentral.min_identity", "mobilome.tncentral.min_reference_coverage",
+    "mobilome.iceberg.min_identity", "mobilome.iceberg.min_overlap_fraction",
+    "mobilome.isosdb.min_covered_percent", "mobilome.isosdb.min_copy_number",
+    "mobilome.contig_boundary_bp",
+)
 
 
 def find_snakemake():
@@ -235,6 +252,65 @@ class TestConfigYamlBooleans(unittest.TestCase):
         self.assert_stops({"mobilome.tncentral": BARE_WORD_SLOT}, "on",
                           "[BacFlux] mobilome.tncentral is a block")
 
+    # ── NUMBER keys: a number, never a boolean ──
+
+    def test_keep_percent_on_stops_and_says_there_is_no_off(self):
+        # keep_percent is handed to Filtlong unconverted, so without the check a
+        # bare on would reach Filtlong as the text True.
+        self.assert_stops({"mode": "nanopore",
+                           "parameters.long_read_qc.keep_percent": BARE_WORD_SLOT}, "on",
+                          "[BacFlux] parameters.long_read_qc.keep_percent is an unquoted on",
+                          "not as a number", "such as 95",
+                          "There is no off: 100 rejects no read by percentage.")
+
+    def test_min_length_off_stops(self):
+        # A whole-number key: int() would read off as 0.
+        self.assert_stops({"mode": "nanopore",
+                           "parameters.long_read_qc.min_length": BARE_WORD_SLOT}, "off",
+                          "[BacFlux] parameters.long_read_qc.min_length is an unquoted off",
+                          "not as a number", "a whole number of bases, such as 1000")
+
+    def test_length_weight_no_stops(self):
+        # A decimal key: float() would read no as 0.0. Checked in hybrid, the one
+        # mode that hands it to Filtlong.
+        self.assert_stops({"mode": "hybrid",
+                           "parameters.long_read_qc.length_weight": BARE_WORD_SLOT}, "no",
+                          "[BacFlux] parameters.long_read_qc.length_weight is an unquoted off",
+                          "not as a number", "a number, such as 1")
+
+    def test_coverage_profile_on_stops_even_with_the_module_off(self):
+        # A fraction: float() would read on as 1.0, which is inside (0, 1] and so
+        # would pass the range check. The template leaves mobilome.run false, and
+        # the run must stop anyway, as it does for a mobilome block written as one
+        # value.
+        self.assert_stops({"mobilome.coverage_profile": BARE_WORD_SLOT}, "on",
+                          "[BacFlux] mobilome.coverage_profile is an unquoted on",
+                          "a fraction greater than 0 and at most 1, such as 0.5")
+
+    def test_coverage_profile_off_names_yaml_not_the_range(self):
+        # With the module on, off must get the YAML message, not the range
+        # check's "it is 0.0", which would not say how the value was misread.
+        status, output = self.dry_run({"mobilome.run": True,
+                                       "mobilome.coverage_profile": BARE_WORD_SLOT}, "off")
+        self.assertEqual(status, 1, output[-3000:])
+        self.assertIn("[BacFlux] mobilome.coverage_profile is an unquoted off", output)
+        self.assertNotIn("but it is 0.0", output)
+
+    def test_resources_ram_gb_off_stops_with_the_yaml_message(self):
+        self.assert_stops({"resources.ram_gb": BARE_WORD_SLOT}, "off",
+                          "[BacFlux] resources.ram_gb is an unquoted off",
+                          "a whole number, 1 or more")
+
+    def test_every_number_key_stops_on_a_bare_word(self):
+        # One dry run per number key in the template, alternating the two
+        # spellings. ConfigNumberKeyListTest below checks that this list and the
+        # template agree, so a new number key cannot be left out by accident.
+        for index, key in enumerate(NUMBER_KEYS):
+            word, read_as = (("off", "an unquoted off"), ("on", "an unquoted on"))[index % 2]
+            with self.subTest(key=key, word=word):
+                self.assert_stops({key: BARE_WORD_SLOT}, word,
+                                  f"[BacFlux] {key} is {read_as}", "not as a number")
+
     # ── What must still parse ──
 
     def test_template_config_parses(self):
@@ -273,6 +349,54 @@ class TestConfigYamlBooleans(unittest.TestCase):
                 self.assertTrue(screen_commands, output[-3000:])
                 for command in screen_commands:
                     self.assertIn("--mode off", command)
+
+    def test_valid_numbers_reach_filtlong_unchanged(self):
+        # The checks only stop booleans and text: a number, written as an
+        # integer, a decimal or in quotes, is converted exactly as before. -p prints each
+        # job's shell command, so the values Filtlong receives can be read off.
+        status, output = self.dry_run(
+            {"mode": "hybrid",
+             "parameters.long_read_qc.min_length": 500,
+             "parameters.long_read_qc.keep_percent": 97.5,
+             "parameters.long_read_qc.length_weight": 0},
+            extra_args=["-p"],
+        )
+        self.assertEqual(status, 0, output[-3000:])
+        self.assertIn("--min_length 500", output)
+        self.assertIn("--keep_percent 97.5", output)
+        self.assertIn("--length_weight 0.0", output)
+        status, output = self.dry_run(
+            {"mode": "nanopore", "parameters.long_read_qc.keep_percent": "95"},
+            extra_args=["-p"],
+        )
+        self.assertEqual(status, 0, output[-3000:])
+        self.assertIn("--keep_percent 95 ", output)
+
+    def test_blank_numbers_take_their_defaults(self):
+        # A number key with nothing after the colon (YAML reads it as None) takes
+        # its default, as a missing key does. Before, min_length and length_weight
+        # crashed with a bare Python error and keep_percent reached Filtlong as
+        # the text None.
+        for key, expected in (("parameters.long_read_qc.min_length", "--min_length 1000"),
+                              ("parameters.long_read_qc.keep_percent", "--keep_percent 95 "),
+                              ("parameters.long_read_qc.length_weight", "--length_weight 1.0")):
+            with self.subTest(key=key):
+                status, output = self.dry_run({"mode": "hybrid", key: BARE_WORD_SLOT}, "",
+                                              extra_args=["-p"])
+                self.assertEqual(status, 0, output[-3000:])
+                self.assertIn(expected, output)
+
+    def test_text_in_a_number_key_stops(self):
+        # Text that is not a number stops the run with a [BacFlux] message,
+        # instead of a bare Python error (float("ninety")) or, for keep_percent,
+        # being handed to Filtlong as it is.
+        self.assert_stops({"mobilome.tncentral.min_identity": "ninety"}, None,
+                          "[BacFlux] mobilome.tncentral.min_identity is 'ninety', "
+                          "which is not a number", "a percent identity, such as 90.0")
+        self.assert_stops({"mode": "nanopore", "parameters.long_read_qc.keep_percent": "all"},
+                          None,
+                          "[BacFlux] parameters.long_read_qc.keep_percent is 'all', "
+                          "which is not a number", "There is no off")
 
     def test_medaka_model_off_still_skips_medaka(self):
         # medaka_model is the one word key where a boolean is a real choice.
@@ -317,6 +441,46 @@ class ConfigBlockListTest(unittest.TestCase):
         listed_blocks = set(re.findall(r'"([A-Za-z0-9_.]+)"', text[start:end]))
 
         self.assertEqual(template_blocks, listed_blocks)
+
+
+class ConfigNumberKeyListTest(unittest.TestCase):
+    """Every number key in the template is checked against a bare on/off.
+
+    The rule files check each number key by name, one call per key. If a number key
+    is added to config/config.yaml without that call, a bare on/off in it is read as
+    1 or 0 without a word. This test compares three lists: the template's number
+    keys, NUMBER_KEYS above (what the dry-run test loops over), and the keys named
+    in the rule files' checks. It needs no Snakemake.
+    """
+
+    def test_every_template_number_key_is_checked(self):
+        # Every setting in the template whose value is a number. bool is excluded
+        # by name because Python counts True and False as numbers too.
+        with open(TEMPLATE) as handle:
+            template = yaml.safe_load(handle)
+        template_numbers = set()
+        pending = [("", template)]
+        while pending:
+            prefix, mapping = pending.pop()
+            for key, value in mapping.items():
+                if isinstance(value, dict):
+                    pending.append((prefix + key + ".", value))
+                elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                    template_numbers.add(prefix + key)
+
+        # The keys the rule files check: the first argument of every
+        # _config_number(...) call, plus resources.<key> for every
+        # _whole_number("<key>", ...) call, which runs the same check.
+        rules = os.path.join(REPO, "workflow", "rules", "shared")
+        text = ""
+        for name in ("00_common.smk", "80_mobilome.smk"):
+            with open(os.path.join(rules, name)) as handle:
+                text += handle.read()
+        checked = set(re.findall(r'_config_number\(\s*"([a-z0-9_.]+)"', text))
+        checked |= {"resources." + key for key in re.findall(r'_whole_number\("([a-z_]+)"', text)}
+
+        self.assertEqual(template_numbers, set(NUMBER_KEYS))
+        self.assertEqual(template_numbers, checked)
 
 
 if __name__ == "__main__":

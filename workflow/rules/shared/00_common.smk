@@ -9,8 +9,10 @@
 # Sections, in file order:
 #
 # 0.  Config shape       : stop on a block written as one value (a bare
-#                          `decontamination: off`), and define the check every
-#                          one-word key uses against YAML's on/off booleans.
+#                          `decontamination: off`), and define the checks every
+#                          one-word key and every number key use against YAML's
+#                          on/off booleans (number keys also against blanks and
+#                          text).
 # 1.  Mode dispatch      : read and validate config.mode (illumina | nanopore |
 #                          hybrid | contigs).
 # 1b. Phage caller       : VirSorter2 (default) or geNomad (opt-in), and what
@@ -63,8 +65,8 @@ from snakemake.io import glob_wildcards
 # Snakemake reads the config file as YAML 1.1. In YAML 1.1 an UNQUOTED on, yes or
 # true is not a word but the boolean True, and an unquoted off, no or false is the
 # boolean False. So what reaches this file is Python's True or False, not the text
-# the user typed. Two kinds of key can be misread that way, and BacFlux stops the
-# run on both rather than guess what was meant:
+# the user typed. Three kinds of key can be misread that way, and BacFlux stops
+# the run on all three rather than guess what was meant:
 #
 #   * a BLOCK, i.e. a key with its settings indented beneath it, such as
 #     parameters.decontamination, written as a single value instead, e.g.
@@ -73,6 +75,12 @@ from snakemake.io import glob_wildcards
 #   * a WORD key, which takes one word from a fixed list, such as phage.caller
 #     (virsorter2 or genomad). Each one is checked where it is read, further down,
 #     with _stop_on_yaml_bool(), defined just below.
+#   * a NUMBER key, such as resources.ram_gb or mobilome.coverage_profile.
+#     Python counts True as the number 1 and False as 0, so without a check a
+#     bare on or off would become a threshold of 1 or 0 without a word, or reach
+#     a tool as the text True or False. Each one is read with _config_number(),
+#     also defined just below, which also gives a blank value its default and
+#     stops on text that is not a number.
 #
 # Keys that really are on/off switches (mobilome.run, discard_no_hit, ...) are
 # read with _config_bool(), defined in section 5b, and a bare true or false is
@@ -107,6 +115,65 @@ def _stop_on_yaml_bool(key, value, valid_words, note=""):
         f"[BacFlux] {key} is {typed}, which YAML reads as the boolean "
         f"{str(value).lower()}, not as a word. It must be {valid_words}.{note}"
     )
+
+
+def _stop_on_yaml_bool_number(key, value, valid_number, note=""):
+    # Stop the run when a NUMBER key arrived as a YAML boolean.
+    #   Takes in: the key's full name for the message (e.g.
+    #             "mobilome.coverage_profile"), its value as Snakemake loaded it
+    #             from the config, what number the key takes, written out for a
+    #             person to read (e.g. "a fraction greater than 0 and at most 1,
+    #             such as 0.5"), and an optional extra sentence about that key.
+    #   Does:     nothing unless the value is True or False. Python counts True
+    #             as 1 and False as 0, so int() and float() accept both without
+    #             complaint: a bare `contig_boundary_bp: off` would quietly become
+    #             a 0 bp window. A number key has no on or off, so a boolean can
+    #             only be a mistake.
+    #   Produces: for a boolean, a [BacFlux] message worded like the one
+    #             _stop_on_yaml_bool gives a word key, and exit status 1.
+    #             Otherwise nothing. Used by _config_number below and by
+    #             _whole_number (section 3a).
+    if not isinstance(value, bool):
+        return
+    if value:
+        typed = "an unquoted on, yes or true"
+    else:
+        typed = "an unquoted off, no or false"
+    sys.exit(
+        f"[BacFlux] {key} is {typed}, which YAML reads as the boolean "
+        f"{str(value).lower()}, not as a number. It must be {valid_number}.{note}"
+    )
+
+
+def _config_number(key, value, default, convert, valid_number, note=""):
+    # Read one NUMBER key from the config.
+    #   Takes in: the key's full name for messages (e.g. "mobilome.coverage_profile"),
+    #             its value as Snakemake loaded it (None when the line is left
+    #             blank), the default for a missing or blank value, the function
+    #             that turns the value into a number (int or float), or None for a
+    #             value handed to a tool exactly as written (keep_percent), what
+    #             number the key takes, written out for a person to read, and an
+    #             optional extra sentence about that key.
+    #   Does:     a missing or blank value takes the default. A bare on/off stops
+    #             the run (_stop_on_yaml_bool_number, above). Text that is not a
+    #             number, such as "abc", stops it too, instead of ending in a bare
+    #             Python error or reaching a tool as text.
+    #   Produces: the number, converted with `convert`, or the value as written
+    #             when `convert` is None. A valid value reaches the rules in exactly
+    #             the form it always did, so no finished job re-runs.
+    if value is None or str(value).strip() == "":
+        value = default
+    _stop_on_yaml_bool_number(key, value, valid_number, note)
+    try:
+        if convert is None:
+            float(value)        # only checked: the value is passed on as written
+            return value
+        return convert(value)
+    except (TypeError, ValueError):
+        sys.exit(
+            f"[BacFlux] {key} is {value!r}, which is not a number. "
+            f"It must be {valid_number}.{note}"
+        )
 
 
 # Every block in config/config.yaml, by its full dotted name. A parent comes
@@ -565,10 +632,12 @@ _resources = config.get("resources", {}) or {}
 def _whole_number(key, default):
     # Read resources.<key> as a whole number of 1 or more. A missing or blank key
     # takes the default. Anything else (2.5, "abc", true, 0) stops the run with a
-    # [BacFlux] message instead of being silently truncated or misread.
+    # [BacFlux] message instead of being silently truncated or misread. A bare
+    # on/off is caught first, so its message says how YAML read it (section 0).
     value = _resources.get(key)
     if value is None:
         value = default
+    _stop_on_yaml_bool_number(f"resources.{key}", value, "a whole number, 1 or more")
     text = str(value).strip()
     if isinstance(value, bool) or not text.isdigit() or int(text) < 1:
         sys.exit(f"[BacFlux] resources.{key} must be a whole number, 1 or more (got: {value!r}).")
@@ -1391,11 +1460,34 @@ _mobilome_cfg = config.get("mobilome", {}) or {}
 # what nanopore mode does. He recommends --length_weight 0. Discussion in
 # docs/methods_att_and_small_plasmids.md.
 # https://rrwick.github.io/2026/02/05/read_qc_testing.html
+#
+# All three are read with _config_number (section 0): a blank value takes the
+# default, and a bare on/off or text that is not a number stops the run. Without
+# it, int() and float() would read on as 1 and off as 0, and keep_percent, which
+# is handed to Filtlong as written, would reach it as the text True, False or None.
+# Checked in every mode, like long_read_mode, although only the long-read modes
+# use them.
 _lrqc = (config.get("parameters", {}) or {}).get("long_read_qc", {}) or {}
-FILTLONG_MIN_LENGTH    = int(_lrqc.get("min_length", 1000))
-FILTLONG_KEEP_PERCENT  = _lrqc.get("keep_percent", 95)
+
+FILTLONG_MIN_LENGTH = _config_number(
+    "parameters.long_read_qc.min_length", _lrqc.get("min_length"),
+    default=1000, convert=int,
+    valid_number="a whole number of bases, such as 1000",
+)
+
+FILTLONG_KEEP_PERCENT = _config_number(
+    "parameters.long_read_qc.keep_percent", _lrqc.get("keep_percent"),
+    default=95, convert=None,
+    valid_number="the percentage of bases to keep, such as 95",
+    note=" There is no off: 100 rejects no read by percentage.",
+)
+
 # Default 1 = filtlong's own default = do not let length dominate quality.
-FILTLONG_LENGTH_WEIGHT = float(_lrqc.get("length_weight", 1))
+FILTLONG_LENGTH_WEIGHT = _config_number(
+    "parameters.long_read_qc.length_weight", _lrqc.get("length_weight"),
+    default=1, convert=float,
+    valid_number="a number, such as 1",
+)
 
 # ── Short-read guidance for the hybrid ONT filter (default OFF) ──
 # With -1/-2, filtlong scores every long read against the Illumina reads and, with
@@ -1426,13 +1518,25 @@ MOBILOME_RUN = _config_bool(_mobilome_cfg.get("run"), False)
 # further apart than this are not treated as one composite element. The
 # co-localisation script always reports the real measured distance next to the
 # call, so a reader can disagree with the threshold without re-running anything.
-MOBILOME_MAX_COMPOSITE_SPAN = int(_mobilome_cfg.get("max_composite_span_bp", 20000))
+# Read with _config_number (section 0): blank takes the default; a bare
+# on/off or text stops the run.
+MOBILOME_MAX_COMPOSITE_SPAN = _config_number(
+    "mobilome.max_composite_span_bp", _mobilome_cfg.get("max_composite_span_bp"),
+    default=20000, convert=int,
+    valid_number="a distance in base pairs, such as 20000",
+)
 
 # How close to a contig end counts as "at the boundary". IS elements are the main
 # reason short-read assemblies break, so an IS (or an AMR gene) sitting at a contig
 # end is exactly where the evidence runs out — every such call carries this flag
 # and is capped at low confidence.
-MOBILOME_BOUNDARY_BP = int(_mobilome_cfg.get("contig_boundary_bp", 100))
+# Read with _config_number (section 0): blank takes the default; a bare
+# on/off or text stops the run.
+MOBILOME_BOUNDARY_BP = _config_number(
+    "mobilome.contig_boundary_bp", _mobilome_cfg.get("contig_boundary_bp"),
+    default=100, convert=int,
+    valid_number="a distance in base pairs, such as 100",
+)
 
 # Whether an ICE/IME candidate must have tRNA-anchored att boundaries before it may
 # be called HIGH confidence (a stricter form of the confidence rule in
@@ -1465,8 +1569,18 @@ TNCENTRAL_SHA256 = str(_tncentral_cfg.get("sha256") or "").strip()
 TNCENTRAL_LOCAL = str(_tncentral_cfg.get("dir") or "").strip()
 # The naming thresholds (see docs/mobilome/tuning.md). Exposed because they are
 # conventions, not biology, and the measured values are reported alongside the call.
-TNCENTRAL_MIN_IDENTITY = float(_tncentral_cfg.get("min_identity", 90.0))
-TNCENTRAL_MIN_COVERAGE = float(_tncentral_cfg.get("min_reference_coverage", 0.80))
+# Read with _config_number (section 0): blank takes the default; a bare
+# on/off or text stops the run.
+TNCENTRAL_MIN_IDENTITY = _config_number(
+    "mobilome.tncentral.min_identity", _tncentral_cfg.get("min_identity"),
+    default=90.0, convert=float,
+    valid_number="a percent identity, such as 90.0",
+)
+TNCENTRAL_MIN_COVERAGE = _config_number(
+    "mobilome.tncentral.min_reference_coverage", _tncentral_cfg.get("min_reference_coverage"),
+    default=0.80, convert=float,
+    valid_number="a fraction of the reference element, such as 0.8",
+)
 
 MOBILOME_NAME_ELEMENTS = MOBILOME_RUN and bool(TNCENTRAL_URL or TNCENTRAL_LOCAL)
 
@@ -1483,8 +1597,18 @@ if isinstance(_iceberg_urls, str):
     _iceberg_urls = [_iceberg_urls]
 ICEBERG_URLS = [str(u).strip() for u in _iceberg_urls if str(u).strip()]
 ICEBERG_LOCAL = str(_iceberg_cfg.get("dir") or "").strip()
-ICEBERG_MIN_IDENTITY = float(_iceberg_cfg.get("min_identity", 80.0))
-ICEBERG_MIN_OVERLAP = float(_iceberg_cfg.get("min_overlap_fraction", 0.50))
+# Read with _config_number (section 0): blank takes the default; a bare
+# on/off or text stops the run.
+ICEBERG_MIN_IDENTITY = _config_number(
+    "mobilome.iceberg.min_identity", _iceberg_cfg.get("min_identity"),
+    default=80.0, convert=float,
+    valid_number="a percent identity, such as 80.0",
+)
+ICEBERG_MIN_OVERLAP = _config_number(
+    "mobilome.iceberg.min_overlap_fraction", _iceberg_cfg.get("min_overlap_fraction"),
+    default=0.50, convert=float,
+    valid_number="a fraction of the candidate element, such as 0.5",
+)
 
 MOBILOME_NAME_ICE = MOBILOME_RUN and bool(ICEBERG_URLS or ICEBERG_LOCAL)
 
@@ -1503,8 +1627,18 @@ _isosdb_cfg = _mobilome_cfg.get("isosdb") or {}
 ISOSDB_FASTA_URL = str(_isosdb_cfg.get("fasta_url") or "").strip()
 ISOSDB_FAMILY_URL = str(_isosdb_cfg.get("family_map_url") or "").strip()
 ISOSDB_LOCAL = str(_isosdb_cfg.get("dir") or "").strip()
-ISOSDB_MIN_COVERED = float(_isosdb_cfg.get("min_covered_percent", 90.0))
-ISOSDB_MIN_COPIES = float(_isosdb_cfg.get("min_copy_number", 0.5))
+# Read with _config_number (section 0): blank takes the default; a bare
+# on/off or text stops the run.
+ISOSDB_MIN_COVERED = _config_number(
+    "mobilome.isosdb.min_covered_percent", _isosdb_cfg.get("min_covered_percent"),
+    default=90.0, convert=float,
+    valid_number="a percentage of the database entry, such as 90.0",
+)
+ISOSDB_MIN_COPIES = _config_number(
+    "mobilome.isosdb.min_copy_number", _isosdb_cfg.get("min_copy_number"),
+    default=0.5, convert=float,
+    valid_number="a multiple of the genome's read depth, such as 0.5",
+)
 
 MOBILOME_COPY_NUMBER = (
     MOBILOME_RUN and HAS_SHORT_READS and bool(ISOSDB_FASTA_URL or ISOSDB_LOCAL)

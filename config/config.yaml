@@ -14,8 +14,10 @@
 #   5. resources / parameters: tune threads, RAM, and per-mode options
 #
 # How this file is marked up:
-#   [nanopore|hybrid]     the modes that READ a key or a section. Every other
-#                         mode ignores it entirely.
+#   [nanopore|hybrid]     the modes that READ a key or a section. In every other
+#                         mode it has no effect, but the start-up checks still
+#                         read it: a bare on/off where a number belongs stops
+#                         the run in any mode.
 #   REQUIRED              the run stops at parse time (in seconds, before any
 #                         job starts) if it is missing.
 #   OPTIONAL              leave it empty and the workflow does without it, or
@@ -242,10 +244,8 @@ parameters:
                            #   THE KEY THAT MATTERS for plasmid recovery — see the
                            #   2x2 above. Was 90. At typical bacterial ONT depth
                            #   you are not short of data, so being selective costs
-                           #   more than it gains. There is no "off" spelling: the
-                           #   number is handed straight to filtlong's
-                           #   --keep_percent, so a BLANK value arrives there as
-                           #   the literal None and filtlong refuses to start. Set
+                           #   more than it gains. There is no "off" spelling, and
+                           #   a BLANK value takes the default, 95. Set
                            #   100 to keep everything above min_length — the safest
                            #   setting for plasmids. (The 602-read figure this
                            #   project quoted for years was measured with

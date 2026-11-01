@@ -13,7 +13,9 @@ mode, `directories.output_dir`, the five required database paths and, for
 values belong to optional sources and layers and can stay empty when unused. This page follows
 the file's own order, and every section is tagged with the modes that read it —
 `[all modes]`, `[nanopore|hybrid]` and so on. Keys belonging to a mode that is
-not running are ignored entirely.
+not running have no effect on the run, but the start-up checks still read them:
+a malformed value, such as a bare `on` or `off` where a number belongs, stops the
+run in every mode.
 
 !!! abstract "Terms used on this page"
 
@@ -168,6 +170,7 @@ the file lists the keys:
 | `mobilome.icescan.run` | has a `url` or a `dir` to use | Stops |
 | `mobilome.isosdb.fasta_url` | `family_map_url` set alongside it | Stops |
 | any boolean key | recognisable as true/false | Stops naming the value |
+| any number key: `resources.threads`, `ram_gb`, `runtime_hours`; `parameters.long_read_qc.min_length`, `keep_percent`, `length_weight`; and in `mobilome`, `max_composite_span_bp`, `coverage_profile`, `contig_boundary_bp` and the `min_*` thresholds of `tncentral`, `iceberg` and `isosdb` | a number, not a bare `on` or `off` and not text; a blank value takes the default | Stops, saying how YAML read the value, or that it is not a number, and what number the key takes |
 
 Each stop ends the run with exit status 1, so a wrapper script or a cluster
 submission sees the failure. Most messages begin with `[BacFlux]`; a missing
@@ -186,6 +189,7 @@ required key is reported by Python as a `KeyError` naming it.
     | `medaka_model` | `false` skips Medaka, `true` infers the model |
     | `parameters.decontamination.mode` or `long_read_mode` | `off` counts as `off`; `on`, `yes` or `true` names no policy, and the run stops |
     | any other key that takes a word: `mode`, `phage.caller`, `parameters.nt_version`, `spades_kmers`, `auto_vote`, `flye_input_mode` | stops, saying how YAML read the value and listing the words it accepts |
+    | any key that takes a number: the three `resources`, `min_length`, `keep_percent`, `length_weight`, and the mobilome thresholds such as `coverage_profile` and `min_identity` | stops, saying how YAML read the value and what number the key takes. A number has no off: write the value itself, e.g. `keep_percent: 100`, which rejects no read by percentage |
     | a block written as one value, e.g. `decontamination: off` or `mobilome: on` | stops. Decontamination is switched off with `mode: off` inside its block and the mobilome module with `run: false` inside its block; phage calling has no off switch |
 
 `bakta_db`, `eggnog_db`, `gtdbtk_db` and `platon_db` are passed to their tools as
@@ -567,9 +571,8 @@ define universal plasmid-size ranges protected by either setting.
     "these settings stop the reads being thrown away", not as "and then it
     assembled".
 
-There is no spelling for "off". The number goes straight to Filtlong's
-`--keep_percent`, so a blank value arrives as the literal `None` and Filtlong
-refuses to start. A value of `100` rejects no read by this percentage; `--min_length`
+There is no spelling for "off", and a blank value takes the default, 95. A value of
+`100` rejects no read by this percentage; `--min_length`
 still applies, as does the 500 Mb `--target_bases` cap (`nanopore`, and `hybrid` with
 `short_read_guidance: false`) or, with guidance on, trimming and splitting against the
 Illumina reads. Raising either key further rarely gains anything — total
