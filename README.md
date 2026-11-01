@@ -45,6 +45,9 @@ This README is deliberately short: it covers what BacFlux is and how to get a fi
 going. Everything else — parameter reference, per-mode guidance, output semantics, the
 mobilome module and the methodological caveats — lives on the documentation site.
 
+Questions, ideas and results are welcome in [Discussions](https://github.com/iLivius/BacFlux/discussions);
+please report bugs as [Issues](https://github.com/iLivius/BacFlux/issues).
+
 ## Synopsis
 
 BacFlux is a [Snakemake](https://snakemake.github.io/) workflow that takes a bacterial
@@ -191,13 +194,15 @@ file, is on [output files](https://iLivius.github.io/BacFlux/reference/output/).
 
 ## Citation
 
-> Antonielli, L., Großkinsky, D. K., Koch, H., Trognitz, F., Sanchez Mejia, A., & Nagel, M.
-> (2024). *BacFlux: A workflow for bacterial short-read assembly, QC, annotation, and more.*
-> Zenodo. <https://doi.org/10.5281/zenodo.11143917>
+> Antonielli, L. (2026). *BacFlux: a unified Snakemake workflow for bacterial whole-genome
+> sequencing.* Zenodo. <https://doi.org/10.5281/zenodo.11143917>
 
 That DOI is the concept DOI and always resolves to the newest release; each tagged release
 also gets its own version DOI, which is the one to cite when the exact code matters.
-Machine-readable metadata is in [`CITATION.cff`](CITATION.cff).
+Machine-readable metadata is in [`CITATION.cff`](CITATION.cff). The first Zenodo record,
+v1.1.5 (2024, <https://doi.org/10.5281/zenodo.11143918>), also credits D. K. Großkinsky,
+H. Koch, F. Trognitz, A. Sanchez Mejia and M. Nagel; cite it for work done with that
+version.
 
 Most of the science BacFlux reports is produced by other people's tools and databases, so
 **cite those too**. The full list is in [`CITATIONS.md`](CITATIONS.md) and on

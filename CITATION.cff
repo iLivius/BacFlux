@@ -12,11 +12,11 @@
 # `date-released` is the day the version below is tagged. It is set ahead of
 # tagging; if the tag lands on a different day, correct it before tagging.
 #
-# Also left out on purpose: an ORCID for the author (none was on file here), and
-# the v1 Zenodo record's co-authors — Großkinsky D. K., Koch H., Trognitz F.,
-# Sanchez Mejia A. and Nagel M. — who are credited on the 2024 record for
-# BacFlux v1. Whether they carry over to the v2.0.0 record is an authorship
-# decision, not a documentation one, so nothing has been assumed here.
+# Authorship: BacFlux v2.0.0 and later have a single author, listed below. The
+# first Zenodo record, v1.1.5 (2024, doi:10.5281/zenodo.11143918), also credits
+# Großkinsky D. K., Koch H., Trognitz F., Sanchez Mejia A. and Nagel M.; every
+# later record lists the author alone. Work done with any release cites that
+# release's version DOI. No ORCID is on file for the author, so none is given.
 #
 # The `references` list below covers the tools BacFlux depends on. It is a
 # working subset: CITATIONS.md is the authoritative and complete list, and it

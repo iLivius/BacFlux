@@ -1,5 +1,9 @@
 # Contributing to BacFlux
 
+Questions and ideas are welcome in [Discussions](https://github.com/iLivius/BacFlux/discussions).
+Please report bugs as [Issues](https://github.com/iLivius/BacFlux/issues), with your config
+file and the log of the rule that failed.
+
 Contributions are welcome. Three rules apply to every change.
 
 ## Don't bundle restricted databases

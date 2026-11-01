@@ -14,13 +14,16 @@
 
 ## Citing BacFlux
 
-> Antonielli, L., Großkinsky, D. K., Koch, H., Trognitz, F., Sanchez Mejia, A., &
-> Nagel, M. (2024). *BacFlux: A workflow for bacterial short-read assembly, QC,
-> annotation, and more.* Zenodo. <https://doi.org/10.5281/zenodo.11143917>
+> Antonielli, L. (2026). *BacFlux: a unified Snakemake workflow for bacterial
+> whole-genome sequencing.* Zenodo. <https://doi.org/10.5281/zenodo.11143917>
 
 That DOI is the **concept DOI** — it always resolves to the newest release. Every
 tagged release also gets its own **version DOI** on Zenodo. Cite the version DOI
 when the exact code matters, which for a methods section it usually does.
+
+The first Zenodo record, v1.1.5 (2024,
+<https://doi.org/10.5281/zenodo.11143918>), also credits D. K. Großkinsky, H. Koch,
+F. Trognitz, A. Sanchez Mejia and M. Nagel; cite it for work done with that version.
 
 Machine-readable metadata is in
 [`CITATION.cff`](https://github.com/iLivius/BacFlux/blob/main/CITATION.cff);
