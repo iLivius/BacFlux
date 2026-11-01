@@ -26,14 +26,14 @@ Why a curated name is worth a whole tier
 ----------------------------------------
 Tier 3 is INFERRED: two IS copies of the same family, the right distance apart,
 with a gene in between, so we call it a composite transposon. That inference has
-known failure modes — IS26 in particular forms translocatable units with its
-copies in DIRECT orientation, breaking the same-orientation rule the pattern
-relies on.
+known blind spots: copies in inverted orientation, or with no strand, fail its
+same-orientation test (IS6/IS26 is exempt from that test, so Tn5- or Tn10-like
+structures are what it misses).
 
 A TnCentral hit is not an inference. It is a match to an element somebody
-characterised, named and deposited, whose architecture is already known — so it
-gets IS26 right for free. That is why a curated hit OVERRIDES the pattern-based
-call rather than merely agreeing with it (docs/mobilome/optional-layers.md).
+characterised, named and deposited, whose architecture is already known. That
+is why a curated hit OVERRIDES the pattern-based call rather than merely
+agreeing with it (docs/mobilome/optional-layers.md).
 
 What it takes in and what it produces
 -------------------------------------

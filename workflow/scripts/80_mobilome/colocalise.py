@@ -142,8 +142,9 @@ import sys
 # threshold can re-judge a row without re-running anything.
 
 # Longest block of DNA we are willing to call a composite transposon. Real
-# composites run from ~2.5 kb (IS26 translocatable units) to ~25 kb. 20 kb is a
-# convention; the workflow passes mobilome.max_composite_span_bp (also 20 kb).
+# composites run from ~2.5 kb (one gene between two IS26 copies) to ~25 kb.
+# 20 kb is a convention; the workflow passes mobilome.max_composite_span_bp
+# (also 20 kb).
 DEFAULT_MAX_COMPOSITE_SPAN_BP = 20000
 
 # How close an upstream IS must be before we are willing to say it could be
@@ -196,14 +197,38 @@ ABUTTING_IS_MAX_GAP_BP = 25
 # abutting-IS test above; on its own a low coverage means nothing about mobility.
 MIN_COVERAGE_FOR_INTACT_GENE = 90.0
 
-# IS families whose copies flank a cargo gene in DIRECT orientation. IS26 (family
-# IS6) is the single most clinically important AMR architecture there is: it
-# builds "translocatable units" with its copies in direct, not inverted,
-# orientation. The generic composite rule below asks for the two flanking copies
-# to be in the same orientation; this family is exempted from that test entirely
-# so that IS26 structures are called whichever way round the two copies sit.
-# Without this exception the most important architecture in the table is the one
-# we would miss (see the IS26 warning in docs/mobilome/tuning.md).
+# IS families exempt from the same-orientation test of the composite rule
+# (find_composite_pair, ladder tier 3). For every other family a flanking pair
+# counts only when both copies have a strand and the strands agree, that is,
+# when the two copies point the same way (direct orientation). A pair from this
+# set is accepted whichever way its copies point: direct, inverted, or with one
+# or both strands unknown. Direct pairs would pass the test anyway, so what the
+# exemption adds is the inverted and the strand-unknown pairs.
+#
+# Why IS26. IS26 is one of the IS most often found beside resistance genes in
+# Gram-negative pathogens, and its copies around those genes occur both ways
+# round. They are directly repeated when a translocatable unit (a small circle
+# holding one IS26 and the DNA beside it) has inserted next to an existing IS26
+# (Harmer, Moran & Hall 2014); a stretch bounded like that is called a
+# pseudo-compound transposon. They end up inverted when, for example, IS26
+# copies itself to a nearby site in the opposite orientation, flipping the DNA
+# in between (He et al. 2015). Only a directly repeated pair can move the DNA
+# between its copies, and even then in two steps rather than as one unit
+# (Harmer, Pong & Hall 2020). An inverted pair therefore marks an IS26-bounded
+# region rather than a structure that can move as such, and a strand-unknown
+# pair could be either. Every composite row reports `same_orientation`
+# (yes / no / NA) so the three can be told apart, and every tier-3 call that
+# rests on an exempted pair gets an audit line (is26_orientation_exemption_applied)
+# saying which way its copies point. When a higher tier wins, that line is not
+# written: in tier 4 the pair is mentioned only in
+# named_element_overrides_composite_pattern, without the arrangement.
+#
+# ISEScan reports IS26 under its family name, IS6; the other entries catch other
+# spellings of the same family. Because the test is on the family, it also
+# covers IS26's relatives in family IS6, such as IS257/IS431 and IS1216, which
+# form the same kind of structures. Removing the family would drop IS26-bounded
+# genes with inverted or strand-unknown copies below tier 3 (see the IS26
+# warning in docs/mobilome/tuning.md).
 ORIENTATION_EXEMPT_IS_FAMILIES = {"IS6", "IS26", "IS6/IS26", "IS26/IS6"}
 
 # ISEScan family values that carry no information about WHICH element this is.
@@ -1189,13 +1214,15 @@ def normalise_family(value):
 
 
 def is_orientation_exempt(element):
-    """True when this IS family is allowed to flank cargo in ANY orientation.
+    """True when this IS copy skips the same-orientation test for composites.
 
-    See ORIENTATION_EXEMPT_IS_FAMILIES above: IS26/IS6 builds translocatable
-    units with its copies in direct orientation, so applying the generic
-    same-orientation test to it would throw away the most clinically important
-    AMR architecture there is. We also catch the case where the family column is
-    blank but the element was NAMED IS26 by the naming cascade.
+    Takes one element dict from parse_mobile_elements. Returns True when its
+    family is in ORIENTATION_EXEMPT_IS_FAMILIES (IS6 is the family ISEScan
+    reports IS26 under) or, failing that, when its name starts with IS26. The
+    name test is for an element table whose family column is uninformative but
+    which names its rows; the workflow's own ISEScan table has no name column,
+    so there the family alone decides. find_composite_pair then accepts the pair
+    whichever way its copies point (ORIENTATION_EXEMPT_IS_FAMILIES says why).
     """
     if normalise_family(element["family"]) in ORIENTATION_EXEMPT_IS_FAMILIES:
         return True
@@ -1499,16 +1526,19 @@ def find_composite_pair(gene, insertion_sequences, max_span_bp):
       * the gene lies strictly BETWEEN them;
       * the two copies are the same element (same family, or same ISEScan
         cluster when the family is uninformative);
-      * they are in the SAME orientation — EXCEPT for IS26/IS6, which is exempt
-        (see ORIENTATION_EXEMPT_IS_FAMILIES: it flanks cargo in direct
-        orientation and is the most important architecture in clinical AMR);
+      * both copies have a strand and the strands agree (direct orientation):
+        opposite strands are rejected as an inverted pair, a missing strand as
+        strand-unknown. EXCEPT for IS26/IS6, whose pairs skip this test and are
+        accepted direct, inverted or strand-unknown (ORIENTATION_EXEMPT_IS_FAMILIES
+        says why); such a pair is flagged so the caller can audit it;
       * the whole span is no longer than max_span_bp.
 
     Where several pairs qualify, the TIGHTEST one (smallest span) is returned:
     the innermost pair is the most plausible boundary of the moving unit.
 
     Returns (best_pair_or_None, rejection_summary) where a pair is
-    (left_element, right_element, span_bp) and rejection_summary is a dict of
+    (left_element, right_element, span_bp, same_orientation, strands_known,
+    used_exemption) and rejection_summary is a dict of
     {reason: [detail strings]} for the audit trail — a candidate structure
     we looked at and turned down is exactly what the audit file is for.
 
@@ -1556,8 +1586,12 @@ def find_composite_pair(gene, insertion_sequences, max_span_bp):
             same_orientation = strands_known and left_strand == right_strand
 
             if orientation_exempt:
-                # IS26/IS6: accept either arrangement. Recorded so the reader can
-                # see the exception was used rather than wonder why it passed.
+                # IS26/IS6: accept the pair whichever way its copies point -
+                # direct, inverted, or with a strand missing. Direct pairs come
+                # through here too. The last field (True) lets the caller write
+                # the exemption to the audit when this pair sets the tier (tier
+                # 3), so the reader can see it was used rather than wonder why
+                # the pair passed.
                 accepted_pairs.append((left, right, span, same_orientation, strands_known, True))
                 continue
 
@@ -2144,8 +2178,9 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
     elif named_element is not None:
         # Tier 4: inside a curated unit transposon or integron cassette. A curated
         # named hit OVERRIDES the pattern-based composite call below, because the
-        # curated entry carries the true architecture (and gets IS26 right for
-        # free) — see the TnCentral section of docs/mobilome/optional-layers.md.
+        # curated entry carries the element's known architecture, whereas the
+        # composite call is inferred from where two IS copies sit — see the
+        # TnCentral section of docs/mobilome/optional-layers.md.
         row["mobility_tier"] = 4
         row["mge_context"] = named_element["element_type"]
         row["mge_id"] = named_element["id"]
@@ -2183,12 +2218,38 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
         base_confidence = "high"
         context_elements = [left, right]
         if used_exemption:
+            # IS6/IS26 pairs skip the same-orientation test (see
+            # ORIENTATION_EXEMPT_IS_FAMILIES). Say which way the two copies
+            # actually point, so a reader of the audit file can tell a pair that
+            # would have passed the test anyway (direct) from one accepted only
+            # because of the exemption (inverted, or a strand missing). The
+            # same answer is in the table's same_orientation column.
+            if same_orientation:
+                arrangement = ("the copies are in direct orientation, so the pair "
+                               "would have passed the test anyway")
+            elif strands_known:
+                arrangement = ("the copies are in inverted orientation, so the pair "
+                               "was accepted only because of the exemption")
+            else:
+                arrangement = ("at least one copy has no strand, so the pair was "
+                               "accepted only because of the exemption")
+            # Name the copy that made the pair exempt, and how: by its family
+            # (the usual case: ISEScan reports IS26 as family IS6) or, in an
+            # element table that names its rows, by a name starting with IS26
+            # (see is_orientation_exempt).
+            if is_orientation_exempt(left):
+                exempt_copy = left
+            else:
+                exempt_copy = right
+            if normalise_family(exempt_copy["family"]) in ORIENTATION_EXEMPT_IS_FAMILIES:
+                exempt_basis = f"its family ({exempt_copy['family']})"
+            else:
+                exempt_basis = f"its name ({exempt_copy['name']})"
             add_audit(
                 "evidence_rejected", "is26_orientation_exemption_applied",
-                f"flanking pair {left['id']}/{right['id']} is family "
-                f"{left['family'] or right['family']}: the same-orientation test was "
-                "skipped because IS26/IS6 forms translocatable units with its copies "
-                "in direct orientation",
+                f"flanking pair {left['id']}/{right['id']}: {exempt_copy['id']} is "
+                f"IS6/IS26 by {exempt_basis}, so the same-orientation test is not "
+                f"applied; {arrangement}",
                 tier=3, context="composite",
             )
         if left["complete"] != "complete" or right["complete"] != "complete":

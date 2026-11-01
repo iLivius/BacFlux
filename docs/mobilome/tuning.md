@@ -411,7 +411,7 @@ where the curve flattens rather than an arbitrary larger number.
 `mobilome.max_composite_span_bp` (Layer A, default **20,000**, `MOBILOME_MAX_COMPOSITE_SPAN`
 in `00_common.smk`) is
 the longest span accepted for a composite transposon, which is ladder tier 3. Real
-composites run from about 2.5 kb (IS*26* translocatable units) to about 25 kb. The
+composites run from about 2.5 kb (one gene between two IS*26* copies) to about 25 kb. The
 measured span is always reported next to the call, in `flanking_span_bp`.
 
 Everything else in the co-localisation step is Layer C, in `colocalise.py`:

@@ -233,11 +233,11 @@ def test_family_matching_uses_family_then_cluster():
 
 def test_is6_family_is_exempt_from_the_orientation_rule():
     """The exemption has to fire on either spelling of the same element: ISEScan
-    writes the family as IS6, while a curated name from the TnCentral cascade
-    arrives as IS26 in the `name` column."""
+    writes the family as IS6, while an element table that names its rows may
+    carry IS26 in the `name` column instead."""
     assert co.is_orientation_exempt({"family": "IS6", "name": ""}) is True
     assert co.is_orientation_exempt({"family": "is26", "name": ""}) is True
-    # Family column blank but the naming cascade called it IS26.
+    # Family uninformative ("new" counts as blank) but the table names it IS26.
     assert co.is_orientation_exempt({"family": "new", "name": "IS26"}) is True
     assert co.is_orientation_exempt({"family": "IS3", "name": ""}) is False
 
@@ -400,10 +400,13 @@ def test_tier2_on_a_minus_strand_gene_looks_at_the_other_side(tmp_path):
 # ── Ladder tier 3: composite transposon, and the IS26 exception ──────────────
 #
 # Two copies of the same IS bracketing the gene can move the whole block as one
-# unit. The generic rule asks for the same family, the same orientation and a
-# span within --max-composite-span; IS6/IS26 is exempted from the orientation
-# test because it forms translocatable units with its copies in DIRECT
-# orientation, and it is the single most clinically important architecture here.
+# unit. The generic rule asks for the same family, the same orientation (both
+# strands known and equal) and a span within --max-composite-span. IS6/IS26 is
+# exempted from the orientation test: its copies around resistance genes occur
+# both directly repeated and inverted, so its pairs are accepted direct,
+# inverted or with a strand missing. Direct pairs would pass anyway; the
+# exemption adds the other two, and every composite call that relies on it is
+# written to the audit.
 
 
 def test_tier3_composite_same_family_same_orientation(tmp_path):
@@ -476,8 +479,11 @@ def test_composite_rejected_when_the_span_is_too_long(tmp_path):
 
 
 def test_is26_direct_orientation_is_still_called_a_composite(tmp_path):
-    """IS26 flanks its cargo in DIRECT orientation — the clinically vital case."""
-    report, _audit = run_colocalise(
+    """A direct IS26 pair, the pseudo-compound-transposon arrangement, is called
+    a composite. It would pass the generic same-orientation test anyway; IS6
+    pairs go through the exemption branch instead, and this checks that the
+    branch keeps them and says in the audit that the test did not matter."""
+    report, audit = run_colocalise(
         tmp_path,
         amr_rows=[amr_row(symbol="blaSHV-12", start=10000, stop=11000, strand="+")],
         is_rows=[
@@ -493,6 +499,10 @@ def test_is26_direct_orientation_is_still_called_a_composite(tmp_path):
     assert row["mge_context"] == "composite"
     assert row["is_family"] == "IS6"
     assert row["same_orientation"] == "yes"
+    detail = [line["detail"] for line in audit
+              if line["reason"] == "is26_orientation_exemption_applied"][0]
+    assert "direct orientation" in detail
+    assert "would have passed the test anyway" in detail
 
 
 def test_is26_is_exempt_from_the_orientation_rule_in_either_arrangement(tmp_path):
@@ -500,8 +510,8 @@ def test_is26_is_exempt_from_the_orientation_rule_in_either_arrangement(tmp_path
 
     The generic rule asks for both copies in the same orientation. IS6/IS26 is
     exempted from that test altogether, so the call does not depend on which way
-    round the two copies happen to sit — this is the single most important AMR
-    architecture and must not be lost to an orientation technicality.
+    round the two copies sit; same_orientation reports which way they do, and
+    the audit says the pair passed only because of the exemption.
     """
     report, audit = run_colocalise(
         tmp_path,
@@ -517,6 +527,89 @@ def test_is26_is_exempt_from_the_orientation_rule_in_either_arrangement(tmp_path
     assert row["mge_context"] == "composite"
     assert row["same_orientation"] == "no"      # reported honestly, not hidden
     assert "is26_orientation_exemption_applied" in audit_reasons(audit)
+    detail = [line["detail"] for line in audit
+              if line["reason"] == "is26_orientation_exemption_applied"][0]
+    assert "inverted orientation" in detail
+    assert "only because of the exemption" in detail
+    # The reason given must not contradict the rule: direct pairs pass the
+    # generic test anyway, so "direct orientation" cannot be why this one passed.
+    assert "direct orientation" not in detail
+
+
+@pytest.mark.parametrize("missing_strand", ["NA", ""])
+def test_is26_pair_with_a_missing_strand_is_accepted_and_says_so(tmp_path, missing_strand):
+    """The exemption's third case: an IS6 pair with one strand missing is still
+    a composite, same_orientation is NA rather than a guess, and the audit says
+    the pair passed only because of the exemption.
+
+    ISEScan leaves the strand blank for an IS with no predicted transposase;
+    isescan_to_table.py writes NA in its place, and that NA is what
+    {sample}_is_elements.tsv hands colocalise.py in the workflow. A raw ISEScan
+    table still carries the blank, so both spellings must count as missing.
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(symbol="aadA2", start=10000, stop=11000, strand="+")],
+        is_rows=[
+            is_row(start=9000, end=9800, strand=missing_strand, family="IS6",
+                   is_id="IS26_a"),
+            is_row(start=11200, end=12000, strand="-", family="IS6", is_id="IS26_b"),
+        ],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "3"
+    assert row["same_orientation"] == "NA"
+    detail = [line["detail"] for line in audit
+              if line["reason"] == "is26_orientation_exemption_applied"][0]
+    assert "no strand" in detail
+    assert "only because of the exemption" in detail
+
+
+@pytest.mark.parametrize("missing_strand", ["NA", ""])
+def test_non_is6_pair_with_a_missing_strand_is_rejected_and_audited(tmp_path, missing_strand):
+    """Control for the test above: the same geometry in family IS3 is turned
+    down with flanking_is_strand_unknown, because the generic rule cannot
+    check an orientation it does not have. Both spellings of a missing strand
+    (NA from isescan_to_table.py, a blank from raw ISEScan) are covered."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000, strand="+")],
+        is_rows=[
+            is_row(start=8000, end=9000, strand=missing_strand, family="IS3",
+                   is_id="ISleft"),
+            is_row(start=12000, end=13000, strand="-", family="IS3", is_id="ISright"),
+        ],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+    )
+    assert report[0]["mobility_tier"] == "1"
+    assert "flanking_is_strand_unknown" in audit_reasons(audit)
+
+
+def test_is26_exemption_by_name_says_so_in_the_audit(tmp_path):
+    """The exemption can also come from an element table that names its rows:
+    here both copies have the uninformative family "new" and the same ISEScan
+    cluster, and one is named IS26. The pair is inverted, so it passes only
+    because of the exemption, and the audit names the copy and says it was its
+    name, not its family, that made the pair exempt."""
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(start=10000, stop=11000, strand="+")],
+        is_rows=[
+            is_row(start=9000, end=9800, strand="+", family="new",
+                   cluster="IS_cl_9", is_id="X_a", name="IS26"),
+            is_row(start=11200, end=12000, strand="-", family="new",
+                   cluster="IS_cl_9", is_id="X_b"),
+        ],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+    )
+    row = report[0]
+    assert row["mobility_tier"] == "3"
+    assert row["same_orientation"] == "no"
+    detail = [line["detail"] for line in audit
+              if line["reason"] == "is26_orientation_exemption_applied"][0]
+    assert "X_a is IS6/IS26 by its name (IS26)" in detail
+    assert "only because of the exemption" in detail
 
 
 def test_non_is6_inverted_pair_is_rejected_and_the_reason_is_audited(tmp_path):
@@ -582,10 +675,9 @@ def test_the_tightest_flanking_pair_wins(tmp_path):
 
 # ── Ladder tier 4: a curated named element overrides the pattern ─────────────
 #
-# A TnCentral or Integrall hit brings the real architecture with it, so a named
-# transposon or integron wins over a composite inferred from IS geometry — the
-# curated entry gets cases like IS26 right for free. The naming layer is opt-in
-# (no URL configured, no names), so tier 4 never appears on most runs.
+# A TnCentral hit brings the real architecture with it, so a named transposon or
+# integron wins over a composite inferred from IS geometry. The naming layer is
+# opt-in (no URL configured, no names), so tier 4 never appears on most runs.
 
 
 def test_tier4_named_unit_transposon_overrides_the_composite_pattern(tmp_path):

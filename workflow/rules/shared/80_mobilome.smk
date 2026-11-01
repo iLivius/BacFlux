@@ -1103,8 +1103,8 @@ if MOBILOME_RUN:
         # Biology: TnCentral catalogues transposons and integrons that people have
         #          characterised and named. Matching one is qualitatively different
         #          from inferring a composite from two IS copies: the architecture
-        #          is already known, so it gets awkward cases like IS26 right for
-        #          free.
+        #          is already known rather than read off the position and
+        #          orientation of the IS copies.
         # Takes in: nothing from the workflow — a URL from the config, or a
         #           directory the user already holds.
         # Does: download, verify, unpack, repair, and index. The ZIP holds
