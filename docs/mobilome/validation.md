@@ -598,27 +598,19 @@ the shipped one on every flank window the caller genuinely searched — after
 insertion-sequence masking, at the real element coordinates, at the real computed
 repeat-length floor:
 
-> **52 benchmark genomes — a wider set than the 40 scored above — 246 *att* searches,
-> 180 distinct flank windows, 1,033 repeats, exact set equality on every window.** No
-> window hit either implementation's internal cap.
+> **52 benchmark genomes — a wider set than the 40 scored above — with the ICEscan
+> layer on: 249 *att* searches, 183 distinct flank windows, 1,044 repeats, exact set
+> equality on every window.** No window hit either implementation's internal cap.
 
 The two implementations returned the same set of repeats on every window tested.
 vmatch itself was not run: the comparison partner reimplements its method, so the
 result shows that the shipped search returns the exact maximal repeats it is defined
 to return. Agreement between two implementations of one definition says nothing about
-whether a boundary is biologically real.
+whether a boundary is biologically real. The comparison script is not distributed.
 
 The Bioconda recipe for vmatch 2.3.1 declares `license: Unknown / OTHER`, and no
 licence text could be retrieved from the upstream site when this was checked in July
 2026, so its terms could not be established. BacFlux does not use vmatch.
-
-!!! note "An earlier figure that should not be quoted"
-
-    A previous version of this measurement was recorded as "35 of 35 windows, 122
-    repeats". It does not reproduce under any scoping that could be reconstructed,
-    because the script that produced it was never kept. The equality result itself
-    reproduces, over roughly five times as many windows, and the numbers above are the
-    ones to use. The script that produces them is not distributed.
 
 ## No code from the EBI pipeline is used here
 

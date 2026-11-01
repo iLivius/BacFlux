@@ -565,8 +565,9 @@ defects, since fixed; the other two were differences in candidate extent with no
 repeat on either side (§6.3).
 
 A separate implementation using a suffix array, LCP array and cross-flank MEM
-enumeration was compared with BacFlux on **52 genomes, 246 att searches, 180 distinct
-flank windows and 1,033 repeats**. The repeat sets were identical on every window.
+enumeration was compared with BacFlux on **52 genomes, 249 att searches, 183 distinct
+flank windows and 1,044 repeats**, with the ICEscan layer on for every genome. The
+repeat sets were identical on every window.
 The Vmatch executable itself was not run: on those windows, a search with Vmatch's
 maximal-repeat semantics finds no repeat that BacFlux's search misses. Agreement
 between two implementations of one definition does not validate an element boundary.
@@ -588,7 +589,7 @@ BacFlux does not use it.
 | Call burden, 40 genomes | BacFlux 65 calls / 2.63 Mb (68 / 2.69 Mb with ICEscan on all 40); MAP 64 calls / 2.88 Mb |
 | Negative controls, 32.6 Mb | 2 candidate calls each (BacFlux 5 with ICEscan on); identical coordinates on the one shared call |
 | Boundaries | Comparable — chromosomal median \|start offset\| 5,141 bp vs MAP 7,427; standalone recovery 0.94 vs 0.94. §6.3 records that this comparison prompted two fixes to our att search |
-| Is vmatch required by BacFlux? | No. Two implementations of the intended repeat search agreed on the 180 tested windows; this was not a direct Vmatch executable benchmark. |
+| Is vmatch required by BacFlux? | No. Two implementations of the intended repeat search agreed on the 183 tested windows; this was not a direct Vmatch executable benchmark. |
 
 Nothing here supports a claim that either pipeline is better than the other. It
 supports three narrower claims: BacFlux's caller recovers the curated elements MAP

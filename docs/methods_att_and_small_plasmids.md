@@ -174,12 +174,12 @@ prefix-doubling suffix array, Kasai LCP array and cross-flank MEM enumeration. I
 replayed actual caller windows after IS masking, at the recorded coordinates and
 repeat-length floor. The check script is not distributed.
 
-The two implementations returned identical sets on **52 benchmark genomes, 246 att
-searches, 180 distinct flank windows and 1,033 repeats**. Neither reached its internal
-cap. On those windows, a search with Vmatch's maximal-repeat semantics finds no repeat
-that BacFlux's search misses; the Vmatch executable itself was not run. Agreement
-between two implementations of one definition does not validate a biological
-boundary.
+The two implementations returned identical sets on **52 benchmark genomes, 249 att
+searches, 183 distinct flank windows and 1,044 repeats**, with the ICEscan layer on for
+every genome. Neither reached its internal cap. On those windows, a search with
+Vmatch's maximal-repeat semantics finds no repeat that BacFlux's search misses; the
+Vmatch executable itself was not run. Agreement between two implementations of one
+definition does not validate a biological boundary.
 
 ### Licensing note
 

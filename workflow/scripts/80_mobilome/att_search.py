@@ -494,8 +494,8 @@ MIN_ATT_REPEAT_BP = 15
 # audit row in conjscan_to_ice.py, i.e. a change to the output, so it has been
 # left for a deliberate change rather than done quietly here.
 #
-# Why this is a latent gap rather than a live problem: the re-run recorded in
-# docs/methods_att_and_small_plasmids.md covered 246 att searches over 52
+# Why this is a latent gap rather than a live problem: the comparison recorded in
+# docs/methods_att_and_small_plasmids.md covered 249 att searches over 52
 # benchmark genomes and no window hit either implementation's internal cap.
 MAX_SEED_MATCHES = 200_000
 

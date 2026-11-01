@@ -255,11 +255,13 @@ awk -F'\t' '$5=="kept_flagged"' 08.mobilome/S1/S1_ice_discarded.tsv | cut -f6 | 
     protein, or from a VirB4 that CONJscan's MOB model lists as accessory. ICEscan's
     coupling-protein and mating-pair hits are never used as anchors.
 
-    None of the 26 IME rows in the benchmark reached high confidence: 25 had two
-    classes and one had three but remained medium. Eighteen also carried
-    `machinery_degraded` because of `low_system_wholeness`: a relaxase-only match to
-    a larger CONJscan model can score 0.333 wholeness even when the IME architecture
-    is expected. In comparison, 30 of 53 ICE rows were high confidence.
+    On the 52 complete records in the benchmark (the 40 scored on
+    [Validation](validation.md) plus 12 clinical genomes), with the ICEscan layer on,
+    none of the 26 IME rows reached high confidence: 25 had two classes and one had
+    three but remained medium. Eighteen also carried `machinery_degraded` because of
+    `low_system_wholeness`: a relaxase-only match to a larger CONJscan model can
+    score 0.333 wholeness even when the IME architecture is expected. In comparison,
+    30 of 53 ICE rows were high confidence.
 
     Lowering the anchor-class minimum to two would make only eight of the 26 IMEs
     eligible: 17 others are also capped by `machinery_not_intact` and one by
@@ -575,11 +577,11 @@ isescan_table` says, for every *dnaC* and *dnaI*, which way it went and why. The
 an ICE?* (anchors, machinery, one contig) and *where does it end?* (`boundary_method`).
 By default they are reported side by side and only the first sets confidence.
 
-Measured cost of turning it on: across the 85 element rows produced by the 52 complete
-records in the benchmark, 30 reach high confidence and only **7** of those have
-`boundary_method=tRNA`. The key demotes 23 of 30 high calls to medium **even on closed
-genomes**. Use it on closed long-read assemblies, where an unresolved boundary is a
-warning sign rather than the norm.
+Measured cost of turning it on: across the 88 element rows produced by the 52 complete
+records in the benchmark with the ICEscan layer on, 30 reach high confidence and only
+**7** of those have `boundary_method=tRNA`. The key demotes 23 of 30 high calls to
+medium **even on closed genomes**. Use it on closed long-read assemblies, where an
+unresolved boundary is a warning sign rather than the norm.
 
 Either way, cargo is never assigned from an unresolved boundary: a de novo repeat is
 reported but never widens an element, so the interval stays the machinery span, a floor.
@@ -607,7 +609,7 @@ reported but never widens an element, so the interval stays the machinery span, 
     **`MAX_SEED_MATCHES` truncates silently.** Hitting it breaks out of the scan, so a
     real repeat sitting among the unexamined seeds is missed and the element reports
     `boundary_method=none` — indistinguishable from "the flanks carry no repeat". No
-    audit row says the search was cut short. Across 246 att searches over 52 benchmark
+    audit row says the search was cut short. Across 249 att searches over 52 benchmark
     genomes no window reached the cap, so this is a latent gap rather than a live
     problem (the note above `MAX_SEED_MATCHES` in `att_search.py`).
 
