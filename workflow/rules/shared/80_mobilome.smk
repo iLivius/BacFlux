@@ -374,8 +374,9 @@ if MOBILOME_RUN:
     # gene name and product. The full report adds five things this module needs:
     #   1. the Method column (EXACTX / BLASTX / PARTIALX / HMM / POINTX …) — a
     #      free confidence tier, straight from the tool;
-    #   2. PARTIAL* methods, which flag a hit truncated at a contig end — the
-    #      honest signal for short-read fragmentation;
+    #   2. the PARTIAL_CONTIG_END* methods, which flag a hit truncated at a contig
+    #      end — the honest signal for short-read fragmentation (a bare PARTIAL*
+    #      hit is truncated inside the contig instead);
     #   3. element type/subtype (AMR / STRESS / VIRULENCE);
     #   4. drug class and subclass;
     #   5. point mutations, when --organism is known (see the rule above).

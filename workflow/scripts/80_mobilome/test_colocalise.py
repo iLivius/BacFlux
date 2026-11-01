@@ -52,12 +52,18 @@ AMRFINDER_HEADER = [
 
 
 def amr_row(contig="contig_1", start=10000, stop=11000, strand="+",
-            symbol="blaTEM-116", method="ALLELEX", amr_class="BETA-LACTAM"):
-    """One AMRFinderPlus row with sensible defaults; override what a test needs."""
+            symbol="blaTEM-116", method="ALLELEX", amr_class="BETA-LACTAM",
+            coverage="100.00"):
+    """One AMRFinderPlus row with sensible defaults; override what a test needs.
+
+    `coverage` fills "% Coverage of reference". Real AMRFinderPlus output gives
+    every PARTIAL and PARTIAL_CONTIG_END hit less than 90 there, so a test about
+    a partial hit should set it rather than keep the full-length default.
+    """
     return [
         "s1_00001", contig, str(start), str(stop), strand, symbol,
         "broad-spectrum class A beta-lactamase", "core", "AMR", "AMR",
-        amr_class, amr_class, method, "286", "286", "100.00", "100.00", "286",
+        amr_class, amr_class, method, "286", "286", coverage, "100.00", "286",
         "AAA1.1", "beta-lactamase TEM-116", "NA", "NA",
     ]
 
@@ -1506,6 +1512,82 @@ def test_a_partial_hit_truncated_by_the_contig_end_is_not_called_inactivation(tm
     row = report[0]
     assert row["is_inside_amr_cds"] == "no"
     assert "is_abuts_partial_amr_hit_likely_inactivation" not in audit_reasons(audit)
+
+
+def test_a_contig_end_hit_with_low_coverage_is_not_called_inactivation(tmp_path):
+    """The same guard, at the coverage a real contig-end hit always has.
+
+    AMRFinderPlus only calls a hit PARTIAL_CONTIG_END when it covers under 90%
+    of its reference, so every real one also has a low coverage. Modelled here:
+    a PARTIAL_CONTIG_ENDX aac(3)-IIa fragment at 62.5% coverage that runs off
+    the start of its contig, with an IS26 flush against its other end. The
+    contig end cut this gene short, not the IS, so it must not be flagged as
+    inactivation, and the IS stays available to the other context tests.
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(symbol="aac(3)-IIa", start=1, stop=450, strand="-",
+                          method="PARTIAL_CONTIG_ENDX", coverage="62.50")],
+        is_rows=[is_row(start=451, end=1670, strand="-", family="IS6",
+                        cluster="IS6_1", is_id="IS26_a")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["is_inside_amr_cds"] == "no"
+    assert "is_abuts_partial_amr_hit_likely_inactivation" not in audit_reasons(audit)
+    # The IS26 sits upstream of this minus-strand gene and on its strand, so once
+    # the gene is not called broken the IS is read as a possible promoter (tier
+    # 2), as it would be next to any other gene.
+    assert row["mobility_tier"] == "2"
+    assert row["mge_id"] == "IS26_a"
+    # The contig end is still reported, and still caps the row at low.
+    assert row["amr_partial_at_contig_end"] == "yes"
+    assert row["confidence"] == "low"
+
+
+def test_an_is_abutting_a_low_coverage_hit_is_called_inactivation(tmp_path):
+    """Coverage alone still marks a fragment when the method does not say
+    PARTIAL: an HMM hit covering 61.5% of its reference, flush against an IS26,
+    in the middle of its contig. The contig-end guard must not switch this
+    signal off.
+    """
+    report, audit = run_colocalise(
+        tmp_path,
+        amr_rows=[amr_row(symbol="bla", start=10000, stop=10450, strand="-",
+                          method="HMM", coverage="61.48")],
+        is_rows=[is_row(start=10451, end=11670, strand="-", family="IS6",
+                        cluster="IS6_1", is_id="IS26_a")],
+        replicon_rows=[["contig_1", "chromosome", "contig_1", "NA", "NA"]],
+        length_rows=(("contig_1", 200000),),
+    )
+    row = report[0]
+    assert row["is_inside_amr_cds"] == "yes"
+    assert row["mobility_tier"] != "2"          # NOT expression modulation
+    assert "is_abuts_partial_amr_hit_likely_inactivation" in audit_reasons(audit)
+
+
+def test_the_contig_end_guard_wins_over_the_coverage_test():
+    """find_truncating_abutting_is called directly, on the three cases that
+    decide it. One IS starts right after the end of each hit (a 0 bp gap)."""
+    flush_is = [{"id": "IS26_a", "start": 451, "end": 1670}]
+
+    # Cut short by the contig end: excluded, even at a low coverage.
+    contig_end_hit = {"start": 1, "end": 450, "method": "PARTIAL_CONTIG_ENDX",
+                      "pct_coverage": "62.50"}
+    assert co.find_truncating_abutting_is(contig_end_hit, flush_is) == (None, None, None)
+
+    # Truncated inside the contig: the IS is found, 0 bp from the hit's end.
+    internal_partial = {"start": 1, "end": 450, "method": "PARTIALX",
+                        "pct_coverage": "62.50"}
+    element, gap, which_end = co.find_truncating_abutting_is(internal_partial, flush_is)
+    assert (element["id"], gap, which_end) == ("IS26_a", 0, "end")
+
+    # Low coverage with a method that does not say PARTIAL: still a fragment.
+    low_coverage_hmm = {"start": 1, "end": 450, "method": "HMM",
+                        "pct_coverage": "61.48"}
+    element, gap, which_end = co.find_truncating_abutting_is(low_coverage_hmm, flush_is)
+    assert (element["id"], gap, which_end) == ("IS26_a", 0, "end")
 
 
 def test_a_complete_gene_next_to_an_is_is_still_ordinary_context(tmp_path):

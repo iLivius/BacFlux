@@ -67,7 +67,7 @@ Straight from AMRFinderPlus, which is why these columns exist rather than ABRica
 | `n_flanking_is` | IS copies on either side within the composite window |
 | `same_orientation` | whether the two flanking copies point the same way. `NA` when a strand is unknown |
 | `flanking_span_bp` | the measured span of a called composite — compare it against `mobilome.max_composite_span_bp` |
-| `is_inside_amr_cds` | `yes` = an IS covers at least half of the coding sequence, or lies within 25 bp of a hit AMRFinderPlus reports as truncated (a `PARTIAL` method other than `PARTIAL_CONTIG_END`, or under 90% reference coverage). Read as likely **inactivation**; the flag never raises the tier. A smaller overlap leaves `no` and caps confidence at `medium` (`is_partially_overlaps_amr_gene`) |
+| `is_inside_amr_cds` | `yes` = an IS covers at least half of the coding sequence, or lies within 25 bp of a hit AMRFinderPlus reports as truncated inside the contig (a `PARTIAL` method, or under 90% reference coverage). The 25 bp test never counts a `PARTIAL_CONTIG_END` hit, whatever its coverage: the contig end cut it short, not an IS. An IS covering at least half of such a hit still sets `yes`. Read as likely **inactivation**; the flag never raises the tier. A smaller overlap leaves `no` and caps confidence at `medium` (`is_partially_overlaps_amr_gene`) |
 | `is_amr_overlap_bp` | how much of the gene it overlaps |
 
 ### The conjugation machinery behind a tier 5 or 6 call

@@ -424,7 +424,7 @@ Everything else in the co-localisation step is Layer C, in `colocalise.py`:
 | `MIN_AMR_FRACTION_INSIDE_ELEMENT` | 0.9 | fraction of the AMR gene inside a named element before the element is said to carry it |
 | `MIN_AMR_FRACTION_OVERLAPPED_FOR_DISRUPTION` | 0.5 | fraction overlapped by an IS before the CDS is called disrupted (likely inactivated) rather than merely overlapping |
 | `ABUTTING_IS_MAX_GAP_BP` | 25 | how flush an IS must be against a **partial** AMR hit to read the pair as "the IS split this gene". Tight on purpose: it tests "butted up against", not "nearby" |
-| `MIN_COVERAGE_FOR_INTACT_GENE` | 90.0 | below this percent coverage an AMRFinderPlus hit is treated as a fragment. Used only with the abutting-IS test |
+| `MIN_COVERAGE_FOR_INTACT_GENE` | 90.0 | below this percent coverage an AMRFinderPlus hit is treated as a fragment. Used only with the abutting-IS test, and never for a `PARTIAL_CONTIG_END` hit |
 | `ORIENTATION_EXEMPT_IS_FAMILIES` | `{IS6, IS26, …}` | families exempt from the same-orientation rule for composites |
 | `UNINFORMATIVE_FAMILY_VALUES` | `{"", NA, NEW, UNKNOWN, ISNCY, …}` | ISEScan family labels carrying no information about *which* element this is |
 

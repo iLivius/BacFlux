@@ -469,9 +469,10 @@ def to_int(value):
 def to_float(value):
     """Parse a percentage into a float, or return None if it is not a number.
 
-    Used for AMRFinderPlus's "% Coverage of reference", which is "NA" whenever the
-    hit came from an HMM rather than an alignment. None means "not stated", and
-    every caller treats that as "cannot judge", never as zero.
+    Used for AMRFinderPlus's "% Coverage of reference". AMRFinderPlus 4.x fills it
+    for HMM hits as well as for alignment hits, which is why a low coverage can
+    mark an HMM fragment in find_truncating_abutting_is. None means the cell was
+    empty or "NA", and every caller treats that as "cannot judge", never as zero.
     """
     try:
         return float(str(value).strip())
@@ -1302,7 +1303,8 @@ def find_truncating_abutting_is(gene, insertion_sequences):
     Two guards keep it honest:
       * The hit must be partial for a reason OTHER than the contig running out.
         AMRFinderPlus says which: a method naming CONTIG_END means the assembly
-        truncated the gene, not an IS, so those are excluded.
+        truncated the gene, not an IS, so those are excluded, whatever their
+        coverage.
       * The IS must be within ABUTTING_IS_MAX_GAP_BP of the gene's edge. A
         transposition leaves the two flush (often with a short target-site
         duplication), so this window is small on purpose.
@@ -1313,10 +1315,20 @@ def find_truncating_abutting_is(gene, insertion_sequences):
     method = str(gene.get("method", "")).upper()
     coverage = to_float(gene.get("pct_coverage", ""))
 
+    # A hit cut short by the end of its contig is left out first, before the
+    # coverage test below. AMRFinderPlus only names a method PARTIAL_CONTIG_END*
+    # when the hit covers under 90% of its reference, so every one of them would
+    # also pass that test and come straight back in. For these the assembly is to
+    # blame, not an IS, and that is already reported separately
+    # (amr_partial_at_contig_end, with its low-confidence cap).
+    if "CONTIG_END" in method:
+        return None, None, None
+
     # "Partial for a reason other than the contig ending." PARTIALX / PARTIALP etc.
-    # mean AMRFinderPlus matched only part of its reference; *CONTIG_END* means the
-    # assembly is to blame, which is already reported separately.
-    method_says_partial = "PARTIAL" in method and "CONTIG_END" not in method
+    # mean AMRFinderPlus matched only part of its reference. A coverage under
+    # MIN_COVERAGE_FOR_INTACT_GENE says the same for a method that does not name
+    # it, such as an HMM or INTERNAL_STOP hit.
+    method_says_partial = "PARTIAL" in method
     coverage_says_partial = coverage is not None and coverage < MIN_COVERAGE_FOR_INTACT_GENE
     if not (method_says_partial or coverage_says_partial):
         return None, None, None
