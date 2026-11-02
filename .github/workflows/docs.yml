@@ -4,8 +4,9 @@
 #
 # What happens on a push to main:
 #   1. GitHub checks out the repo on a temporary Ubuntu runner.
-#   2. Installs Python and the exact mkdocs-material version verified locally (pinned
-#      below, so a future mkdocs-material release can't silently break this build).
+#   2. Installs Python and the exact mkdocs-material and mkdocs-glightbox (image
+#      viewer) versions verified locally (pinned below, so a future release can't
+#      silently break this build).
 #   3. Runs `mkdocs gh-deploy`, which builds the site and force-pushes the result to
 #      the gh-pages branch (created automatically on first run if it doesn't exist).
 #   4. GitHub Pages (once pointed at the gh-pages branch in repo Settings) serves
@@ -54,7 +55,7 @@ jobs:
           # Without a matching file it fails outright at setup rather than just
           # skipping the cache, which is what actually broke the first run.
 
-      - run: pip install mkdocs-material==9.7.7
+      - run: pip install mkdocs-material==9.7.7 mkdocs-glightbox==0.5.2
 
       # No --strict here: a genuinely broken link should fail loudly when caught
       # locally (mkdocs build --strict, already part of the normal editing routine

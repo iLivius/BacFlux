@@ -33,8 +33,8 @@ family of pipelines.
 
 ## The workflow at a glance
 
-[![Metro map of BacFlux v2.1.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table.](assets/bacflux_metro.png#only-light)](assets/bacflux_metro.png)
-[![Metro map of BacFlux v2.1.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table.](assets/bacflux_metro_dark.png#only-dark)](assets/bacflux_metro_dark.png)
+![Metro map of BacFlux v2.1.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table.](assets/bacflux_metro.png#only-light)
+![Metro map of BacFlux v2.1.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table.](assets/bacflux_metro_dark.png#only-dark)
 
 Each coloured line is one mode. The four lines take their own routes to
 `contigs_final.fasta`, the genome each mode delivers, and from there run through the
@@ -43,7 +43,8 @@ SPAdes draft and decontaminates it, and the Illumina reads that map back to the 
 contigs are what Polypolish uses to correct the long-read assembly. An open ring marks
 a step the config switches on or off; the prophage stage runs VirSorter2 by default,
 or geNomad instead. The dashed red line is the optional mobilome module. Select the
-map to open it at full size.
+map to open it larger; select it again to see it at full size, and close it with x
+or Esc.
 
 ## The four modes
 

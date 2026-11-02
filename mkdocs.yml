@@ -76,6 +76,10 @@ extra_css:
 
 plugins:
   - search
+  - glightbox:          # a selected image opens in an overlay, closed with x or Esc
+      zoomable: true    # selecting the opened image shows it at its own size
+      draggable: true   # mouse drag inside the viewer (the default)
+      auto_themed: true # the viewer shows the copy that matches the colour scheme
 
 # The nav mirrors how the workflow is built: the four modes differ only in their
 # front end (reads and assembly), and everything from taxonomy onwards is one
