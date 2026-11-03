@@ -33,8 +33,8 @@ family of pipelines.
 
 ## The workflow at a glance
 
-![Metro map of BacFlux v2.1.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table.](assets/bacflux_metro.png#only-light)
-![Metro map of BacFlux v2.1.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table.](assets/bacflux_metro_dark.png#only-dark)
+![Metro map of BacFlux v2.2.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. In the annotation box, an optional Baktfold branch leaves Bakta. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table. A magenta dash-dot line, the optional trait profile, leaves Bakta and runs through ProstT5 on all proteins, Foldseek against EcoFoldDB and the trait rules to the trait profile table. The trait rules also use Bakta's gene names; thin magenta feeders bring in the antiSMASH regions and, when Baktfold runs, its names, and a summary across samples feeds the MultiQC report.](assets/bacflux_metro.png#only-light)
+![Metro map of BacFlux v2.2.0. Blue (illumina), purple (hybrid), green (nanopore) and yellow (contigs) lines run through read QC, assembly, decontamination and polishing to contigs_final.fasta, then through assembly QC, taxonomy, annotation, antimicrobial resistance, plasmids and prophages to the MultiQC report. In the annotation box, an optional Baktfold branch leaves Bakta. A dashed red line, the optional mobilome module, reads the annotation, the taxonomy and the plasmid calls and ends in the mobility-ladder table. A magenta dash-dot line, the optional trait profile, leaves Bakta and runs through ProstT5 on all proteins, Foldseek against EcoFoldDB and the trait rules to the trait profile table. The trait rules also use Bakta's gene names; thin magenta feeders bring in the antiSMASH regions and, when Baktfold runs, its names, and a summary across samples feeds the MultiQC report.](assets/bacflux_metro_dark.png#only-dark)
 
 Each coloured line is one mode. The four lines take their own routes to
 `contigs_final.fasta`, the genome each mode delivers, and from there run through the
@@ -42,9 +42,11 @@ same stages. In `hybrid` the purple line has two arms: the Illumina arm assemble
 SPAdes draft and decontaminates it, and the Illumina reads that map back to the kept
 contigs are what Polypolish uses to correct the long-read assembly. An open ring marks
 a step the config switches on or off; the prophage stage runs VirSorter2 by default,
-or geNomad instead. The dashed red line is the optional mobilome module. Select the
-map to open it larger; select it again to see it at full size, and close it with x
-or Esc.
+or geNomad instead. The dashed red line is the optional mobilome module. The magenta
+dash-dot line is the optional trait profile; its thin arrows bring in the antiSMASH
+regions and, when Baktfold runs, Baktfold's names, and carry its summary to MultiQC.
+Select the map to open it larger; select it again to see it at full size, and close
+it with x or Esc.
 
 ## The four modes
 
