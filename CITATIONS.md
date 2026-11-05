@@ -25,7 +25,8 @@ learning from its design:
   *Using SPAdes de novo assembler.* Current Protocols in Bioinformatics 70:e102.
 
 - **Bakta** — Schwengers O, Jelonek L, Dieckmann MA, Beyvers S, Blom J, Goesmann A. (2021)
-  *Bakta: rapid and standardized annotation of bacterial genomes via alphanumerical identifiers.*
+  *Bakta: rapid and standardized annotation of bacterial genomes via alignment-free
+  sequence identification.*
   Microbial Genomics 7(11):000685. <https://doi.org/10.1099/mgen.0.000685>
 
 - **Baktfold** (optional, `baktfold.run: true`) — Bouras G, Lim SW, Durr L, Vreugde S,
@@ -42,6 +43,19 @@ learning from its design:
   Its database (<https://doi.org/10.5281/zenodo.17347516>) is built from SwissProt, the
   AlphaFold Protein Structure Database, PDB and CATH; if you report which of them a name
   came from, cite that database as well (Baktfold's README lists the papers).
+
+- **EcoFoldDB** (optional, `traits.run: true`) — Ghaly TM, Rajabal V, Russell D,
+  Colombi E, Tetu SG. (2025) *EcoFoldDB: Protein Structure-Guided Functional Profiling
+  of Ecologically Relevant Microbial Traits at the Metagenome Scale.* Environmental
+  Microbiology 27(9):e70178. <https://doi.org/10.1111/1462-2920.70178>
+  The trait profile searches its database, EcoFoldDB v2.0
+  (<https://doi.org/10.5281/zenodo.16908168>), with **Foldseek**, after Baktfold's
+  **ProstT5** step has turned each protein of up to 4,000 amino acids into a string of
+  Foldseek's 3Di structural alphabet; cite Baktfold, ProstT5 and Foldseek as listed
+  under Baktfold above. The primary papers behind each trait rule are in the
+  `reference` column of `workflow/scripts/40_annotation/trait_rules_v1.tsv`.
+  *The database is CC BY 4.0. The EcoFoldDB repository's code carries no licence, and
+  BacFlux does not use it.*
 
 - **CheckM** — Parks DH, Imelfort M, Skennerton CT, Hugenholtz P, Tyson GW. (2015)
   *CheckM: assessing the quality of microbial genomes recovered from isolates,

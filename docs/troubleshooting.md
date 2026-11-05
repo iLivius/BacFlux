@@ -52,21 +52,30 @@ some cost you seconds, one costs you the length of the run up to that rule.
 | Config key | Caught | What you see |
 |---|---|---|
 | `input.illumina_dir`, `nanopore_dir`, `contigs_dir` | parse time | `[BacFlux] input.contigs_dir is not an existing directory: '/no/such/dir'` |
-| `directories.vs2_db`, `antismash_db`, `dbcan_db`, `card_db`, `genomad_db` | parse time | `[BacFlux] directories.vs2_db is '/tmp', but it has no 'Done_all_setup'. Point it at the directory 'virsorter setup' produced …` |
+| `directories.vs2_db`, `antismash_db`, `dbcan_db`, `card_db`, `genomad_db`; `baktfold_db` when `baktfold.run` or `traits.run` is true, and `ecofolddb_db` when `traits.run` is true | parse time | `[BacFlux] directories.vs2_db is '/tmp', but it has no 'Done_all_setup'. Point it at the directory 'virsorter setup' produced …` |
 | `directories.checkv_db` | parse time | `[BacFlux] directories.checkv_db is '…', but that directory holds 0 CheckV database(s) (looking for */genome_db/checkv_reps.faa).` |
-| `links.dbcan_link`, plus `phix_link` and `card_link` in the modes that need them | parse time | the missing key is named |
+| `links.dbcan_link`, plus `phix_link` and `card_link` in the modes that need them, and `ecofolddb_link` or `directories.ecofolddb_db` with `traits.run: true` | parse time | the missing key is named |
 | `directories.blast_db` | DAG build (so, a dry run) | `MissingInputException in rule blob_json … affected files: <blast_db>/names.dmp, <blast_db>/nodes.dmp` |
 | `directories.bakta_db`, `eggnog_db`, `gtdbtk_db`, `platon_db` | **not checked** | the tool fails when its own rule runs |
 
-Six of the seven optional database keys share one check: a file that can only exist
+Seven of the eight optional database keys share one check: a file that can only exist
 inside a real copy of that particular database — `Done_all_setup` for VirSorter2,
 `aro_index.tsv` for CARD, `version.txt` for geNomad, `dbCAN.hmm` for dbCAN,
-`clusterblast/` for antiSMASH, `swissprot.dbtype` for Baktfold (function `_resolve_optional_db_dir` in
-`00_common.smk`). A directory that exists but holds the wrong thing is therefore
-still caught. `checkv_db` is the exception, because it is the one key that points
-at the *parent* of the versioned database folder; it is checked for exactly one
-`*/genome_db/checkv_reps.faa` underneath, so aiming a level too high or too low is
-caught as well (the `CHECKVDB` check in `00_common.smk`).
+`clusterblast/` for antiSMASH, `swissprot.dbtype` for Baktfold, `EcoFoldDB.dbtype` for
+EcoFoldDB (function `_resolve_optional_db_dir` in `00_common.smk`). A directory that
+exists but holds the wrong thing is therefore still caught. `checkv_db` is the
+exception, because it is the one key that points at the *parent* of the versioned
+database folder; it is checked for exactly one `*/genome_db/checkv_reps.faa`
+underneath, so aiming a level too high or too low is caught as well (the `CHECKVDB`
+check in `00_common.smk`).
+
+`ecofolddb_db` gets a second check: every EcoFoldDB entry that the trait profile's
+gene dictionary, `trait_genes_v1.tsv`, uses must be listed in the copy's
+`EcoFoldDB_descriptions.txt`. The copy in
+the EcoFoldDB GitHub repository names some entries differently from the Zenodo record,
+fails this check, and the message names the missing entries. Point the key at the
+`EcoFoldDB_v2.0/` folder of the Zenodo archive instead, or leave it empty to let the
+workflow download that archive.
 
 !!! warning "Four of the five required databases are read, not verified"
 

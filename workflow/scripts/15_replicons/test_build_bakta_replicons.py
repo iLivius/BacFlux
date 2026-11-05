@@ -3,11 +3,10 @@
 
 The script under test builds the small table that tells Bakta which contigs of a
 long-read assembly are circular. That matters because Pyrodigal, the gene caller
-Bakta uses, only calls genes running across the origin on a sequence marked
-circular — on a closed chromosome that is a handful of real genes, dnaA among
-them. Getting the table wrong therefore costs annotation, and getting it wrong
-in the confident direction bakes a made-up replicon type into a record people
-read as fact.
+Bakta uses, only calls a gene running across the origin on a sequence marked
+circular. Getting the table wrong therefore costs that gene, and getting it
+wrong in the confident direction bakes a made-up replicon type into a record
+people read as fact.
 
 These need no tools and no databases: tiny in-memory fixtures (a FASTA, a Flye
 assembly_info.txt and a dnaapler reorientation summary) go through the parsers

@@ -44,12 +44,13 @@ A full run leaves several thousand files. These are the ones that carry the resu
 | `02.assembly/{sample}/eval/checkm/{sample}_checkm_stats.tsv` | Completeness and contamination of that genome. | all |
 | `03.taxonomy/{sample}/classify/gtdbtk.*.summary.tsv` | GTDB-Tk classification, reference matches and warnings. | all |
 | `04.annotation/bakta/{sample}/{sample}.tsv` | The gene calls, with products. | all |
+| `04.annotation/traits/{sample}/{sample}_trait_profile.tsv` | Which plant-growth, biocontrol, stress and degradation traits the genome's genes support, with the genes behind each call. | all, opt-in |
 | `05.amr/abricate/{sample}/AMR_summary.txt` | AMR and virulence hits on the assembly, across eight databases. | all |
 | `05.amr/mapping/{sample}/{sample}_CARD_report.tsv` | AMR determinants found in the *reads*, classified by what kind of CARD entry each is. | `[illumina, hybrid]` |
 | `06.plasmids/{sample}/platon/verified_plasmids.txt` | Contigs predicted as plasmids, with supplementary BLAST annotations. | all |
 | `07.phages/checkv/{sample}/quality_summary.tsv` | Predicted prophages and how complete each one is. | all |
 | `08.mobilome/{sample}/{sample}_amr_mobility.tsv` | For each AMR gene: the mobile-element context and a mobility tier. | all, opt-in |
-| `09.report/multiqc_report.html` | Read QC, assembly QC, completeness and taxonomy for the whole batch on one page. | all |
+| `09.report/multiqc_report.html` | Read QC, assembly QC, completeness and taxonomy for the whole batch on one page, and the trait calls when the trait profile is on. | all |
 
 !!! warning "One output directory, one batch"
 
@@ -94,7 +95,9 @@ output_dir/
 |   |-- bakta/{sample}/   eggnog/{sample}/
 |   |-- antismash/{sample}/   + antismash/databases/
 |   |-- dbcan/{sample}/       + dbcan/<db version>/
-|   `-- baktfold/{sample}/    + baktfold/databases/      only when baktfold.run: true
+|   |-- baktfold/{sample}/                       only when baktfold.run: true
+|   |-- baktfold/databases/                      when baktfold.run or traits.run is true
+|   `-- traits/{sample}/      + traits/databases/  only when traits.run: true
 |-- 05.amr/
 |   |-- abricate/{sample}/                       eight databases + a summary
 |   `-- mapping/{sample}/  + card_db/            [illumina, hybrid]
@@ -236,14 +239,16 @@ point-mutation detection. See [Taxonomy](../analysis/taxonomy.md).
 
 | Path | Contents |
 |---|---|
-| `bakta/{sample}/` | The full Bakta annotation set — `{sample}.gff3`, `.tsv`, `.faa`, `.fna`, `.gbff` and more. Three later stages reach into this directory: eggNOG takes the `.faa`, antiSMASH the `.gbff`, dbCAN both the `.faa` and the `.gff3`. |
+| `bakta/{sample}/` | The full Bakta annotation set — `{sample}.gff3`, `.tsv`, `.faa`, `.fna`, `.gbff` and more. Three later stages reach into this directory: eggNOG takes the `.faa`, antiSMASH the `.gbff`, dbCAN both the `.faa` and the `.gff3`. With the optional layers on, Baktfold takes the `.json`, the trait profile the `.faa` and `.tsv`, and the mobilome module the `.faa`, `.gff3` and `.tsv`. |
 | `eggnog/{sample}/` | `{sample}.emapper.*` — orthologous group per protein, with COG category, GO, KEGG KO and pathway, EC. Terminal: nothing else reads it. |
-| `antismash/{sample}/` | Secondary-metabolite clusters, with antiSMASH's own HTML report. Terminal. |
+| `antismash/{sample}/` | Secondary-metabolite clusters, with antiSMASH's own HTML report. Terminal, unless the trait profile is on: it reads the region types as supporting evidence. |
 | `antismash/databases/` | The shared antiSMASH reference database: downloaded here, or a symlink view of a copy you already hold. |
 | `dbcan/{sample}/` | CAZyme calls, gene clusters and substrate predictions. Terminal. |
 | `dbcan/<db version>/` | The shared dbCAN database, likewise. The folder is named from the download URL, so the version is visible on disk. The empty `.verified.sha256` beside it is the marker written once the checksum matched, and its presence is what stops the download repeating. |
-| `baktfold/{sample}/` | Only with `baktfold.run: true`. Bakta's file set again, with names found by predicted structure for the proteins Bakta called hypothetical, plus `{sample}.inference.tsv` (the database hit behind each name) and one `baktfold_<database>_tophit.tsv` per database. Terminal: every other stage reads Bakta's annotation. |
-| `baktfold/databases/` | Baktfold's database and the ProstT5 model: downloaded here, or a symlink view of a copy you already hold. |
+| `baktfold/{sample}/` | Only with `baktfold.run: true`. Bakta's file set again, with names found by predicted structure for the proteins Bakta called hypothetical, plus `{sample}.inference.tsv` (the database hit behind each name) and one `baktfold_<database>_tophit.tsv` per database. Every other stage reads Bakta's annotation; only the trait profile, when on, also counts these names. |
+| `baktfold/databases/` | Baktfold's database and the ProstT5 model: downloaded here, or a symlink view of a copy you already hold. Also set up when `traits.run: true`, which uses the ProstT5 model. |
+| `traits/{sample}/` | Only with `traits.run: true`. `{sample}_trait_profile.tsv` (one row per trait: called, partial or not called, with the genes behind it), `{sample}_trait_profile_audit.tsv` (the reason for each decision) and `{sample}_trait_genes.tsv` (each protein that matched a gene, with its evidence and whether it counted). `structure/` holds the proteins searched (`{sample}_searched.faa`), their 3Di sequences (`prostt5/`) and the Foldseek query database (`querydb/`), kept so the slow 3Di step runs once (the archive clean-up removes them). Read by `09.report/traits_summary.tsv`. See [Trait profile](../analysis/traits.md). |
+| `traits/databases/` | EcoFoldDB v2.0: downloaded here and checked against `links.ecofolddb_md5`, or a symlink view of a copy you already hold. |
 
 eggNOG is the slow tail of a BacFlux run. See [Annotation](../analysis/annotation.md).
 
@@ -368,9 +373,11 @@ what not to conclude from one, is on
 
 | File | Contents |
 |---|---|
-| `multiqc_report.html` | fastp or NanoPlot, Qualimap, QUAST, CheckM, GTDB-Tk and Bakta for the whole batch, with sample names rewritten into readable panel labels. |
+| `multiqc_report.html` | fastp or NanoPlot, Qualimap, QUAST, CheckM, GTDB-Tk and Bakta for the whole batch, with sample names rewritten into readable panel labels; with `traits.run: true`, also a heatmap of every sample's trait calls. |
 | `multiqc_config.yaml` | The generated config, kept so the renaming rules are inspectable. |
-| `multiqc_data/` | MultiQC's parsed numbers behind the report. |
+| `multiqc_report_data/` | MultiQC's parsed numbers behind the report. |
+| `traits_summary.tsv` | Only with `traits.run: true`. Every sample's trait calls side by side: one row per sample, one column per trait, each cell `called`, `partial` or `not called`. Made again whenever a sample is added. |
+| `traits_summary_mqc.tsv` | Only with `traits.run: true`. The same calls as numbers (2 called, 1 partial, 0 not called), which MultiQC draws as the report's trait heatmap. |
 
 Left alone, MultiQC names a sample after every directory component of the file it came
 from. The generated config rewrites those into `<what it is> | <sample>` — so a panel
@@ -412,18 +419,20 @@ not a failure.
 | `02.assembly/{sample}/eval/genomes/` | Staging copies of the assemblies under their bin ids, for QUAST, CheckM and GTDB-Tk. |
 | `02.assembly/{sample}/polypolish/` contents | Alignments and the pre-correction draft. |
 | `04.annotation/eggnog/{sample}_tmp/` | emapper's scratch space. |
+| `04.annotation/traits/{sample}/{sample}_ecofolddb_hits.tsv` | The trait profile's Foldseek hit table, about 170 MB per genome, read only by the trait calls. Making the calls again later repeats the 2-minute search from the kept `structure/` folder. |
+| `04.annotation/traits/{sample}/search_tmp/` | Foldseek's scratch space for that search. |
 | `05.amr/card.tar.bz2`, on the download path | The downloaded CARD archive, removed once it is unpacked into `05.amr/card_db/`, which is kept. |
 | `08.mobilome/{sample}/assembly_depth_ref/`, `isosdb_ref/` | BBMap indexes for the copy-number analysis. |
 | `09.report/multiqc_inputs/` | Relabelled CheckM and GTDB-Tk copies staged for MultiQC. |
 
 Nearly every tool directory on this page is a declared Snakemake **directory** output:
-the per-sample trees written by Bakta, eggNOG, antiSMASH, dbCAN, QUAST, CheckM,
-Qualimap, GTDB-Tk, Platon, the phage caller, CheckV, ISEScan and CONJscan, and every
-database directory the workflow fetches. Snakemake deletes a directory output before
-re-running the rule that makes it, so anything you put inside one will not survive that
-rule re-running. Keep your own files beside them, not in them. `09.report/` is the
-deliberate exception, although keeping your own analysis files outside generated outputs
-is easier to manage.
+the per-sample trees written by Bakta, eggNOG, antiSMASH, dbCAN, Baktfold, QUAST,
+CheckM, Qualimap, GTDB-Tk, Platon, the phage caller, CheckV, ISEScan and CONJscan, the
+trait profile's `structure/` folder, and every database directory the workflow
+fetches. Snakemake deletes a directory output before re-running the rule that makes
+it, so anything you put inside one will not survive that rule re-running. Keep your
+own files beside them, not in them. `09.report/` is the deliberate exception, although
+keeping your own analysis files outside generated outputs is easier to manage.
 
 ---
 

@@ -98,6 +98,7 @@ Two practical consequences:
 | `hybrid` adds | everything in the two rows above, plus polypolish and snippy. Bowtie2 builds the first screen's coverage track; minimap maps the long reads for the second screen, over the delivered genome |
 | `contigs` adds | minimap — its own front-end rule is plain `awk`, but BlobTools still wants a BAM, so the contigs are mapped against themselves |
 | `mobilome.run: true` adds | isescan, macsyfinder, and tncentral for the optional naming and copy-number layers |
+| `baktfold.run: true` or `traits.run: true` adds | baktfold, which also carries the ProstT5 and Foldseek steps of the trait profile |
 
 ## 4. The tools BacFlux expects to find, and does not install
 
@@ -121,8 +122,8 @@ minimal Debian or Ubuntu system has no `wget`, and a minimal Red Hat-family syst
 no `tar` — so BacFlux provides them:
 
 - `wget`, `tar`, `gzip` and `bzip2` come from `workflow/envs/download.yaml` (PhiX,
-  CARD, dbCAN, the ICEscan models) or from the tool's own environment (geNomad,
-  VirSorter2, CheckV);
+  CARD, dbCAN, the ICEscan models, EcoFoldDB) or from the tool's own environment
+  (geNomad, VirSorter2, CheckV);
 - `curl` and `unzip` come from `workflow/envs/tncentral.yaml`, for the optional
   mobilome layers (TnCentral, ICEberg, ISOSDB);
 - the CheckM package downloads its reference data (about 275 MB) while conda builds
@@ -132,19 +133,20 @@ no `tar` — so BacFlux provides them:
 The download recipes on [Reference databases](databases.md), which you run yourself,
 use the `wget` and `tar` of your own system.
 
-**Rules without an environment.** Eight rules declare no conda environment, and two
+**Rules without an environment.** Ten rules declare no conda environment, and two
 more, `all` and `download_all`, are targets that run no command of their own. The
-eight run in the environment you launched Snakemake from and use only utilities from
+ten run in the environment you launched Snakemake from and use only utilities from
 the list above:
 
 | Group | Rules | Uses |
 |-------|-------|------|
 | Filter, copy or stage a FASTA | `filter_contigs`, `finalize_contigs`, `stage_qc_genomes` | `awk`, `grep`, `head`, `cat`, `cp`, `mkdir`, `ls`, `dirname`, `tee` |
-| Build a symlink view of a database you already hold | `download_amr_db_local`, `cazyme_db_local`, `secondary_metabolites_db_local`, `genomad_db_local`, `virsorter2_db_local` | `mkdir`, `ln`, `basename` |
+| Build a symlink view of a database you already hold | `download_amr_db_local`, `cazyme_db_local`, `secondary_metabolites_db_local`, `genomad_db_local`, `virsorter2_db_local`, `structure_annotation_db_local`, `trait_db_local` | `mkdir`, `ln`, `basename` |
 
-**BacFlux's own helper scripts.** Twelve rules — `select_contigs`,
-`screen_final_contigs`, `build_replicons` and nine rules of the mobilome module — run
-their script in `workflow/envs/python.yaml`, a pinned Python with nothing else in it.
+**BacFlux's own helper scripts.** Fourteen rules — `select_contigs`,
+`screen_final_contigs`, `build_replicons`, nine rules of the mobilome module, and
+`trait_profile` and `traits_summary` of the trait profile — run their script in
+`workflow/envs/python.yaml`, a pinned Python with nothing else in it.
 The scripts import only Python's standard library, so there is no `pip install` step.
 
 The helper scripts' unit tests need nothing but Python and `pytest`, so they run
@@ -163,14 +165,14 @@ every download rule is a local rule.
 ## 5. Reference databases
 
 Five databases must be downloaded by hand before a run: Bakta, NCBI `core_nt`,
-eggNOG, GTDB and Platon. A further seven may be pointed at a copy you already hold,
+eggNOG, GTDB and Platon. A further eight may be pointed at a copy you already hold,
 and the rest BacFlux fetches itself on the first run that needs them, or all at
 once with the `download_all` target. Sizes, download recipes and the config keys
 that hold the paths are all on [Reference databases](databases.md).
 
 Required database keys must exist and point to prepared databases. A missing
 key stops configuration parsing, whereas an empty or invalid path may fail later,
-when the database is used. For the seven optional local-database paths, BacFlux
+when the database is used. For the eight optional local-database paths, BacFlux
 also checks for an existing directory and database-specific files during planning.
 A successful dry run does not establish that every database is complete.
 

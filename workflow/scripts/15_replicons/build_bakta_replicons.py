@@ -4,11 +4,12 @@
 Why Bakta has to be told which contigs are circular
 ---------------------------------------------------
 Bakta annotates every sequence as a LINEAR CONTIG unless it is told otherwise.
-For a long-read assembly that is wrong and it costs real genes: Pyrodigal (the
-gene caller Bakta uses) branches on topology, and on a sequence marked circular
-it is allowed to call a gene that runs across the origin. On a closed bacterial
-chromosome that is typically a handful of genes at position 1 — including, quite
-often, dnaA itself, which is exactly the gene dnaapler rotated to the start.
+For a long-read assembly that is wrong: Pyrodigal (the gene caller Bakta uses)
+branches on topology, and only on a sequence marked circular is it allowed to
+call a gene that runs across the origin, which Bakta then joins into one CDS.
+dnaapler has already rotated every circular contig in which it found a start
+gene (dnaA, repA, terL or cog1474) to begin at that gene, so this matters most
+for a circular contig dnaapler could not rotate.
 
 Long-read assemblies are the only ones where we KNOW the topology: Flye reports,
 per contig, whether it closed it into a circle. So in nanopore and hybrid mode we

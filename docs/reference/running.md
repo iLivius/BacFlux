@@ -174,7 +174,7 @@ and count as one core each. Rules whose tool stops scaling ask for less, through
 | Thread request | Rules |
 |---|---|
 | `CPUS` (the full `resources.threads`) | `map_phix`, `illumina_assembly` (SPAdes), `ont_assembly` (Flye), `map_contigs`, `map_sel_contigs`, `map_final_contigs` |
-| `capped_cpus(24)` | BLAST screening, QUAST, CheckM, Qualimap, GTDB-Tk, Bakta, eggNOG, antiSMASH, dbCAN, BBMap→CARD, Platon, VirSorter2, geNomad, CheckV, Polypolish, Snippy, `fix_start`, Medaka **in nanopore mode** |
+| `capped_cpus(24)` | BLAST screening, QUAST, CheckM, Qualimap, GTDB-Tk, Bakta, eggNOG, antiSMASH, dbCAN, Baktfold (`structure_annotation`), the trait profile's `trait_structure_query` and `trait_structure_search`, BBMap→CARD, Platon, VirSorter2, geNomad, CheckV, Polypolish, Snippy, `fix_start`, Medaka **in nanopore mode** |
 | `capped_cpus(16)` | `trim_adapters` (fastp); the mobilome depth and ISOSDB mapping analyses |
 | `capped_cpus(8)` | NanoPlot raw and filtered QC; Medaka **in hybrid mode** (the two long-read modes carry different values, kept as they were until timings say otherwise); the mobilome tool rules (AMRFinderPlus, ISEScan, CONJScan, ICEscan, the two BLAST naming analyses); the two CheckV database rules |
 | `capped_cpus(4)` | `virsorter2_db` |
@@ -326,7 +326,7 @@ whole batch stopping. Fix the one sample, then resume with `--rerun-incomplete`.
 |---|---|---|
 | `.snakemake/conda/` in the launch directory, or the `--conda-prefix` folder | the per-rule environments, and the Medaka model weights stored inside the medaka one | rebuilt from scratch, needs network |
 | `.snakemake/` metadata | what is up to date, and the lock | the next run recomputes more than it needs to |
-| under `output_dir` | the databases the workflow fetches and keeps — the PhiX genome and its Bowtie2 index, CARD, antiSMASH, dbCAN, CheckV, the phage caller's own database, and the optional mobilome databases | re-downloaded or rebuilt; for PhiX and CARD, see below |
+| under `output_dir` | the databases the workflow fetches and keeps — the PhiX genome and its Bowtie2 index, CARD, antiSMASH, dbCAN, CheckV, the phage caller's own database, and the optional Baktfold, EcoFoldDB and mobilome databases | re-downloaded or rebuilt; for PhiX and CARD, see below |
 | `output_dir/logs/` | one log per rule and sample (`LOGS` in `00_common.smk`) | nothing recomputes; you lose the record |
 
 The PhiX index and CARD are kept for a reason beyond saving a download. Snakemake
@@ -344,11 +344,11 @@ redoes every step whose input is rebuilt, or newer than that step's results:
 
 Kept, PhiX and CARD are downloaded and the index built once per output folder, and a
 sample added to the folder later runs on its own; only the MultiQC report, which
-covers every sample, is made again. A folder whose `01.reads/phix/` holds no
-`phix.*.bt2` files, for example after the archive clean-up
-(`workflow/scripts/clean_workdir.sh`) has removed them, has no index: the next run
-that screens a sample builds it, and every finished sample there is redone. Put new
-samples in a new output folder instead.
+covers every sample, is made again, and with `traits.run: true` the trait summary. A
+folder whose `01.reads/phix/` holds no `phix.*.bt2` files, for example after the
+archive clean-up (`workflow/scripts/clean_workdir.sh`) has removed them, has no index:
+the next run that screens a sample builds it, and every finished sample there is
+redone. Put new samples in a new output folder instead.
 
 Reusing the same launch directory and the same `output_dir` is what keeps the
 rest from being rebuilt. Databases you already hold elsewhere can be pointed at
@@ -441,6 +441,8 @@ What `download_all` fetches, according to the configuration:
 | VirSorter2 database | `virsorter2_db` | `phage.caller: virsorter2`, unless `directories.vs2_db` names your copy | `07.phages/vs2_db/` |
 | geNomad database | `genomad_db` | `phage.caller: genomad`, unless `directories.genomad_db` names your copy | `07.phages/genomad_db/` |
 | CheckV database | `checkv_db` | unless `directories.checkv_db` names your copy | `07.phages/checkv_db/` |
+| Baktfold database and the ProstT5 model | `structure_annotation_db` | `baktfold.run` or `traits.run`, unless `directories.baktfold_db` names your copy | `04.annotation/baktfold/databases/` |
+| EcoFoldDB | `trait_db` | `traits.run`, unless `directories.ecofolddb_db` names your copy | `04.annotation/traits/databases/` |
 | CONJScan models | `conjscan_models` | `mobilome.run` | `08.mobilome/conjscan_models/` |
 | ICEscan models | `icescan_models` | `mobilome.icescan.run` | `08.mobilome/icescan_models/` |
 | TnCentral | `tncentral_db` | the `tncentral` layer is on | `08.mobilome/tncentral_db/` |
@@ -620,9 +622,9 @@ On many clusters, project storage and the home directory provide these shared pa
 `workflow/scripts/clean_workdir.sh` strips a finished output directory down to
 results, reports and audit trails, deleting bulky intermediates (trimmed and
 filtered reads, SPAdes and Flye working directories, Medaka scratch, CheckM
-scratch) and every database the workflow keeps in the output tree. Raw input
-reads are never touched — they are read in place, never copied into the output
-tree.
+scratch, the trait profile's structure files) and every database the workflow
+keeps in the output tree. Raw input reads are never touched — they are read in
+place, never copied into the output tree.
 
 ```bash
 # preview — this is what --run would delete

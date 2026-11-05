@@ -117,7 +117,7 @@ cleaned down to results and archived.
 
 | Change | What to do |
 |---|---|
-| **Sample names may contain underscores** (and dots). Fifteen characters are still refused: `* # @ % ^ / ! ? & : ; \| < >` and space | nothing, unless you had renamed files to avoid underscores |
+| **Sample names may contain underscores** (and dots). Fifteen characters are still refused: `* # @ % ^ / ! ? & : ; | < >` and space | nothing, unless you had renamed files to avoid underscores |
 | **GTDB R232 with GTDB-Tk 2.7.2** | download R232; the pinned version rejects older releases |
 | **Bakta database v6.0** with Bakta 1.12.1 | download v6.0 |
 | **The virus caller is selectable.** VirSorter2 stays the default; geNomad is opt-in, and choosing it also produces a Platon + geNomad plasmid concordance table | nothing, unless you want geNomad |
@@ -128,9 +128,11 @@ cleaned down to results and archived.
 
 One downstream difference is deliberate and appears in the two long-read modes: Bakta
 gains or loses a single feature, because it is now handed a `--replicons` table
-declaring a closed chromosome circular. That makes its gene caller run in closed mode,
-which shifts a couple of marginal start codons. It is one feature in several thousand
-in the comparison on [Rationale](../about/rationale.md). Changes in gene boundaries
+declaring a complete chromosome circular. When every sequence is declared a
+chromosome or a plasmid, Bakta treats the genome as complete and trains its gene
+caller without closed ends, letting a gene run off the end of a sequence, which
+shifts a couple of marginal start codons. It is one feature in several thousand in
+the comparison on [Rationale](../about/rationale.md). Changes in gene boundaries
 should be considered when comparing annotations across versions.
 
 ## Next

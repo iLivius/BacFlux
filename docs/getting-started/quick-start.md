@@ -32,7 +32,7 @@ Run these from the repository root. `workflow/Snakefile` is found there
 automatically, which is why it never appears on the command line. Paths inside the
 config are used as you wrote them, so a relative one resolves against the directory
 you launched from, not against the config file — use absolute paths. `output_dir`
-is the exception: it is resolved to an absolute path for you.
+and the optional database paths are resolved to absolute paths for you.
 
 Steps 1 and 2 in more detail, including which few rules run outside a conda
 environment: [installation](installation.md).
@@ -66,7 +66,7 @@ fetch for you. You download them once and give BacFlux the path:
 Everything else — PhiX, CARD, CheckV, dbCAN, VirSorter2, antiSMASH — is downloaded
 by the workflow into `output_dir` on the first run. All of those but PhiX also have
 an optional `directories.*_db` key: point it at a copy you already hold and nothing
-is fetched. Download recipes, sizes and the seven optional keys are on
+is fetched. Download recipes, sizes and the eight optional keys are on
 [reference databases](databases.md).
 
 ## Step 3 — the keys that decide a run

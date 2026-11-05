@@ -4,7 +4,8 @@ Stage `04.annotation` predicts genes and assigns functional annotations to
 `02.assembly/{sample}/contigs_final.fasta`. Four tools provide complementary
 outputs through `workflow/rules/shared/40_annotation.smk`, and a fifth, Baktfold,
 can be switched on. The stage is available in all modes, with circular-replicon
-information supplied in the long-read modes.
+information supplied in the long-read modes. The optional
+[trait profile](traits.md) builds on this stage and has a page of its own.
 
 Bakta goes first and the other three read its output, not the contigs, so one gene
 set underlies every functional layer: a CAZyme cluster, a biosynthetic cluster and an
@@ -18,10 +19,12 @@ orthologous group all sit on the same coordinates.
 | [run_dbcan](https://github.com/bcb-unl/run_dbcan) | 5.1.2 | predicted carbohydrate-active enzymes, clusters and substrates | `04.annotation/dbcan/{sample}/` |
 | [Baktfold](https://github.com/gbouras13/baktfold), optional | 0.3.0 | a name, found by predicted structure, for proteins Bakta left "hypothetical" | `04.annotation/baktfold/{sample}/` |
 
-Three of the four are terminal products — you read them, nothing downstream does.
-Bakta is the exception: MultiQC summarises it, and the optional mobilome module reads
-its proteins, its GFF3 and its annotation table. Baktfold, when switched on, is
-terminal too: nothing reads it, so it changes no other result.
+eggNOG-mapper and dbCAN are terminal products — you read them, nothing downstream does.
+Bakta is the exception: MultiQC summarises it, the optional mobilome module reads its
+proteins, its GFF3 and its annotation table, and Baktfold its `.json`. antiSMASH, and
+Baktfold when switched on, are terminal too, unless the optional
+[trait profile](traits.md) is on: it reads Bakta's proteins and annotation table,
+antiSMASH's region types as supporting evidence, and Baktfold's names.
 
 !!! abstract "Terms used on this page"
 
@@ -44,7 +47,7 @@ its dependency on the directory and reaches in for the one file it wants.
 |---|---|
 | **In** | `02.assembly/{sample}/contigs_final.fasta`; the kept genus, `{sample}_kept_genus.txt`, from [decontamination](decontamination.md); the replicon table in the long-read modes |
 | **Out** | `04.annotation/bakta/{sample}/` — `{sample}.faa`, `.gff3`, `.gbff`, `.tsv` and the rest |
-| **Next** | eggNOG-mapper (`.faa`), antiSMASH (`.gbff`), dbCAN (`.faa` + `.gff3`), MultiQC, and the [mobilome module](../mobilome/index.md) (`.faa` + `.gff3` + `.tsv`) |
+| **Next** | eggNOG-mapper (`.faa`), antiSMASH (`.gbff`), dbCAN (`.faa` + `.gff3`), MultiQC, the [mobilome module](../mobilome/index.md) (`.faa` + `.gff3` + `.tsv`), [Baktfold](#baktfold) (`.json`) and the [trait profile](traits.md) (`.faa` + `.tsv`) |
 
 The settings that are worth knowing:
 
@@ -85,10 +88,12 @@ The first line of `logs/annotation_{sample}.log` records the genus used, as
 
 *`nanopore` and `hybrid` only.*
 
-Bakta treats every sequence as a linear contig unless told otherwise, and that costs
-genes: on a sequence declared circular, Pyrodigal may call a gene running across the
-origin instead of leaving two partial CDS at the ends. On a closed chromosome that is
-typically a handful of genes at position 1, often including *dnaA* itself.
+Bakta treats every sequence as a linear contig unless told otherwise. On a linear
+contig its gene caller, Pyrodigal, runs with closed ends: BacFlux runs Bakta without
+its `--partial` option, so no gene may run off either end, and a gene that crosses the
+origin of a circular chromosome cannot be called whole. On a sequence declared
+circular, genes may run off the ends, and Bakta joins the two halves of a gene that
+crosses the origin into one CDS.
 
 Long-read assemblies are the only ones where the topology is measured, so
 `build_replicons` writes a small table — topology from Flye's circularity call, type
@@ -201,7 +206,7 @@ closest known relative.
 |---|---|
 | **In** | `{sample}.gbff` from the Bakta directory; the antiSMASH reference database |
 | **Out** | `04.annotation/antismash/{sample}/` |
-| **Next** | User interpretation |
+| **Next** | User interpretation; the [trait profile](traits.md) reads its region types from `{sample}.json`, when `traits.run: true` |
 
 It runs with `--taxon bacteria` and `--genefinding-tool none`. The second flag tells
 antiSMASH not to re-predict genes but to reuse Bakta's calls, which travel inside the
@@ -279,7 +284,9 @@ the integrity claim holds for the download path alone.
 ## Baktfold
 
 *Rules `structure_annotation_db` (or `structure_annotation_db_local`) and
-`structure_annotation`. Off by default; `baktfold.run: true` switches them on.*
+`structure_annotation`. Off by default; `baktfold.run: true` switches them on, and
+`traits.run: true` switches on the database rule alone (the trait profile uses its
+ProstT5 model).*
 
 Bakta names a protein by sequence similarity. When nothing in its databases is
 similar enough, it writes "hypothetical protein". Protein structure is more conserved
@@ -292,7 +299,7 @@ structure databases: SwissProt, AlphaFold clusters, PDB and CATH.
 |---|---|
 | **In** | `{sample}.json` from the Bakta directory; the Baktfold database |
 | **Out** | `04.annotation/baktfold/{sample}/` |
-| **Next** | User interpretation |
+| **Next** | User interpretation; the [trait profile](traits.md) counts its names from `{sample}.tsv`, when `traits.run: true` |
 
 The output repeats Bakta's file set — `{sample}.tsv`, `.gff3`, `.gbff`, `.json`,
 `.faa` and the rest — with the new names in place. Every protein Bakta had already
@@ -304,8 +311,10 @@ named keeps its Bakta annotation. Two kinds of file are added:
   with its identity, coverage and e-value.
 
 Bakta's own annotation stays the one every other stage reads — eggNOG-mapper,
-antiSMASH, dbCAN, the AMR stage and the mobilome module — so switching Baktfold on
-adds jobs and changes no other result.
+antiSMASH, dbCAN, the AMR stage and the mobilome module. Only the optional
+[trait profile](traits.md) also reads Baktfold's names, as evidence for the proteins
+Bakta left hypothetical. So switching Baktfold on adds jobs and changes no other
+result, apart from the trait calls when `traits.run` is true as well.
 
 !!! warning "A structure match is weaker evidence than a sequence match"
 
@@ -320,7 +329,9 @@ goes to the ProstT5 step, which grows with the number of hypothetical proteins.
 
 The database, about 22 GB with the four Foldseek databases and the ProstT5 model, is
 fetched by `baktfold install` on the first run, or taken from `directories.baktfold_db`
-when you already hold one, through a symlink view as for antiSMASH.
+when you already hold one, through a symlink view as for antiSMASH. The trait profile
+uses its ProstT5 model, so the database is set up when `baktfold.run` or `traits.run`
+is true.
 
 ## Resources
 

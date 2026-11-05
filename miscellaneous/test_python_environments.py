@@ -257,6 +257,9 @@ def test_the_reader_finds_the_rules_that_run_python():
         "is_copy_number": "../../envs/python.yaml",
         "mobilome_replicons": "../../envs/python.yaml",
         "amr_mge_colocalisation": "../../envs/python.yaml",
+        # The two helpers of the opt-in trait profile (traits.run).
+        "trait_profile": "../../envs/python.yaml",
+        "traits_summary": "../../envs/python.yaml",
         # Two helpers run in the Platon environment, which has Python 3 in it.
         "card_mapping_report": "../../envs/platon.yaml",
         "plasmid_concordance": "../../envs/platon.yaml",

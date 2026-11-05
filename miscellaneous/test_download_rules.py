@@ -199,7 +199,7 @@ def test_the_known_download_rules_are_found():
     expected = {"download_phix", "download_amr_db", "cazyme_db_download",
                 "secondary_metabolites_db", "virsorter2_db", "genomad_db", "checkv_db",
                 "conjscan_models", "icescan_models", "tncentral_db", "iceberg_db",
-                "isosdb_db", "check_medaka_model"}
+                "isosdb_db", "check_medaka_model", "trait_db"}
     found = set(local_download_rules())
     assert expected <= found, sorted(expected - found)
 

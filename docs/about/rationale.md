@@ -52,11 +52,12 @@ file, `mode`, chooses the front end; nothing else on the command line changes.
 | `hybrid` | both | both front ends, then Polypolish correction of the ONT assembly with the short reads, and a Snippy comparison of the two | 16 |
 | `contigs` | a finished assembly (FASTA) | contig filtering only | 1 |
 
-Those four front ends are 30 rules between them. The analysis they feed is 64 rules in
-`workflow/rules/shared/` — 22 of them the optional mobilome module and 2 the optional
-Baktfold layer — written once instead of four times, plus seven `_local` variants that link a database copy you
-already hold. [Choosing a mode](../getting-started/choosing-a-mode.md) covers
-which one a given dataset belongs in.
+Those four front ends are 30 rules between them. The analysis they feed is 69 rules in
+`workflow/rules/shared/` — 22 of them the optional mobilome module, 2 the optional
+Baktfold layer and 5 the optional trait profile — written once instead of four times,
+plus eight `_local` variants that link a database copy you already hold.
+[Choosing a mode](../getting-started/choosing-a-mode.md) covers which one a given
+dataset belongs in.
 
 ## Why the shared rules matter { #what-writing-a-step-once-buys }
 
@@ -138,10 +139,13 @@ those tests; it does not establish equivalence for every possible input.
 
 One downstream difference is deliberate and appears in the two long-read modes: Bakta
 gains or loses a single feature in each, because BacFlux now hands it a `--replicons`
-table declaring a closed chromosome circular. That makes Bakta's gene caller run in
-closed mode, which shifts a couple of marginal start codons anywhere in the genome. This
-change reflects different topology information supplied to the gene caller; the
-comparison alone does not establish which individual feature call is correct.
+table declaring a complete chromosome circular. When every sequence of a genome is
+declared a chromosome or a plasmid, Bakta treats the genome as complete and trains its
+gene caller without closed ends, that is, letting a gene run off the end of a sequence;
+the trained model scores start codons over the whole genome, so a couple of marginal
+start codons shift anywhere in it. This change reflects different topology information
+supplied to the gene caller; the comparison alone does not establish which individual
+feature call is correct.
 
 The helper scripts that carry real logic — the decontamination selector, the Medaka
 model check, the replicon table, CARD reporting, plasmid concordance and the mobilome

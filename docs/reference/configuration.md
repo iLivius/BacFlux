@@ -81,11 +81,13 @@ config file. Since you are told to run from the repository root, a relative
 | `/data/results/run1` | exactly there |
 | `results/run1` | inside the clone, at `BacFlux/results/run1` |
 
-Neither is wrong, but only one of them is usually what you meant. `output_dir` is
-the one path BacFlux expands to an absolute form for you, so it behaves
-predictably once set; the rest (`input.*_dir`, `directories.*_db`, the
-decontamination file paths) are used exactly as written. Give all of them as
-absolute paths unless you are certain.
+Neither is wrong, but only one of them is usually what you meant. BacFlux expands
+`output_dir` to an absolute form for you, so it behaves predictably once set. It
+does the same for a database you already hold (the optional `directories.*_db`
+keys, such as `checkv_db`), because it links that copy into the output folder,
+and a link needs the full path. The rest (`input.*_dir`, the five required
+databases, the decontamination file paths) are used exactly as written. Give all
+of them as absolute paths unless you are certain.
 
 ## SPAdes k-mer sizes
 
@@ -143,7 +145,7 @@ the file lists the keys:
 
 | Key | Check | What happens |
 |---|---|---|
-| any block (`input`, `parameters`, `parameters.decontamination`, `phage`, `mobilome`, `mobilome.tncentral`, …) | its settings indented beneath it, not a single value such as `off` | Stops naming the block; for `decontamination`, `phage`, `mobilome` and the four mobilome layers it also says what to write instead |
+| any block (`input`, `parameters`, `parameters.decontamination`, `phage`, `mobilome`, `mobilome.tncentral`, …) | its settings indented beneath it, not a single value such as `off` | Stops naming the block; for `decontamination`, `phage`, `baktfold`, `traits`, `mobilome` and the four mobilome layers it also says what to write instead |
 | `mode` | present, and one of the four | Missing: stops with a `KeyError`. Present but unrecognised, or a bare `on`/`off`: stops, listing the four |
 | `input.<mode>_dir` | set, and an existing directory | Stops naming the key |
 | input files | at least one, all sharing one extension, extension recognised | Stops listing the extensions it found |
@@ -153,11 +155,13 @@ the file lists the keys:
 | `directories.output_dir` and the five required databases | present | Stops with a `KeyError` naming the key |
 | `directories.checkv_db` | holds exactly one `*/genome_db/checkv_reps.faa` | Stops, and says to give the parent directory |
 | `directories.vs2_db`, `antismash_db`, `dbcan_db`, `card_db`, `genomad_db` | a directory, holding a file only that database has | Stops naming the missing probe file |
-| `directories.baktfold_db` | the same check, made only when `baktfold.run` is true | Stops naming the missing probe file |
+| `directories.baktfold_db` | the same check, made only when `baktfold.run` or `traits.run` is true | Stops naming the missing probe file |
+| `directories.ecofolddb_db` | the same check, made only when `traits.run` is true; and every EcoFoldDB entry the trait gene dictionary, `trait_genes_v1.tsv`, uses is listed in its `EcoFoldDB_descriptions.txt` | Stops naming the missing probe file, or the missing entries, and recommends the Zenodo copy |
 | `directories.genomad_db` | every file readable by you; metadata table has the current column set | Stops listing unreadable files, or explaining the schema mismatch |
 | `links.dbcan_link` | set, and a `.tar.gz` | Stops |
 | `links.card_link`, `links.phix_link` | set whenever the mode has short reads | Stops naming the key and the mode |
 | `links.checkv_link`, `links.genomad_link` | a `.tar.gz` if set | Stops |
+| `links.ecofolddb_link` | when `traits.run` is true: a `.tar.gz` if set, and set unless `directories.ecofolddb_db` is | Stops |
 | `resources.threads`, `ram_gb`, `runtime_hours` | a whole number, 1 or more | Stops, naming the key and the value |
 | `parameters.nt_version` | a folder name, not a bare `on`/`off` | Stops |
 | `parameters.eggnog.dbmem` | `resources.ram_gb` can hold one job | Stops, and names the number to raise |
@@ -167,11 +171,12 @@ the file lists the keys:
 | `parameters.decontamination.mode` or `long_read_mode` set to `include` | a genus to include: `include_genera`, `include_genera_by_sample` or a `sample_overrides` file | Stops |
 | `parameters.<mode>.flye_input_mode` | one of `auto`, `nano-raw`, `nano-hq` | Stops |
 | `phage.caller` | `virsorter2` or `genomad`; there is no `off` | Stops, and says phage calling has no off switch |
+| `traits.max_gene_gap` | 1 or more, checked only when `traits.run` is true | Stops, naming the value |
 | `mobilome.coverage_profile` | a fraction in `(0, 1]` | Stops, and says it is a fraction, not a percentage |
 | `mobilome.icescan.run` | has a `url` or a `dir` to use | Stops |
 | `mobilome.isosdb.fasta_url` | `family_map_url` set alongside it | Stops |
 | any boolean key | recognisable as true/false | Stops naming the value |
-| any number key: `resources.threads`, `ram_gb`, `runtime_hours`; `parameters.long_read_qc.min_length`, `keep_percent`, `length_weight`; and in `mobilome`, `max_composite_span_bp`, `coverage_profile`, `contig_boundary_bp` and the `min_*` thresholds of `tncentral`, `iceberg` and `isosdb` | a number, not a bare `on` or `off` and not text; a blank value takes the default | Stops, saying how YAML read the value, or that it is not a number, and what number the key takes |
+| any number key: `resources.threads`, `ram_gb`, `runtime_hours`; `parameters.long_read_qc.min_length`, `keep_percent`, `length_weight`; `traits.max_gene_gap`; and in `mobilome`, `max_composite_span_bp`, `coverage_profile`, `contig_boundary_bp` and the `min_*` thresholds of `tncentral`, `iceberg` and `isosdb` | a number, not a bare `on` or `off` and not text; a blank value takes the default | Stops, saying how YAML read the value, or that it is not a number, and what number the key takes |
 
 Each stop ends the run with exit status 1, so a wrapper script or a cluster
 submission sees the failure. Most messages begin with `[BacFlux]`; a missing
@@ -190,7 +195,7 @@ required key is reported by Python as a `KeyError` naming it.
     | `medaka_model` | `false` skips Medaka, `true` infers the model |
     | `parameters.decontamination.mode` or `long_read_mode` | `off` counts as `off`; `on`, `yes` or `true` names no policy, and the run stops |
     | any other key that takes a word: `mode`, `phage.caller`, `parameters.nt_version`, `spades_kmers`, `auto_vote`, `flye_input_mode` | stops, saying how YAML read the value and listing the words it accepts |
-    | any key that takes a number: the three `resources`, `min_length`, `keep_percent`, `length_weight`, and the mobilome thresholds such as `coverage_profile` and `min_identity` | stops, saying how YAML read the value and what number the key takes. A number has no off: write the value itself, e.g. `keep_percent: 100`, which rejects no read by percentage |
+    | any key that takes a number: the three `resources`, `min_length`, `keep_percent`, `length_weight`, `max_gene_gap`, and the mobilome thresholds such as `coverage_profile` and `min_identity` | stops, saying how YAML read the value and what number the key takes. A number has no off: write the value itself, e.g. `keep_percent: 100`, which rejects no read by percentage |
     | a block written as one value, e.g. `decontamination: off` or `mobilome: on` | stops. Decontamination is switched off with `mode: off` inside its block and the mobilome module with `run: false` inside its block; phage calling has no off switch |
 
 `bakta_db`, `eggnog_db`, `gtdbtk_db` and `platon_db` are passed to their tools as
@@ -201,13 +206,15 @@ files inside it are declared rule inputs; the `parameters.nt_version` subfolder 
 not checked. A successful dry run therefore does not prove that every required
 database is usable. The optional
 `directories.*_db` overrides are the exception — each is validated the moment it
-is set, which is why `config/config_v2_test_examples.yaml` leaves them out of its
-four minimal per-mode dry-run configs.
+is set (`baktfold_db` only when `baktfold.run` or `traits.run` is true,
+`ecofolddb_db` only when `traits.run` is true), which is why
+`config/config_v2_test_examples.yaml` leaves them out of its four minimal per-mode
+dry-run configs.
 
 What the run prints back while parsing is worth reading: the active mode, the
 phage caller, the decontamination policy, one line per discovered sample, and —
-where they apply — the eggNOG memory flag to add and the mobilome module's
-banner.
+where they apply — the eggNOG memory flag to add and the banners of the mobilome
+module, Baktfold and the trait profile.
 
 ## The keys that define a run
 
@@ -292,7 +299,7 @@ directories:
 
 | Key | What it does | Notes |
 |---|---|---|
-| `output_dir` | Root for every result and log, plus every database the workflow downloads for itself | Created if absent. May be relative — it is the one path resolved to an absolute one automatically. |
+| `output_dir` | Root for every result and log, plus every database the workflow downloads for itself | Created if absent. May be relative: it is resolved to an absolute path automatically. |
 
 Reusing one output directory across runs is what stops the self-downloaded
 databases being fetched again. Conda environments do **not** live here: Snakemake
@@ -318,7 +325,7 @@ Versions and download recipes are on
 
 ### Optional local copies of the downloaded databases
 
-Seven databases the workflow can fetch itself. Point the matching key at a copy you
+Eight databases the workflow can fetch itself. Point the matching key at a copy you
 already hold and **nothing is downloaded** — the key overrides both the `links.*`
 entry and, where the tool has one, its own downloader. These paths are only ever
 read: BacFlux builds a local symlink view rather than touching your directory.
@@ -331,7 +338,8 @@ read: BacFlux builds a local symlink view rather than touching your directory.
 | `dbcan_db` | An extracted dbCAN database matching `links.dbcan_link` | all modes | `dbCAN.hmm` |
 | `card_db` | An extracted CARD database | `illumina`, `hybrid` | `aro_index.tsv` |
 | `genomad_db` | The `genomad_db/` directory `genomad download-database` produced | `phage.caller: genomad` | `version.txt` |
-| `baktfold_db` | The directory `baktfold install -d <dir>` filled (about 22 GB) | `baktfold.run: true` | `swissprot.dbtype` |
+| `baktfold_db` | The directory `baktfold install -d <dir>` filled (about 22 GB) | `baktfold.run: true` or `traits.run: true` | `swissprot.dbtype` |
+| `ecofolddb_db` | The `EcoFoldDB_v2.0/` folder of the Zenodo archive, holding `EcoFoldDB`, `EcoFoldDB.dbtype` and `EcoFoldDB_descriptions.txt` (about 0.8 GB) | `traits.run: true` | `EcoFoldDB.dbtype` |
 
 !!! note "Why CheckV gets a local view rather than being used in place"
 
@@ -376,6 +384,8 @@ links:
   checkv_link: "https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz"
   genomad_link: "https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz"
   genomad_md5:  "67244b528bb8bed464d1ca147136d33e"
+  ecofolddb_link: "https://zenodo.org/records/16908168/files/EcoFoldDB_v2.0.tar.gz"
+  ecofolddb_md5:  "be3144a4993f5816a8b772db964d1f3e"
 ```
 
 | Key | Required in | Default | Notes |
@@ -386,6 +396,8 @@ links:
 | `checkv_link` | *optional*, all modes | a Zenodo mirror of CheckV's own database | Empty means CheckV downloads its own. Ignored when `directories.checkv_db` is set — and BacFlux says so rather than ignoring the key silently. |
 | `genomad_link` | *optional*, `phage.caller: genomad` | the geNomad authors' own Zenodo copy | Must be the database archive (`genomad_db_v*.tar.gz`), not the HMM or MSA archive beside it on the same record. Empty falls back to geNomad's own downloader. |
 | `genomad_md5` | with `genomad_link` | the MD5 of the default archive | Zenodo publishes an MD5 rather than the `.sha256` sidecar the other mirrors carry, so it is configured rather than derived. **Change it whenever you change the link.** A mismatch stops rule `genomad_db` before the archive is extracted; an empty value downloads without verification and says so in `logs/genomad_db.log`. |
+| `ecofolddb_link` | *optional*, `traits.run: true` | EcoFoldDB v2.0 on Zenodo | Must be the `.tar.gz` archive of the Zenodo record: the copy in the authors' GitHub repository names some entries differently from the names the trait rules use. Nothing is downloaded when `directories.ecofolddb_db` is set, but a link that is set must still be a `.tar.gz`; with neither set, a run with `traits.run: true` stops before any job starts. |
+| `ecofolddb_md5` | with `ecofolddb_link` | the MD5 of the default archive | As for geNomad, Zenodo publishes an MD5. **Change it whenever you change the link.** A mismatch stops rule `trait_db` before the archive is extracted; an empty value downloads without verification and says so in `logs/trait_db.log`. |
 
 The CheckV and geNomad mirrors exist for one reason: both databases are served
 from `portal.nersc.gov` ([NERSC](https://www.nersc.gov/)), which is unreachable
@@ -745,11 +757,29 @@ baktfold:
 
 | Key | What it does | Default | Notes |
 |---|---|---|---|
-| `run` | Searches the proteins Bakta called "hypothetical protein" by predicted structure, and writes a second annotation to `04.annotation/baktfold/{sample}/` | `false` | Bakta's annotation stays the one every other stage reads, so this adds jobs and changes no other result. The database comes from `directories.baktfold_db`, or about 22 GB is downloaded into the output folder on the first run. |
+| `run` | Searches the proteins Bakta called "hypothetical protein" by predicted structure, and writes a second annotation to `04.annotation/baktfold/{sample}/` | `false` | Bakta's annotation stays the one every other stage reads, so this adds jobs and changes no other result, apart from the trait calls when `traits.run` is also true: they count Baktfold's names. The database comes from `directories.baktfold_db`, or about 22 GB is downloaded into the output folder on the first run. |
 | `fast` | Skips the search against AlphaFold clusters, the slowest of Baktfold's four searches | `false` | Faster, but fewer proteins get a name. |
 
 What the names mean, and how far to trust them, is under
 [Annotation](../analysis/annotation.md#baktfold).
+
+---
+
+## Trait profile `[all modes]` *— optional*
+
+```yaml
+traits:
+  run: false                   # true: call traits from sets of genes
+  max_gene_gap: 10             # how far apart co-localised genes may lie, in genes
+```
+
+| Key | What it does | Default | Notes |
+|---|---|---|---|
+| `run` | Calls traits for plant-growth promotion, biocontrol, stress tolerance and bioremediation, each from a set of genes recognised by EcoFoldDB structure hits, Bakta's names and, with `baktfold.run: true`, Baktfold's names. Writes `04.annotation/traits/{sample}/`, `09.report/traits_summary.tsv` and a section of the MultiQC report | `false` | Adds jobs and changes no other stage's result. Needs Baktfold's database for its ProstT5 model even when `baktfold.run` is false (`directories.baktfold_db`, or about 22 GB downloaded), and EcoFoldDB (`directories.ecofolddb_db`, or `links.ecofolddb_link`). The 3Di step takes about 1 h 50 min per genome on 16 CPU cores. |
+| `max_gene_gap` | How far apart the genes of a co-localised group may lie: each at most this many positions from the previous one in the contig's gene order | `10` | One value for every rule. A whole number, 1 or more. |
+
+What each call means, and how far to trust it, is under
+[Trait profile](../analysis/traits.md).
 
 ---
 
@@ -1058,6 +1088,9 @@ the benchmark afterwards.
 | `--target_bases 500000000` | `rule filter_long_reads`, `nanopore/10_reads.smk` and `hybrid/30_ont_reads.smk` (`FILTLONG_TARGET_BASES`, `00_common.smk`) | The nanopore mode's total-output cap. Hybrid mode also applies the cap when `short_read_guidance: false`. With guidance enabled it uses the selected Illumina reads, `--trim` and `--split 1000` instead; `--length_weight` is passed in hybrid mode. |
 | coverage ≥ 2×, length ≥ 500 bp | `FASTA_SEL_CMD`, `00_common.smk` | The contig filter, read out of the SPAdes header. Always applied in `illumina` and `hybrid`; in `contigs` mode only when the first header looks like SPAdes' own (it carries `length_…` or `cov_…`), since inventing a filter for an assembly from anywhere else would silently delete real sequence. |
 | 80% of the reference | `EXACT_NAME_REFERENCE_COVERAGE`, `name_ice_elements.py` | Below it, an ICEberg name is suffixed `-like`. Distinct from `iceberg.min_overlap_fraction`, which is measured against our candidate. |
+| 4,000 amino acids | `TRAITS_MAX_PROTEIN_LENGTH`, `00_common.smk` | The longest protein the trait profile searches by structure. Each longer one is listed in the gene table as `not_searched_too_long`, and can still count by its name. EcoFoldDB's published method (Ghaly et al. 2025). |
+| Foldseek `-s 8` | `TRAITS_FOLDSEEK_SENSITIVITY`, `00_common.smk` | The sensitivity of the trait profile's search against EcoFoldDB, as in EcoFoldDB's published method. |
+| e-value below 1e-10, both coverages above 0.8 | `E_VALUE_MAX` / `COVERAGE_MIN`, `trait_profile.py` | EcoFoldDB's published filter for a structure hit. `BORDERLINE_E_VALUE` (1e-11), `BORDERLINE_COVERAGE` (0.85) and `BORDERLINE_FACTOR` (10, for a rival hit nearly as good), in the same script, flag a kept hit close to a cut-off or to a rival ([Borderline hits](../analysis/traits.md#borderline-hits)). |
 
 !!! warning "The CARD analysis is a sensitive screen, not a high-identity one"
 

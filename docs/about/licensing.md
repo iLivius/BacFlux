@@ -90,7 +90,8 @@ the key in the middle column.
 | **ICEscan models** — the optional second model set, a fork of CONJScan distributed inside ICEfinder2's bundle | `mobilome.icescan.run: true` | **CC BY-NC-SA 4.0**, Institut Pasteur / CNRS — the same terms as the models it forks | the package's own `LICENSE` file |
 | **TnCentral** — names transposons and integrons | `mobilome.tncentral.url` or `.dir` | an **"All Rights Reserved"** notice, and **no terms page at all** | the publisher's site, checked 2026-07-28 |
 | **ICEberg 3.0** — names the ICE and IME candidates | `mobilome.iceberg.urls` or `.dir` | **no licence, terms or reuse statement anywhere**; every page carries only *"Copyright © 2023 All Rights Reserved by Microbial Bioinformatics Group in MML, SJTU."* | the publisher's site, checked 2026-07-28 |
-| **Baktfold** — names Bakta's hypothetical proteins by predicted structure, with **Foldseek** and the **ProstT5** model | `baktfold.run: true` | **MIT** (Baktfold); **GPLv3** (Foldseek, run as a separate program); **MIT** (ProstT5); its database **CC BY 4.0** | the Bioconda recipes, the ProstT5 model card and the database's Zenodo record, checked 2026-11-01 |
+| **Baktfold** — names Bakta's hypothetical proteins by predicted structure, with **Foldseek** and the **ProstT5** model | `baktfold.run: true`; also `traits.run: true`, which runs Baktfold's ProstT5 step and Foldseek and fetches the same database | **MIT** (Baktfold); **GPLv3** (Foldseek, run as a separate program); **MIT** (ProstT5); its database **CC BY 4.0** | the Bioconda recipes, the ProstT5 model card and the database's Zenodo record, checked 2026-11-01 |
+| **EcoFoldDB** — the protein-structure database the trait profile searches | `traits.run: true` | the database **CC BY 4.0**; the authors' GitHub repository, which holds their annotation script, states **no licence**, and BacFlux does not use its code | the database's Zenodo record and the repository, checked 2026-11-02 |
 | **ISOSDB** — estimates IS abundance from reads for comparison with located calls | `mobilome.isosdb.fasta_url` + `family_map_url`, or `.dir` | **MIT**, in the pseudoR repository | the repository |
 
 **MacSyFinder is not CONJScan**: the engine is GPLv3, the models it loads are
@@ -141,14 +142,16 @@ The workflow reports this itself, not only in this document:
 - `conjscan_models` and `icescan_models` write the CC BY-NC-SA notice to the top
   of their own logs (the first lines of each rule's shell, in
   `workflow/rules/shared/80_mobilome.smk`).
-- Every opt-in download comes from an unversioned address, so each writes a
-  `PROVENANCE.txt` beside the data. `tncentral_db`, `iceberg_db` and `isosdb_db`
-  record the source, the fetch date, the checksum of the FASTA as it was indexed
-  (for TnCentral and ICEberg, after BacFlux has repaired their deflines), the
+- Every opt-in download of the mobilome module comes from an unversioned address, so
+  each writes a `PROVENANCE.txt` beside the data. `tncentral_db`, `iceberg_db` and
+  `isosdb_db` record the source, the fetch date, the checksum of the FASTA as it was
+  indexed (for TnCentral and ICEberg, after BacFlux has repaired their deflines), the
   sequence count and the licence statement for that source;
   `icescan_models` records the package's own version line and profile count in
   place of a checksum. That file is the only record of which release you
   analysed — see [Optional layers](../mobilome/optional-layers.md).
+- The EcoFoldDB download comes from a versioned Zenodo record and is checked against
+  `links.ecofolddb_md5` before it is unpacked; `logs/trait_db.log` records the result.
 
 ## What this repository deliberately does not contain
 
@@ -173,6 +176,12 @@ site could not be reached when this was checked in July 2026, so its terms could
 be established — weaker ground than a known restrictive licence. A second
 implementation of the same repeat definition returned the same repeats on every
 tested window; see [Validation](../mobilome/validation.md).
+
+**No EcoFoldDB code.** The EcoFoldDB repository on GitHub, which holds the authors'
+annotation script, states no licence: an absence of a grant, not a permission. BacFlux
+uses only the database, published on Zenodo under CC BY 4.0. The trait calls come from
+BacFlux's own script, written from the published method; see
+[Trait profile](../analysis/traits.md).
 
 ## Citing
 

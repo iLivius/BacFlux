@@ -9,9 +9,11 @@ is by sight and needs no grepping:
 | `10_decontam/` | `workflow/rules/shared/10_decontam.smk` |
 | `12_medaka_check/` | `workflow/rules/shared/12_medaka_check.smk` |
 | `15_replicons/` | `workflow/rules/shared/15_replicons.smk` |
+| `40_annotation/` | `workflow/rules/shared/40_annotation.smk` |
 | `50_amr/` | `workflow/rules/shared/50_amr.smk` |
 | `60_plasmid/` | `workflow/rules/shared/60_plasmid.smk` |
 | `80_mobilome/` | `workflow/rules/shared/80_mobilome.smk` |
+| `90_report/` | `workflow/rules/shared/90_report.smk` |
 
 **A script sitting loose in this directory, not in a numbered one, is not part of a
 workflow run.** It is a maintenance tool you run by hand. Right now that is
@@ -31,6 +33,15 @@ checker reports a refused name that has vanished from a new GTDB release.
 They stay here rather than moving in with `clean_workdir.sh` because they `import
 gtdb_amrfinder_organism`, which *is* a workflow script. Splitting them off would break
 that import to gain a tidier listing, which is a bad trade.
+
+## Two files inside `40_annotation/` are data, not scripts
+
+`trait_rules_v1.tsv` (which genes each trait needs) and `trait_genes_v1.tsv` (how each
+gene is recognised) hold the trait logic that `trait_profile.py` applies; the script
+names no gene or trait of its own. Rule `trait_profile` takes both tables as inputs, so
+editing either one makes every sample's trait calls again on the next run. The tests
+at the end of `test_trait_profile.py` check the shipped tables themselves, and
+`docs/analysis/traits.md` explains their columns.
 
 ## Tests sit next to the script they test
 

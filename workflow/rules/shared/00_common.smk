@@ -32,9 +32,10 @@
 #                          characters, the shared awk one-liners.
 # 5b. Helpers            : the functions that used to be copy-pasted into the
 #                          four v1 Snakefiles, plus the config-driven module
-#                          gates (mobilome, eggNOG --dbmem).
+#                          gates (mobilome, Baktfold, trait profile, eggNOG
+#                          --dbmem).
 # 6.  Decontam policy    : resolved once; the same in all four modes.
-# 7.  Database links     : CheckV, geNomad, dbCAN, CARD, PhiX.
+# 7.  Database links     : CheckV, geNomad, dbCAN, CARD, PhiX, EcoFoldDB.
 # 8.  Long-read options  : Flye input mode, Medaka model, and the wiring
 #                          constants that differ between nanopore and hybrid.
 # 9.  Sample discovery   : globs the ACTIVE mode's input directory only — the
@@ -186,6 +187,7 @@ _CONFIG_BLOCKS = (
     "parameters.nanopore", "parameters.hybrid",
     "phage",
     "baktfold",
+    "traits",
     "mobilome",
     "mobilome.icescan", "mobilome.tncentral", "mobilome.iceberg", "mobilome.isosdb",
 )
@@ -202,6 +204,9 @@ _CONFIG_BLOCK_HINTS = {
     "baktfold":
         "To switch Baktfold on or off, write run: true or run: false indented "
         "beneath it.",
+    "traits":
+        "To switch the trait profile on or off, write run: true or run: false "
+        "indented beneath it.",
     "mobilome":
         "To switch the module on or off, write run: true or run: false indented "
         "beneath it.",
@@ -419,6 +424,7 @@ PLATONDB = config["directories"]["platon_db"]
 #     /path/to/checkv/                 <- put THIS in the config
 #         checkv-db-v1.5/
 #             genome_db/  hmm_db/  README.txt
+# A relative path is made absolute after its start-up checks, further below.
 CHECKVDB = str((config["directories"].get("checkv_db") or "")).strip()
 
 # ── Shared read-only databases (VS2, antiSMASH, dbCAN, CARD) ──
@@ -457,6 +463,27 @@ def _resolve_optional_db_dir(config_key, probe_relpath, hint):
     return path
 
 
+def _absolute_if_relative(path):
+    # Turn a database path given relative to the launch folder into an absolute
+    # one, against that same folder (Snakemake's working directory, where every
+    # relative path in the config is read). Used for the databases whose
+    # *_db_local rule links the files of your copy into BacFlux's own directory
+    # with `ln -s`: antiSMASH, dbCAN, CARD, CheckV and Baktfold. A relative link
+    # target is read from the folder the link sits in, not from the launch
+    # folder, so with a relative path every link would point nowhere, and the
+    # database would fail at its first use: for CheckV in the link rule's own
+    # DIAMOND step, for the others only when the tool runs. An
+    # absolute path, and "" (no copy given), come back unchanged, so a run that
+    # already gave absolute paths sees the same commands and re-runs nothing.
+    # The VirSorter2, geNomad and EcoFoldDB link rules make the path absolute in
+    # their own shell commands (`cd ... && pwd`), so they do not need this, and
+    # leaving their input as written keeps a run that gave them a relative path
+    # from re-running.
+    if path and not os.path.isabs(path):
+        return os.path.abspath(path)
+    return path
+
+
 VS2DB = _resolve_optional_db_dir(
     "vs2_db", "Done_all_setup",
     "Point it at the directory 'virsorter setup' produced (containing hmm/, group/, rbs/, Done_all_setup)."
@@ -464,24 +491,24 @@ VS2DB = _resolve_optional_db_dir(
 if VS2DB:
     print(f"Using the local VirSorter2 database at '{VS2DB}'. Nothing will be downloaded.")
 
-ANTISMASHDB = _resolve_optional_db_dir(
+ANTISMASHDB = _absolute_if_relative(_resolve_optional_db_dir(
     "antismash_db", "clusterblast",
     "Point it at an antiSMASH --databases directory (containing clusterblast/, pfam/, ...)."
-)
+))
 if ANTISMASHDB:
     print(f"Using the local antiSMASH database at '{ANTISMASHDB}'. Nothing will be downloaded.")
 
-DBCANDB = _resolve_optional_db_dir(
+DBCANDB = _absolute_if_relative(_resolve_optional_db_dir(
     "dbcan_db", "dbCAN.hmm",
     "Point it at a dbCAN database directory matching the version in links.dbcan_link (containing dbCAN.hmm, CAZy.dmnd, ...)."
-)
+))
 if DBCANDB:
     print(f"Using the local dbCAN database at '{DBCANDB}'. Nothing will be downloaded.")
 
-CARDDB = _resolve_optional_db_dir(
+CARDDB = _absolute_if_relative(_resolve_optional_db_dir(
     "card_db", "aro_index.tsv",
     "Point it at an extracted CARD database directory (containing aro_index.tsv, nucleotide_fasta_protein_homolog_model.fasta)."
-)
+))
 if CARDDB:
     print(f"Using the local CARD database at '{CARDDB}'. Nothing will be downloaded.")
 
@@ -625,6 +652,22 @@ NAME_TRANSPOSONS_SCRIPT   = os.path.join(MOBILOME_SCRIPTS_DIR, "name_transposons
 NAME_ICE_SCRIPT           = os.path.join(MOBILOME_SCRIPTS_DIR, "name_ice_elements.py")
 ISOSDB_COPY_SCRIPT        = os.path.join(MOBILOME_SCRIPTS_DIR, "isosdb_copy_number.py")
 
+# Trait-profile helpers (opt-in, traits.run; the layer itself is described in
+# section 5b). trait_profile.py turns one sample's evidence (Bakta's names, the
+# EcoFoldDB structure hits and, when baktfold.run is on, Baktfold's names) into
+# trait calls, and reports antiSMASH's region types beside them; rule
+# trait_profile in shared/40_annotation.smk runs it. The two tables beside it
+# hold the trait logic as data: trait_rules_v1.tsv says which genes each trait
+# needs, trait_genes_v1.tsv how each gene is recognised. The rule takes both
+# tables as inputs, so editing one re-makes the calls.
+# traits_summary.py, run by rule traits_summary in shared/90_report.smk, sets
+# every sample's calls side by side. Both scripts are stdlib-only Python, tested
+# outside Snakemake (`pytest workflow/scripts`).
+TRAIT_PROFILE_SCRIPT  = os.path.join(WORKFLOW_DIR, "scripts", "40_annotation", "trait_profile.py")
+TRAIT_RULES_TSV       = os.path.join(WORKFLOW_DIR, "scripts", "40_annotation", "trait_rules_v1.tsv")
+TRAIT_GENES_TSV       = os.path.join(WORKFLOW_DIR, "scripts", "40_annotation", "trait_genes_v1.tsv")
+TRAITS_SUMMARY_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "90_report", "traits_summary.py")
+
 
 # ──────────────────── 3a. Resource accessors ───────────────────
 # Single source of truth for compute limits. .get with a default means a config
@@ -715,7 +758,7 @@ HAS_READS       = MODE != "contigs"                # anything populating 01.read
 DIR_READS      = OUT + "/01.reads"       # read QC + filtering; sub-dirs illumina/ , ont/  (empty in contigs mode)
 DIR_ASSEMBLY   = OUT + "/02.assembly"    # assembly, polishing, reorientation, decontamination, assembly QC
 DIR_TAXONOMY   = OUT + "/03.taxonomy"    # GTDB-Tk
-DIR_ANNOTATION = OUT + "/04.annotation"  # bakta/ , eggnog/ , antismash/ , dbcan/
+DIR_ANNOTATION = OUT + "/04.annotation"  # bakta/ , eggnog/ , antismash/ , dbcan/ ; opt-in baktfold/ , traits/
 DIR_AMR        = OUT + "/05.amr"         # abricate/ , mapping/  (mapping only in short-read modes)
 DIR_PLASMIDS   = OUT + "/06.plasmids"    # platon + geNomad concordance
 DIR_PHAGES     = OUT + "/07.phages"      # geNomad|virsorter2 caller + checkv
@@ -1333,9 +1376,9 @@ IGNORE_LIST_CMD = r"""BEGIN{FS="[[:space:]]+"} NR>1 && $4!="Y" {print $1}"""
 # Two kinds of thing live here. First, the plain helper functions: each was
 # byte-identical (or trivially different) across the four v1 Snakefiles and is
 # deduplicated here, behaviour preserved exactly. Second, the config-driven module
-# gates — mobilome, long-read QC, eggNOG --dbmem — which sit in this section
-# rather than up in section 2 with the rest of the config parsing because they
-# need _config_bool, defined a few functions below.
+# gates — mobilome, long-read QC, Baktfold, the trait profile, eggNOG --dbmem —
+# which sit in this section rather than up in section 2 with the rest of the
+# config parsing because they need _config_bool, defined a few functions below.
 
 def bakta_locus_tag(sample):
     # Bakta needs a short, safe locus-tag prefix. Derive it from the sample name
@@ -1658,40 +1701,326 @@ if MOBILOME_RUN:
     )
 
 
+# ── The trait-profile switch, read before the Baktfold block that needs it ──
+# The trait profile (traits.run, off by default; the rest of its settings come
+# after the Baktfold block) makes its structure strings with ProstT5, the protein
+# language model kept in Baktfold's database. So that database is needed when
+# EITHER layer is on, and the Baktfold block below must know this switch before
+# it decides whether to look for the database.
+_traits_cfg = config.get("traits") or {}
+TRAITS_RUN = _config_bool(_traits_cfg.get("run"), False)
+
+
 # ── Structure-based names for hypothetical proteins (Baktfold), opt-in ──
 # Off by default. When on, rule structure_annotation (shared/40_annotation.smk)
 # runs Baktfold on each sample's Bakta annotation: the proteins Bakta could only
 # call "hypothetical protein" are searched by predicted 3D structure, and a second,
-# Bakta-format annotation is written to 04.annotation/baktfold/{sample}/. No other
-# rule reads it, so switching the layer on adds jobs and changes no other result.
-#   BAKTFOLD_RUN    : the master switch, baktfold.run.
-#   BAKTFOLD_FAST   : baktfold.fast, which skips the search against AlphaFold
-#                     clusters, the slowest of Baktfold's four searches.
-#   BAKTFOLDDB      : directories.baktfold_db, a database the user already holds.
-#                     Checked only when the layer is on, so a stale path does not
-#                     stop a run that does not use it. "" means: download it.
-#   BAKTFOLD_DB_DIR : where the rules see the database, in BacFlux's own
-#                     04.annotation/baktfold/databases, filled either by the
-#                     download or by symlinks to the user's copy (the reason is
-#                     the same as for antiSMASH, in shared/40_annotation.smk).
+# Bakta-format annotation is written to 04.annotation/baktfold/{sample}/. Bakta's
+# annotation stays the one every other stage reads. Only the trait profile, when
+# traits.run is on too, also reads Baktfold's names, as evidence for a gene. So
+# switching the layer on adds jobs and changes no other result, except the trait
+# calls when traits.run is on. Rule trait_profile then gains an input and an
+# option, so in an output folder that already holds trait calls they are made
+# again. Their hit table is a temp() file, which Snakemake deletes once the
+# calls are made, so the EcoFoldDB search (about 2 minutes per genome) runs again
+# before them, and the trait summary and MultiQC report are made again after
+# them; the 3Di step is not repeated.
+#   BAKTFOLD_RUN       : the master switch, baktfold.run. Rule
+#                        structure_annotation and the banner below follow it.
+#   BAKTFOLD_FAST      : baktfold.fast, which skips the search against AlphaFold
+#                        clusters, the slowest of Baktfold's four searches.
+#   BAKTFOLD_DB_NEEDED : baktfold.run or traits.run. It decides whether the
+#                        database is looked for, downloaded (by download_all
+#                        too) or linked. The trait profile uses only the ProstT5
+#                        model from it, but `baktfold install` has no option to
+#                        fetch the model alone, so the whole database (about
+#                        22 GB) comes either way.
+#   BAKTFOLDDB         : directories.baktfold_db, a database the user already
+#                        holds. Checked (it must be a directory holding
+#                        swissprot.dbtype) only when BAKTFOLD_DB_NEEDED, so a
+#                        stale path does not stop a run that does not use it.
+#                        "" means: download it.
+#   BAKTFOLD_DB_DIR    : where the rules see the database, in BacFlux's own
+#                        04.annotation/baktfold/databases, filled either by the
+#                        download (rule structure_annotation_db) or by symlinks
+#                        to the user's copy (rule structure_annotation_db_local),
+#                        for the directory()-wipe reason given at
+#                        secondary_metabolites_db in shared/40_annotation.smk.
 _baktfold_cfg = config.get("baktfold") or {}
 BAKTFOLD_RUN = _config_bool(_baktfold_cfg.get("run"), False)
 BAKTFOLD_FAST = _config_bool(_baktfold_cfg.get("fast"), False)
+BAKTFOLD_DB_NEEDED = BAKTFOLD_RUN or TRAITS_RUN
 BAKTFOLDDB = ""
-if BAKTFOLD_RUN:
-    BAKTFOLDDB = _resolve_optional_db_dir(
+if BAKTFOLD_DB_NEEDED:
+    BAKTFOLDDB = _absolute_if_relative(_resolve_optional_db_dir(
         "baktfold_db", "swissprot.dbtype",
         "Point it at the directory 'baktfold install -d <dir>' filled "
         "(containing swissprot, AFDBClusters, pdb, cath, ...).",
-    )
+    ))
     if BAKTFOLDDB:
         print(f"Using the local Baktfold database at '{BAKTFOLDDB}'. Nothing will be downloaded.")
+if BAKTFOLD_RUN:
     print(
         "Baktfold: ON. Bakta's hypothetical proteins are searched by predicted "
         "structure; results in 04.annotation/baktfold/"
         + (" (fast: the AlphaFold-clusters search is skipped)." if BAKTFOLD_FAST else ".")
     )
 BAKTFOLD_DB_DIR = DIR_ANNOTATION + "/baktfold/databases"
+
+
+# ── Trait profile from predicted protein structure (EcoFoldDB), opt-in ──
+# Off by default (TRAITS_RUN, read above). When on, every protein of up to 4000
+# amino acids in each sample's Bakta annotation is turned into a 3Di string by
+# ProstT5 and searched by Foldseek against EcoFoldDB, a curated database of
+# protein structures with known ecological functions. 3Di is Foldseek's
+# structural alphabet: one letter per residue, describing how that residue sits
+# against the residue closest to it in space in the folded protein, so a
+# structure can be searched like a sequence. Rule trait_profile
+# (shared/40_annotation.smk) then combines those structure hits with Bakta's
+# names and, when baktfold.run is on, Baktfold's names, calls each trait of
+# trait_rules_v1.tsv from its set of genes, and reports antiSMASH's region types
+# beside the calls. Rule traits_summary (shared/90_report.smk) sets every
+# sample's calls side by side, for the user and for a section of the MultiQC
+# report. Apart from that section, nothing else reads these files, so switching
+# the layer on adds jobs and changes no other result. User documentation:
+# docs/analysis/traits.md.
+#   TRAITS_MAX_GENE_GAP         : traits.max_gene_gap. The genes a trait needs
+#                                 side by side (as in an operon) count as
+#                                 co-localised when each one is at most this
+#                                 many genes from the previous one on the same
+#                                 contig, counting protein-coding genes only:
+#                                 Bakta's CDS calls and its sORFs, the small
+#                                 proteins of under 30 amino acids it finds on
+#                                 its own. Default 10, so up to nine other genes
+#                                 may sit between two neighbours: a convention
+#                                 of this layer, not a value from a published
+#                                 method. Read even with the layer off, like
+#                                 every number key, so a bare on/off in it
+#                                 always stops the run (section 0); a value
+#                                 below 1 stops it only when the layer is on
+#                                 (below).
+#   TRAITS_MAX_PROTEIN_LENGTH   : 4000. Proteins longer than this many amino
+#                                 acids are not searched by structure;
+#                                 trait_profile lists each one, with its length,
+#                                 in the sample's _trait_genes.tsv.
+#   TRAITS_FOLDSEEK_SENSITIVITY : 8, Foldseek's sensitivity (-s) for the
+#                                 EcoFoldDB search. A higher value finds more
+#                                 distant matches but runs longer; Foldseek's
+#                                 own default is 9.5.
+#                                 This value and TRAITS_MAX_PROTEIN_LENGTH are
+#                                 not config keys: both are EcoFoldDB's
+#                                 published method (Ghaly et al. 2025), whose
+#                                 annotation script searches only proteins of at
+#                                 most 4000 amino acids, with Foldseek at -s 8.
+#                                 Holding them at these values keeps BacFlux's
+#                                 search close to EcoFoldDB's own; the one step
+#                                 that differs, where the 3Di strings come from,
+#                                 is explained in shared/40_annotation.smk.
+#   ECOFOLDDB                   : directories.ecofolddb_db, a database the user
+#                                 already holds. Checked only when the layer is
+#                                 on (the checks are listed below). "" means:
+#                                 download it.
+#   ECOFOLDDB_DB_DIR            : where the rules see EcoFoldDB, in BacFlux's own
+#                                 04.annotation/traits/databases, filled either
+#                                 by the download (rule trait_db) or by symlinks
+#                                 to the user's copy (rule trait_db_local), for
+#                                 the directory()-wipe reason given at
+#                                 secondary_metabolites_db in
+#                                 shared/40_annotation.smk.
+#   DIR_TRAITS                  : 04.annotation/traits, which holds databases/
+#                                 and one folder per sample.
+#   TRAIT_STRUCTURE_DIR         : 04.annotation/traits/{sample}/structure, the
+#                                 3Di strings and the Foldseek query database
+#                                 made from them (rule trait_structure_query);
+#                                 kept, because it takes the slow step to make.
+#   TRAIT_HITS                  : the Foldseek hit table (rule
+#                                 trait_structure_search), a temp() file that
+#                                 Snakemake deletes once rule trait_profile has
+#                                 read it.
+#   TRAIT_GENES, TRAIT_PROFILE,
+#   TRAIT_PROFILE_AUDIT         : the three tables of rule trait_profile, in
+#                                 04.annotation/traits/{sample}/.
+#   TRAITS_SUMMARY(_MQC)        : the cross-sample table of rule traits_summary
+#                                 in 09.report, and the same calls as numbers
+#                                 for MultiQC.
+TRAITS_MAX_GENE_GAP = _config_number(
+    "traits.max_gene_gap", _traits_cfg.get("max_gene_gap"),
+    default=10, convert=int,
+    valid_number="a whole number of genes, such as 10",
+)
+
+# A gap below 1 passes the number check above, but trait_profile.py refuses it,
+# and only when rule trait_profile runs, after the 3Di step (about 1 h 50 min per
+# genome) and the search. Next-door genes are 1 apart, so with a gap of 0 no two
+# different proteins could ever be co-localised. The same limit, 1 or more, is
+# therefore checked here, at start-up, so the two accept the same values.
+# Checked only with the layer on, so a value the run does not use never stops
+# it; the bare on/off check above runs either way.
+if TRAITS_RUN and TRAITS_MAX_GENE_GAP < 1:
+    sys.exit(
+        f"[BacFlux] traits.max_gene_gap must be a whole number of genes, 1 or more, "
+        f"but it is {TRAITS_MAX_GENE_GAP}. It is how far apart, counted in "
+        "protein-coding genes along a contig, the genes a trait needs side by side "
+        "may lie: 1 accepts only next-door neighbours, 10 (the default) up to nine "
+        "genes in between."
+    )
+
+# EcoFoldDB's published search settings, set here on purpose rather than read
+# from the config (see the list at the top of this block). Rule
+# trait_structure_query applies the length limit, rule trait_profile is told it,
+# and rule trait_structure_search uses the sensitivity.
+TRAITS_MAX_PROTEIN_LENGTH = 4000
+TRAITS_FOLDSEEK_SENSITIVITY = 8
+
+
+def _ecofolddb_names_missing(descriptions_path, genes_tsv):
+    # Find the EcoFoldDB entries the gene dictionary (TRAIT_GENES_TSV,
+    # trait_genes_v1.tsv) relies on that are absent from a copy of EcoFoldDB the
+    # user holds.
+    #   Takes in: the copy's EcoFoldDB_descriptions.txt (tab-separated, one row
+    #             per catalogue entry, with a header naming its columns; the
+    #             database's background structures are not listed) and
+    #             TRAIT_GENES_TSV, whose ecofolddb column names the EcoFoldDB
+    #             entries that stand for each gene, as Gene@Pathway/Activity,
+    #             several separated by ";".
+    #   Does:     builds each entry name of the copy from its Gene and
+    #             Pathway/Activity columns, collects every name the gene
+    #             dictionary uses, and compares the two. In the gene dictionary,
+    #             lines starting with "#" (its one-line note on what the file is)
+    #             and blank lines are skipped.
+    #   Produces: the names the dictionary uses but the copy lacks, sorted; an
+    #             empty list when the copy has them all. A copy whose header
+    #             lacks the Gene or Pathway/Activity column, or a gene dictionary
+    #             without its ecofolddb column, stops the run here instead.
+    #   Why: the copy in the authors' GitHub repository has the same structures
+    #   as the Zenodo release but names some entries differently. With such a
+    #   copy the 3Di step and the search would run, about 1 h 50 min per genome,
+    #   and only then would trait_profile.py stop on the missing names. This
+    #   check gives the same answer at start-up. A downloaded copy is checked by
+    #   trait_profile.py alone, which reads the same table, when the trait calls
+    #   run.
+    copy_names = set()
+    with open(descriptions_path, encoding="utf-8", errors="replace") as handle:
+        header = handle.readline().rstrip("\n").split("\t")
+        if "Gene" not in header or "Pathway/Activity" not in header:
+            sys.exit(
+                f"[BacFlux] {descriptions_path} has no Gene and Pathway/Activity "
+                f"columns (its header is: {', '.join(header)}), so it is not an "
+                f"EcoFoldDB descriptions table BacFlux can read."
+            )
+        gene_column = header.index("Gene")
+        pathway_column = header.index("Pathway/Activity")
+        for line in handle:
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) > max(gene_column, pathway_column):
+                copy_names.add(fields[gene_column] + "@" + fields[pathway_column])
+
+    table_names = set()
+    table_header = None
+    with open(genes_tsv, encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("#") or not line.strip():
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if table_header is None:
+                table_header = fields
+                if "ecofolddb" not in table_header:
+                    sys.exit(
+                        f"[BacFlux] {genes_tsv} has no ecofolddb column, so it is not "
+                        "the trait gene dictionary BacFlux ships: re-clone or restore "
+                        "the file."
+                    )
+                name_column = table_header.index("ecofolddb")
+                continue
+            for name in fields[name_column].split(";"):
+                name = name.strip()
+                if name:
+                    table_names.add(name)
+
+    return sorted(table_names - copy_names)
+
+
+# Resolve EcoFoldDB, only when the trait layer is on. ECOFOLDDB is the copy the
+# user already holds (directories.ecofolddb_db, which must contain
+# EcoFoldDB.dbtype), or "" when the archive in links.ecofolddb_link is to be
+# downloaded by rule trait_db (that link is checked in section 7). A user's copy
+# gets three more checks, in this order, each stopping with a [BacFlux] message
+# instead of a traceback or a failure hours later:
+#   1. EcoFoldDB_descriptions.txt must be there: the trait calls read the entry
+#      names from it.
+#   2. the gene dictionary (TRAIT_GENES_TSV) must be there. It ships with
+#      BacFlux, so a missing dictionary means a damaged clone, not a config
+#      mistake; check 3 reads it.
+#   3. every EcoFoldDB entry the gene dictionary names must be in the copy
+#      (_ecofolddb_names_missing above says why).
+# A downloaded copy is checked by trait_profile.py when the trait calls run.
+# The banner then says the layer is on. Its NOTE appears when Baktfold itself is
+# off and directories.baktfold_db is empty: the whole Baktfold database (about
+# 22 GB) is then downloaded just for the ProstT5 model.
+ECOFOLDDB = ""
+if TRAITS_RUN:
+    ECOFOLDDB = _resolve_optional_db_dir(
+        "ecofolddb_db", "EcoFoldDB.dbtype",
+        "Point it at the EcoFoldDB_v2.0 folder of the Zenodo archive in "
+        "links.ecofolddb_link (containing EcoFoldDB, EcoFoldDB.dbtype, "
+        "EcoFoldDB_descriptions.txt, ...).",
+    )
+    if ECOFOLDDB:
+        _ecofolddb_descriptions = os.path.join(ECOFOLDDB, "EcoFoldDB_descriptions.txt")
+        if not os.path.isfile(_ecofolddb_descriptions):
+            sys.exit(
+                f"[BacFlux] directories.ecofolddb_db is '{ECOFOLDDB}', but it has no "
+                "EcoFoldDB_descriptions.txt, the table the trait calls read EcoFoldDB's "
+                "entry names from. Point it at the EcoFoldDB_v2.0 folder of the Zenodo "
+                "archive in links.ecofolddb_link."
+            )
+        if not os.path.isfile(TRAIT_GENES_TSV):
+            sys.exit(
+                f"[BacFlux] traits.run is true, but the trait gene dictionary "
+                f"({TRAIT_GENES_TSV}) is missing. It ships with BacFlux, so this is an "
+                "incomplete copy of the repository rather than a config mistake: "
+                "re-clone or restore the file."
+            )
+        _ecofolddb_missing = _ecofolddb_names_missing(_ecofolddb_descriptions, TRAIT_GENES_TSV)
+        if _ecofolddb_missing:
+            _shown = ", ".join(_ecofolddb_missing[:10])
+            _more = (f" (and {len(_ecofolddb_missing) - 10} more)"
+                     if len(_ecofolddb_missing) > 10 else "")
+            sys.exit(
+                f"[BacFlux] directories.ecofolddb_db is '{ECOFOLDDB}', but its "
+                f"EcoFoldDB_descriptions.txt lacks {len(_ecofolddb_missing)} of the "
+                f"EcoFoldDB entries the trait rules use: {_shown}{_more}. The copy in "
+                "the authors' GitHub repository names some entries differently from the "
+                "Zenodo release the rules were written against. Point "
+                "directories.ecofolddb_db at the EcoFoldDB_v2.0 folder of the Zenodo "
+                "archive (links.ecofolddb_link), or leave it empty to have that archive "
+                "downloaded."
+            )
+        print(f"Using the local EcoFoldDB database at '{ECOFOLDDB}'. Nothing will be downloaded.")
+    print(
+        f"Trait profile: ON. Every protein of up to {TRAITS_MAX_PROTEIN_LENGTH} aa is "
+        "searched by predicted structure against EcoFoldDB (the ProstT5 step takes "
+        "about 1 h 50 min per genome on 16 cores), and traits are called from sets "
+        "of genes; results in 04.annotation/traits/, summary in "
+        "09.report/traits_summary.tsv."
+    )
+    if not BAKTFOLD_RUN and not BAKTFOLDDB:
+        print(
+            "  NOTE: the trait profile needs the ProstT5 model from Baktfold's database. "
+            "directories.baktfold_db is empty, so the whole database (about 22 GB) is "
+            "downloaded into output_dir; set directories.baktfold_db to use a copy you "
+            "already hold."
+        )
+
+DIR_TRAITS          = DIR_ANNOTATION + "/traits"
+ECOFOLDDB_DB_DIR    = DIR_TRAITS + "/databases"                            # a DIRECTORY (rule trait_db or trait_db_local)
+TRAIT_STRUCTURE_DIR = DIR_TRAITS + "/{sample}/structure"                   # a DIRECTORY (rule trait_structure_query)
+TRAIT_HITS          = DIR_TRAITS + "/{sample}/{sample}_ecofolddb_hits.tsv" # temp() (rule trait_structure_search)
+TRAIT_GENES         = DIR_TRAITS + "/{sample}/{sample}_trait_genes.tsv"
+TRAIT_PROFILE       = DIR_TRAITS + "/{sample}/{sample}_trait_profile.tsv"
+TRAIT_PROFILE_AUDIT = DIR_TRAITS + "/{sample}/{sample}_trait_profile_audit.tsv"
+TRAITS_SUMMARY      = DIR_REPORT + "/traits_summary.tsv"
+TRAITS_SUMMARY_MQC  = DIR_REPORT + "/traits_summary_mqc.tsv"
 
 
 # ── eggNOG-mapper --dbmem (opt-in RAM acceleration) ──
@@ -1937,7 +2266,8 @@ if not (DECONTAMINATION["include_genera"]
 # ───────────── 7. Reference-database download links ────────────
 # CheckV and dbCAN run in every mode, and geNomad can be switched on in any of
 # them, so their links are read unconditionally; card_link and phix_link are read
-# here too, but only checked when the mode actually has short reads. All of them
+# here too, but only checked when the mode actually has short reads, and the
+# EcoFoldDB link only when the trait profile is on. All of them
 # are resolved at parse time and fail EARLY with a message naming the config key,
 # rather than as a bare KeyError deep inside a rule an hour into the run.
 _links = config.get("links") or {}
@@ -1976,6 +2306,10 @@ if CHECKVDB:
             "versioned database folder, e.g. /path/to/checkv/ containing checkv-db-v1.5/."
         )
     CHECKV_DB_ID = os.path.basename(os.path.dirname(os.path.dirname(_checkv_reps[0])))
+    # Made absolute only now, after the checks above, so that their messages
+    # quote the path as you wrote it. Rule checkv_db_local links from it
+    # (_absolute_if_relative explains why a relative path would break the links).
+    CHECKVDB = _absolute_if_relative(CHECKVDB)
     print(f"Using the local CheckV database at '{CHECKVDB}' (db_id='{CHECKV_DB_ID}'). Nothing will be downloaded.")
     if CHECKV_LINK:
         print(
@@ -2028,6 +2362,38 @@ if GENOMAD_LINK and not GENOMAD_LINK.endswith(".tar.gz"):
 # without updating the hash is the one case rule genomad_db refuses outright,
 # because a stale hash is worse than an absent one.
 GENOMAD_MD5 = str(_links.get("genomad_md5") or "").strip().lower()
+
+# EcoFoldDB, the structure database of the trait profile (traits.run). Its
+# authors publish it on Zenodo, which gives an MD5 per file, as for geNomad's
+# database, so the link and the hash are read the same way, and rule trait_db
+# checks the hash as rule genomad_db does.
+#
+# Resolution order for EcoFoldDB, highest first:
+#   1. directories.ecofolddb_db → rule trait_db_local, nothing downloaded
+#   2. links.ecofolddb_link     → rule trait_db fetches, checks and unpacks it
+#   3. neither                  → the run stops here, at start-up, rather than
+#                                 in a job: unlike geNomad, EcoFoldDB has no
+#                                 downloader of its own to fall back on, so
+#                                 there would be nothing to search.
+# Both checks below are made only when traits.run is true. A link that is set is
+# checked even when directories.ecofolddb_db takes precedence, as geNomad's is.
+ECOFOLDDB_LINK = str(_links.get("ecofolddb_link") or "").strip()
+ECOFOLDDB_MD5 = str(_links.get("ecofolddb_md5") or "").strip().lower()
+if TRAITS_RUN:
+    if ECOFOLDDB_LINK and not ECOFOLDDB_LINK.endswith(".tar.gz"):
+        sys.exit(
+            f"[BacFlux] Invalid links.ecofolddb_link: expected a .tar.gz archive, got "
+            f"'{os.path.basename(urlparse(ECOFOLDDB_LINK).path)}'. It must be the "
+            f"address of the archive itself (EcoFoldDB_v2.0.tar.gz on Zenodo record "
+            f"16908168), not of the record's page or of Zenodo's API."
+        )
+    if not (ECOFOLDDB_LINK or ECOFOLDDB):
+        sys.exit(
+            "[BacFlux] traits.run is true, but neither links.ecofolddb_link nor "
+            "directories.ecofolddb_db is set, so there is no EcoFoldDB to search. "
+            "Set one of them (config/config.yaml ships with the Zenodo link), or set "
+            "traits.run: false."
+        )
 
 # dbCAN: the link is REQUIRED (every mode annotates CAZymes) and must be a
 # .tar.gz. The matching checksum URL is derived by swapping the suffix. Resolved
@@ -2385,7 +2751,8 @@ def _downstream_targets():
     # The shared deliverables — 02.assembly/eval and 03.* – 09.* — produced by the
     # rules in rules/shared/. Identical across modes (that is the whole point of
     # the shared stage layout), apart from the conditional legs at the bottom:
-    # mapping QC, the CARD read-mapping leg and the mobilome module.
+    # mapping QC, the CARD read-mapping leg, the opt-in Baktfold and trait layers,
+    # and the mobilome module.
     targets = [
         # 02.assembly/eval — assembly + genome QC leaves. Listed explicitly
         # because v1's `rule all` listed them in all four workflows, and because
@@ -2441,6 +2808,24 @@ def _downstream_targets():
     # list, and with it rule structure_annotation and its database rule.
     if BAKTFOLD_RUN:
         targets += expand(DIR_ANNOTATION + "/baktfold/{sample}", sample=SAMPLES)
+    # The trait profile (EcoFoldDB) is opt-in and default OFF: traits.run is what
+    # puts these files in this list, and with them every trait rule and, for its
+    # ProstT5 model, the Baktfold database rule. The three per-sample tables come
+    # from one job, so asking for one would build all three. Each is named
+    # anyway, because each is read on its own: the profile holds the calls, the
+    # genes table the evidence behind each one, and the audit why each trait was
+    # or was not called (every filtering decision stays visible). Snakemake
+    # checks only the files that are named here or that a later rule reads, so a
+    # table left unnamed would not be made again if it alone were deleted. No
+    # rule reads the cross-sample summary: MultiQC asks only for its _mqc twin,
+    # which the same job writes, so it is named here for the same reason.
+    if TRAITS_RUN:
+        targets += [
+            *expand(TRAIT_PROFILE, sample=SAMPLES),
+            *expand(TRAIT_PROFILE_AUDIT, sample=SAMPLES),
+            *expand(TRAIT_GENES, sample=SAMPLES),
+            TRAITS_SUMMARY,
+        ]
     # Mobilome module (08.mobilome) is opt-in and default OFF: config.mobilome.run
     # is what puts its targets in this list, and therefore what puts its 22 rules
     # in the DAG at all.
@@ -2531,8 +2916,13 @@ def download_targets():
         targets.append(GENOMAD_DB_DIR)
     if not CHECKVDB:
         targets.append(CHECKV_DB_DIR)
-    if BAKTFOLD_RUN and not BAKTFOLDDB:
+    # The Baktfold database is fetched when either Baktfold or the trait profile
+    # (which needs its ProstT5 model) is on; EcoFoldDB only for the trait
+    # profile. Each only when no copy of your own is set in directories.*.
+    if BAKTFOLD_DB_NEEDED and not BAKTFOLDDB:
         targets.append(BAKTFOLD_DB_DIR)
+    if TRAITS_RUN and not ECOFOLDDB:
+        targets.append(ECOFOLDDB_DB_DIR)
     if MOBILOME_RUN:
         targets.append(CONJSCAN_MODELS_DIR)
         if MOBILOME_ICESCAN:

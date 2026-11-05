@@ -1,8 +1,10 @@
 # BacFlux — Stage 90 report module (rules/shared/90_report.smk)
 #
-# One rule: gather every QC artefact the run produced into a single MultiQC HTML
-# page, with sample names a human can read. This module is included LAST by
-# Snakefile (step 4 of the include order) so it sees every upstream rule.
+# Rule multiqc gathers every QC artefact the run produced into a single MultiQC
+# HTML page, with sample names a human can read. This module is included LAST by
+# Snakefile (step 4 of the include order) so it sees every upstream rule. With
+# traits.run on, a second rule, traits_summary (at the end of this file), sets
+# every sample's trait calls side by side, and MultiQC shows them as a heatmap.
 #
 # What gets aggregated depends on what the mode actually produced, so the input
 # set is assembled from the capability flags (HAS_SHORT_READS / HAS_LONG_READS /
@@ -17,6 +19,7 @@
 #   CheckM (staged, relabelled)      y         y        y (2)    y
 #   GTDB-Tk (staged, relabelled)     y         y        y (2)    y
 #   Bakta (annotation)               y         y        y        y
+#   trait profile (traits.run only)  y         y        y        y
 #                                                    (2) = two genomes per sample
 #
 # Two things in here are easy to break, and both fail SILENTLY rather than loudly,
@@ -29,7 +32,8 @@
 # re-derived: OUT, DIR_REPORT, DIR_ANNOTATION, LOGS, SAMPLES, CHECKM_STATS,
 # GTDBTK_DIR, QUAST_DIR, QUALIMAP_DIR, FASTP_JSON, NANOPLOT_RAW_DIR,
 # NANOPLOT_FILT_DIR, CHECKM_RELABEL_AWK, GTDBTK_RELABEL_AWK, QC_GENOMES,
-# IS_HYBRID and the capability flags.
+# IS_HYBRID, the capability flags, and for the trait profile TRAITS_RUN,
+# TRAIT_PROFILE, TRAITS_SUMMARY, TRAITS_SUMMARY_MQC and TRAITS_SUMMARY_SCRIPT.
 #
 # The sample-name rename map below is written against v2's unified stage
 # numbering: all technology-specific work is grouped under 01.reads and
@@ -49,7 +53,8 @@ def multiqc_qc_inputs():
     Built from the capability flags rather than the mode name, so each line
     reads as a plain statement about what the mode produces. CheckM and GTDB-Tk
     are NOT in here — they are staged and relabelled first, so the rule names them
-    separately (see the rule's input: block for why that split matters).
+    separately (see the rule's input: block for why that split matters). The
+    trait heatmap joins the list only when traits.run is on.
     """
     paths = []
     if HAS_SHORT_READS:
@@ -63,6 +68,16 @@ def multiqc_qc_inputs():
         paths += expand(QUALIMAP_DIR, sample=SAMPLES)
     paths += expand(QUAST_DIR, sample=SAMPLES)
     paths += expand(DIR_ANNOTATION + "/bakta/{sample}", sample=SAMPLES)
+    # The trait heatmap (traits.run, off by default), written by rule
+    # traits_summary at the end of this file. MultiQC reads it as custom content
+    # (a table another program has written for MultiQC to show, rather than a
+    # tool's output that one of MultiQC's modules reads) because its name ends
+    # in _mqc.tsv. It is added last, and only when the layer is on, so that with
+    # the layer off this list, and params.qc_rel built from it, hold exactly the
+    # QC files above: a report finished without the trait profile is then not
+    # made again.
+    if TRAITS_RUN:
+        paths.append(TRAITS_SUMMARY_MQC)
     return paths
 
 
@@ -370,3 +385,52 @@ EOF
           --outdir "{params.report_dir}" \
           --filename "multiqc_report.html" > "{log}" 2>&1
         """
+
+
+# ── traits_summary — every sample's trait calls side by side (opt-in) ──
+# Defined only when traits.run is true.
+#
+# Takes in: every sample's {sample}_trait_profile.tsv, from rule trait_profile in
+#           shared/40_annotation.smk.
+# Does:     traits_summary.py sets the profiles side by side, one row per sample
+#           and one column per trait, in the order of trait_rules_v1.tsv. No call
+#           is made again here.
+# Produces: 09.report/traits_summary.tsv, each cell called, partial or not
+#           called; and 09.report/traits_summary_mqc.tsv, the same calls as
+#           numbers (2 called, 1 partial, 0 not called) under the "#" header
+#           lines that make MultiQC draw them as a heatmap.
+# Consumed by: the user; the _mqc file also by rule multiqc above, which finds it
+#              through multiqc_qc_inputs().
+#
+# Two files rather than one, because MultiQC colours a heatmap only from numbers
+# while a person reading the table wants the words. Both are declared as files,
+# never as directory("09.report"), for the reason given at rule multiqc. The
+# pinned MultiQC, run as rule multiqc runs it, shows the heatmap rows under the
+# sample names exactly as the file writes them, so the rename map above needs no
+# line for them. MultiQC places the section where it places all custom
+# content, right after General Statistics; moving it would need a line in the
+# generated config, and that would make every finished report again.
+#
+# Environment: envs/python.yaml, the pinned Python of the stdlib helper rules.
+# One thread and no cluster requests: it reads one small table per sample.
+if TRAITS_RUN:
+
+    rule traits_summary:
+        input:
+            profiles = expand(TRAIT_PROFILE, sample=SAMPLES),
+        output:
+            summary = TRAITS_SUMMARY,
+            mqc = TRAITS_SUMMARY_MQC,
+        params:
+            script = TRAITS_SUMMARY_SCRIPT,
+        conda:
+            "../../envs/python.yaml"
+        log:
+            LOGS + "/traits_summary.log"
+        shell:
+            """
+            python {params.script:q} \
+              --profiles {input.profiles:q} \
+              --out-summary {output.summary:q} \
+              --out-mqc {output.mqc:q} > {log} 2>&1
+            """

@@ -108,6 +108,7 @@ nav:
       - Assembly QC: analysis/assembly-qc.md
       - Taxonomy: analysis/taxonomy.md
       - Annotation: analysis/annotation.md
+      - Trait profile: analysis/traits.md
       - Antimicrobial resistance: analysis/amr.md
       - Plasmids: analysis/plasmids.md
       - Prophages: analysis/phages.md

@@ -7,8 +7,8 @@ as required by the selected analyses, or can be supplied through local paths.
 | Database group | Preparation |
 |---|---|
 | Bakta, NCBI nucleotide database, eggNOG, GTDB and Platon | Download the compatible releases and set the five required `directories.*_db` paths |
-| PhiX, CARD, dbCAN, antiSMASH, CheckV and the selected phage caller's database | Downloaded by the workflow when needed |
-| Existing local copies of CheckV, VirSorter2, antiSMASH, dbCAN, CARD, geNomad or Baktfold | Set the corresponding optional path to skip its download |
+| PhiX, CARD, dbCAN, antiSMASH, CheckV, the selected phage caller's database, and those of the optional Baktfold layer and trait profile | Downloaded by the workflow when needed |
+| Existing local copies of CheckV, VirSorter2, antiSMASH, dbCAN, CARD, geNomad, Baktfold or EcoFoldDB | Set the corresponding optional path to skip its download |
 | Optional mobilome layers | Configure each required source; see [Optional layers](../mobilome/optional-layers.md) |
 
 Nothing is written back into a database you supply. BacFlux reads your copy through a
@@ -166,7 +166,8 @@ same output directory across runs of a project and they are downloaded once.
 | CheckV | `07.phages/checkv_db/` | `links.checkv_link` | all |
 | VirSorter2 | `07.phages/vs2_db/` | — (`virsorter setup`) | unless `phage.caller: genomad` |
 | geNomad | `07.phages/genomad_db/` | `links.genomad_link` + `genomad_md5` | only when `phage.caller: genomad` |
-| Baktfold (about 22 GB, with the ProstT5 model) | `04.annotation/baktfold/databases/` | — (`baktfold install`) | only when `baktfold.run: true` |
+| Baktfold (about 22 GB, with the ProstT5 model) | `04.annotation/baktfold/databases/` | — (`baktfold install`) | only when `baktfold.run` or `traits.run` is true; the trait profile uses its ProstT5 model |
+| EcoFoldDB v2.0 (a 0.57 GB archive, about 0.8 GB unpacked) | `04.annotation/traits/databases/` | `links.ecofolddb_link` + `ecofolddb_md5` | only when `traits.run: true` |
 
 `phix_link` and `card_link` ship empty and are required in the two modes that have
 short reads. An unset one stops the run at parse time, naming the key.
@@ -177,7 +178,9 @@ official database lives on `portal.nersc.gov`, as does geNomad's downloader, and
 CheckV default is an unmodified copy of the official archive, and the geNomad default
 is the Zenodo record published by geNomad's own authors. Change `links.genomad_md5`
 whenever you change `links.genomad_link`: a mismatch stops rule `genomad_db` before
-the archive is extracted.
+the archive is extracted. The same holds for `links.ecofolddb_md5` and rule
+`trait_db`. EcoFoldDB's default is the authors' Zenodo record, whose catalogue names
+are the ones the trait rules use.
 
 !!! note "The dbCAN pin"
 
@@ -233,7 +236,8 @@ Set any of these and the corresponding download is skipped entirely.
 | `directories.dbcan_db` | a dbCAN database matching the version in `links.dbcan_link` | avoids a repeat download per project |
 | `directories.card_db` | an extracted CARD database | otherwise CARD is downloaded once into each output folder and kept there |
 | `directories.genomad_db` | the **inner** `genomad_db/` directory — the one holding `version.txt` and `genomad_db.dbtype` | its downloader hard-codes one host with no mirror option, so a local copy is the only fallback |
-| `directories.baktfold_db` | the directory `baktfold install -d <dir>` filled | about 22 GB per output folder otherwise; only read when `baktfold.run: true` |
+| `directories.baktfold_db` | the directory `baktfold install -d <dir>` filled | about 22 GB per output folder otherwise; only read when `baktfold.run` or `traits.run` is true |
+| `directories.ecofolddb_db` | the `EcoFoldDB_v2.0/` folder of the **Zenodo** archive — the one holding `EcoFoldDB.dbtype` and `EcoFoldDB_descriptions.txt` | only read when `traits.run: true`. The copy in the authors' GitHub repository names some entries differently, and the run stops on it, naming them |
 
 For these optional local paths, BacFlux checks during planning that the directory
 exists and contains database-specific files. The five required paths have more
@@ -283,7 +287,8 @@ complete.
 take about 530 GB with the full Bakta database and about 450 GB with the light one,
 mostly `core_nt` and GTDB; actual usage depends on the nucleotide database release.
 The light Bakta database costs some annotation depth. The databases BacFlux fetches
-into `output_dir` add about 20 GB, before any analysis output.
+into `output_dir` add about 20 GB, before any analysis output, and Baktfold's database
+about 22 GB more when `baktfold.run` or `traits.run` is true.
 
 ## Next
 

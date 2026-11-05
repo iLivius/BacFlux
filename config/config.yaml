@@ -25,9 +25,11 @@
 #
 # directories.output_dir is resolved to an absolute path automatically, so it
 # may be given as relative (e.g. "results/run1") and will still land where you
-# expect. Other paths (input.*_dir, directories.*_db) are used as-is: give them
-# as absolute paths unless you're sure what they're relative to (the workflow's
-# launch directory, not output_dir).
+# expect. Other paths are read against the workflow's launch directory, not
+# output_dir: input.*_dir and the five required databases are used as written,
+# and a database copy you already hold (the optional directories.*_db keys) is
+# made absolute before BacFlux links it into the output folder. Give them as
+# absolute paths unless you're sure what they're relative to.
 
 # REQUIRED. Which pipeline to run. Selects rules/<mode>/*.smk and the matching
 # sample-discovery logic.
@@ -83,9 +85,20 @@ directories:
   baktfold_db:  ""             # OPTIONAL — a Baktfold database you already hold: the directory
                                #   `baktfold install -d <dir>` filled (swissprot, AFDBClusters,
                                #   pdb, cath and the ProstT5 model; about 22 GB). Read ONLY when
-                               #   baktfold.run: true; empty => downloaded into output_dir.
+                               #   baktfold.run or traits.run is true (the trait profile uses
+                               #   its ProstT5 model); empty => downloaded into output_dir.
+  ecofolddb_db: ""             # OPTIONAL — an EcoFoldDB database you already hold: the folder
+                               #   with EcoFoldDB, EcoFoldDB.dbtype and EcoFoldDB_descriptions.txt,
+                               #   i.e. the EcoFoldDB_v2.0/ folder of the Zenodo archive in
+                               #   links.ecofolddb_link. Read ONLY when traits.run: true;
+                               #   empty => downloaded into output_dir.
+                               #   Use the Zenodo copy, not the one in the authors' GitHub
+                               #   repository: that copy names some entries differently, and
+                               #   BacFlux's gene dictionary (trait_genes_v1.tsv) uses the
+                               #   Zenodo names. A copy that lacks any of them stops the run at
+                               #   start-up, with the names listed.
                                #
-                               # All five above follow the same rule as checkv_db: BacFlux only
+                               # All seven above follow the same rule as checkv_db: BacFlux only
                                # ever READS these paths (via a local symlink view, never in place),
                                # and each one, when set, overrides the matching download entirely.
 
@@ -113,6 +126,15 @@ links:
   # Pick the genomad_db_*.tar.gz file, NOT the hmm/msa archives beside it.
   genomad_link: "https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz"
   genomad_md5:  "67244b528bb8bed464d1ca147136d33e"   # MD5 of the file above, as published on that Zenodo record. Zenodo gives an MD5 rather than the .sha256 sidecar the CheckV/dbCAN mirrors carry, so it is set here instead of derived from the URL. CHANGE THIS WHENEVER YOU CHANGE genomad_link — a mismatch stops the run. Empty = download without verification.
+  # EcoFoldDB database — read ONLY when traits.run: true.
+  # The Zenodo copy published by EcoFoldDB's own authors (record 16908168,
+  # EcoFoldDB v2.0, CC BY 4.0): about 570 MB to download, 810 MB unpacked.
+  # EcoFoldDB has no downloader of its own, so with traits.run: true either this
+  # link or directories.ecofolddb_db must be set; with neither, the run stops at
+  # start-up. With directories.ecofolddb_db set, nothing is downloaded, but a
+  # link that is set must still be the address of a .tar.gz archive.
+  ecofolddb_link: "https://zenodo.org/records/16908168/files/EcoFoldDB_v2.0.tar.gz"
+  ecofolddb_md5:  "be3144a4993f5816a8b772db964d1f3e"   # MD5 of the file above, as published on that Zenodo record. CHANGE THIS WHENEVER YOU CHANGE ecofolddb_link — a mismatch stops the run. Empty = download without verification.
 
 # Compute limits — what each rule ASKS for, not what the machine sets aside.
 # On a single computer Snakemake enforces only the CPU side: `--cores N` caps every
@@ -435,10 +457,13 @@ phage:
 # Opt-in, default OFF. Baktfold takes the proteins Bakta could only call
 # "hypothetical protein" and looks for a function by predicted 3D structure
 # instead of sequence: the ProstT5 protein language model turns each sequence into
-# Foldseek's structural alphabet, and Foldseek searches SwissProt, AlphaFold
-# clusters, PDB and CATH. It writes a second, Bakta-format annotation to
+# Foldseek's 3Di structural alphabet (one letter per residue, describing how it
+# sits against its closest neighbour in space), and Foldseek searches SwissProt,
+# AlphaFold clusters, PDB and CATH. It writes a second, Bakta-format annotation to
 # 04.annotation/baktfold/{sample}/. Bakta's own annotation stays the one every
-# other stage reads, so switching this on adds jobs and changes no other result.
+# other stage reads, so switching this on adds jobs and changes no other result,
+# apart from the trait calls when traits.run is also true: they count Baktfold's
+# names as evidence for a gene.
 # A structure match is weaker evidence than a sequence match: read its names as
 # leads, with the database hit given beside each. Its database comes from
 # directories.baktfold_db, or is downloaded (about 22 GB) into output_dir on the
@@ -448,6 +473,43 @@ baktfold:
   fast: false                  # true: skip the search against AlphaFold clusters, the
                                #   slowest of the four. Faster, but fewer proteins get a
                                #   name. Default false.
+
+# ── Trait profile from predicted protein structure (EcoFoldDB) [all modes] ──
+# Opt-in, default OFF. Calls traits of plant-growth promotion, biocontrol, stress
+# tolerance and bioremediation (nitrogen fixation, ACC deaminase, siderophores,
+# auxin, breakdown of aromatic compounds, ...), each from a defined set of genes:
+# for most traits several genes that must all be found, often side by side as in
+# an operon; for a few, one marker gene. A gene counts when Bakta's name for a
+# protein matches it (or Baktfold's name, when baktfold.run is on), or from a
+# structure match alone, for the genes where BacFlux's gene dictionary
+# (trait_genes_v1.tsv) allows that.
+# The structure match: the ProstT5 model turns every protein of up to 4000 amino
+# acids into Foldseek's 3Di structural alphabet, and Foldseek searches EcoFoldDB,
+# a curated database of protein structures with known ecological functions.
+# antiSMASH region types are reported beside a call as supporting evidence and
+# never change it. Each trait is reported as called, partial or not called, with
+# the genes behind it. A call says the genes are present, not that the strain
+# expresses the trait.
+# The ProstT5 model lives in the Baktfold database, so this needs that database
+# even when baktfold.run is false: directories.baktfold_db, or downloaded (about
+# 22 GB) into output_dir. EcoFoldDB comes from directories.ecofolddb_db or
+# links.ecofolddb_link. Cost: about 1 h 50 min per genome on 16 CPU cores for the
+# 3Di step; the rest takes minutes.
+# Writes 04.annotation/traits/{sample}/, 09.report/traits_summary.tsv, and the
+# same calls as numbers in 09.report/traits_summary_mqc.tsv, which the MultiQC
+# report shows as a heatmap. Apart from that report section, no other stage
+# reads them, so switching this on adds jobs and changes no other result.
+# Documentation: docs/analysis/traits.md.
+traits:
+  run: false                   # master switch, default OFF.
+  max_gene_gap: 10             # genes that must sit together (an operon, for
+                               #   example) count as co-localised when each one is at
+                               #   most this many genes from the previous one, on the
+                               #   same contig. Counted in protein-coding genes
+                               #   (Bakta's CDS calls and sORFs, its small proteins of
+                               #   under 30 amino acids) along the contig, not in base
+                               #   pairs; tRNA, rRNA and other RNA genes in between do
+                               #   not count. A whole number, 1 or more. Default 10.
 
 # ── Mobilome / AMR-mobility module (stage 08) [all modes] ──
 # Everything from here to the end of the file belongs to this block, and all of it

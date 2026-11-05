@@ -147,9 +147,13 @@ has_dirs() {
 # v2 unified all four modes (illumina/nanopore/hybrid/contigs) onto one
 # directory numbering scheme, so a single marker set covers every mode — unlike
 # v1, where each repo in the family renumbered its own stages, which is why the
-# chain below needs one test per repo. 08.mobilome is deliberately NOT part of
-# the v2 check: the module defaults to off, so its absence does not mean "not v2
-# output".
+# chain below needs one test per repo. The v2 markers are stage folders that
+# every mode writes. 01.reads is deliberately NOT one of them: contigs mode
+# starts from an assembly and has no reads stage. Nor is 08.mobilome: the module
+# defaults to off, so its absence does not mean "not v2 output". No v1 layout
+# has the four v2 markers together (v1 BacFlux and BacFluxL number annotation
+# 05 and taxonomy 04; FastaFlux and BacFluxL+ have no 02.assembly), so the v2
+# test cannot claim a v1 directory.
 #
 # The order of the chain is load-bearing. v1 BacFlux's marker set is a strict
 # SUBSET of v1 BacFluxL's — the only difference is 09.report — so a BacFluxL
@@ -158,7 +162,7 @@ has_dirs() {
 # silently leave the Flye working directories behind. Do not reorder these
 # branches, and put any new layout above the one whose markers it contains.
 detect_workflow() {
-  if has_dirs 01.reads 02.assembly 04.annotation 09.report; then
+  if has_dirs 02.assembly 03.taxonomy 04.annotation 09.report; then
     echo "BacFlux-v2"
   elif has_dirs 02.Illumina_assembly 03.post-processing 04.ONT_assembly 10.annotation 13.phages 14.report; then
     echo "BacFluxL+"
@@ -312,6 +316,34 @@ case "$WORKFLOW" in
       # link and would silently miss the database of a run configured against a
       # different dbCAN release.
       "04.annotation/dbcan/dbcan_db_v5.1.2"
+
+      # Baktfold's database and the ProstT5 model (about 22 GB), fetched into
+      # the output tree when baktfold.run or traits.run is on (the trait
+      # profile makes its 3Di strings with that model: Foldseek's structural
+      # alphabet, one letter per residue, predicted from the protein sequence).
+      # Same two shapes as antiSMASH above: with directories.baktfold_db set it
+      # is a folder of symlinks to your own copy, and rm -rf removes only the
+      # links. A later run in this folder that needs it fetches or links it
+      # again, and then redoes the Baktfold and 3Di jobs of every sample (the
+      # 3Di step alone takes about 1 h 50 min per genome), with the trait calls
+      # after them.
+      # The per-sample baktfold/{sample} folders are results and are kept.
+      "04.annotation/baktfold/databases"
+
+      # EcoFoldDB, the structure database of the opt-in trait profile
+      # (traits.run), fetched into the output tree (about 810 MB). Same two
+      # shapes as antiSMASH above: with directories.ecofolddb_db set it is a
+      # folder of symlinks to your own copy, and rm -rf removes only the links.
+      "04.annotation/traits/databases"
+
+      # The trait profile's per-sample structure/ folders: the proteins given to
+      # the structure search, their 3Di strings from ProstT5 and the Foldseek
+      # query database made from them, about 20 to 25 MB per genome (mostly
+      # ProstT5's per-residue confidence file). They are intermediates; the
+      # results are the trait tables beside them, which stay. A later run in
+      # this folder that needs them redoes the 3Di step of every sample (about
+      # 1 h 50 min per genome), then the EcoFoldDB search and the trait calls.
+      "04.annotation/traits/*/structure"
 
       # eggNOG-mapper's temp working directory (emptied by the tool itself,
       # left behind as an empty shell).

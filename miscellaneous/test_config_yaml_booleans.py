@@ -26,6 +26,11 @@ and the places where a bare on/off IS meaningful (decontamination `mode: off`,
 `long_read_mode: off`, `medaka_model: off`) are still accepted, and a blank
 `long_read_mode:` gets its default, off, as a blank `mode:` gets its own.
 
+The opt-in layers (Baktfold, the trait profile) get tests of their own: left off,
+as the template ships them, they add no job; switched on with stub databases,
+they plan their jobs; and their database settings stop a run only when the layer
+is on.
+
 Snakemake is looked for next to the Python running the tests, then on PATH; the
 tests are skipped when it is not found. Each dry run takes about a second.
 Run with:
@@ -65,7 +70,34 @@ NUMBER_KEYS = (
     "mobilome.iceberg.min_identity", "mobilome.iceberg.min_overlap_fraction",
     "mobilome.isosdb.min_covered_percent", "mobilome.isosdb.min_copy_number",
     "mobilome.contig_boundary_bp",
+    "traits.max_gene_gap",
 )
+
+# The trait gene dictionary that ships with BacFlux. The trait-profile tests build
+# their stub EcoFoldDB from the entry names it uses (see make_trait_stubs below).
+GENE_TABLE = os.path.join(REPO, "workflow", "scripts", "40_annotation", "trait_genes_v1.tsv")
+
+
+def ecofolddb_names_in_gene_table():
+    """The EcoFoldDB entry names the shipped gene dictionary uses, sorted.
+
+    Each name is Gene@Pathway/Activity, as EcoFoldDB's descriptions table builds it;
+    a cell of the table's ecofolddb column holds none, one, or several separated by
+    ";". Lines starting with "#" (the table's note on what it is) are skipped."""
+    names = set()
+    header = None
+    with open(GENE_TABLE, encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("#") or not line.strip():
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if header is None:
+                header = fields
+                continue
+            for name in fields[header.index("ecofolddb")].split(";"):
+                if name.strip():
+                    names.add(name.strip())
+    return sorted(names)
 
 
 def find_snakemake():
@@ -142,13 +174,17 @@ class TestConfigYamlBooleans(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def dry_run(self, changes, bare_word=None, extra_args=()):
+    def dry_run(self, changes, bare_word=None, extra_args=(), targets=()):
         """Write the base config with `changes` applied, dry-run it, return (status, output).
 
         changes:    {dotted key: value}. A value of BARE_WORD_SLOT is replaced in the
                     written file by `bare_word`, unquoted, e.g. `caller: off`.
         extra_args: more Snakemake options, e.g. ["-p"] to print the shell
                     command of every job the dry run lists.
+        targets:    what to build instead of the whole workflow, e.g.
+                    ["download_all"]. Written right after `snakemake`, because
+                    --configfile takes several values and would read a target
+                    written after it as one more config file.
         Returns:    Snakemake's exit status and everything it printed.
         """
         config = copy.deepcopy(self.base_config)
@@ -164,8 +200,8 @@ class TestConfigYamlBooleans(unittest.TestCase):
             handle.write(text)
 
         result = subprocess.run(
-            [SNAKEMAKE, "-n", "--cores", "1", "--snakefile", SNAKEFILE, "--configfile", path,
-             *extra_args],
+            [SNAKEMAKE, *targets, "-n", "--cores", "1", "--snakefile", SNAKEFILE,
+             "--configfile", path, *extra_args],
             cwd=self.tmp.name, capture_output=True, text=True, timeout=600,
         )
         return result.returncode, result.stdout + result.stderr
@@ -440,6 +476,168 @@ class TestConfigYamlBooleans(unittest.TestCase):
                           "[BacFlux] directories.baktfold_db points at")
         status, output = self.dry_run({"directories.baktfold_db": missing})
         self.assertEqual(status, 0, output[-3000:])
+
+    # ── The opt-in trait profile (EcoFoldDB) ──
+
+    # Every rule the trait layer adds. None may be planned while traits.run is false.
+    TRAIT_RULES = ("trait_db", "trait_db_local", "trait_structure_query",
+                   "trait_structure_search", "trait_profile", "traits_summary")
+
+    def make_trait_stubs(self, folder="ecofolddb_stub", leave_out=0):
+        """Stub databases for a dry run with traits.run: true; returns (ecofolddb, baktfold).
+
+        A dry run opens no database file, with one exception: when
+        directories.ecofolddb_db is set, the start-up check reads its
+        EcoFoldDB_descriptions.txt and compares the entry names with the gene
+        dictionary that ships with BacFlux. So the EcoFoldDB stub holds the file the
+        start-up check looks for (EcoFoldDB.dbtype) and a descriptions table in the
+        real column layout, written here from the names that dictionary uses, with
+        invented values in every other column. leave_out drops that many names
+        (the first ones, sorted), as in a copy that names some entries
+        differently. The Baktfold stub holds swissprot.dbtype, as in the Baktfold
+        tests above.
+        """
+        ecofolddb = os.path.join(self.tmp.name, folder)
+        os.makedirs(ecofolddb, exist_ok=True)
+        open(os.path.join(ecofolddb, "EcoFoldDB.dbtype"), "w").close()
+        names = ecofolddb_names_in_gene_table()[leave_out:]
+        with open(os.path.join(ecofolddb, "EcoFoldDB_descriptions.txt"), "w", encoding="utf-8") as out:
+            out.write("ID\tGene\tProtein\tCategory\tSub-category\tPathway/Activity\tEC\tKO\tUniProt\n")
+            for number, name in enumerate(names, start=1):
+                gene, pathway = name.split("@", 1)
+                out.write(f"STUB{number}\t{gene}\tinvented\tinvented\tinvented\t{pathway}\tNA\tNA\tNA\n")
+        baktfold = os.path.join(self.tmp.name, "trait_baktfold_db_stub")
+        os.makedirs(baktfold, exist_ok=True)
+        open(os.path.join(baktfold, "swissprot.dbtype"), "w").close()
+        return ecofolddb, baktfold
+
+    def test_traits_off_by_default_adds_no_job(self):
+        # The template ships traits.run: false: no trait rule is planned, the
+        # Baktfold database is not asked for on the trait profile's account, and
+        # the trait heatmap is not among MultiQC's inputs.
+        status, output = self.dry_run({}, extra_args=["-p"])
+        self.assertEqual(status, 0, output[-3000:])
+        for rule_name in self.TRAIT_RULES:
+            self.assertNotIn("rule " + rule_name, output)
+        self.assertNotIn("structure_annotation", output)
+        self.assertNotIn("traits_summary_mqc", output)
+        self.assertNotIn("Trait profile: ON", output)
+
+    def test_traits_on_with_local_databases_adds_its_jobs(self):
+        # traits.run on, Baktfold off, both databases held locally: the plan gains
+        # the two database views and the four per-sample and summary rules, with
+        # EcoFoldDB's own settings, and the heatmap joins MultiQC's inputs.
+        # Baktfold itself stays off: its database is linked only for the ProstT5
+        # model, no Baktfold annotation runs, and none is passed to the calls.
+        ecofolddb, baktfold = self.make_trait_stubs()
+        status, output = self.dry_run(
+            {"traits.run": True, "directories.ecofolddb_db": ecofolddb,
+             "directories.baktfold_db": baktfold},
+            extra_args=["-p"],
+        )
+        self.assertEqual(status, 0, output[-3000:])
+        for planned in ("rule structure_annotation_db_local:", "rule trait_db_local:",
+                        "rule trait_structure_query:", "rule trait_structure_search:",
+                        "rule trait_profile:", "rule traits_summary:"):
+            self.assertIn(planned, output)
+        self.assertNotIn("rule trait_db:", output)
+        self.assertNotIn("rule structure_annotation:", output)
+        self.assertNotIn("--baktfold-tsv", output)
+        self.assertIn("baktfold proteins-predict", output)
+        self.assertIn("-s 8", output)
+        self.assertIn("--max-protein-length 4000", output)
+        self.assertIn("--max-gene-gap 10", output)
+        # MultiQC is handed the heatmap as a path relative to the output root
+        # (after a space in its -d list), unlike the absolute path in the plan
+        # of rule traits_summary.
+        self.assertIn(" 09.report/traits_summary_mqc.tsv", output)
+
+    def test_traits_on_with_baktfold_on_passes_baktfold_names(self):
+        # With both layers on, Baktfold runs, and its names reach the trait calls.
+        ecofolddb, baktfold = self.make_trait_stubs()
+        status, output = self.dry_run(
+            {"traits.run": True, "baktfold.run": True,
+             "directories.ecofolddb_db": ecofolddb, "directories.baktfold_db": baktfold},
+            extra_args=["-p"],
+        )
+        self.assertEqual(status, 0, output[-3000:])
+        self.assertIn("rule structure_annotation:", output)
+        self.assertIn("--baktfold-tsv", output)
+
+    def test_download_all_with_traits_on_fetches_both_databases(self):
+        # snakemake download_all must fetch everything the run downloads. With
+        # traits.run on and baktfold.run off, that includes Baktfold's database
+        # (for the ProstT5 model) as well as EcoFoldDB, and no analysis job.
+        status, output = self.dry_run({"traits.run": True}, targets=["download_all"])
+        self.assertEqual(status, 0, output[-3000:])
+        self.assertIn("rule structure_annotation_db:", output)
+        self.assertIn("rule trait_db:", output)
+        self.assertNotIn("rule trait_structure_query:", output)
+
+    def test_traits_database_paths_are_checked_only_when_the_layer_is_on(self):
+        # A wrong directories.ecofolddb_db stops a run that uses the trait profile,
+        # and is ignored by a run that does not.
+        missing = os.path.join(self.tmp.name, "no_such_ecofolddb")
+        self.assert_stops({"traits.run": True, "directories.ecofolddb_db": missing}, None,
+                          "[BacFlux] directories.ecofolddb_db points at")
+        status, output = self.dry_run({"directories.ecofolddb_db": missing})
+        self.assertEqual(status, 0, output[-3000:])
+        # The trait profile needs Baktfold's database too, so with traits.run on a
+        # wrong directories.baktfold_db stops the run even with Baktfold off.
+        ecofolddb, _baktfold = self.make_trait_stubs()
+        self.assert_stops({"traits.run": True, "directories.ecofolddb_db": ecofolddb,
+                           "directories.baktfold_db": os.path.join(self.tmp.name, "no_such_baktfold_db")},
+                          None, "[BacFlux] directories.baktfold_db points at")
+
+    def test_ecofolddb_copy_with_other_entry_names_stops(self):
+        # The copy of EcoFoldDB in its authors' GitHub repository names some entries
+        # differently from the Zenodo release; with it, trait_profile.py would stop
+        # on the missing names only after the 3Di step and the search, about
+        # 1 h 50 min per genome. A copy missing one name the gene dictionary uses
+        # must stop the run at start-up instead, naming that entry and pointing to
+        # the Zenodo archive.
+        ecofolddb, baktfold = self.make_trait_stubs(folder="ecofolddb_stub_renamed", leave_out=1)
+        left_out = ecofolddb_names_in_gene_table()[0]
+        self.assert_stops({"traits.run": True, "directories.ecofolddb_db": ecofolddb,
+                           "directories.baktfold_db": baktfold}, None,
+                          "[BacFlux] directories.ecofolddb_db is",
+                          "lacks 1 of the EcoFoldDB entries the trait rules use", left_out,
+                          "Zenodo")
+
+    def test_traits_on_with_no_ecofolddb_source_stops(self):
+        # EcoFoldDB has no downloader of its own: with no link and no local copy
+        # there is nothing to search, so the run stops at start-up, naming both keys.
+        self.assert_stops({"traits.run": True, "links.ecofolddb_link": ""}, None,
+                          "[BacFlux] traits.run is true, but neither links.ecofolddb_link "
+                          "nor directories.ecofolddb_db is set")
+
+    def test_ecofolddb_link_that_is_not_an_archive_stops_only_when_on(self):
+        # Zenodo's API address for the same file ends in /content, not .tar.gz, and
+        # would give the downloaded file the wrong name. It stops a run that uses
+        # the link, and is ignored by a run that does not.
+        api_link = "https://zenodo.org/api/records/16908168/files/EcoFoldDB_v2.0.tar.gz/content"
+        self.assert_stops({"traits.run": True, "links.ecofolddb_link": api_link}, None,
+                          "[BacFlux] Invalid links.ecofolddb_link", "got 'content'")
+        status, output = self.dry_run({"links.ecofolddb_link": api_link})
+        self.assertEqual(status, 0, output[-3000:])
+
+    def test_max_gene_gap_below_one_stops_only_when_on(self):
+        # trait_profile.py refuses a gap below 1 (next-door genes are 1 apart, so
+        # with 0 no two different proteins could be co-localised), but only when
+        # rule trait_profile runs, after the 3Di step of about 1 h 50 min per
+        # genome. The start-up check must stop both 0 and a negative gap first,
+        # at the script's limit. With the layer off the value is not used, and the
+        # run goes ahead.
+        for gap in (0, -1):
+            self.assert_stops({"traits.run": True, "traits.max_gene_gap": gap}, None,
+                              "[BacFlux] traits.max_gene_gap must be a whole number of "
+                              "genes, 1 or more", f"but it is {gap}.")
+            status, output = self.dry_run({"traits.max_gene_gap": gap})
+            self.assertEqual(status, 0, output[-3000:])
+
+    def test_traits_block_written_as_on_stops(self):
+        self.assert_stops({"traits": BARE_WORD_SLOT}, "on",
+                          "[BacFlux] traits is a block", "run: true or run: false")
 
 
 class ConfigBlockListTest(unittest.TestCase):

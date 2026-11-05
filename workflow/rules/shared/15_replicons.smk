@@ -4,12 +4,14 @@
 # circular, plus the audit trail behind every call.
 #
 # Bakta treats every sequence it is given as a LINEAR CONTIG unless told
-# otherwise, and that assumption costs genes. Pyrodigal, Bakta's gene caller,
-# branches on topology: on a sequence declared circular it may call a gene that
-# runs ACROSS THE ORIGIN, merging the first and last partial CDS into one feature.
-# On a closed bacterial chromosome that is typically a handful of genes at
-# position 1 — very often including dnaA itself, which is precisely the gene
-# dnaapler rotated to the start.
+# otherwise. Pyrodigal, Bakta's gene caller, branches on topology: on a linear
+# contig no gene may run off either end (BacFlux runs Bakta without --partial),
+# so a gene that crosses the start of a circular sequence cannot be called
+# whole; on a sequence declared circular it may, and Bakta merges the first and
+# last partial CDS into one feature ACROSS THE ORIGIN. dnaapler has already
+# rotated every circular contig in which it found a start gene (dnaA, repA,
+# terL or cog1474) to begin at that gene, so this matters most for a circular
+# contig dnaapler could not rotate.
 #
 # Long-read assemblies are the only ones where the topology is actually known:
 # Flye reports, per contig, whether it closed the sequence into a circle. Hence

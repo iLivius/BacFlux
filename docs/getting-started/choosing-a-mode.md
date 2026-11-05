@@ -19,7 +19,7 @@ processing and in the read-dependent analyses they can perform.
 | `illumina` | Illumina paired-end reads | `{sample}_R1.<ext>` and `{sample}_R2.<ext>` | `input.illumina_dir` |
 | `nanopore` | ONT long reads | `{sample}_ont.<ext>` | `input.nanopore_dir` |
 | `hybrid` | Both, for the same isolates | both of the above | both directories |
-| `contigs` | A finished assembly and no reads | `{sample}.<fasta\|fa\|fna>` | `input.contigs_dir` |
+| `contigs` | A finished assembly and no reads | `{sample}.<fasta|fa|fna>` | `input.contigs_dir` |
 
 `<ext>` for reads is one of `fastq`, `fq`, `fastq.gz`, `fq.gz`, and every sample in
 one batch must share the same one — a directory holding both `.fastq` and
@@ -127,9 +127,9 @@ Four consequences worth knowing before you choose:
   unavailable in these two modes. ABRicate screening of the contigs still runs in every
   mode. See [Antimicrobial resistance](../analysis/amr.md).
 - **Only the long-read modes know that a contig is circular.** Flye reports it per
-  contig, and Bakta is told through `--replicons`, which lets the gene caller call
-  a gene that runs across the origin — often *dnaA* itself. In `illumina` and
-  `contigs` mode Bakta treats every sequence as linear.
+  contig, and Bakta is told through `--replicons`, so a gene that runs across the
+  start of a circular sequence is called whole. In `illumina` and `contigs` mode
+  Bakta treats every sequence as linear.
 - **The mobilome module is available in all four modes, with confidence affected
   by assembly structure.** On a fragmented assembly the located insertion-sequence count
   is a floor rather than a count, because the elements being detected are a leading
