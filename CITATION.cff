@@ -36,8 +36,11 @@ abstract: >-
   metabolites, CAZymes, antimicrobial resistance and virulence screening, plasmid
   and prophage detection, and an aggregated report. An optional mobilome module
   (off by default) reports, for each AMR gene, whether it sits in a mobile
-  genetic element and how transferable that element is predicted to be. Every
-  tool runs in its own conda environment.
+  genetic element and how transferable that element is predicted to be. Two
+  further optional layers use predicted protein structure: Baktfold names
+  proteins Bakta leaves hypothetical, and a trait profile calls traits for
+  plant-growth promotion, biocontrol, stress tolerance and bioremediation from
+  sets of genes. Every tool runs in its own conda environment.
 type: software
 version: 2.1.0
 date-released: 2026-10-28
@@ -412,6 +415,56 @@ references:
     start: "000685"
     doi: 10.1099/mgen.0.000685
     notes: "Bakta."
+
+  - type: article
+    title: "Baktfold: sensitive protein functional annotation across the microbial tree of life using structural information"
+    authors:
+      - family-names: Bouras
+        given-names: George
+    year: 2026
+    journal: "bioRxiv"
+    doi: 10.64898/2026.03.31.715528
+    notes: "Baktfold (preprint) — optional structure-based names for hypothetical proteins (baktfold.run); its ProstT5 step also feeds the trait profile. Author list abbreviated; full citation in CITATIONS.md."
+
+  - type: article
+    title: "Bilingual language model for protein sequence and structure"
+    authors:
+      - family-names: Heinzinger
+        given-names: Michael
+    year: 2024
+    journal: "NAR Genomics and Bioinformatics"
+    volume: 6
+    issue: 4
+    start: lqae150
+    doi: 10.1093/nargab/lqae150
+    notes: "ProstT5 — predicts the 3Di sequences for Baktfold and the trait profile. Author list abbreviated; full citation in CITATIONS.md."
+
+  - type: article
+    title: "Fast and accurate protein structure search with Foldseek"
+    authors:
+      - family-names: van Kempen
+        given-names: Michel
+    year: 2024
+    journal: "Nature Biotechnology"
+    volume: 42
+    issue: 2
+    start: 243
+    end: 246
+    doi: 10.1038/s41587-023-01773-0
+    notes: "Foldseek — structure search in Baktfold and the trait profile. Author list abbreviated; full citation in CITATIONS.md."
+
+  - type: article
+    title: "EcoFoldDB: protein structure-guided functional profiling of ecologically relevant microbial traits at the metagenome scale"
+    authors:
+      - family-names: Ghaly
+        given-names: Timothy M.
+    year: 2025
+    journal: "Environmental Microbiology"
+    volume: 27
+    issue: 9
+    start: e70178
+    doi: 10.1111/1462-2920.70178
+    notes: "EcoFoldDB — structure database and filter of the optional trait profile (traits.run); database EcoFoldDB v2.0, doi:10.5281/zenodo.16908168, CC BY 4.0. Author list abbreviated; full citation in CITATIONS.md."
 
   - type: article
     title: "eggNOG-mapper v2: functional annotation, orthology assignments, and domain prediction at the metagenomic scale"
