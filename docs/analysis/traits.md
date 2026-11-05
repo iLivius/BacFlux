@@ -223,7 +223,7 @@ The rules table, `trait_rules_v1.tsv`:
 | Column | Contents |
 |---|---|
 | `trait_id`, `trait` | the identifier every output uses, and the trait in words |
-| `application` | one or more of `biofertiliser`, `biocontrol`, `biostimulant`, `stress tolerance` and `bioremediation`, separated by commas; `context` marks a call that describes the strain's metabolism rather than supporting a product claim |
+| `application` | one or more of `biofertiliser`, `biocontrol`, `biostimulant`, `stress tolerance` and `bioremediation`, separated by commas; `context` marks a call that describes the strain's metabolism rather than supporting a product claim ([What a call does not mean](#what-a-call-does-not-mean)) |
 | `required` | the alternative gene sets |
 | `supporting` | genes and antiSMASH region types that are reported but not required, separated by `|` |
 | `colocalised` | empty, `all`, or groups separated by `;` |
@@ -364,6 +364,25 @@ as `acdS` for ACC deaminase or `nosZ` for nitrous oxide reduction. When that gen
 listed in `structure_only`, the call rests on a structure hit alone, with no name
 confirming it; only a gene whose `s_alone` is `yes`, such as `nosZ`, can count this
 way, so `acdS` always needs a name.
+
+**`context` describes the strain, not a product claim.** The `application` column
+gives each trait the use it points to. `context` marks a trait whose call describes
+the strain's metabolism but does not, on its own, support a biofertiliser,
+biocontrol, biostimulant or bioremediation claim. Three kinds of traits carry it:
+
+- the four denitrification steps, `nitrate_reduction` to `n2o_reduction`, `context`
+  only: nitrate reduction is the first step both of denitrification, which loses
+  nitrogen from the soil, and of nitrate ammonification, which keeps it as ammonium;
+- `siderophore_mycobactin`, `context` only: mycobactin is the siderophore of
+  mycobacteria and their relatives, so a call says which genus you are holding
+  rather than that the strain supplies a plant with iron;
+- the central aromatic routes, catechol and protocatechuate ring cleavage and
+  phenylacetate degradation, `bioremediation, context`: many aromatic pollutants end
+  up in them, but they are also the ordinary exit for plant phenolics in many soil
+  bacteria. A pollutant claim rests on an upstream route, such as
+  `naphthalene_upper_pathway` or `toluene_monooxygenase_aerobic`.
+
+The label never changes a decision.
 
 **`borderline: yes`** marks a call in which a counted protein carries a structure hit
 close to a cut-off or to a rival. Check that hit in the gene table before quoting the
