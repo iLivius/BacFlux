@@ -1852,13 +1852,19 @@ def assess_gene(sample, amr, elements_on_contig, replicons, contig_lengths,
                 "kept, but it rests on one tool.",
             ))
         elif call_source == "conflict":
+            # Two cases reach here (platon_replicons.py, branches 2 and 4): Platon
+            # called the contig chromosomal, or Platon skipped it and its length
+            # (beyond the megaplasmid ceiling, a likely chromid) says chromosome;
+            # either way geNomad called it a plasmid. The replicon table's
+            # evidence column says which.
             caps.append((
                 "low", "replicon_call_tools_disagree",
-                f"Platon called contig '{contig}' chromosomal and geNomad called "
-                "it a plasmid. The chromosomal call is reported because Platon is "
-                "the default caller, but if geNomad is right this gene is on a "
-                "plasmid and is NOT an intrinsic determinant - check this contig "
-                "before relying on the tier.",
+                f"contig '{contig}' is called chromosomal (by Platon, or from a "
+                "length beyond the megaplasmid ceiling; the replicon table says "
+                "which) while geNomad calls it a plasmid. The chromosomal call is "
+                "reported, but if geNomad is right this gene is on a plasmid and "
+                "is NOT an intrinsic determinant - check this contig before "
+                "relying on the tier.",
             ))
 
     # ── Step 3: split the elements on this contig by what they are ──────────

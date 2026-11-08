@@ -631,7 +631,10 @@ definition, so machinery on a contig called `plasmid` is a conjugative plasmid r
 not an ICE — audit reason `ice_demoted_on_plasmid_replicon`. On an `unknown` contig you
 get `ice_on_unclassified_replicon` instead. The floor is not Platon's 500 kb because
 megaplasmids run to 1–2 Mb; between the two the module says `unknown` and lets the
-confidence cap reflect that.
+confidence cap reflect that. Above it, a geNomad plasmid call is weighed against the
+length rather than taken: such a contig is called chromosomal with the disagreement
+flagged, since a replicon that large is usually a secondary chromosome (see
+[Plasmids](../analysis/plasmids.md#what-the-mobility-ladder-takes-from-here)).
 
 ## The two directions
 

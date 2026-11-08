@@ -236,25 +236,25 @@ def classify_plasmid_mobility(record):
     return "non-mobilisable", evidence
 
 
-# ── The two size thresholds, and the band of doubt between them ──────────────
+# ── Platon's size filter, and the megaplasmid ceiling ────────────────────────
 
-# Platon refuses to even look at a contig this long or longer — read from its
-# own source (platon/constants.py: MAX_CONTIG_LENGTH = 500000; platon.py skips a
-# contig when length >= MAX_CONTIG_LENGTH). Such a contig is reported as "too
-# long" and never classified. What happens to such a contig in
-# Platon's output files depends on the rest of the genome:
+# Platon looks only at contigs of 1,000 bp up to 499,999 bp — read from its own
+# source (platon/constants.py: MIN_CONTIG_LENGTH = 1000, MAX_CONTIG_LENGTH =
+# 500000; platon.py skips a contig when length < MIN_CONTIG_LENGTH or length >=
+# MAX_CONTIG_LENGTH). A skipped contig is reported as "too short" or "too long"
+# and never classified. What happens to it in Platon's output files depends on
+# the rest of the genome:
 #   - when no contig passes the size filter (a closed genome whose replicons are
 #     all over 500 kb), Platon stops early and writes no FASTA and no table;
 #   - when at least one contig passes, Platon writes its chromosome FASTA from
 #     every input contig it did not call plasmid (platon.py, the
-#     "<prefix>.chromosome.fasta" block), so the skipped long contigs land in
-#     that file too, although Platon never classified them.
-# So for a contig over 500 kb, being in the chromosome FASTA is not a call: a
-# 1.1 Mb megaplasmid of a genome that also has a small plasmid sits there. Such a
-# contig is treated below as one Platon did not classify, and its length decides.
-# Platon skips contigs under 1,000 bp too (MIN_CONTIG_LENGTH in its constants.py)
-# and writes them into the chromosome FASTA in the same way; only the 500 kb limit
-# is applied here.
+#     "<prefix>.chromosome.fasta" block), so the skipped contigs land in that
+#     file too, although Platon never classified them.
+# So for a skipped contig, being in the chromosome FASTA is not a call: a 1.1 Mb
+# megaplasmid of a genome that also has a small plasmid sits there, and so does
+# every contig under 1 kb of a draft assembly. Such a contig is treated below as
+# one Platon did not classify: geNomad's call or its length decides.
+PLATON_MIN_CONTIG_LENGTH = 1000
 PLATON_MAX_CONTIG_LENGTH = 500000
 
 # Above THIS length we are willing to call an unclassified contig the chromosome.
@@ -264,6 +264,14 @@ PLATON_MAX_CONTIG_LENGTH = 500000
 # the point where "Platon skipped it because it is far too big to be a plasmid"
 # becomes safe to state. Between the two thresholds we say `unknown` and let the
 # confidence cap downstream reflect that we really do not know.
+#
+# A replicon of 2 Mb or more that is not the main chromosome is usually a
+# secondary chromosome, a "chromid" (Harrison et al. 2010, Trends Microbiol
+# 18:141, doi:10.1016/j.tim.2009.12.010): it carries core genes but replicates
+# and partitions like a plasmid, which is why geNomad can score it as one (the
+# 3.36 Mb second chromosome of Paraburkholderia xenovorans LB400, for one). A
+# geNomad plasmid call on such a contig is therefore weighed against its length,
+# as a disagreement (branch 4 below), not taken as a plasmid.
 #
 # rule mobilome_replicons does not pass --min-chromosome-bp, so this default is
 # what every BacFlux run uses. Changing it means adding the flag to that rule's
@@ -275,18 +283,21 @@ DEFAULT_MIN_CHROMOSOME_BP = 2000000
 # ── One row per contig: the decision chain ───────────────────────────────────
 # The branches below are tested in this order, and the order IS the logic. Read
 # them as "the strongest evidence available for this contig, in descending order
-# of how much we trust it". "Platon says" applies only to a contig shorter than
-# 500 kb; a longer one counts as not classified by Platon, whatever file it was
-# written to (see PLATON_MAX_CONTIG_LENGTH above).
+# of how much we trust it". "Platon says" applies only to a contig within
+# Platon's size filter (1,000 to 499,999 bp); any other counts as not classified
+# by Platon, whatever file it was written to (see PLATON_MAX_CONTIG_LENGTH).
 #
 #   1. Platon says plasmid                     -> plasmid, mobility typed
 #   2. Platon says chromosome, geNomad says plasmid -> chromosome, flagged conflict
 #   3. Platon says chromosome                  -> chromosome, mobility NA
-#   4. Platon said nothing, geNomad says plasmid -> plasmid, mobility unknown
-#   5. Nobody classified it, and it is over the megaplasmid ceiling -> chromosome,
+#   4. Platon said nothing, geNomad says plasmid, but the contig is over the
+#      megaplasmid ceiling                     -> chromosome, flagged conflict
+#   5. Platon said nothing, geNomad says plasmid -> plasmid, mobility unknown
+#   6. Nobody classified it, and it is over the megaplasmid ceiling -> chromosome,
 #      inferred from length alone
-#   6. Nobody classified it, and a megaplasmid cannot be ruled out -> unknown
-#   7. Anything else                           -> unknown
+#   7. Nobody classified it, and a megaplasmid cannot be ruled out -> unknown
+#   8. Nobody classified it, and it is under Platon's 1 kb minimum -> unknown
+#   9. Anything else                           -> unknown
 
 def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
                min_chromosome_bp=DEFAULT_MIN_CHROMOSOME_BP, genomad_calls=None):
@@ -311,14 +322,18 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
     for contig in sorted(all_contigs):
         genomad = genomad_calls.get(contig, {})
         genomad_says_plasmid = genomad.get("call") == "plasmid"
-        # Did Platon look at this contig at all? Not when it is longer than its
-        # size filter. Without a known length (no --contigs), the files are all
-        # there is to go on. Only the chromosome FASTA needs this check: Platon
-        # writes a contig to its plasmid FASTA only after classifying it, so a
-        # contig over 500 kb never appears there.
+        # Did Platon look at this contig at all? Not when it is outside its size
+        # filter. Without a known length (no --contigs), the files are all there
+        # is to go on. Only the chromosome FASTA needs this check: Platon writes
+        # a contig to its plasmid FASTA only after classifying it, so a skipped
+        # contig never appears there.
         length = (contig_lengths or {}).get(contig)
-        platon_looked = length is None or length < PLATON_MAX_CONTIG_LENGTH
+        platon_looked = length is None or (
+            PLATON_MIN_CONTIG_LENGTH <= length < PLATON_MAX_CONTIG_LENGTH)
         platon_says_chromosome = platon_looked and contig in chromosome_ids
+        # geNomad's plasmid call against a length no realistic plasmid has
+        # (see DEFAULT_MIN_CHROMOSOME_BP): branch 4 below.
+        too_long_for_a_plasmid = length is not None and length >= min_chromosome_bp
 
         if contig in plasmid_ids:
             replicon = "plasmid"
@@ -351,6 +366,24 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
             # CONJscan's question, answered separately.
             mobility = "NA"
             evidence = "chromosomal contig; Platon does not assess chromosomal mobility"
+        elif genomad_says_plasmid and too_long_for_a_plasmid:
+            # Platon skipped the contig for its length, geNomad calls it a
+            # plasmid, and the contig is longer than any realistic plasmid: most
+            # likely a chromid (see DEFAULT_MIN_CHROMOSOME_BP). As in branch 2,
+            # the call that sides with the chromosome is kept and the
+            # disagreement is flagged, so confidence is capped downstream rather
+            # than a secondary chromosome being reported as a plasmid.
+            replicon = "chromosome"
+            mobility = "NA"
+            evidence = (
+                f"CONFLICT: geNomad called this contig a plasmid (score "
+                f"{genomad.get('score', 'NA')}), but at {length} bp it is above "
+                f"the {min_chromosome_bp} bp megaplasmid ceiling, where a "
+                "secondary chromosome (a chromid) is likelier; Platon skipped it "
+                "for its length. Called chromosome from the length, with the "
+                "disagreement flagged - check this contig before treating genes "
+                "on it as intrinsic or as mobile."
+            )
         elif genomad_says_plasmid:
             # Platon made NO call about this contig, and geNomad calls it a
             # plasmid. Nothing is being overridden here - this is the only
@@ -382,9 +415,10 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
             )
         else:
             # Platon did not classify this contig: it is in neither Platon FASTA,
-            # or it is longer than Platon's size filter (500 kb), in which case it
-            # may sit in the chromosome FASTA without Platon having looked at it.
-            # On a closed genome this is where the chromosome itself ends up.
+            # or it is outside Platon's size filter (500 kb or more, under 1 kb),
+            # in which case it may sit in the chromosome FASTA without Platon
+            # having looked at it. On a closed genome this is where the
+            # chromosome itself ends up.
             if length is not None and length >= min_chromosome_bp:
                 # Far larger than any realistic plasmid, so this is the
                 # chromosome. Say so — but record that it is INFERRED from
@@ -407,6 +441,16 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
                     f"{PLATON_MAX_CONTIG_LENGTH} bp size filter, but is small "
                     "enough that a megaplasmid cannot be ruled out"
                 )
+            elif length is not None and length < PLATON_MIN_CONTIG_LENGTH:
+                # Under Platon's minimum: Platon never looked at it, and a contig
+                # this short says nothing about its replicon by its length.
+                replicon = "unknown"
+                mobility = "NA"
+                evidence = (
+                    f"not classified: {length} bp is shorter than Platon's "
+                    f"{PLATON_MIN_CONTIG_LENGTH} bp minimum, so Platon never "
+                    "looked at it"
+                )
             else:
                 replicon = "unknown"
                 mobility = "NA"
@@ -427,8 +471,8 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
             call_source = "platon"
         elif replicon == "plasmid":
             call_source = "genomad"         # the rescue case above
-        elif platon_says_chromosome and genomad_says_plasmid:
-            call_source = "conflict"
+        elif genomad_says_plasmid and (platon_says_chromosome or too_long_for_a_plasmid):
+            call_source = "conflict"        # branches 2 and 4 above
         else:
             call_source = "platon"
 

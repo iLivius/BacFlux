@@ -282,3 +282,54 @@ def test_a_short_contig_in_the_chromosome_fasta_is_still_platons_call(tmp_path):
     for rows in (with_lengths, without_lengths):
         assert rows["chr_fragment"]["replicon"] == "chromosome"
         assert rows["chr_fragment"]["mobility_evidence"].startswith("chromosomal contig")
+
+
+def test_a_contig_under_platons_minimum_is_not_a_chromosome_call(tmp_path):
+    """Platon also skips every contig under 1,000 bp and writes it into the
+    chromosome FASTA. Such a contig is not classified: unknown, unless geNomad
+    calls it a plasmid."""
+    platon_dir = write_platon_dir(
+        tmp_path, plasmids=["p_small"], chromosomes=["chr1", "short", "short_plasmid"])
+    concordance = write_concordance(tmp_path, [
+        {"contig": "short_plasmid", "platon_call": "not_called",
+         "genomad_call": "plasmid", "genomad_score": "0.95",
+         "agreement": "genomad_only"},
+    ])
+    lengths = {"chr1": 400000, "short": 963, "short_plasmid": 980,
+               "p_small": SMALL_PLASMID_BP}
+
+    rows = rows_by_contig(pr.build_rows(
+        platon_dir, "contigs_final", sorted(lengths), contig_lengths=lengths,
+        genomad_calls=pr.read_genomad_concordance(concordance)))
+
+    assert rows["short"]["replicon"] == "unknown"
+    assert "1000 bp minimum" in rows["short"]["mobility_evidence"]
+    assert rows["short_plasmid"]["replicon"] == "plasmid"
+    assert rows["short_plasmid"]["replicon_call_source"] == "genomad"
+    assert rows["chr1"]["replicon"] == "chromosome"
+
+
+def test_a_genomad_plasmid_call_on_a_chromid_sized_contig_is_a_conflict(tmp_path):
+    """A contig of 2 Mb or more that only geNomad calls a plasmid is most likely
+    a secondary chromosome (a chromid): chromosome, flagged conflict, so its
+    genes are neither called mobile nor intrinsic at full confidence. A 1.5 Mb
+    megaplasmid with the same geNomad call stays a plasmid."""
+    platon_dir = write_platon_dir(tmp_path)          # closed genome: no Platon files
+    concordance = write_concordance(tmp_path, [
+        {"contig": "chromid", "platon_call": "not_called", "genomad_call": "plasmid",
+         "genomad_score": "0.94", "agreement": "genomad_only"},
+        {"contig": "megaplasmid", "platon_call": "not_called", "genomad_call": "plasmid",
+         "genomad_score": "0.97", "agreement": "genomad_only"},
+    ])
+    lengths = {"chr1": 4895836, "chromid": 3363523, "megaplasmid": 1471779}
+
+    rows = rows_by_contig(pr.build_rows(
+        platon_dir, "contigs_final", sorted(lengths), contig_lengths=lengths,
+        genomad_calls=pr.read_genomad_concordance(concordance)))
+
+    assert rows["chromid"]["replicon"] == "chromosome"
+    assert rows["chromid"]["replicon_call_source"] == "conflict"
+    assert "chromid" in rows["chromid"]["mobility_evidence"]
+    assert rows["megaplasmid"]["replicon"] == "plasmid"
+    assert rows["megaplasmid"]["replicon_call_source"] == "genomad"
+    assert rows["chr1"]["mobility_evidence"].startswith("inferred chromosomal")

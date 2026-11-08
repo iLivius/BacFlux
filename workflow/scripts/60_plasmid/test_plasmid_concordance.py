@@ -340,12 +340,20 @@ class TestPlatonSizeFilter(unittest.TestCase):
         fasta = write_temp(">contig_a some description\nACGT\nACG\n>contig_b\nA\n")
         self.assertEqual(pc.read_contig_lengths(fasta), {"contig_a": 7, "contig_b": 1})
 
-    def test_the_boundary_is_platons_own(self):
-        # Platon skips a contig when length >= 500,000, so 499,999 bp is the
-        # longest contig it classifies.
+    def test_the_boundaries_are_platons_own(self):
+        # Platon skips a contig when length >= 500,000 or length < 1,000, so it
+        # classifies contigs of 1,000 to 499,999 bp.
         self.assertTrue(pc.platon_could_classify("c", {"c": 499999}))
         self.assertFalse(pc.platon_could_classify("c", {"c": 500000}))
+        self.assertTrue(pc.platon_could_classify("c", {"c": 1000}))
+        self.assertFalse(pc.platon_could_classify("c", {"c": 999}))
         self.assertTrue(pc.platon_could_classify("c", {}))
+
+    def test_a_contig_under_platons_minimum_is_genomad_only(self):
+        rows = pc.build_rows("sampleA", {}, {"short"}, {},
+                             {"short": ("0.95", "NA")}, contig_lengths={"short": 963})
+        self.assertEqual((rows[0]["platon_call"], rows[0]["agreement"]),
+                         ("not_called", "genomad_only"))
 
 
 if __name__ == "__main__":
