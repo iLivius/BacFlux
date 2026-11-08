@@ -570,10 +570,12 @@ rule amr_workbook:
         qc_genomes = QC_GENOME_TABLE,
         taxonomy_dir = GTDBTK_DIR,
         contigs = FINAL_CONTIGS,
-        # The three ABRicate tables of rule amr_contigs (shared/50_amr.smk).
+        # The three ABRicate tables of rule amr_contigs (shared/50_amr.smk), and
+        # ABRicate's version and database dates (rule abricate_databases there).
         card = DIR_AMR + "/abricate/{sample}/card.tsv",
         resfinder = DIR_AMR + "/abricate/{sample}/resfinder.tsv",
         argannot = DIR_AMR + "/abricate/{sample}/argannot.tsv",
+        abricate_databases = ABRICATE_DATABASES_TSV,
         platon_dir = PLATON_DIR,
         viral_dir = WORKBOOK_VIRAL_DIR,
         checkv_dir = DIR_PHAGES + "/checkv/{sample}",
@@ -610,6 +612,7 @@ rule amr_workbook:
           --card {input.card:q} \
           --resfinder {input.resfinder:q} \
           --argannot {input.argannot:q} \
+          --abricate-databases {input.abricate_databases:q} \
           --platon-dir {input.platon_dir:q} \
           --platon-prefix {params.platon_prefix:q} \
           --phage-caller {params.phage_caller:q} \

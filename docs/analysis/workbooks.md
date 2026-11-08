@@ -87,6 +87,15 @@ version that changes those coordinates changes the ID. Every hit stays on
 `reference_accessions` holds the GenBank accessions of the database's reference
 sequences, with their coordinates. CARD's ARO numbers are not in ABRicate's output.
 
+`in_resfinder` says whether ResFinder found the gene. ResFinder collects acquired
+resistance genes ([Zankari et al. 2012](https://doi.org/10.1093/jac/dks261)), while CARD
+and ARG-ANNOT also list genes a species carries anyway, such as efflux pumps, porins and
+their regulators; a gene found only by CARD or ARG-ANNOT is therefore worth a look
+before it is read as acquired. The `Summary` sheet counts the loci ResFinder found, and
+gives ABRicate's version and the date ABRicate lists for its copy of each database
+(also on `Run_QC`, from `05.amr/abricate/abricate_databases.tsv`), so each result is
+reported with the database it came from.
+
 ### On a plasmid?
 
 The answer reads the replicon call of the gene's contig: the mobilome module's
@@ -97,15 +106,15 @@ same code (`platon_replicons.py`).
 |---|---|
 | plasmid, by Platon, by geNomad or by both | `yes` |
 | chromosome, by Platon, or inferred from a length of 2 Mb or more | `no` |
-| chromosome by Platon, plasmid by geNomad | `uncertain` |
+| chromosome by Platon or from a length of 2 Mb or more, plasmid by geNomad (call source `conflict`) | `uncertain` |
 | unknown: neither tool classified the contig | `uncertain` |
 | any, when Platon failed for the strain | `not_assessed`, unless geNomad calls the contig a plasmid |
 
 `plasmid_call_source` says which tools the call rests on: `genomad` when geNomad alone
 called a plasmid, `both`, `conflict`, and `platon` for every other call, including a
 contig Platon skipped whose call comes from its length (`plasmid_evidence` then says
-so). Platon skips every contig of 500 kb or more, and such a contig is decided by
-geNomad's call or by its length, as explained under
+so). Platon skips every contig of 500 kb or more and every contig under 1 kb, and such a
+contig is decided by geNomad's call or by its length, as explained under
 [Plasmids](plasmids.md#what-the-mobility-ladder-takes-from-here). A plasmid is not
 transferable by being a plasmid: `plasmid_mobility` gives Platon's reading of its
 conjugation and mobilisation genes.

@@ -170,6 +170,8 @@ def test_report_dag_and_cli_matrix(tmp_path, input_config, report_parser,
         assert Path(args.checkv_contamination).parent == checkv_directory
         assert Path(args.viral_table).is_relative_to(viral_directory)
         assert args.contigs in inputs
+        if command == "amr":
+            assert args.abricate_databases in inputs
         if command == "traits":
             assert args.provenance in inputs and args.gene_dictionary in inputs
             assert str(Path(args.catalogue).parent) in inputs

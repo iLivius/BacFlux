@@ -268,7 +268,9 @@ criteria, so disagreement should be investigated rather than treated as an error
 One TSV per database — `argannot`, `card`, `ecoh`, `ecoli_vf`, `megares`, `ncbi`,
 `resfinder`, `vfdb` — plus `AMR_summary.txt`, which collates a sample's eight tables.
 This analysis carries the EFSA thresholds: a hit needs ≥80% identity and ≥70% gene-length
-coverage.
+coverage. Beside the per-sample folders, `abricate/abricate_databases.tsv` gives ABRicate's
+version and, for each database, the number of sequences and the date ABRicate lists for its
+copy, once per run.
 
 ### `mapping/{sample}/` — `[illumina, hybrid]`
 

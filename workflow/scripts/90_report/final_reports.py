@@ -525,6 +525,30 @@ def group_hits_into_loci(hits, sample):
     return loci
 
 
+def read_abricate_databases(path):
+    """Read ABRicate's version and its database copies -> {database word: row}.
+
+    Takes in: 05.amr/abricate/abricate_databases.tsv, from rule
+              abricate_databases (shared/50_amr.smk): `abricate --list` (DATABASE,
+              SEQUENCES, DBTYPE, DATE) with ABRicate's version as a last column.
+    Gives back: one row per database, keyed by the name ABRicate uses (card,
+              resfinder, argannot, ...). DATE is the date ABRicate gives for its
+              copy of the database, the closest thing to a database version it
+              records. A result is reported with the database it came from and
+              that database's version or date, so the workbook shows both.
+    """
+    _header, rows = read_tsv(path, ("DATABASE", "SEQUENCES", "DATE", "ABRICATE_VERSION"))
+    return {row["DATABASE"].strip().lower(): row for row in rows}
+
+
+def database_note(database, database_word, listing):
+    """One phrase for a database's copy, e.g. "CARD, dated 2026-Apr-3, 6052 sequences"."""
+    row = listing.get(database_word)
+    if row is None:
+        return f"{database}, not in ABRicate's list"
+    return f"{database}, dated {row['DATE']}, {row['SEQUENCES']} sequences"
+
+
 # ── Plasmid context ──────────────────────────────────────────────────────────
 
 def platon_crashed(platon_dir):
@@ -575,12 +599,14 @@ def plasmid_answer(contig, replicon_calls, crashed):
                     or by both (plasmid_call_source says which);
       not_assessed  Platon failed for this sample, so nothing short of a
                     geNomad plasmid call can be said;
-      uncertain     Platon calls the contig chromosome but geNomad calls it a
-                    plasmid (call source "conflict");
+      uncertain     the contig is called chromosome, by Platon or from a length
+                    of 2 Mb or more, but geNomad calls it a plasmid (call source
+                    "conflict"; a contig that long is likely a chromid);
       no            the contig is called chromosome: by Platon, or inferred from
                     a length of 2 Mb or more for a contig Platon skipped;
       uncertain     anything else: a contig neither tool classified, such as one
-                    between 500 kb and 2 Mb that could be a megaplasmid.
+                    between 500 kb and 2 Mb that could be a megaplasmid, or one
+                    under Platon's 1 kb minimum.
     """
     if contig not in replicon_calls:
         raise ValueError(f"contig {contig!r} has a gene but no replicon call; the AMR "
@@ -1094,6 +1120,10 @@ AMR_LOCUS_COLUMNS = [
     ("genes", "gene names given by the databases, longest hit first; databases often name "
               "one gene differently"),
     ("databases", "which of CARD, ResFinder and ARG-ANNOT found the gene"),
+    ("in_resfinder", "yes when ResFinder found the gene. ResFinder collects acquired "
+                     "resistance genes; a gene found only by CARD or ARG-ANNOT can be one "
+                     "every strain of the species carries, such as an efflux pump, a porin "
+                     "or a regulator"),
     ("database_hits", "how many database hits were grouped into this locus (a hit joins the "
                       "longest one when at least 80 % of it lies inside); each is a row on "
                       "Database_hits"),
@@ -1109,10 +1139,12 @@ AMR_LOCUS_COLUMNS = [
                  "mobilome module makes it (platon_replicons.py)"),
     ("plasmid", "is the gene on a plasmid? yes: the contig is called plasmid (by Platon, "
                 "geNomad or both); no: called chromosome (by Platon, or 2 Mb or longer when "
-                "Platon skipped it); uncertain: Platon and geNomad disagree, or neither "
+                "Platon skipped it); uncertain: geNomad calls a plasmid what Platon or a "
+                "length of 2 Mb or more calls chromosome, or neither "
                 "classified the contig; not_assessed: Platon failed"),
     ("plasmid_call_source", "the replicon table's call source: genomad (geNomad alone called a "
-                            "plasmid), both, conflict (Platon chromosome, geNomad plasmid), or "
+                            "plasmid), both, conflict (chromosome by Platon or by a length of "
+                            "2 Mb or more, plasmid by geNomad), or "
                             "platon for every other call, including a contig Platon skipped whose "
                             "call comes from its length (see plasmid_evidence)"),
     ("plasmid_mobility", "for a plasmid, conjugative, mobilisable or non-mobilisable from "
@@ -1228,6 +1260,7 @@ def build_amr_workbook(args):
     for database, database_word in ABRICATE_DATABASES:
         hits.extend(read_abricate(tables[database], database, database_word, out_root))
     loci = group_hits_into_loci(hits, args.sample)
+    listing = read_abricate_databases(args.abricate_databases)
 
     # 3. The context of each locus. Each source is read once, here.
     contig_lengths = platon_replicons.read_contig_lengths(args.contigs)
@@ -1254,7 +1287,9 @@ def build_amr_workbook(args):
             "locus_id": locus["locus_id"], "contig": locus["contig"],
             "start": locus["start"], "end": locus["end"], "strand": locus["strand"],
             "genes": joined(hit["gene"] for hit in hits_here),
-            "databases": locus["databases"], "database_hits": len(hits_here),
+            "databases": locus["databases"],
+            "in_resfinder": YES if "ResFinder" in locus["databases"].split("; ") else NO,
+            "database_hits": len(hits_here),
             "min_pct_identity": min(hit["pct_identity"] for hit in hits_here),
             "max_pct_identity": max(hit["pct_identity"] for hit in hits_here),
             "min_pct_coverage": min(hit["pct_coverage"] for hit in hits_here),
@@ -1320,6 +1355,10 @@ def build_amr_workbook(args):
 
     hits_per_database = collections.Counter(hit["database"] for hit in hits)
     hit_counts = ", ".join(f"{name} {hits_per_database[name]}" for name, _w in ABRICATE_DATABASES)
+    # One ABRicate ran every database, so any row of the listing gives its version.
+    abricate_version = "NA"
+    if listing:
+        abricate_version = list(listing.values())[0]["ABRICATE_VERSION"]
     summary_rows = [
         {"item": "Sample", "value": args.sample,
          "note": "BacFlux sample name, from the input file name"},
@@ -1331,6 +1370,15 @@ def build_amr_workbook(args):
          "note": f"{hit_counts}; one row each on Database_hits"},
         {"item": "AMR loci", "value": len(loci),
          "note": "the hits of one gene grouped into one row of AMR_loci"},
+        {"item": "Found by ResFinder",
+         "value": sum(1 for row in locus_rows if row["in_resfinder"] == YES),
+         "note": "loci ResFinder found; ResFinder collects acquired resistance genes, "
+                 "while CARD and ARG-ANNOT also list genes the species carries anyway"},
+        {"item": "Databases",
+         "value": f"ABRicate {abricate_version}",
+         "note": "; ".join(database_note(name, word, listing)
+                           for name, word in ABRICATE_DATABASES)
+                 + "; the date is the one ABRicate gives for its copy of each database"},
         {"item": "On a plasmid", "value": counted_answers(locus_rows, "plasmid"),
          "note": "loci by answer in the plasmid column"},
         {"item": "Inside an ICE or IME", "value": counted_answers(locus_rows, "ice_ime"),
@@ -1364,7 +1412,11 @@ def build_amr_workbook(args):
     for database, database_word in ABRICATE_DATABASES:
         run_qc_rows.append({"item": f"ABRicate {database}",
                             "value": shown_path(tables[database], out_root),
-                            "detail": f"{hits_per_database[database]} hits"})
+                            "detail": f"{hits_per_database[database]} hits; "
+                                      + database_note(database, database_word, listing)})
+    run_qc_rows.append({"item": "ABRicate databases",
+                        "value": shown_path(args.abricate_databases, out_root),
+                        "detail": "ABRicate's version and the date of its copy of each database"})
     run_qc_rows += [
         {"item": "Platon", "value": shown_path(args.platon_dir, out_root),
          "detail": "exited with an error" if crashed else "finished"},
@@ -1797,6 +1849,9 @@ def make_parser():
     amr.add_argument("--card", required=True, help="ABRicate's CARD table.")
     amr.add_argument("--resfinder", required=True, help="ABRicate's ResFinder table.")
     amr.add_argument("--argannot", required=True, help="ABRicate's ARG-ANNOT table.")
+    amr.add_argument("--abricate-databases", required=True,
+                     help="05.amr/abricate/abricate_databases.tsv: ABRicate's version and "
+                          "the date of its copy of each database.")
     amr.add_argument("--ice-table", default=None,
                      help="The mobilome module's ICE table, when it ran.")
     amr.add_argument("--mobility", default=None,

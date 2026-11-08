@@ -162,6 +162,37 @@ rule AMR_summary:
         """
 
 
+# ── abricate_databases — which ABRicate, and which database copies, this run used ──
+# ABRicate carries its own copy of each database, and the copy changes with the
+# ABRicate release. A resistance-gene result is reported with the database it was
+# found in and that database's version or date, so this rule records them once
+# per run.
+# Takes in: nothing but the pinned ABRicate environment.
+# Does: `abricate --version` and `abricate --list` (one line per database: name,
+#       number of sequences, nucleotide or protein, and the date ABRicate gives
+#       for its copy), joined into one table with the version as a last column.
+# Produces: 05.amr/abricate/abricate_databases.tsv (ABRICATE_DATABASES_TSV).
+# Consumed by: rule amr_workbook (shared/90_report.smk), which shows the version
+#              and the dates of CARD, ResFinder and ARG-ANNOT; and the user.
+rule abricate_databases:
+    output:
+        listing = ABRICATE_DATABASES_TSV,
+    conda:
+        "../../envs/abricate.yaml"
+    log:
+        LOGS + "/abricate_databases.log"
+    shell:
+        # Doubled braces in the awk program: Snakemake formats this text and
+        # would otherwise read a single-braced { print ... } as a placeholder.
+        r"""
+        version=$(abricate --version 2>> {log} | awk '{{ print $2 }}')
+        abricate --list 2>> {log} \
+          | awk -F '\t' -v OFS='\t' -v version="$version" \
+              'NR == 1 {{ print $0, "ABRICATE_VERSION"; next }} {{ print $0, version }}' \
+          > {output.listing}
+        """
+
+
 # ──────────────────── CARD read-mapping leg (BBMap) ────────────
 # Gated on the CAPABILITY flag HAS_SHORT_READS (illumina + hybrid), not on the
 # mode name. _downstream_targets() in 00_common.smk requests these files

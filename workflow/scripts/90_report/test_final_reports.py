@@ -560,6 +560,10 @@ def make_output_folder(tmp_path, mobilome=True):
     write_tsv(abricate / "resfinder.tsv", ABRICATE_HEADER, [
         abricate_row("plasmid", 5010, 5790, "aadA2_1", "resfinder")])
     write_tsv(abricate / "argannot.tsv", ABRICATE_HEADER, [])
+    write_tsv(out / "05.amr/abricate/abricate_databases.tsv",
+              ["DATABASE", "SEQUENCES", "DBTYPE", "DATE", "ABRICATE_VERSION"],
+              [{"DATABASE": name, "SEQUENCES": 1000, "DBTYPE": "nucl", "DATE": "2026-Apr-3",
+                "ABRICATE_VERSION": "1.4.0"} for name in ("card", "resfinder", "argannot")])
 
     platon = out / "06.plasmids/SAMPLE1/platon"
     platon.mkdir(parents=True)
@@ -587,6 +591,7 @@ def make_output_folder(tmp_path, mobilome=True):
             "--contigs", str(out / "02.assembly/SAMPLE1/contigs_final.fasta"),
             "--card", str(abricate / "card.tsv"), "--resfinder", str(abricate / "resfinder.tsv"),
             "--argannot", str(abricate / "argannot.tsv"),
+            "--abricate-databases", str(out / "05.amr/abricate/abricate_databases.tsv"),
             "--platon-dir", str(platon), "--platon-prefix", "contigs_final",
             "--phage-caller", "virsorter2",
             "--viral-table", str(out / "07.phages/virsorter/SAMPLE1/final-viral-boundary.tsv"),
@@ -657,6 +662,14 @@ def test_the_amr_workbook_answers_every_question_for_every_locus(tmp_path):
     assert (plasmid["plasmid"], plasmid["plasmid_mobility"]) == ("yes", "conjugative")
     assert plasmid["databases"] == "CARD; ResFinder"
     assert plasmid["mobility_tier"] == 6
+
+    # ResFinder, the database of acquired genes, found only aadA2.
+    assert (plasmid["in_resfinder"], chrom["in_resfinder"]) == ("yes", "no")
+    summary = {row["item"]: row for row in sheet_rows(sheets, "Summary")}
+    assert summary["Found by ResFinder"]["value"] == 1
+    # The database version and dates are reported with the results.
+    assert summary["Databases"]["value"] == "ABRicate 1.4.0"
+    assert "CARD, dated 2026-Apr-3, 1000 sequences" in summary["Databases"]["note"]
 
     hits = sheet_rows(sheets, "Database_hits")
     assert {h["gaps"] for h in hits} == {"0/0", "6/4"}

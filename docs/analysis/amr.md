@@ -407,6 +407,7 @@ For what happens to an AMR call once the mobilome module has it, see
 |---|---|
 | `05.amr/abricate/{sample}/{db}.tsv` (×8) | all four |
 | `05.amr/abricate/{sample}/AMR_summary.txt` | all four |
+| `05.amr/abricate/abricate_databases.tsv` (ABRicate's version and the date of its copy of each database) | all four |
 | `05.amr/mapping/{sample}/{sample}_CARD_report.tsv` | `illumina`, `hybrid` |
 | `05.amr/mapping/{sample}/{sample}_covstats.tsv` | `illumina`, `hybrid` |
 | `05.amr/mapping/{sample}/{sample}_AMR_legend.tsv` | `illumina`, `hybrid` |

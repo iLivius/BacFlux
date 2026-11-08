@@ -1368,6 +1368,11 @@ CARD_DB_DIR  = DIR_AMR + "/card_db"
 # and both rules are driven by expand(..., db=DATABASES).
 DATABASES = ["argannot", "card", "ecoh", "ecoli_vf", "megares", "ncbi", "resfinder", "vfdb"]
 DATABASE_PATTERN = "|".join(DATABASES)
+# ABRicate's version and the date of its copy of each database, written once per
+# run by rule abricate_databases (shared/50_amr.smk) and shown in the AMR workbook,
+# because a resistance-gene result is reported together with the database it was
+# found in and that database's version or date.
+ABRICATE_DATABASES_TSV = DIR_AMR + "/abricate/abricate_databases.tsv"
 
 # Sample names become filenames, locus tags, wildcards and report labels. These
 # characters break paths or make wildcard matching ambiguous, so a sample whose
