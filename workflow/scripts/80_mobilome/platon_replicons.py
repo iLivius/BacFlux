@@ -238,11 +238,23 @@ def classify_plasmid_mobility(record):
 
 # ── The two size thresholds, and the band of doubt between them ──────────────
 
-# Platon refuses to even look at a contig longer than this — read from its own
-# source (platon/constants.py: MAX_CONTIG_LENGTH = 500000). Anything above it is
-# reported as "too long" and never classified, so it appears in NEITHER the
-# chromosome nor the plasmid FASTA. On a closed genome that means the chromosome
-# itself is missing from Platon's output entirely.
+# Platon refuses to even look at a contig this long or longer — read from its
+# own source (platon/constants.py: MAX_CONTIG_LENGTH = 500000; platon.py skips a
+# contig when length >= MAX_CONTIG_LENGTH). Such a contig is reported as "too
+# long" and never classified. What happens to such a contig in
+# Platon's output files depends on the rest of the genome:
+#   - when no contig passes the size filter (a closed genome whose replicons are
+#     all over 500 kb), Platon stops early and writes no FASTA and no table;
+#   - when at least one contig passes, Platon writes its chromosome FASTA from
+#     every input contig it did not call plasmid (platon.py, the
+#     "<prefix>.chromosome.fasta" block), so the skipped long contigs land in
+#     that file too, although Platon never classified them.
+# So for a contig over 500 kb, being in the chromosome FASTA is not a call: a
+# 1.1 Mb megaplasmid of a genome that also has a small plasmid sits there. Such a
+# contig is treated below as one Platon did not classify, and its length decides.
+# Platon skips contigs under 1,000 bp too (MIN_CONTIG_LENGTH in its constants.py)
+# and writes them into the chromosome FASTA in the same way; only the 500 kb limit
+# is applied here.
 PLATON_MAX_CONTIG_LENGTH = 500000
 
 # Above THIS length we are willing to call an unclassified contig the chromosome.
@@ -263,7 +275,9 @@ DEFAULT_MIN_CHROMOSOME_BP = 2000000
 # ── One row per contig: the decision chain ───────────────────────────────────
 # The branches below are tested in this order, and the order IS the logic. Read
 # them as "the strongest evidence available for this contig, in descending order
-# of how much we trust it":
+# of how much we trust it". "Platon says" applies only to a contig shorter than
+# 500 kb; a longer one counts as not classified by Platon, whatever file it was
+# written to (see PLATON_MAX_CONTIG_LENGTH above).
 #
 #   1. Platon says plasmid                     -> plasmid, mobility typed
 #   2. Platon says chromosome, geNomad says plasmid -> chromosome, flagged conflict
@@ -297,11 +311,19 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
     for contig in sorted(all_contigs):
         genomad = genomad_calls.get(contig, {})
         genomad_says_plasmid = genomad.get("call") == "plasmid"
+        # Did Platon look at this contig at all? Not when it is longer than its
+        # size filter. Without a known length (no --contigs), the files are all
+        # there is to go on. Only the chromosome FASTA needs this check: Platon
+        # writes a contig to its plasmid FASTA only after classifying it, so a
+        # contig over 500 kb never appears there.
+        length = (contig_lengths or {}).get(contig)
+        platon_looked = length is None or length < PLATON_MAX_CONTIG_LENGTH
+        platon_says_chromosome = platon_looked and contig in chromosome_ids
 
         if contig in plasmid_ids:
             replicon = "plasmid"
             mobility, evidence = classify_plasmid_mobility(table.get(contig, {}))
-        elif contig in chromosome_ids and genomad_says_plasmid:
+        elif platon_says_chromosome and genomad_says_plasmid:
             # BOTH tools looked and DISAGREED. Platon positively called this
             # chromosome; geNomad positively called it plasmid.
             #
@@ -322,7 +344,7 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
                 "two tools disagree - check this contig by hand before treating "
                 "genes on it as intrinsic."
             )
-        elif contig in chromosome_ids:
+        elif platon_says_chromosome:
             replicon = "chromosome"
             # Platon says nothing about chromosomal mobility, and pretending it
             # did would be wrong. Whether this chromosome carries an ICE is
@@ -359,10 +381,10 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
                 "rests on whether CONJscan finds machinery on this contig."
             )
         else:
-            # Seen in the assembly but absent from BOTH Platon FASTAs. The usual
-            # cause is Platon's size filter: it skips anything over 500 kb, so on
-            # a closed genome the chromosome itself never appears in its output.
-            length = (contig_lengths or {}).get(contig)
+            # Platon did not classify this contig: it is in neither Platon FASTA,
+            # or it is longer than Platon's size filter (500 kb), in which case it
+            # may sit in the chromosome FASTA without Platon having looked at it.
+            # On a closed genome this is where the chromosome itself ends up.
             if length is not None and length >= min_chromosome_bp:
                 # Far larger than any realistic plasmid, so this is the
                 # chromosome. Say so — but record that it is INFERRED from
@@ -375,7 +397,7 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
                     f"{min_chromosome_bp} bp megaplasmid ceiling, so Platon never "
                     "classified it"
                 )
-            elif length is not None and length > PLATON_MAX_CONTIG_LENGTH:
+            elif length is not None and length >= PLATON_MAX_CONTIG_LENGTH:
                 # In the awkward band: too long for Platon to assess, but small
                 # enough that a megaplasmid is still possible. Do not guess.
                 replicon = "unknown"
@@ -405,7 +427,7 @@ def build_rows(platon_dir, prefix, extra_contigs, contig_lengths=None,
             call_source = "platon"
         elif replicon == "plasmid":
             call_source = "genomad"         # the rescue case above
-        elif contig in chromosome_ids and genomad_says_plasmid:
+        elif platon_says_chromosome and genomad_says_plasmid:
             call_source = "conflict"
         else:
             call_source = "platon"

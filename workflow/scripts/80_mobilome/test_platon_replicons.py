@@ -195,3 +195,90 @@ def test_a_header_only_concordance_means_no_plasmid_candidates(tmp_path):
     a genome that has none."""
     concordance = write_concordance(tmp_path, [])
     assert pr.read_genomad_concordance(concordance) == {}
+
+
+# ── Platon's size filter: a long contig in the chromosome FASTA is not a call ──
+# Platon skips every contig of 500 kb or more. When at least one other contig of the
+# genome passes the filter, Platon still writes the skipped ones into its
+# chromosome FASTA, because that file holds every input contig it did not call
+# plasmid. Reading that file as a chromosome call would turn a 0.5-2 Mb
+# megaplasmid into "chromosome", and every resistance gene on it into a tier 1
+# intrinsic candidate. The contig lengths from the assembly (--contigs) are what
+# lets the script tell the two apart.
+
+MEGAPLASMID_BP = 1123075      # the size of a real megaplasmid (R. jostii pRHL1)
+CHROMOSOME_BP = 5000000       # a typical bacterial chromosome
+SMALL_PLASMID_BP = 80000      # short enough for Platon to classify
+
+
+def test_a_megaplasmid_in_the_chromosome_fasta_stays_unknown(tmp_path):
+    """The 1.1 Mb contig sits in Platon's chromosome FASTA only because Platon
+    skipped it. Its length is in the band where a megaplasmid cannot be ruled
+    out, so the honest answer is 'unknown', not 'chromosome'."""
+    platon_dir = write_platon_dir(
+        tmp_path, plasmids=["p_small"], chromosomes=["chr1", "mega"],
+        table_rows=[{"ID": "p_small", "# Mobilization": "1"}])
+    lengths = {"chr1": CHROMOSOME_BP, "mega": MEGAPLASMID_BP,
+               "p_small": SMALL_PLASMID_BP}
+
+    rows = rows_by_contig(pr.build_rows(
+        platon_dir, "contigs_final", sorted(lengths), contig_lengths=lengths))
+
+    assert rows["mega"]["replicon"] == "unknown"
+    assert "megaplasmid cannot be ruled out" in rows["mega"]["mobility_evidence"]
+    # The small plasmid Platon did classify keeps Platon's call.
+    assert rows["p_small"]["replicon"] == "plasmid"
+
+
+def test_a_long_contig_in_the_chromosome_fasta_is_an_inferred_chromosome(tmp_path):
+    """Over the 2 Mb ceiling the contig is called chromosome, but the evidence
+    text says the call is inferred from length, not made by Platon."""
+    platon_dir = write_platon_dir(
+        tmp_path, plasmids=["p_small"], chromosomes=["chr1"])
+    lengths = {"chr1": CHROMOSOME_BP, "p_small": SMALL_PLASMID_BP}
+
+    rows = rows_by_contig(pr.build_rows(
+        platon_dir, "contigs_final", sorted(lengths), contig_lengths=lengths))
+
+    assert rows["chr1"]["replicon"] == "chromosome"
+    assert rows["chr1"]["mobility_evidence"].startswith("inferred chromosomal")
+
+
+def test_genomad_decides_a_megaplasmid_platon_skipped(tmp_path):
+    """Platon never looked at the 1.1 Mb contig, so a geNomad plasmid call is
+    the only opinion there is: plasmid, source 'genomad'. It is not a conflict,
+    because there is no Platon call to conflict with."""
+    platon_dir = write_platon_dir(
+        tmp_path, plasmids=["p_small"], chromosomes=["chr1", "mega"])
+    concordance = write_concordance(tmp_path, [
+        {"contig": "mega", "platon_call": "not_called",
+         "genomad_call": "plasmid", "genomad_score": "0.97",
+         "agreement": "genomad_only"},
+    ])
+    lengths = {"chr1": CHROMOSOME_BP, "mega": MEGAPLASMID_BP,
+               "p_small": SMALL_PLASMID_BP}
+
+    rows = rows_by_contig(pr.build_rows(
+        platon_dir, "contigs_final", sorted(lengths), contig_lengths=lengths,
+        genomad_calls=pr.read_genomad_concordance(concordance)))
+
+    assert rows["mega"]["replicon"] == "plasmid"
+    assert rows["mega"]["replicon_call_source"] == "genomad"
+    assert "CONFLICT" not in rows["mega"]["mobility_evidence"]
+
+
+def test_a_short_contig_in_the_chromosome_fasta_is_still_platons_call(tmp_path):
+    """For a contig of 400 kb, under the 500 kb limit, the chromosome FASTA is
+    read as Platon's call, with or without known lengths."""
+    platon_dir = write_platon_dir(
+        tmp_path, plasmids=["p_small"], chromosomes=["chr_fragment"])
+    lengths = {"chr_fragment": 400000, "p_small": SMALL_PLASMID_BP}
+
+    with_lengths = rows_by_contig(pr.build_rows(
+        platon_dir, "contigs_final", sorted(lengths), contig_lengths=lengths))
+    without_lengths = rows_by_contig(pr.build_rows(
+        platon_dir, "contigs_final", sorted(lengths)))
+
+    for rows in (with_lengths, without_lengths):
+        assert rows["chr_fragment"]["replicon"] == "chromosome"
+        assert rows["chr_fragment"]["mobility_evidence"].startswith("chromosomal contig")

@@ -167,26 +167,34 @@ if PHAGE_CALLER == "genomad":
     # is its own audit trail, in the spirit of contig_taxonomy_decisions.tsv. The
     # kept v1 BLAST-text state rides along as one clearly supplementary column.
     #
-    # Both inputs are per-sample DIRECTORIES and the shell reaches inside them for
-    # the individual files, which keeps those inner files off the DAG (the same
-    # arrangement shared/40_annotation.smk uses for Bakta's output directory). Four
-    # files are read, and each carries one part of the picture:
+    # The two tool inputs are per-sample DIRECTORIES and the shell reaches inside
+    # them for the individual files, which keeps those inner files off the DAG
+    # (the same arrangement shared/40_annotation.smk uses for Bakta's output
+    # directory). Four files are read there, and each carries one part of the
+    # picture:
     #   contigs_final.tsv               — Platon's plasmid calls and their RDS score
     #   contigs_final.chromosome.fasta  — the contig IDs Platon called chromosome
     #   verified_plasmids.txt           — the kept v1 BLAST-text state per contig
     #   …_plasmid_summary.tsv           — geNomad's calls, score and FDR, from
     #                                     genomad_end_to_end in shared/70_phage.smk
+    # The assembly itself (FINAL_CONTIGS, the file Platon ran on) gives the contig
+    # lengths. Platon skips every contig over 500 kb but still writes it into its
+    # chromosome FASTA when another contig of the genome passed, so only the
+    # length tells a real chromosome call from a skipped megaplasmid.
     # The join, the column contract and the tie rules live in
     # scripts/60_plasmid/plasmid_concordance.py — stdlib-only Python, so it borrows Platon's
     # pinned interpreter through the platon env instead of adding a dependency.
     #
     # Produces 06.plasmids/{sample}/{sample}_plasmid_concordance.tsv, the terminal
     # plasmid deliverable on this path — rule all asks for this file, and asking for
-    # it is what pulls both callers into the run.
+    # it is what pulls both callers into the run. It is also read by
+    # mobilome_replicons (shared/80_mobilome.smk) and by the per-strain workbooks
+    # (shared/90_report.smk), as geNomad's second opinion on Platon's calls.
     rule plasmid_concordance:
         input:
             platon_dir = PLATON_DIR,
             genomad_dir = GENOMAD_DIR,
+            contigs = FINAL_CONTIGS,
         output:
             concordance = PLASMID_CONCORDANCE,
         params:
@@ -212,5 +220,6 @@ if PHAGE_CALLER == "genomad":
               --platon-chromosome {input.platon_dir}/{params.contigs_prefix}.chromosome.fasta \
               --verified-plasmids {input.platon_dir}/verified_plasmids.txt \
               --genomad-plasmid-summary {input.genomad_dir}/{params.genomad_summary_rel} \
+              --contigs {input.contigs} \
               --output {output.concordance} > {log} 2>&1
             """

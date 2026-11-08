@@ -17,11 +17,7 @@ below walk one contig through each of those outcomes.
 
 Run:
     pytest workflow/scripts/60_plasmid/test_plasmid_concordance.py
-
-Running the file directly with python also works but executes only 18 of the 23
-tests: the unittest.main() guard sits ABOVE the last class in this file, so it
-exits before TestPlatonFailureIsNotASecondOpinion is even defined. pytest ignores
-the guard and collects everything, which is why it is the way to run this.
+(running the file directly with python also works).
 """
 
 import os
@@ -52,6 +48,9 @@ def write_temp(content):
 #   contig_4 -> Platon CHROMOSOME vs geNomad plasmid        -> conflict / low
 # contig_5 exists only in the chromosome FASTA and is the negative control: both
 # tools called it chromosomal, so it must not appear in the output at all.
+# contig_4 is 400 kb on purpose: the chromosome FASTA is read as Platon's call
+# only for a contig under 500 kb (the longer case is tested in
+# TestPlatonSizeFilter at the end of this file).
 PLATON_TSV = (
     "ID\tLength\tCoverage\t# ORFs\tRDS\tCircular\tInc Type(s)\t# Plasmid Hits\n"
     "contig_1\t45000\t12.0\t60\t0.85\tyes\tIncF\t3\n"
@@ -64,13 +63,13 @@ GENOMAD_SUMMARY = (
     "seq_name\tlength\ttopology\tn_genes\tgenetic_code\tplasmid_score\tfdr\tn_hallmarks\n"
     "contig_1\t45000\tno_terminal_repeats\t60\t11\t0.95\t0.012\t2\n"
     "contig_3\t3000\tno_terminal_repeats\t5\t11\t0.77\tNA\t0\n"
-    "contig_4\t2000000\tno_terminal_repeats\t1800\t11\t0.60\tNA\t1\n"
+    "contig_4\t400000\tno_terminal_repeats\t380\t11\t0.60\tNA\t1\n"
 )
 
 # Platon called contig_4 a chromosome (so contig_4 is a real conflict, not just
 # "not_called"). contig_3 appears nowhere on the Platon side.
 CHROMOSOME_FASTA = (
-    ">contig_4 length=2000000\n"
+    ">contig_4 length=400000\n"
     "ACGTACGTACGT\n"
     ">contig_5 length=1500000\n"
     "TTTTGGGGCCCC\n"
@@ -253,13 +252,6 @@ class TestWriteAndReadBack(unittest.TestCase):
         self.assertEqual(lines, ["\t".join(pc.OUTPUT_COLUMNS)])
 
 
-# This guard sits mid-file, so `python <this file>` stops here and never defines
-# the class below it — see the note in the module docstring. Under pytest the
-# guard is false and everything is collected.
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
-
-
 # ── A crashed Platon is not a second opinion ─────────────────────────────────
 
 class TestPlatonFailureIsNotASecondOpinion(unittest.TestCase):
@@ -307,3 +299,54 @@ class TestPlatonFailureIsNotASecondOpinion(unittest.TestCase):
                          ("platon_unavailable", "low"))
         self.assertEqual(pc.classify("not_assessed", "absent"),
                          ("platon_unavailable", "low"))
+
+
+# ── Platon's size filter: a long contig in the chromosome FASTA is not a call ──
+
+class TestPlatonSizeFilter(unittest.TestCase):
+    """Platon skips every contig over 500 kb, yet writes it into its chromosome
+    FASTA whenever another contig of the genome passed the filter. A geNomad
+    plasmid call on such a contig is therefore geNomad's call alone, not a
+    conflict with Platon. The contig lengths from the assembly are what tell
+    the two cases apart."""
+
+    def setUp(self):
+        # A genome with a 5 Mb chromosome, a 1.1 Mb megaplasmid and a small
+        # plasmid. Platon classified only the small plasmid; both long contigs
+        # sit in its chromosome FASTA. geNomad calls the megaplasmid a plasmid.
+        self.chromosome_ids = {"chromosome", "megaplasmid"}
+        self.platon_plasmids = {"small_plasmid": "0.9"}
+        self.genomad = {"megaplasmid": ("0.97", "NA")}
+        self.lengths = {"chromosome": 5000000, "megaplasmid": 1123075,
+                        "small_plasmid": 80000}
+
+    def test_a_skipped_megaplasmid_is_genomad_only_not_a_conflict(self):
+        rows = pc.build_rows("sampleA", self.platon_plasmids, self.chromosome_ids,
+                             {}, self.genomad, contig_lengths=self.lengths)
+        row = {r["contig"]: r for r in rows}["megaplasmid"]
+        self.assertEqual(row["platon_call"], "not_called")
+        self.assertEqual((row["agreement"], row["confidence"]),
+                         ("genomad_only", "medium"))
+
+    def test_without_lengths_the_fasta_is_taken_at_its_word(self):
+        # The function's default, kept for callers that have no assembly.
+        rows = pc.build_rows("sampleA", self.platon_plasmids, self.chromosome_ids,
+                             {}, self.genomad)
+        row = {r["contig"]: r for r in rows}["megaplasmid"]
+        self.assertEqual(row["platon_call"], "chromosome")
+        self.assertEqual(row["agreement"], "conflict")
+
+    def test_lengths_are_read_from_the_assembly(self):
+        fasta = write_temp(">contig_a some description\nACGT\nACG\n>contig_b\nA\n")
+        self.assertEqual(pc.read_contig_lengths(fasta), {"contig_a": 7, "contig_b": 1})
+
+    def test_the_boundary_is_platons_own(self):
+        # Platon skips a contig when length >= 500,000, so 499,999 bp is the
+        # longest contig it classifies.
+        self.assertTrue(pc.platon_could_classify("c", {"c": 499999}))
+        self.assertFalse(pc.platon_could_classify("c", {"c": 500000}))
+        self.assertTrue(pc.platon_could_classify("c", {}))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

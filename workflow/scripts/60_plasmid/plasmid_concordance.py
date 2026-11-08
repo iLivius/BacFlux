@@ -38,8 +38,11 @@ Inputs (all produced upstream on the SAME contigs_final.fasta, so contig IDs
 match directly — the front-end trims FASTA headers to their first token):
 - Platon per-plasmid table  <prefix>.tsv                -> plasmid-called contigs + RDS
 - Platon chromosome FASTA    <prefix>.chromosome.fasta   -> chromosome-called contig IDs
+                                                            (read so only under 500 kb; see
+                                                            PLATON_MAX_CONTIG_LENGTH)
 - verified_plasmids.txt      (the kept v1 BLAST-text check)
 - geNomad plasmid summary    <prefix>_plasmid_summary.tsv -> geNomad-called contigs + score/fdr
+- the assembly itself        contigs_final.fasta          -> contig lengths
 
 Output: {sample}_plasmid_concordance.tsv, one row per plasmid CANDIDATE contig
 (the union of the two tools' plasmid calls); every column is described on
@@ -106,6 +109,24 @@ VERIFIED_SUFFIX_NO_HIT = " was not verified by BLAST search."
 # closed genome. Reading "no output files" as "Platon failed" would therefore
 # mislabel exactly the assemblies we most want to be right about.
 PLATON_CRASH_MARKER = "Platon exited with status"
+
+
+# ── Platon's size filter ─────────────────────────────────────────────────────
+
+# Platon skips every contig this long or longer (platon/constants.py:
+# MAX_CONTIG_LENGTH = 500000; platon.py skips a contig when length >=
+# MAX_CONTIG_LENGTH) and never classifies it. When at least one contig
+# of the genome passes the filter, Platon still writes the skipped long contigs
+# into <prefix>.chromosome.fasta, because that file holds every input contig it
+# did not call plasmid. So for a contig over 500 kb, being in that FASTA is not
+# a chromosome call: a 1.1 Mb megaplasmid of a genome that also carries a small
+# plasmid sits there. build_rows() therefore reports such a contig as
+# not_called, and a geNomad plasmid call on it as genomad_only, not as a
+# conflict with a Platon call that was never made. The same reading is used by
+# platon_replicons.py in the mobilome module. Platon skips contigs under 1,000 bp
+# too (MIN_CONTIG_LENGTH) and writes them into the chromosome FASTA in the same
+# way; only the 500 kb limit is applied here.
+PLATON_MAX_CONTIG_LENGTH = 500000
 
 
 # ── Small shared readers: FASTA IDs, TSV tables, column lookup ──────────────
@@ -205,6 +226,9 @@ def parse_fasta_ids(path):
     actively called CHROMOSOME. That set lets the concordance distinguish a real
     Platon/geNomad clash (Platon chromosome vs geNomad plasmid -> "conflict")
     from a contig Platon simply never scored as a plasmid ("not_called").
+    The file also holds the contigs Platon skipped for their size (500 kb or
+    more, or under 1,000 bp), so build_rows() checks each contig's length
+    against the 500 kb limit before reading it as a call.
 
     Input:  a FASTA path (may be empty).
     Output: set of contig IDs (first header token each).
@@ -283,6 +307,41 @@ def parse_verified_plasmids(path):
             if contig_id:
                 blast_states[contig_id] = state
     return blast_states
+
+
+def read_contig_lengths(path):
+    """Read the assembly FASTA into {contig_id: length in bp}.
+
+    Input:  contigs_final.fasta, the file Platon ran on (rule plasmid_search).
+    Output: dict mapping contig ID (first header token, as Platon reports it)
+            to its length. Empty for a missing file.
+    Needed because Platon's own files do not say how long a skipped contig
+    was, and that length decides whether a chromosome-FASTA entry is a call
+    (same reader as in platon_replicons.py).
+    """
+    lengths = {}
+    if not path or not os.path.exists(path):
+        return lengths
+    current = None
+    with open(path, "r", encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith(">"):
+                current = first_token(line)
+                lengths[current] = 0
+            elif current is not None:
+                lengths[current] += len(line.strip())
+    return lengths
+
+
+def platon_could_classify(contig, contig_lengths):
+    """Did Platon look at this contig at all? -> True/False.
+
+    False only when the contig's length is known and reaches Platon's 500 kb
+    size filter (see PLATON_MAX_CONTIG_LENGTH). With no length known, the answer is
+    True, so the chromosome FASTA is read as a call, as it always was.
+    """
+    length = (contig_lengths or {}).get(contig)
+    return length is None or length < PLATON_MAX_CONTIG_LENGTH
 
 
 # ── geNomad's side: the contigs it calls plasmids ───────────────────────────
@@ -376,7 +435,7 @@ def classify(platon_call, genomad_call):
 
 
 def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_plasmids,
-               platon_assessed=True):
+               platon_assessed=True, contig_lengths=None):
     """Assemble one output row per plasmid CANDIDATE contig.
 
     The candidate set is the UNION of Platon-plasmid and geNomad-plasmid contigs.
@@ -385,7 +444,11 @@ def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_pl
 
     Input:  the four parsed structures plus the sample name, and
             platon_assessed=False when Platon crashed for this sample (from
-            platon_run_failed), which turns every Platon call into not_assessed.
+            platon_run_failed), which turns every Platon call into not_assessed,
+            and contig_lengths ({contig: bp}, from read_contig_lengths), which
+            tells a Platon chromosome call apart from a contig Platon skipped for
+            being over 500 kb. Without lengths the chromosome FASTA is taken at
+            its word.
     Output: a list of dicts keyed by OUTPUT_COLUMNS, sorted by contig ID so the
             table is deterministic across runs.
     """
@@ -403,10 +466,13 @@ def build_rows(sample, platon_plasmids, chromosome_ids, blast_states, genomad_pl
         elif contig in platon_plasmids:
             platon_call = "plasmid"
             platon_rds = platon_plasmids[contig]
-        elif contig in chromosome_ids:
+        elif contig in chromosome_ids and platon_could_classify(contig, contig_lengths):
             platon_call = "chromosome"
             platon_rds = "NA"
         else:
+            # Never scored as a plasmid: either absent from both Platon files, or
+            # a contig over 500 kb that Platon skipped and wrote to its
+            # chromosome FASTA without classifying it.
             platon_call = "not_called"
             platon_rds = "NA"
 
@@ -473,6 +539,10 @@ def main():
                         help="verified_plasmids.txt (kept v1 BLAST-text check).")
     parser.add_argument("--genomad-plasmid-summary", required=True,
                         help="geNomad <prefix>_plasmid_summary.tsv (score + fdr).")
+    parser.add_argument("--contigs", required=True,
+                        help="The assembly Platon ran on (contigs_final.fasta), for "
+                             "contig lengths: a contig over 500 kb was skipped by "
+                             "Platon even when it sits in the chromosome FASTA.")
     parser.add_argument("--output", required=True,
                         help="Destination concordance TSV.")
     args = parser.parse_args()
@@ -483,6 +553,7 @@ def main():
     blast_states = parse_verified_plasmids(args.verified_plasmids)
     platon_assessed = not platon_run_failed(args.verified_plasmids)
     genomad_plasmids = parse_genomad_plasmids(args.genomad_plasmid_summary)
+    contig_lengths = read_contig_lengths(args.contigs)
 
     # Join-key audit — the whole agreement mechanism rests on byte-identical
     # contig IDs across the three sources. If both tools called something but NONE
@@ -518,7 +589,7 @@ def main():
     # Join the two callers into the confidence-tiered table and write it.
     rows = build_rows(
         args.sample, platon_plasmids, chromosome_ids, blast_states, genomad_plasmids,
-        platon_assessed=platon_assessed,
+        platon_assessed=platon_assessed, contig_lengths=contig_lengths,
     )
     write_rows(args.output, rows)
 
