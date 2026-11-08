@@ -3,8 +3,10 @@
 # Rule multiqc gathers every QC artefact the run produced into a single MultiQC
 # HTML page, with sample names a human can read. This module is included LAST by
 # Snakefile (step 4 of the include order) so it sees every upstream rule. With
-# traits.run on, a second rule, traits_summary (at the end of this file), sets
-# every sample's trait calls side by side, and MultiQC shows them as a heatmap.
+# traits.run on, a second rule, traits_summary, sets every sample's trait calls
+# side by side, and MultiQC shows them as a count of calls and grouped heatmaps.
+# At the end of this file, rules amr_workbook and traits_workbook write one Excel
+# workbook per strain into 10.workbooks/.
 #
 # What gets aggregated depends on what the mode actually produced, so the input
 # set is assembled from the capability flags (HAS_SHORT_READS / HAS_LONG_READS /
@@ -32,8 +34,11 @@
 # re-derived: OUT, DIR_REPORT, DIR_ANNOTATION, LOGS, SAMPLES, CHECKM_STATS,
 # GTDBTK_DIR, QUAST_DIR, QUALIMAP_DIR, FASTP_JSON, NANOPLOT_RAW_DIR,
 # NANOPLOT_FILT_DIR, CHECKM_RELABEL_AWK, GTDBTK_RELABEL_AWK, QC_GENOMES,
-# IS_HYBRID, the capability flags, and for the trait profile TRAITS_RUN,
-# TRAIT_PROFILE, TRAITS_SUMMARY, TRAITS_SUMMARY_MQC and TRAITS_SUMMARY_SCRIPT.
+# IS_HYBRID, the capability flags, MULTIQC_VERSIONS_SCRIPT and
+# MULTIQC_CITATIONS_SCRIPT; for the trait profile TRAITS_RUN, TRAIT_PROFILE,
+# TRAIT_PROVENANCE, TRAIT_RULES_TSV, TRAITS_SUMMARY, TRAITS_SUMMARY_MQC and
+# TRAITS_SUMMARY_SCRIPT; and for the workbooks the paths of the tables they read,
+# AMR_WORKBOOK, TRAITS_WORKBOOK and FINAL_REPORT_SCRIPT.
 #
 # The sample-name rename map below is written against v2's unified stage
 # numbering: all technology-specific work is grouped under 01.reads and
@@ -68,14 +73,13 @@ def multiqc_qc_inputs():
         paths += expand(QUALIMAP_DIR, sample=SAMPLES)
     paths += expand(QUAST_DIR, sample=SAMPLES)
     paths += expand(DIR_ANNOTATION + "/bakta/{sample}", sample=SAMPLES)
-    # The trait heatmap (traits.run, off by default), written by rule
-    # traits_summary at the end of this file. MultiQC reads it as custom content
-    # (a table another program has written for MultiQC to show, rather than a
-    # tool's output that one of MultiQC's modules reads) because its name ends
-    # in _mqc.tsv. It is added last, and only when the layer is on, so that with
-    # the layer off this list, and params.qc_rel built from it, hold exactly the
-    # QC files above: a report finished without the trait profile is then not
-    # made again.
+    # The trait plots (traits.run, off by default), written by rule
+    # traits_summary at the end of this file into one folder. MultiQC reads the
+    # files in it as custom content (plots another program has written for
+    # MultiQC to show, rather than a tool's output that one of MultiQC's modules
+    # reads) because their names end in _mqc.json. The folder is added last, and
+    # only when the layer is on, so that with the layer off this list, and
+    # params.qc_rel built from it, hold exactly the QC files above.
     if TRAITS_RUN:
         paths.append(TRAITS_SUMMARY_MQC)
     return paths
@@ -205,13 +209,16 @@ else:
 #       would be a parse error in nanopore mode where that key does not exist.
 #       Keeping the mode-varying items anonymous and passing them positionally
 #       (via a params twin, see below) avoids that whole class of problem.
-# Does: writes a MultiQC config, stages + relabels the CheckM and GTDB-Tk tables,
-#       then runs MultiQC from the output root.
+# Does: writes a MultiQC config; writes the tool versions and the References
+#       section with two helper scripts; stages + relabels the CheckM and GTDB-Tk
+#       tables; then runs MultiQC from the output root.
 # Produces:
-#   report_html  = 09.report/multiqc_report.html — the terminal deliverable that
-#                  _downstream_targets() requests
-#   multiqc_yaml = the generated config, kept so the rename rules are inspectable
-#   staging      = a temp() directory holding the relabelled CheckM/GTDB-Tk copies
+#   report_html    = 09.report/multiqc_report.html — the terminal deliverable that
+#                    _downstream_targets() requests
+#   multiqc_yaml   = the generated config, kept so the rename rules are inspectable
+#   versions_yaml  = the Software Versions section's data, from multiqc_versions.py
+#   citations_html = the References section, from multiqc_citations.py
+#   staging        = a temp() directory holding the relabelled CheckM/GTDB-Tk copies
 # Consumed by: the user. Runs in every mode — nothing switches this rule off.
 #
 # The report directory itself is deliberately NOT a declared output. v1 declared
@@ -228,6 +235,8 @@ rule multiqc:
     output:
         report_html = DIR_REPORT + "/multiqc_report.html",
         multiqc_yaml = DIR_REPORT + "/multiqc_config.yaml",
+        versions_yaml = DIR_REPORT + "/multiqc_versions.yaml",
+        citations_html = DIR_REPORT + "/bacflux_references_mqc.html",
         staging = temp(directory(DIR_REPORT + "/multiqc_inputs")),
     params:
         # ── Why the relative twins below exist ──
@@ -262,6 +271,22 @@ rule multiqc:
         ignore_guard = MULTIQC_IGNORE_GUARD,
         checkm_relabel = CHECKM_RELABEL_AWK,
         gtdbtk_relabel = GTDBTK_RELABEL_AWK,
+        # The two helper scripts are parameters, as for every helper script, so
+        # editing one re-makes no report by itself.
+        versions_script = MULTIQC_VERSIONS_SCRIPT,
+        citations_script = MULTIQC_CITATIONS_SCRIPT,
+        # The folder of the pinned environment files. multiqc_versions.py reads
+        # a tool's pinned version there when the tool's own output does not say
+        # which version made it.
+        env_dir = os.path.join(WORKFLOW_DIR, "envs"),
+        # Which kinds of tools this run used, so the two scripts list only those:
+        # the read-QC tools in the read modes, and the structure-search tools of
+        # the trait profile.
+        version_flags = (
+            ("--short-reads " if HAS_SHORT_READS else "")
+            + ("--long-reads " if HAS_LONG_READS else "")
+            + ("--traits " if TRAITS_RUN else "")
+        ),
     conda:
         "../../envs/multiqc.yaml"
     log:
@@ -296,9 +321,44 @@ rule multiqc:
 sample_names_replace_regex: true
 sample_names_replace_exact: true
 
+# The order of the report. For the tool sections, a larger number comes first;
+# General Statistics always stays on top. The two bacflux_traits_ lines order the
+# parts of the Trait profile section, where a smaller number comes first: the call
+# counts first, the references last, the heatmaps between them.
+report_section_order:
+  fastp: {{order: 1000}}
+  nanostat: {{order: 900}}
+  quast: {{order: 800}}
+  qualimap: {{order: 700}}
+  checkm: {{order: 600}}
+  gtdbtk: {{order: 500}}
+  bakta: {{order: 400}}
+  bacflux_traits: {{order: 300}}
+  bacflux_references: {{order: 200}}
+  multiqc_software_versions: {{order: -1000}}
+  bacflux_traits_overview: {{order: 1}}
+  bacflux_traits_references: {{order: 10000}}
+
 sample_names_replace:
 {params.replace_block}
 EOF
+
+        # The tool versions for the Software Versions section. A version is read
+        # from the tool's own output where it records one; otherwise the pinned
+        # version is given and labelled "(workflow pin)", because a pin says which
+        # version the workflow installs, not which one made an older result.
+        python {params.versions_script:q} \
+          --env-dir {params.env_dir:q} \
+          --output-root {params.out_root:q} \
+          --samples {SAMPLES:q} \
+          {params.version_flags} \
+          --out {output.versions_yaml:q}
+
+        # The References section: each tool's paper, written out in the report,
+        # so it can be read offline.
+        python {params.citations_script:q} \
+          {params.version_flags} \
+          --out {output.citations_html:q}
 
         # 2. Stage CheckM and GTDB-Tk with rewritten bin ids.
         #    Neither tool's table is keyed by a filename — the sample name is the
@@ -377,9 +437,11 @@ EOF
         multiqc \
           $IGNORE_ARG \
           --config "{output.multiqc_yaml}" \
+          --config "{output.versions_yaml}" \
           --force \
           -d \
           {params.qc_rel} \
+          {output.citations_html:q} \
           "{params.staging_rel}/checkm" \
           "{params.staging_rel}/gtdbtk" \
           --outdir "{params.report_dir}" \
@@ -390,26 +452,27 @@ EOF
 # ── traits_summary — every sample's trait calls side by side (opt-in) ──
 # Defined only when traits.run is true.
 #
-# Takes in: every sample's {sample}_trait_profile.tsv, from rule trait_profile in
-#           shared/40_annotation.smk.
+# Takes in: every sample's {sample}_trait_profile.tsv and
+#           {sample}_trait_provenance.json, from rule trait_profile in
+#           shared/40_annotation.smk, and the trait catalogue
+#           (trait_rules_v1.tsv), whose references, assays and caveats the
+#           report quotes.
 # Does:     traits_summary.py sets the profiles side by side, one row per sample
 #           and one column per trait, in the order of trait_rules_v1.tsv. No call
-#           is made again here.
+#           is made again here. Before quoting the catalogue, it checks that the
+#           catalogue's SHA-256 fingerprint is the one every provenance file
+#           recorded, so a catalogue edited after the calls were made is caught.
 # Produces: 09.report/traits_summary.tsv, each cell called, partial or not
-#           called; and 09.report/traits_summary_mqc.tsv, the same calls as
-#           numbers (2 called, 1 partial, 0 not called) under the "#" header
-#           lines that make MultiQC draw them as a heatmap.
-# Consumed by: the user; the _mqc file also by rule multiqc above, which finds it
+#           called; and the folder 09.report/traits_summary_mqc/, which holds
+#           the plot files MultiQC shows: a count of calls per sample, one
+#           heatmap per group of traits, and the references and assays.
+# Consumed by: the user; the folder also by rule multiqc above, which finds it
 #              through multiqc_qc_inputs().
 #
-# Two files rather than one, because MultiQC colours a heatmap only from numbers
-# while a person reading the table wants the words. Both are declared as files,
-# never as directory("09.report"), for the reason given at rule multiqc. The
-# pinned MultiQC, run as rule multiqc runs it, shows the heatmap rows under the
-# sample names exactly as the file writes them, so the rename map above needs no
-# line for them. MultiQC places the section where it places all custom
-# content, right after General Statistics; moving it would need a line in the
-# generated config, and that would make every finished report again.
+# The table is a file output; the plot folder is a directory() output, which
+# Snakemake empties before the rule runs again, so a plot file left by an older
+# catalogue cannot linger in the report. Only that folder is declared this way,
+# never 09.report itself, for the reason given at rule multiqc.
 #
 # Environment: envs/python.yaml, the pinned Python of the stdlib helper rules.
 # One thread and no cluster requests: it reads one small table per sample.
@@ -418,9 +481,11 @@ if TRAITS_RUN:
     rule traits_summary:
         input:
             profiles = expand(TRAIT_PROFILE, sample=SAMPLES),
+            provenance = expand(TRAIT_PROVENANCE, sample=SAMPLES),
+            rules = TRAIT_RULES_TSV,
         output:
             summary = TRAITS_SUMMARY,
-            mqc = TRAITS_SUMMARY_MQC,
+            mqc = directory(TRAITS_SUMMARY_MQC),
         params:
             script = TRAITS_SUMMARY_SCRIPT,
         conda:
@@ -431,6 +496,187 @@ if TRAITS_RUN:
             """
             python {params.script:q} \
               --profiles {input.profiles:q} \
+              --provenance {input.provenance:q} \
+              --rules {input.rules:q} \
               --out-summary {output.summary:q} \
               --out-mqc {output.mqc:q} > {log} 2>&1
+            """
+
+
+# ── amr_workbook and traits_workbook — one Excel workbook per strain ──
+# Takes in: the results of earlier stages for one sample, listed in each rule's
+#           input block below.
+# Does:     final_reports.py (scripts/90_report/) groups the AMR database hits of
+#           one gene into one row and adds each gene's context by comparing
+#           coordinates: is it on a plasmid, inside an ICE or IME, inside a phage
+#           region? It makes no new gene call. Each answer is yes, no, uncertain
+#           or not_assessed; the rules behind them are in that script and in
+#           docs/analysis/workbooks.md.
+# Produces: 10.workbooks/{sample}_amr.xlsx in every run (rule amr_workbook), and
+#           10.workbooks/{sample}_traits.xlsx with traits.run (rule
+#           traits_workbook).
+# Consumed by: the user.
+#
+# Several inputs are folders that their own rule declares as directory()
+# outputs (GTDB-Tk, Platon, the virus caller, CheckV, EcoFoldDB). Naming the
+# folder as the input links it to the rule that makes it; the shell then reaches
+# the files inside, as rule plasmid_concordance does.
+#
+# The script is a parameter, as for every helper script, so editing
+# final_reports.py re-makes no workbook by itself.
+#
+# Environment: envs/report.yaml (Python 3.12 and XlsxWriter, which writes the
+# .xlsx files). One thread and no cluster requests: a workbook takes seconds.
+
+# The virus caller's region table, and the folder it sits in: geNomad's virus
+# summary with phage.caller: genomad, otherwise VirSorter2's region ends. The
+# path inside the folder is the same for every sample, so it is passed as a
+# plain string, like genomad_summary_rel in rule plasmid_concordance.
+WORKBOOK_VIRAL_DIR = GENOMAD_DIR if PHAGE_CALLER == "genomad" else VS2_DIR
+WORKBOOK_VIRAL_TABLE = GENOMAD_VIRUS_SUMMARY if PHAGE_CALLER == "genomad" else VS2_BOUNDARY
+WORKBOOK_VIRAL_REL = os.path.relpath(WORKBOOK_VIRAL_TABLE, WORKBOOK_VIRAL_DIR)
+
+
+def workbook_options(wildcards, amr):
+    """The optional arguments of final_reports.py for one sample, as shell text.
+
+    Each optional table is passed only when the step that writes it is part of
+    this run: geNomad's plasmid concordance with phage.caller: genomad; with
+    mobilome.run, the mobilome module's replicon table (both workbooks) and its
+    ICE, mobility and audit tables (AMR workbook only). An absent table adds no
+    text at all to the command, rather than an empty argument. Each path is
+    quoted for the shell (shlex.quote), as the {...:q} placeholders in the shell
+    blocks are, so an output folder with a space in its name still works.
+    """
+    from shlex import quote
+
+    options = []
+    if PHAGE_CALLER == "genomad":
+        options.append(("--plasmid-concordance", PLASMID_CONCORDANCE))
+    if MOBILOME_RUN:
+        options.append(("--replicons", MOBILOME_REPLICONS))
+        if amr:
+            options.append(("--ice-table", ICE_TABLE_FOR_COLOCALISE))
+            options.append(("--mobility", MOBILITY_TABLE))
+            options.append(("--mobility-audit", MOBILITY_AUDIT))
+    words = []
+    for flag, path in options:
+        words.append(flag + " " + quote(path.format(sample=wildcards.sample)))
+    return " ".join(words)
+
+
+rule amr_workbook:
+    input:
+        qc_genomes = QC_GENOME_TABLE,
+        taxonomy_dir = GTDBTK_DIR,
+        contigs = FINAL_CONTIGS,
+        # The three ABRicate tables of rule amr_contigs (shared/50_amr.smk).
+        card = DIR_AMR + "/abricate/{sample}/card.tsv",
+        resfinder = DIR_AMR + "/abricate/{sample}/resfinder.tsv",
+        argannot = DIR_AMR + "/abricate/{sample}/argannot.tsv",
+        platon_dir = PLATON_DIR,
+        viral_dir = WORKBOOK_VIRAL_DIR,
+        checkv_dir = DIR_PHAGES + "/checkv/{sample}",
+        # The optional tables of workbook_options above. The ** lines add the
+        # entries of a dictionary here only when their step is in this run.
+        **({"concordance": PLASMID_CONCORDANCE} if PHAGE_CALLER == "genomad" else {}),
+        **({
+            "replicons": MOBILOME_REPLICONS,
+            "ice_table": ICE_TABLE_FOR_COLOCALISE,
+            "mobility": MOBILITY_TABLE,
+            "mobility_audit": MOBILITY_AUDIT,
+        } if MOBILOME_RUN else {}),
+    output:
+        workbook = AMR_WORKBOOK,
+    params:
+        script = FINAL_REPORT_SCRIPT,
+        output_root = OUT,
+        platon_prefix = GENOMAD_PREFIX,
+        phage_caller = PHAGE_CALLER,
+        viral_rel = WORKBOOK_VIRAL_REL,
+        options = lambda w: workbook_options(w, amr=True),
+    conda:
+        "../../envs/report.yaml"
+    log:
+        LOGS + "/amr_workbook_{sample}.log"
+    shell:
+        """
+        python {params.script:q} amr \
+          --sample {wildcards.sample:q} \
+          --output-root {params.output_root:q} \
+          --qc-genomes {input.qc_genomes:q} \
+          --taxonomy-dir {input.taxonomy_dir:q} \
+          --contigs {input.contigs:q} \
+          --card {input.card:q} \
+          --resfinder {input.resfinder:q} \
+          --argannot {input.argannot:q} \
+          --platon-dir {input.platon_dir:q} \
+          --platon-prefix {params.platon_prefix:q} \
+          --phage-caller {params.phage_caller:q} \
+          --viral-table "{input.viral_dir}/{params.viral_rel}" \
+          --checkv-quality "{input.checkv_dir}/quality_summary.tsv" \
+          --checkv-contamination "{input.checkv_dir}/contamination.tsv" \
+          {params.options} \
+          --out {output.workbook:q} > {log:q} 2>&1
+        """
+
+
+if TRAITS_RUN:
+
+    rule traits_workbook:
+        input:
+            qc_genomes = QC_GENOME_TABLE,
+            taxonomy_dir = GTDBTK_DIR,
+            contigs = FINAL_CONTIGS,
+            # The trait calls and their provenance (rule trait_profile), the
+            # catalogue they were made with, and EcoFoldDB's folder, which holds
+            # EcoFoldDB_descriptions.txt.
+            profile = TRAIT_PROFILE,
+            genes = TRAIT_GENES,
+            audit = TRAIT_PROFILE_AUDIT,
+            provenance = TRAIT_PROVENANCE,
+            rules = TRAIT_RULES_TSV,
+            gene_dictionary = TRAIT_GENES_TSV,
+            ecofolddb = ECOFOLDDB_DB_DIR,
+            platon_dir = PLATON_DIR,
+            viral_dir = WORKBOOK_VIRAL_DIR,
+            checkv_dir = DIR_PHAGES + "/checkv/{sample}",
+            **({"concordance": PLASMID_CONCORDANCE} if PHAGE_CALLER == "genomad" else {}),
+            **({"replicons": MOBILOME_REPLICONS} if MOBILOME_RUN else {}),
+        output:
+            workbook = TRAITS_WORKBOOK,
+        params:
+            script = FINAL_REPORT_SCRIPT,
+            output_root = OUT,
+            platon_prefix = GENOMAD_PREFIX,
+            phage_caller = PHAGE_CALLER,
+            viral_rel = WORKBOOK_VIRAL_REL,
+            options = lambda w: workbook_options(w, amr=False),
+        conda:
+            "../../envs/report.yaml"
+        log:
+            LOGS + "/traits_workbook_{sample}.log"
+        shell:
+            """
+            python {params.script:q} traits \
+              --sample {wildcards.sample:q} \
+              --output-root {params.output_root:q} \
+              --qc-genomes {input.qc_genomes:q} \
+              --taxonomy-dir {input.taxonomy_dir:q} \
+              --contigs {input.contigs:q} \
+              --profile {input.profile:q} \
+              --genes {input.genes:q} \
+              --audit {input.audit:q} \
+              --rules {input.rules:q} \
+              --gene-dictionary {input.gene_dictionary:q} \
+              --catalogue "{input.ecofolddb}/EcoFoldDB_descriptions.txt" \
+              --provenance {input.provenance:q} \
+              --platon-dir {input.platon_dir:q} \
+              --platon-prefix {params.platon_prefix:q} \
+              --phage-caller {params.phage_caller:q} \
+              --viral-table "{input.viral_dir}/{params.viral_rel}" \
+              --checkv-quality "{input.checkv_dir}/quality_summary.tsv" \
+              --checkv-contamination "{input.checkv_dir}/contamination.tsv" \
+              {params.options} \
+              --out {output.workbook:q} > {log:q} 2>&1
             """

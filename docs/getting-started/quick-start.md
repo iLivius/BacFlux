@@ -274,6 +274,7 @@ After a successful single-sample run, with the mobilome module off (the default)
 │   ├── virsorter/isolate1/  checkv/isolate1/
 │   └── checkv_db/  vs2_db/               # fetched once and kept
 ├── 09.report/multiqc_report.html
+├── 10.workbooks/isolate1_amr.xlsx        # the strain's AMR genes and their context
 └── logs/                                 # one log per job, named rule + sample
 ```
 
@@ -304,6 +305,7 @@ Use these files to inspect the main results:
 | Resistance, from the reads | `05.amr/mapping/{sample}/{sample}_CARD_report.tsv` |
 | Which contigs are plasmids? | `06.plasmids/{sample}/platon/verified_plasmids.txt` |
 | One QC page for the whole batch | `09.report/multiqc_report.html` |
+| The strain's AMR genes in one file, each with its plasmid and prophage context | `10.workbooks/{sample}_amr.xlsx` |
 
 The full layout, stage by stage, is in [output files](../reference/output.md).
 

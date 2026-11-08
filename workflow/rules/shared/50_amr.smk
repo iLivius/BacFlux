@@ -79,7 +79,9 @@
 #
 # Takes in: contigs = FINAL_CONTIGS, the finished decontaminated assembly.
 # Produces: 05.amr/abricate/{sample}/{db}.tsv — one hit table per (sample, db).
-# Consumed by: AMR_summary below, which collates a sample's eight tables.
+# Consumed by: AMR_summary below, which collates a sample's eight tables; and the
+#              card, resfinder and argannot tables by rule amr_workbook
+#              (shared/90_report.smk), which groups their hits into one row per gene.
 #
 # The rule declares ONE templated output and contains NO expand(). The fan-out
 # over the eight databases lives in _downstream_targets() in 00_common.smk, which

@@ -17,6 +17,7 @@ Run: pytest workflow/scripts/40_annotation/test_trait_profile.py -q
 
 import csv
 import gzip
+import hashlib
 import json
 import os
 
@@ -2068,6 +2069,55 @@ def test_supporting_gene_alone_does_not_make_a_call(tmp_path):
 # ── Command line and output shape ────────────────────────────────────────────
 # The headers and vocabulary of the three tables, the order of the gene table,
 # and what happens with an empty genome or a Bakta table without its header.
+
+def test_provenance_records_the_catalogues_outputs_and_parameters(tmp_path):
+    """The provenance record fingerprints the three catalogue files and the three
+    tables by content, keeps only file names (no folders, so no local paths),
+    and records the calling parameters. Rules traits_summary and traits_workbook
+    rely on it to check that the catalogue they quote made these calls."""
+    args = write_inputs(tmp_path, named_abc(), ABC_GENES, [abc_rule()])
+    record_path = tmp_path / "out" / "SAMPLE1_trait_provenance.json"
+    args += ["--max-gene-gap", "3", "--max-protein-length", "500",
+             "--out-provenance", str(record_path)]
+    assert tp.main(args) == 0
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert record["schema_version"] == "1.0"
+    assert record["sample"] == "SAMPLE1"
+    for name, filename in (("rules", "rules.tsv"), ("gene_dictionary", "genes.tsv"),
+                           ("catalogue", "EcoFoldDB_descriptions.txt")):
+        source = tmp_path / filename
+        assert record["inputs"][name] == {
+            "file": filename, "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        }
+    for name, filename in (("genes", "SAMPLE1_trait_genes.tsv"),
+                           ("profile", "SAMPLE1_trait_profile.tsv"),
+                           ("audit", "SAMPLE1_trait_profile_audit.tsv")):
+        output = tmp_path / "out" / filename
+        assert record["outputs"][name] == {
+            "file": filename, "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        }
+    assert record["parameters"] == {
+        "max_gene_gap": 3, "max_protein_length": 500,
+        "structure_evalue_max": tp.E_VALUE_MAX, "structure_coverage_min": tp.COVERAGE_MIN,
+        "borderline_evalue": tp.BORDERLINE_E_VALUE,
+        "borderline_coverage": tp.BORDERLINE_COVERAGE,
+        "borderline_factor": tp.BORDERLINE_FACTOR,
+        "antismash_regions_used": False, "baktfold_names_used": False,
+    }
+    with open(tp.__file__, "rb") as handle:
+        assert record["producer"]["sha256"] == hashlib.sha256(handle.read()).hexdigest()
+    assert str(tmp_path) not in record_path.read_text(encoding="utf-8")
+
+    # The same inputs give the same record, byte for byte: no date, no path.
+    first = record_path.read_bytes()
+    assert tp.main(args) == 0
+    assert record_path.read_bytes() == first
+
+    # An edited table no longer matches its fingerprint.
+    output = tmp_path / "out" / "SAMPLE1_trait_profile.tsv"
+    output.write_text(output.read_text(encoding="utf-8") + "edited\n", encoding="utf-8")
+    assert tp.file_fingerprint(output)["sha256"] != record["outputs"]["profile"]["sha256"]
+
 
 def test_outputs_have_the_documented_headers_and_vocabulary(tmp_path):
     """The three headers are a contract with rule traits_summary and with the

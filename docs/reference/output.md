@@ -51,6 +51,8 @@ A full run leaves several thousand files. These are the ones that carry the resu
 | `07.phages/checkv/{sample}/quality_summary.tsv` | Predicted prophages and how complete each one is. | all |
 | `08.mobilome/{sample}/{sample}_amr_mobility.tsv` | For each AMR gene: the mobile-element context and a mobility tier. | all, opt-in |
 | `09.report/multiqc_report.html` | Read QC, assembly QC, completeness and taxonomy for the whole batch on one page, and the trait calls when the trait profile is on. | all |
+| `10.workbooks/{sample}_amr.xlsx` | The strain's resistance genes from CARD, ResFinder and ARG-ANNOT, one row per gene, each with its plasmid, ICE/IME and phage context. | all |
+| `10.workbooks/{sample}_traits.xlsx` | The strain's trait calls with their genes, caveats, suggested assays and references. | all, opt-in |
 
 !!! warning "One output directory, one batch"
 
@@ -108,6 +110,7 @@ output_dir/
 |   `-- checkv/{sample}/     + checkv_db/
 |-- 08.mobilome/                                 only when mobilome.run: true
 |-- 09.report/                                   multiqc_report.html
+|-- 10.workbooks/                                {sample}_amr.xlsx; {sample}_traits.xlsx with traits.run: true
 `-- logs/                                        one file per rule per sample
 ```
 
@@ -247,7 +250,7 @@ point-mutation detection. See [Taxonomy](../analysis/taxonomy.md).
 | `dbcan/<db version>/` | The shared dbCAN database, likewise. The folder is named from the download URL, so the version is visible on disk. The empty `.verified.sha256` beside it is the marker written once the checksum matched, and its presence is what stops the download repeating. |
 | `baktfold/{sample}/` | Only with `baktfold.run: true`. Bakta's file set again, with names found by predicted structure for the proteins Bakta called hypothetical, plus `{sample}.inference.tsv` (the database hit behind each name) and one `baktfold_<database>_tophit.tsv` per database. Every other stage reads Bakta's annotation; only the trait profile, when on, also counts these names. |
 | `baktfold/databases/` | Baktfold's database and the ProstT5 model: downloaded here, or a symlink view of a copy you already hold. Also set up when `traits.run: true`, which uses the ProstT5 model. |
-| `traits/{sample}/` | Only with `traits.run: true`. `{sample}_trait_profile.tsv` (one row per trait: called, partial or not called, with the genes behind it), `{sample}_trait_profile_audit.tsv` (the reason for each decision) and `{sample}_trait_genes.tsv` (each protein that matched a gene, with its evidence and whether it counted). `structure/` holds the proteins searched (`{sample}_searched.faa`), their 3Di sequences (`prostt5/`) and the Foldseek query database (`querydb/`), kept so the slow 3Di step runs once (the archive clean-up removes them). Read by `09.report/traits_summary.tsv`. See [Trait profile](../analysis/traits.md). |
+| `traits/{sample}/` | Only with `traits.run: true`. `{sample}_trait_profile.tsv` (one row per trait: called, partial or not called, with the genes behind it), `{sample}_trait_profile_audit.tsv` (the reason for each decision), `{sample}_trait_genes.tsv` (each protein that matched a gene, with its evidence and whether it counted), and `{sample}_trait_provenance.json` (the fingerprints of the catalogue and of these three tables, with the calling parameters, checked before the catalogue is quoted beside the calls). `structure/` holds the proteins searched (`{sample}_searched.faa`), their 3Di sequences (`prostt5/`) and the Foldseek query database (`querydb/`), kept so the slow 3Di step runs once (the archive clean-up removes them). Read by `09.report/traits_summary.tsv` and `10.workbooks/{sample}_traits.xlsx`. See [Trait profile](../analysis/traits.md). |
 | `traits/databases/` | EcoFoldDB v2.0: downloaded here and checked against `links.ecofolddb_md5`, or a symlink view of a copy you already hold. |
 
 eggNOG is the slow tail of a BacFlux run. See [Annotation](../analysis/annotation.md).
@@ -373,19 +376,43 @@ what not to conclude from one, is on
 
 | File | Contents |
 |---|---|
-| `multiqc_report.html` | fastp or NanoPlot, Qualimap, QUAST, CheckM, GTDB-Tk and Bakta for the whole batch, with sample names rewritten into readable panel labels; with `traits.run: true`, also a heatmap of every sample's trait calls. |
-| `multiqc_config.yaml` | The generated config, kept so the renaming rules are inspectable. |
+| `multiqc_report.html` | General Statistics, then fastp, NanoStat (NanoPlot's statistics), QUAST, QualiMap, CheckM, GTDB-Tk and Bakta, with `traits.run: true` the Trait profile, then References and Software Versions. A section appears only when the mode has its tool. |
+| `multiqc_config.yaml` | The generated config: the order of the sections and the sample renaming, kept so both can be inspected. |
 | `multiqc_report_data/` | MultiQC's parsed numbers behind the report. |
+| `bacflux_references_mqc.html` | The References section: the paper of each tool the report shows, written into the report so it can be read offline. |
+| `multiqc_versions.yaml` | The versions shown under Software Versions. |
 | `traits_summary.tsv` | Only with `traits.run: true`. Every sample's trait calls side by side: one row per sample, one column per trait, each cell `called`, `partial` or `not called`. Made again whenever a sample is added. |
-| `traits_summary_mqc.tsv` | Only with `traits.run: true`. The same calls as numbers (2 called, 1 partial, 0 not called), which MultiQC draws as the report's trait heatmap. |
+| `traits_summary_mqc/` | Only with `traits.run: true`. The plot files of the report's Trait profile section: the call counts per strain, one heatmap per application label, and each trait's references and suggested assay. |
 
 Left alone, MultiQC names a sample after every directory component of the file it came
 from. The generated config rewrites those into `<what it is> | <sample>` — so a panel
 row reads `assembly QC | S1`, and a hybrid sample's two genomes appear separately as
 `completeness Illumina | S1` and `completeness ONT | S1`.
 
-The report directory is deliberately not a declared Snakemake output, so anything you
-drop in it survives a re-run.
+Software Versions gives each tool's version as the tool wrote it into its own output
+for these samples. A tool that writes none, such as CheckM, gets the version pinned in
+its environment file, marked `(workflow pin)`: the version this copy of BacFlux
+installs, which is not proof of the version that made a result computed earlier.
+
+The report directory itself is deliberately not a declared Snakemake output, so anything
+you drop in it survives a re-run. `traits_summary_mqc/` is the exception: it is emptied
+and written again whenever the trait summary is made again, so keep your own files
+outside it.
+
+---
+
+## `10.workbooks`
+
+| File | Contents |
+|---|---|
+| `{sample}_amr.xlsx` | Every run. The resistance genes ABRicate found in CARD, ResFinder and ARG-ANNOT, one row per gene, each answering yes, no, uncertain or not_assessed to three questions: on a plasmid, inside an ICE or IME, inside a phage region? Further sheets keep every database hit, the mobile elements and virus regions the answers rest on, the mobilome module's tables when it ran, the inputs and a data dictionary. |
+| `{sample}_traits.xlsx` | Only with `traits.run: true`. Every trait of the catalogue with its call, genes, caveat, suggested assay and references, and the plasmid and phage context of every gene behind the calls. |
+
+Without the mobilome module, the ICE/IME and mobility-tier columns read `not_assessed`,
+not `no`. Each workbook is made again whenever one of its inputs changes; the folder is
+not a declared Snakemake output, so making one strain's workbook again never removes
+another's. Keep notes in a copy elsewhere. The sheets and the rule behind each answer
+are explained under [Per-strain workbooks](../analysis/workbooks.md).
 
 ---
 

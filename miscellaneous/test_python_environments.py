@@ -260,6 +260,13 @@ def test_the_reader_finds_the_rules_that_run_python():
         # The two helpers of the opt-in trait profile (traits.run).
         "trait_profile": "../../envs/python.yaml",
         "traits_summary": "../../envs/python.yaml",
+        # The two per-strain Excel workbooks (10.workbooks/), in their own
+        # environment because they need XlsxWriter.
+        "amr_workbook": "../../envs/report.yaml",
+        "traits_workbook": "../../envs/report.yaml",
+        # MultiQC's rule also runs two small helper scripts (the software
+        # versions and the references section) with MultiQC's own Python.
+        "multiqc": "../../envs/multiqc.yaml",
         # Two helpers run in the Platon environment, which has Python 3 in it.
         "card_mapping_report": "../../envs/platon.yaml",
         "plasmid_concordance": "../../envs/platon.yaml",

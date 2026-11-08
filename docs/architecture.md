@@ -153,6 +153,7 @@ output_dir/
 ├── 07.phages/      prophage predictions, CheckV quality
 ├── 08.mobilome/    mobility table                    (only when switched on)
 ├── 09.report/      MultiQC
+├── 10.workbooks/   one AMR workbook per strain; a traits workbook with traits.run
 └── logs/           one log per rule, per sample
 ```
 

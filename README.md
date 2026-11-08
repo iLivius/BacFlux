@@ -7,7 +7,7 @@ __  __  |  __ `/  ___/_  /_   __  /_  / / /_  |/_/
 _  /_/ // /_/ // /__ _  __/   _  / / /_/ /__>  <
 /_____/ \__,_/ \___/ /_/      /_/  \__,_/ /_/|_|
 
-v2.1.0
+v2.2.0
 ```
 
 **A unified Snakemake workflow for Illumina, ONT, hybrid data or existing bacterial assemblies, integrating decontamination, quality control, taxonomy, annotation, AMR gene detection and mobilome analysis.**
@@ -34,6 +34,7 @@ The detailed map, step by step, is on the [documentation home page](https://iLiv
 | [Choosing a mode](https://iLivius.github.io/BacFlux/getting-started/choosing-a-mode/) | which mode a dataset belongs in, and what a wrong one does |
 | [Modes](https://iLivius.github.io/BacFlux/modes/) | the four front ends, one page each |
 | [Analysis stages](https://iLivius.github.io/BacFlux/analysis/decontamination/) | decontamination, QC, taxonomy, annotation, AMR, plasmids, prophages |
+| [Trait profile](https://iLivius.github.io/BacFlux/analysis/traits/) | optional EcoFoldDB trait predictions, evidence, assays and interpretation |
 | [Mobilome module](https://iLivius.github.io/BacFlux/mobilome/) | activation, mobility tiers, outputs and interpretation limits |
 | [Configuration](https://iLivius.github.io/BacFlux/reference/configuration/) | every key, which modes read it, its default and its trade-off |
 | [Output files](https://iLivius.github.io/BacFlux/reference/output/) | what each stage writes, and which files are the deliverables |
@@ -89,11 +90,14 @@ assembly fragmentation and available read types still affect the results.
 
   03.taxonomy      GTDB-Tk against GTDB R232
   04.annotation    Bakta · eggNOG · antiSMASH · dbCAN
+                   Baktfold* · EcoFoldDB trait profile*
   05.amr           ABRicate over eight databases · reads mapped to CARD †
   06.plasmids      Platon, with a supplementary BLAST line beside each call
   07.phages        VirSorter2 (or geNomad*) → CheckV
   08.mobilome      AMRFinderPlus · ISEScan · CONJscan → a mobility tier per AMR gene *
   09.report        MultiQC — one page for the whole batch
+  10.workbooks     one Excel workbook per strain: AMR genes and their context,
+                   and the trait calls *
 
   Decontamination (BLAST + BlobTools) and assembly QC (QUAST, CheckM, Qualimap) are
   shared code as well; both sit inside 02.assembly, where each front end needs them.
@@ -109,6 +113,23 @@ every gene left without mobile-element context. These predictions require
 interpretation with their confidence fields and assembly limitations; they do not
 demonstrate transfer or establish intrinsic resistance. See
 [the mobilome module](https://iLivius.github.io/BacFlux/mobilome/).
+
+Two optional annotation layers support strain screening. `baktfold.run: true`
+suggests names for proteins Bakta left hypothetical, using predicted structure.
+`traits.run: true` searches all eligible proteins against EcoFoldDB and combines the
+hits with gene names and trait rules. It also uses Baktfold's names when that layer
+is enabled. The result is genomic evidence for a trait; laboratory assays are needed
+to test whether the strain expresses it. See
+[Baktfold](https://iLivius.github.io/BacFlux/analysis/annotation/#baktfold) and the
+[trait profile](https://iLivius.github.io/BacFlux/analysis/traits/).
+
+**The per-strain workbooks** (`10.workbooks`) gather, for each strain, the resistance
+genes found in CARD, ResFinder and ARG-ANNOT, one row per gene, each with three answers:
+is it on a plasmid, inside an ICE or IME, inside a phage region? Each answer is `yes`,
+`no`, `uncertain` or `not_assessed`, so an analysis that did not run never reads as a
+negative result. With the trait profile on, a second workbook lists the trait calls with
+their genes, caveats, suggested assays and references. See
+[per-strain workbooks](https://iLivius.github.io/BacFlux/analysis/workbooks/).
 
 v2.0.0 brings together the four workflows that grew out of BacFlux — `BacFlux` for
 Illumina reads, `FastaFlux` for finished assemblies, `BacFluxL` for ONT reads and
@@ -176,16 +197,23 @@ separately from Platon itself — v1.5.0 is the current database for every Plato
 differ.
 
 Everything else — PhiX, CARD, CheckV, dbCAN, VirSorter2, antiSMASH, and the optional
-mobilome databases — is downloaded into `output_dir` on the first run that needs it, or
-all at once with `snakemake download_all`. Most of those also take a `directories.*_db`
+Baktfold, EcoFoldDB and mobilome databases — is downloaded into `output_dir` on the
+first run that needs it, or all at once with `snakemake download_all`. Most of those
+also take a `directories.*_db`
 key: point it at a copy you already hold and nothing is fetched. Download recipes, disk
 sizes and every optional key are on
 [reference databases](https://iLivius.github.io/BacFlux/getting-started/databases/).
 
+The trait profile needs Baktfold's database and ProstT5 model (about 22 GB) even
+when `baktfold.run` is false, plus EcoFoldDB v2.0 (about 0.8 GB unpacked).
+Existing copies can be supplied as `directories.baktfold_db` and
+`directories.ecofolddb_db`. Neither optional layer needs a manual software install:
+Snakemake builds its environment when it is enabled.
+
 ## Output
 
 Everything lands under `directories.output_dir`, in one numbered directory per stage —
-`01.reads` through `09.report`, in the order they run, with the same numbering in all four
+`01.reads` through `10.workbooks`, in the order they run, with the same numbering in all four
 modes. The delivered genome is always `02.assembly/{sample}/contigs_final.fasta`, and the
 shared stages from `03` onwards analyse that genome. Beside it,
 `contaminants/contig_taxonomy_decisions.tsv` records every contig that was kept or dropped

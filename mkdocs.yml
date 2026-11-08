@@ -112,6 +112,7 @@ nav:
       - Antimicrobial resistance: analysis/amr.md
       - Plasmids: analysis/plasmids.md
       - Prophages: analysis/phages.md
+      - Per-strain workbooks: analysis/workbooks.md
   - Mobilome module:
       - mobilome/index.md
       - The mobility ladder: mobilome/mobility-ladder.md

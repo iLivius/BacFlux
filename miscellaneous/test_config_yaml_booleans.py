@@ -481,7 +481,8 @@ class TestConfigYamlBooleans(unittest.TestCase):
 
     # Every rule the trait layer adds. None may be planned while traits.run is false.
     TRAIT_RULES = ("trait_db", "trait_db_local", "trait_structure_query",
-                   "trait_structure_search", "trait_profile", "traits_summary")
+                   "trait_structure_search", "trait_profile", "traits_summary",
+                   "traits_workbook")
 
     def make_trait_stubs(self, folder="ecofolddb_stub", leave_out=0):
         """Stub databases for a dry run with traits.run: true; returns (ecofolddb, baktfold).
@@ -538,7 +539,8 @@ class TestConfigYamlBooleans(unittest.TestCase):
         self.assertEqual(status, 0, output[-3000:])
         for planned in ("rule structure_annotation_db_local:", "rule trait_db_local:",
                         "rule trait_structure_query:", "rule trait_structure_search:",
-                        "rule trait_profile:", "rule traits_summary:"):
+                        "rule trait_profile:", "rule traits_summary:",
+                        "rule traits_workbook:"):
             self.assertIn(planned, output)
         self.assertNotIn("rule trait_db:", output)
         self.assertNotIn("rule structure_annotation:", output)
@@ -547,10 +549,10 @@ class TestConfigYamlBooleans(unittest.TestCase):
         self.assertIn("-s 8", output)
         self.assertIn("--max-protein-length 4000", output)
         self.assertIn("--max-gene-gap 10", output)
-        # MultiQC is handed the heatmap as a path relative to the output root
-        # (after a space in its -d list), unlike the absolute path in the plan
-        # of rule traits_summary.
-        self.assertIn(" 09.report/traits_summary_mqc.tsv", output)
+        # MultiQC is handed the folder of trait plots as a path relative to the
+        # output root (after a space in its -d list), unlike the absolute path in
+        # the plan of rule traits_summary.
+        self.assertIn(" 09.report/traits_summary_mqc", output)
 
     def test_traits_on_with_baktfold_on_passes_baktfold_names(self):
         # With both layers on, Baktfold runs, and its names reach the trait calls.

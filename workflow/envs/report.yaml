@@ -1,0 +1,29 @@
+# Python 3.12 and XlsxWriter 3.2.9, for rules amr_workbook and traits_workbook
+# (shared/90_report.smk). The exact package builds are fixed by
+# report.linux-64.pin.txt next to this file; Snakemake creates the environment
+# from that list.
+#
+# What it is for. Those two rules write the per-strain Excel workbooks in
+# 10.workbooks/. XlsxWriter is a maintained library that writes .xlsx files
+# (BSD-2-Clause licence, pure Python, no other program needed). Each cell is
+# written with an explicit type, so a coordinate stays a number and a value
+# such as ABRicate's GAPS "6/4" stays text instead of becoming a date when the
+# file is opened in Excel.
+#
+# Why its own environment instead of envs/python.yaml. Snakemake compares the
+# text of an environment file with that of the last run, so adding XlsxWriter
+# to envs/python.yaml would re-run every rule that uses that environment in an
+# existing output folder. A separate file used only by the two workbook rules
+# keeps those rules untouched.
+#
+# The pin list was made on 2026-11-08 (conda 26.9.4) with
+#   CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY=false conda create -p <env> --override-channels \
+#       -c conda-forge python=3.12 xlsxwriter=3.2.9
+# followed by conda list -p <env> --explicit. The setting leaves out pip, which
+# nothing here uses; --override-channels makes conda use only conda-forge.
+name: report
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - xlsxwriter=3.2.9

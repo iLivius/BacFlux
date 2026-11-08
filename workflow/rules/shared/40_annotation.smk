@@ -1148,7 +1148,7 @@ if TRAITS_RUN:
     #           on one contig, each at most traits.max_gene_gap genes from the
     #           one before it. Its comments and docs/analysis/traits.md give the
     #           full logic and every reason word it writes.
-    # Produces: three tables in 04.annotation/traits/{sample}/:
+    # Produces: three tables and their provenance in 04.annotation/traits/{sample}/:
     #             {sample}_trait_profile.tsv        one row per trait: called,
     #                                               partial or not called, with
     #                                               the genes behind it;
@@ -1157,8 +1157,17 @@ if TRAITS_RUN:
     #                                               and why it counted;
     #             {sample}_trait_profile_audit.tsv  one row per trait, with the
     #                                               reason for its decision.
-    # Consumed by: traits_summary in shared/90_report.smk (the profiles); the
-    #              user, for all three.
+    #             {sample}_trait_provenance.json    SHA-256 fingerprints of the
+    #                                               two catalogue tables, the
+    #                                               EcoFoldDB catalogue and the
+    #                                               three tables above, plus the
+    #                                               calling parameters, so the
+    #                                               traits workbook can check that
+    #                                               the catalogue it quotes is the
+    #                                               one these calls were made with.
+    # Consumed by: traits_summary in shared/90_report.smk (the profiles and the
+    #              provenance records); traits_workbook there (all four files);
+    #              the user, for the three tables.
     #
     # The two trait tables are inputs on purpose. The calls must always match
     # the tables they were made from, so editing either table re-makes them
@@ -1190,6 +1199,7 @@ if TRAITS_RUN:
             genes = TRAIT_GENES,
             profile = TRAIT_PROFILE,
             audit = TRAIT_PROFILE_AUDIT,
+            provenance = TRAIT_PROVENANCE,
         params:
             script = TRAIT_PROFILE_SCRIPT,
             # traits.max_gene_gap, for the side-by-side test.
@@ -1227,5 +1237,6 @@ if TRAITS_RUN:
               --max-protein-length {params.max_protein_length} \
               --out-genes {output.genes:q} \
               --out-profile {output.profile:q} \
-              --out-audit {output.audit:q} > {log} 2>&1
+              --out-audit {output.audit:q} \
+              --out-provenance {output.provenance:q} > {log} 2>&1
             """

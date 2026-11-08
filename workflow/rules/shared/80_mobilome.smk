@@ -1030,7 +1030,8 @@ if MOBILOME_RUN:
     #           and N50 — the context the call has to be read against.
     # Consumed by: name_ice_elements when the ICEberg layer is on, otherwise
     #              straight to amr_mge_colocalisation, as a SECOND element source
-    #              alongside the IS table.
+    #              alongside the IS table; and, the same way, by rule amr_workbook
+    #              (shared/90_report.smk), for its ICE/IME answer.
     rule conjscan_ice:
         input:
             conjscan_dir = CONJSCAN_DIR,
@@ -1552,7 +1553,8 @@ if MOBILOME_RUN:
         #       records what each candidate matched and what was refused.
         # Consumed by: amr_mge_colocalisation, which reads this table INSTEAD of
         #       ICE_TABLE whenever this layer is on. That swap is decided once, in
-        #       00_common.smk, by ICE_TABLE_FOR_COLOCALISE.
+        #       00_common.smk, by ICE_TABLE_FOR_COLOCALISE, which rule amr_workbook
+        #       (shared/90_report.smk) reads too.
         #
         # Its log is mobilome_name_ice_{sample}.log — shortened, where every other
         # rule's log is "mobilome_" plus the rule name in full. Left alone because
@@ -1864,7 +1866,9 @@ if MOBILOME_RUN:
     # Produces: MOBILOME_REPLICONS.
     # Consumed by: amr_mge_colocalisation, where it decides ladder tiers 5 and 6
     #              for anything sitting on a plasmid, and by conjscan_ice, which
-    #              needs it to tell a conjugative PLASMID from an ICE.
+    #              needs it to tell a conjugative PLASMID from an ICE; also by the
+    #              per-strain workbooks (amr_workbook, traits_workbook in
+    #              shared/90_report.smk), for their plasmid answer.
     #
     # No separate audit file, and that is deliberate — it is the one mobilome
     # rule without one. The project rule is that every decision states a reason,
@@ -1952,7 +1956,9 @@ if MOBILOME_RUN:
     #       above from the top down, and record what capped the confidence.
     # Produces: MOBILITY_TABLE (the deliverable, one row per AMR gene) and
     #           MOBILITY_AUDIT (why every gene without context got none).
-    # Consumed by: the user. This is the module's terminal product.
+    # Consumed by: the user. This is the module's terminal product. Rule
+    #              amr_workbook (shared/90_report.smk) also copies both tables into
+    #              the AMR workbook and shows each gene's tier there.
     #
     # Its log is mobilome_colocalisation_{sample}.log rather than the rule name
     # in full; left alone, like name_ice_elements's, because renaming it only

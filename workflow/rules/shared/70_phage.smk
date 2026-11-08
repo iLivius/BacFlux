@@ -613,6 +613,12 @@ if not CHECKVDB:
 # Produces 07.phages/checkv/{sample}/ — key file quality_summary.tsv. This is the
 # last phage step, and the file rule all asks for: asking for it is what pulls in
 # whichever caller ran.
+# Consumed by: the user, and rules amr_workbook and traits_workbook
+# (shared/90_report.smk), which read quality_summary.tsv and contamination.tsv to
+# tell the viral part of a prophage region from the host DNA around it. They use
+# a region's parts only when it also has a row in quality_summary.tsv, so after a
+# CheckV failure (header-only quality_summary.tsv, see below) a gene in a
+# caller's region reads `uncertain`, not `yes`.
 #
 # GRACEFUL EMPTY-INPUT HANDLING (BacFlux "degrade, don't hard-fail" convention): a
 # virus-free genome is common, and both callers can emit an empty or absent virus

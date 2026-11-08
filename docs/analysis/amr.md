@@ -413,6 +413,11 @@ For what happens to an AMR call once the mobilome module has it, see
 | `08.mobilome/{sample}/{sample}_amrfinderplus.tsv` | all four, `mobilome.run: true` |
 | `08.mobilome/{sample}/{sample}_amrfinderplus_mutations.tsv` | all four, `mobilome.run: true` |
 | `08.mobilome/{sample}/{sample}_amrfinder_organism_audit.tsv` | all four, `mobilome.run: true` |
+| `10.workbooks/{sample}_amr.xlsx` | all four |
+
+The workbook gathers the CARD, ResFinder and ARG-ANNOT hits of each gene into one row,
+with its plasmid, ICE/IME and phage context; see
+[Per-strain workbooks](workbooks.md#the-amr-workbook).
 
 ## References
 

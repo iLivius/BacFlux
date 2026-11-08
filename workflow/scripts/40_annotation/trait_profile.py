@@ -79,6 +79,12 @@ What it writes
                  Rule traits_summary reads every sample's profile.
   --out-audit    {sample}_trait_profile_audit.tsv: one row per trait with a fixed
                  reason token and the detail behind the decision.
+  --out-provenance  {sample}_trait_provenance.json (optional; the workflow always
+                 asks for it): the SHA-256 fingerprints of the two trait tables,
+                 the EcoFoldDB catalogue and the three tables above, with the
+                 calling parameters. Rules traits_summary and traits_workbook
+                 check them before quoting the catalogue beside these calls; see
+                 write_provenance().
 Column meanings and every reason token are listed beside GENE_TABLE_COLUMNS,
 PROFILE_COLUMNS and AUDIT_COLUMNS below, and in docs/analysis/traits.md.
 
@@ -202,6 +208,7 @@ import argparse
 import collections
 import decimal
 import gzip
+import hashlib
 import json
 import math
 import os
@@ -2232,6 +2239,51 @@ def write_tsv(path, columns, rows):
             handle.write("\t".join(_cell(row.get(column)) for column in columns) + "\n")
 
 
+def file_fingerprint(path):
+    """Fingerprint one file: {"file": its name, "sha256": its SHA-256 digest}.
+
+    The SHA-256 digest is a 64-character code computed from every byte of the
+    file; any change to the file, even one character, gives a different code.
+    Only the file name is kept beside it, as a label for a person reading the
+    JSON: the folder would reveal where the analysis ran, and comparing
+    contents rather than paths keeps the record valid when the output folder
+    is moved.
+    """
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return {"file": os.path.basename(path), "sha256": digest.hexdigest()}
+
+
+def write_provenance(path, sample, inputs, parameters, outputs):
+    """Write {sample}_trait_provenance.json: what these calls were made with.
+
+    Takes in: the output path; the sample name; the fingerprints of the three
+              catalogue files taken when main() started (inputs); the calling
+              parameters; and the paths of the three tables just written
+              (outputs), which are fingerprinted here.
+    Why: the catalogue's caveats, assays and references are quoted beside the
+    calls by rule traits_summary (in the MultiQC report) and rule
+    traits_workbook (in the traits workbook). Both compare these fingerprints
+    with the files they read, so a catalogue edited after the calls were made
+    is caught instead of being quoted beside calls it did not make.
+    Written last, after the three tables, so a run that stops half way leaves
+    no record vouching for incomplete tables.
+    """
+    record = {
+        "schema_version": "1.0",
+        "sample": sample,
+        "producer": file_fingerprint(__file__),
+        "inputs": inputs,
+        "parameters": parameters,
+        "outputs": {name: file_fingerprint(table) for name, table in outputs.items()},
+    }
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(record, handle, sort_keys=True, indent=2, allow_nan=False)
+        handle.write("\n")
+
+
 def main(argv=None):
     """Command-line entry point used by rule trait_profile.
 
@@ -2282,6 +2334,10 @@ def main(argv=None):
                         help="Output: one row per trait.")
     parser.add_argument("--out-audit", required=True,
                         help="Output: the reason behind each trait decision.")
+    parser.add_argument("--out-provenance",
+                        help="Optional: write the fingerprints of the catalogue "
+                             "files and output tables, with the calling "
+                             "parameters, to this JSON file.")
     args = parser.parse_args(argv)
     # Next-door genes are 1 apart, so with a gap of 0 no two different proteins
     # could ever be co-localised, and every trait that asks for it would be
@@ -2291,6 +2347,17 @@ def main(argv=None):
         parser.error("--max-gene-gap must be 1 or more")
     if args.max_protein_length < 1:
         parser.error("--max-protein-length must be 1 or more")
+
+    # Fingerprint the three catalogue files before reading them, so the record
+    # describes the files these calls were made from. A run by hand may leave
+    # out --out-provenance; the workflow always asks for it.
+    provenance_inputs = None
+    if args.out_provenance:
+        provenance_inputs = {
+            "rules": file_fingerprint(args.rules),
+            "gene_dictionary": file_fingerprint(args.genes),
+            "catalogue": file_fingerprint(args.catalogue),
+        }
 
     # 1. The two tables, checked against each other and the catalogue before
     #    anything else is read.
@@ -2365,6 +2432,25 @@ def main(argv=None):
     write_tsv(args.out_genes, GENE_TABLE_COLUMNS, gene_rows)
     write_tsv(args.out_profile, PROFILE_COLUMNS, profile_rows)
     write_tsv(args.out_audit, AUDIT_COLUMNS, audit_rows)
+
+    # The provenance record last, once the three tables exist (see
+    # write_provenance for why).
+    if args.out_provenance:
+        write_provenance(args.out_provenance, args.sample, provenance_inputs, {
+            "max_gene_gap": args.max_gene_gap,
+            "max_protein_length": args.max_protein_length,
+            "structure_evalue_max": E_VALUE_MAX,
+            "structure_coverage_min": COVERAGE_MIN,
+            "borderline_evalue": BORDERLINE_E_VALUE,
+            "borderline_coverage": BORDERLINE_COVERAGE,
+            "borderline_factor": BORDERLINE_FACTOR,
+            "antismash_regions_used": args.antismash_json is not None,
+            "baktfold_names_used": args.baktfold_tsv is not None,
+        }, {
+            "genes": args.out_genes,
+            "profile": args.out_profile,
+            "audit": args.out_audit,
+        })
 
     # Closing summary. The rule sends stdout to its log, so the counts and the
     # path to the reasons are there even when nothing is called.

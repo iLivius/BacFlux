@@ -43,6 +43,26 @@ editing either one makes every sample's trait calls again on the next run. The t
 at the end of `test_trait_profile.py` check the shipped tables themselves, and
 `docs/analysis/traits.md` explains their columns.
 
+The same rule writes `{sample}_trait_provenance.json`: the SHA-256 fingerprints of the
+two tables, of EcoFoldDB's descriptions and of the three trait tables, with the calling
+parameters. `90_report/traits_summary.py` and `90_report/final_reports.py` check them
+before they quote the catalogue beside the calls.
+
+## The scripts of the report, in `90_report/`
+
+`90_report/final_reports.py` writes the per-strain Excel workbooks in `10.workbooks/`
+(rules `amr_workbook` and `traits_workbook`). It makes no new call: it groups the
+database hits of one gene into one row and adds each gene's plasmid, ICE/IME and phage
+context by coordinates. For the replicon call and the mobile-element rules it imports
+`80_mobilome/platon_replicons.py` and `80_mobilome/colocalise.py`, so the workbook and
+the mobilome module cannot disagree. It runs in `workflow/envs/report.yaml`, which adds
+XlsxWriter to Python.
+
+`90_report/traits_summary.py` writes the batch table of trait calls and the plot files of
+the report's Trait profile section, in `09.report/traits_summary_mqc/`.
+`90_report/multiqc_versions.py` and `90_report/multiqc_citations.py`, run by rule
+`multiqc`, write the report's tool versions and its References section.
+
 ## Tests sit next to the script they test
 
 `50_amr/card_mapping_report.py` is tested by `50_amr/test_card_mapping_report.py`, and

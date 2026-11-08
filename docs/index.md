@@ -15,7 +15,7 @@ strain selection alongside phenotypic evidence and application-specific assessme
 
 An optional mobilome module assesses the genomic context and potential mobility
 of detected antimicrobial resistance genes. The configuration key `mode` selects
-the input mode. This site documents version **v2.1.0**.
+the input mode. This site documents version **v2.2.0**.
 
 BacFlux belongs to the [BioFlux](https://github.com/stars/iLivius/lists/bioflux)
 family of pipelines.

@@ -20,6 +20,7 @@ report, and changes no other stage's result.
 | `{sample}_trait_profile.tsv` | **the result** — one row per trait: called, partial or not called, with the genes behind it |
 | `{sample}_trait_profile_audit.tsv` | **why** — one row per trait, with a fixed reason for its decision |
 | `{sample}_trait_genes.tsv` | **the evidence** — one row per protein and gene: what matched, and whether it counted |
+| `{sample}_trait_provenance.json` | **the record** — the fingerprints of the catalogue and of the three tables above, with the calling parameters |
 | `09.report/traits_summary.tsv` | every sample's calls side by side, one column per trait |
 
 Read them in this order: the summary, to see the batch at a glance; then a sample's
@@ -45,7 +46,7 @@ switches them on.*
 |---|---|
 | **In** | `{sample}.faa` and `{sample}.tsv` from the Bakta directory; EcoFoldDB; the ProstT5 model from Baktfold's database; `{sample}.json` from antiSMASH; Baktfold's `{sample}.tsv` when `baktfold.run: true` |
 | **Out** | `04.annotation/traits/{sample}/` |
-| **Next** | `09.report/traits_summary.tsv` and the MultiQC report; user interpretation |
+| **Next** | `09.report/traits_summary.tsv`, the MultiQC report and `10.workbooks/{sample}_traits.xlsx`; user interpretation |
 
 A gene is recognised in three ways, and one protein can carry all three.
 
@@ -331,13 +332,36 @@ failed the filter keeps its name row: the failed hit fills the structure columns
 ### `09.report/traits_summary.tsv`
 
 One row per sample and one column per `trait_id`, in table order, each cell `called`,
-`partial` or `not called`. The MultiQC report draws the same calls as a heatmap, right
-after General Statistics, from the numbers in `09.report/traits_summary_mqc.tsv`:
-2 (dark blue) for called, 1 (light blue) for partial, 0 (light grey) for not called.
-The heatmap has no colour bar; the section's description gives this key. MultiQC
-writes the number in each cell only when the grid has fewer than 400 cells, which with
-49 traits means up to eight samples; in a larger batch the colours tell the calls
-apart, and pointing at a cell shows its number.
+`partial` or `not called`.
+
+The MultiQC report shows the same calls in its Trait profile section, after Bakta,
+from the plot files in `09.report/traits_summary_mqc/`:
+
+- **Call counts**: for each strain, how many traits are called, partial and not called.
+  The counts help to find strains in a batch; they do not rank strains by benefit.
+- **One heatmap per application label**, strains in rows and traits in columns. Each
+  trait appears once, under its exact label, so `biofertiliser, biocontrol` has its own
+  panel. The axis shows each trait's `trait_id`, and the panel lists every ID with the
+  trait's name.
+- **References and assays**: for each trait, the papers behind its rule, a suggested
+  laboratory assay and its caveat, from the catalogue.
+
+Dark blue is **called**, light blue **partial** and grey **not called**. The heatmaps
+draw them from the numbers 2, 1 and 0, which stand for the three categories, not for a
+score of confidence or activity. A separate **References** section of the report lists
+the papers of the tools and of the trait methods.
+
+### `{sample}_trait_provenance.json`
+
+Written last by `trait_profile.py`, after the three tables. It records the SHA-256
+fingerprint (a code computed from every byte of a file) of the two catalogue tables, of
+EcoFoldDB's descriptions and of the three tables, each beside its file name, with the
+calling parameters. The MultiQC report and the traits workbook quote the catalogue's
+caveats, assays and references beside the calls, so rule `traits_summary` and rule
+`traits_workbook` compare these fingerprints with the files they read first: a catalogue
+edited after the calls were made, or an edited table, stops them, with rule
+`trait_profile` to be run again. Only contents are compared, so an output folder that has
+been moved still passes.
 
 ## What a call does not mean
 
@@ -445,9 +469,12 @@ which carries ProstT5 and Foldseek, and the two scripts in `workflow/envs/python
 
 ## What to check afterwards
 
-- `09.report/traits_summary.tsv`, or the trait heatmap in
+- `09.report/traits_summary.tsv`, or the trait heatmaps in
   `09.report/multiqc_report.html`: every sample at a glance.
 - `{sample}_trait_profile_audit.tsv`: the reason behind each decision.
+- `10.workbooks/{sample}_traits.xlsx`: the calls with their genes, caveats, suggested
+  assays and references, and the plasmid and phage context of every gene, in one file
+  per strain ([Per-strain workbooks](workbooks.md#the-traits-workbook)).
 - `logs/trait_db.log`: the download, and whether the MD5 matched. Nothing is
   extracted when it did not. With `directories.ecofolddb_db` set,
   `logs/trait_db_local.log` takes its place.

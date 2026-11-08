@@ -212,6 +212,10 @@ as an input: no rule in stage 08 opens a file under `07.phages/`. Stage 08 does 
 plasmid stage, and opting in to geNomad changes what that stage hands it, because the
 concordance table is built here.
 
+The per-strain AMR workbook reads this stage: the caller's regions and CheckV's split of
+each region into its viral part and host DNA decide whether a resistance gene lies in a
+phage region (see [Per-strain workbooks](workbooks.md#inside-a-phage-region)).
+
 ## What to check afterwards
 
 - `07.phages/checkv/{sample}/quality_summary.tsv` — the graded calls, or a header-only file

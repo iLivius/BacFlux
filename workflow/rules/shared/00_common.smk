@@ -667,6 +667,14 @@ TRAIT_PROFILE_SCRIPT  = os.path.join(WORKFLOW_DIR, "scripts", "40_annotation", "
 TRAIT_RULES_TSV       = os.path.join(WORKFLOW_DIR, "scripts", "40_annotation", "trait_rules_v1.tsv")
 TRAIT_GENES_TSV       = os.path.join(WORKFLOW_DIR, "scripts", "40_annotation", "trait_genes_v1.tsv")
 TRAITS_SUMMARY_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "90_report", "traits_summary.py")
+# The per-strain Excel workbooks (rules amr_workbook and traits_workbook in
+# shared/90_report.smk). final_reports.py reads results earlier stages wrote and
+# makes no new gene call; it runs in envs/report.yaml, which brings XlsxWriter.
+FINAL_REPORT_SCRIPT   = os.path.join(WORKFLOW_DIR, "scripts", "90_report", "final_reports.py")
+# The two helpers rule multiqc runs before MultiQC itself: the tool versions of
+# the Software Versions section, and the References section of the report.
+MULTIQC_VERSIONS_SCRIPT  = os.path.join(WORKFLOW_DIR, "scripts", "90_report", "multiqc_versions.py")
+MULTIQC_CITATIONS_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "90_report", "multiqc_citations.py")
 
 
 # ──────────────────── 3a. Resource accessors ───────────────────
@@ -827,9 +835,19 @@ MOBILOME_REPLICONS       = MOBILOME_DIR + "/{sample}_replicon_calls.tsv"
 MOBILITY_TABLE           = MOBILOME_DIR + "/{sample}_amr_mobility.tsv"   # THE deliverable
 MOBILITY_AUDIT           = MOBILOME_DIR + "/{sample}_amr_mobility_audit.tsv"
 
-# Closes the numbered stage list started above; the mobilome paths sit in between
-# because they are all built off DIR_MOBILOME.
+# The last two numbered stages, continuing the list started above; the mobilome
+# paths sit in between because they are all built off DIR_MOBILOME.
 DIR_REPORT     = OUT + "/09.report"      # multiqc
+
+# 10.workbooks — the per-strain Excel workbooks: {sample}_amr.xlsx in every run,
+# and {sample}_traits.xlsx with traits.run. They gather results of several
+# stages, so they come last. Each workbook is declared as a FILE output, never
+# the folder as a directory() output: Snakemake deletes a directory() output
+# before its rule runs again, which would remove every other strain's workbook
+# whenever one is made again.
+DIR_WORKBOOKS   = OUT + "/10.workbooks"
+AMR_WORKBOOK    = DIR_WORKBOOKS + "/{sample}_amr.xlsx"
+TRAITS_WORKBOOK = DIR_WORKBOOKS + "/{sample}_traits.xlsx"
 
 # Cross-cutting output locations, sitting alongside the numbered stages rather
 # than inside any one of them. Needed as of this file (not before): v1's rules
@@ -892,12 +910,14 @@ GENOMAD_PREFIX = os.path.splitext(os.path.basename(FINAL_CONTIGS))[0]   # "conti
 GENOMAD_DB_DIR          = DIR_PHAGES + "/genomad_db"            # produced by rule genomad_db
 GENOMAD_DIR             = DIR_PHAGES + "/genomad/{sample}"      # produced by rule genomad_end_to_end (a DIRECTORY)
 GENOMAD_VIRUS_FASTA     = GENOMAD_DIR + "/" + GENOMAD_PREFIX + "_summary/" + GENOMAD_PREFIX + "_virus.fna"
+GENOMAD_VIRUS_SUMMARY   = GENOMAD_DIR + "/" + GENOMAD_PREFIX + "_summary/" + GENOMAD_PREFIX + "_virus_summary.tsv"   # read by the workbooks
 GENOMAD_PLASMID_SUMMARY = GENOMAD_DIR + "/" + GENOMAD_PREFIX + "_summary/" + GENOMAD_PREFIX + "_plasmid_summary.tsv"
 
 # VirSorter2 — the default virus caller, and the only one that runs unless
 # config.phage.caller is set to genomad.
 VS2_DB_DIR = DIR_PHAGES + "/vs2_db"                             # produced by rule virsorter2_db
 VS2_DIR    = DIR_PHAGES + "/virsorter/{sample}"                 # produced by rule viral_identification_virsorter2 (a DIRECTORY)
+VS2_BOUNDARY = VS2_DIR + "/final-viral-boundary.tsv"            # each region's ends on its contig, read by the workbooks
 
 # CheckV — completeness/contamination QC of whichever caller's virus calls.
 # ALWAYS this path: "the CheckV database this run uses". Exactly one of two
@@ -1840,9 +1860,13 @@ BAKTFOLD_DB_DIR = DIR_ANNOTATION + "/baktfold/databases"
 #   TRAIT_GENES, TRAIT_PROFILE,
 #   TRAIT_PROFILE_AUDIT         : the three tables of rule trait_profile, in
 #                                 04.annotation/traits/{sample}/.
+#   TRAIT_PROVENANCE            : the fingerprints of the catalogue files and
+#                                 of those three tables, written with them by
+#                                 rule trait_profile and checked by rules
+#                                 traits_summary and traits_workbook.
 #   TRAITS_SUMMARY(_MQC)        : the cross-sample table of rule traits_summary
-#                                 in 09.report, and the same calls as numbers
-#                                 for MultiQC.
+#                                 in 09.report, and the folder of MultiQC plot
+#                                 files it writes beside it.
 TRAITS_MAX_GENE_GAP = _config_number(
     "traits.max_gene_gap", _traits_cfg.get("max_gene_gap"),
     default=10, convert=int,
@@ -2019,8 +2043,9 @@ TRAIT_HITS          = DIR_TRAITS + "/{sample}/{sample}_ecofolddb_hits.tsv" # tem
 TRAIT_GENES         = DIR_TRAITS + "/{sample}/{sample}_trait_genes.tsv"
 TRAIT_PROFILE       = DIR_TRAITS + "/{sample}/{sample}_trait_profile.tsv"
 TRAIT_PROFILE_AUDIT = DIR_TRAITS + "/{sample}/{sample}_trait_profile_audit.tsv"
+TRAIT_PROVENANCE    = DIR_TRAITS + "/{sample}/{sample}_trait_provenance.json"
 TRAITS_SUMMARY      = DIR_REPORT + "/traits_summary.tsv"
-TRAITS_SUMMARY_MQC  = DIR_REPORT + "/traits_summary_mqc.tsv"
+TRAITS_SUMMARY_MQC  = DIR_REPORT + "/traits_summary_mqc"
 
 
 # ── eggNOG-mapper --dbmem (opt-in RAM acceleration) ──
@@ -2785,6 +2810,10 @@ def _downstream_targets():
         *expand(DIR_PHAGES + "/checkv/{sample}", sample=SAMPLES),
         # 09.report — MultiQC
         DIR_REPORT + "/multiqc_report.html",
+        # 10.workbooks — one AMR workbook per strain, in every run. Without the
+        # opt-in mobilome module it still reports the database hits and their
+        # plasmid and phage context; its ICE/IME columns then read not_assessed.
+        *expand(AMR_WORKBOOK, sample=SAMPLES),
     ]
     # Mapping QC exists wherever real reads were mapped. Contigs mode maps the
     # contigs against themselves purely to give BlobTools a coverage track, and a
@@ -2824,7 +2853,11 @@ def _downstream_targets():
             *expand(TRAIT_PROFILE, sample=SAMPLES),
             *expand(TRAIT_PROFILE_AUDIT, sample=SAMPLES),
             *expand(TRAIT_GENES, sample=SAMPLES),
+            *expand(TRAIT_PROVENANCE, sample=SAMPLES),
             TRAITS_SUMMARY,
+            # The same calls with their genes, caveats, assays and references,
+            # one workbook per strain (10.workbooks/{sample}_traits.xlsx).
+            *expand(TRAITS_WORKBOOK, sample=SAMPLES),
         ]
     # Mobilome module (08.mobilome) is opt-in and default OFF: config.mobilome.run
     # is what puts its targets in this list, and therefore what puts its 22 rules
