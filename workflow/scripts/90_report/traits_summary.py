@@ -105,7 +105,8 @@ LEGEND = (
 PARENT_DESCRIPTION = (
     "<p>Traits predicted from each strain's genes (the BacFlux trait profile). A "
     "call says that the genes behind a trait are present; it does not show that the "
-    "strain expresses the trait.</p>"
+    "strain expresses the trait, and it says nothing about whether the strain is safe "
+    "to use: see its taxonomy and its AMR workbook (10.workbooks).</p>"
     + LEGEND +
     "<p>The heatmaps group the traits by the catalogue's application label, with "
     "each trait's ID on the axis and its name listed above the heatmap. Traits "

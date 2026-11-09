@@ -1689,6 +1689,9 @@ def build_traits_workbook(args):
         {"item": "Laboratory assays", "value": "not compared",
          "note": "these are predictions from the genome; the assay column suggests how to "
                  "test each trait"},
+        {"item": "Safety", "value": "not assessed here",
+         "note": "a trait call says nothing about whether the strain is safe to use: see the "
+                 "GTDB taxon above and the strain's AMR workbook"},
         {"item": "How to read the context answers", "value": "yes / no / uncertain / not_assessed",
          "note": ANSWER_NOTE},
     ]

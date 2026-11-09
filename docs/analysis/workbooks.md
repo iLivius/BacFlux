@@ -204,8 +204,9 @@ the three trait tables, as they were when the calls were made. If any of these f
 changed since, the workbook stops and asks for rule `trait_profile` to be run again, so
 a caveat or a reference is never shown beside a call made with another version of the
 catalogue. Only contents are compared, so an output folder that has been moved still
-passes. The `Summary` sheet states that laboratory assays were not compared: the
-workbook takes no laboratory results.
+passes. The `Summary` sheet states that laboratory assays were not compared, since the
+workbook takes no laboratory results, and that safety is not assessed there: a trait
+call says nothing about whether the strain is safe to use.
 
 ## Working with the files
 

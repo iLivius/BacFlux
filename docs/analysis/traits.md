@@ -389,6 +389,14 @@ listed in `structure_only`, the call rests on a structure hit alone, with no nam
 confirming it; only a gene whose `s_alone` is `yes`, such as `nosZ`, can count this
 way, so `acdS` always needs a name.
 
+**A call says nothing about safety.** The genes behind a plant-beneficial trait are not
+confined to harmless bacteria: pyoverdine, a siderophore of the catalogue, is also a
+virulence factor of *Pseudomonas aeruginosa*
+([Meyer et al. 1996](https://doi.org/10.1128/iai.64.2.518-523.1996)). Whether a strain can
+be used rests on its taxonomy and risk group, and on its resistance and virulence genes and
+their mobility ([AMR workbook](workbooks.md#the-amr-workbook)), not on how many traits it
+carries. The trait profile ranks nothing.
+
 **`context` describes the strain, not a product claim.** The `application` column
 gives each trait the use it points to. `context` marks a trait whose call describes
 the strain's metabolism but does not, on its own, support a biofertiliser,
