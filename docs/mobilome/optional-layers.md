@@ -327,9 +327,9 @@ Two practical uses. **Keep the file with the results** — it is the line a meth
 section needs, and it is the only record that exists. And **check it when two runs
 disagree**: a different checksum on the same URL is the first thing to rule out.
 
-`conjscan_models`, the module's always-on model fetch, writes none. It installs a
-*versioned* package through `msf_data install`, so the version is already
-recoverable.
+`conjscan_models`, the module's always-on model fetch, writes one too,
+`08.mobilome/conjscan_models/PROVENANCE.txt`: the version requested and installed,
+the address of the release archive, the fetch date and the licence.
 
 !!! note "Only two of the four can be pinned in advance"
 

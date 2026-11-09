@@ -47,10 +47,11 @@ Platon's replicon calls from `06.plasmids`. Nothing in it re-detects a plasmid o
 
 !!! note "The first run needs network access"
 
-    The CONJscan model package is fetched at run time by `msf_data install`. It is a
-    *versioned* package, so unlike the optional layers it needs no `PROVENANCE.txt` —
-    the version is already recoverable. The rule writes the models' licence notice to
-    the top of its own log.
+    The CONJscan model package is downloaded at run time: rule `conjscan_models`
+    fetches the archive of the pinned release, CONJScan 2.1.0, from github.com and
+    installs it with MacSyFinder's `msf_data install`. Its `PROVENANCE.txt` records the
+    version, the address it came from and the date, and the rule writes the models'
+    licence notice to the top of its own log.
 
 ## What runs in which mode
 

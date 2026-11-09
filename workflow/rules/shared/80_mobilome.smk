@@ -623,6 +623,29 @@ if MOBILOME_RUN:
     # Produces: 08.mobilome/conjscan_models/ — one shared copy for all samples.
     # Consumed by: conjscan.
     #
+    # How it fetches: the archive of the pinned CONJScan release is downloaded
+    # from github.com, and msf_data (MacSyFinder's model installer) installs that
+    # file. msf_data can fetch the package itself, but it asks GitHub's API, which
+    # answers 60 requests an hour per address to a client without a login, and
+    # msf_data has no way to log in. A shared server or an institutional gateway
+    # can use up that allowance without a single request from BacFlux, and the
+    # fetch then fails. A download from github.com itself is not counted against
+    # that allowance, and the models msf_data installs from the downloaded file are
+    # the same files it installs when it fetches the package itself.
+    # The download uses the environment's own Python, so no download tool is
+    # needed; -I keeps that Python from reading the user's Python settings or a
+    # module of the same name in the current folder. The file must be named
+    # CONJScan-<version>.tar.gz, because msf_data reads the package name and the
+    # version from the file name. It is downloaded into the models folder and
+    # deleted there once installed (msf_data unpacks it in a cache folder of its
+    # own, so the two never meet). If any step fails, Snakemake deletes the whole
+    # models folder, as for any failed job.
+    # The archive is deliberately not declared as a temp() output: Snakemake
+    # checks a job's code and parameters only when it holds a record for every
+    # output of the job, and a deleted temp() file has none, so a later change of
+    # CONJSCAN_VERSION would no longer fetch the new models in an existing output
+    # folder.
+    #
     # GOTCHA: `macsydata` is DEPRECATED in MacSyFinder 2.1.6 and prints a rename
     # warning; the current command is `msf_data`. The shell prefers msf_data and
     # falls back, so the rule works across both spellings.
@@ -643,11 +666,14 @@ if MOBILOME_RUN:
             # no diff in this repository to explain it. 2.1.0 is what produced the
             # results in docs/mobilome/validation.md, including the MOBM call that did
             # not exist before it. Raising this pin is a decision to re-validate.
-            #
-            # msf_data/macsydata accept a PEP 508 requirement, and resolve versions from
-            # the model repository's TAGS — which is why the releases page shows fewer
-            # versions than are installable.
             version = CONJSCAN_VERSION,
+            # The archive GitHub builds for the version's tag in the macsy-models
+            # organisation, so the pin above alone decides which models are
+            # installed. CONJScan's versions are the TAGS of its repository; its
+            # releases page shows fewer of them.
+            url = f"https://github.com/macsy-models/CONJScan/archive/refs/tags/{CONJSCAN_VERSION}.tar.gz",
+            # The name msf_data reads the package and the version from.
+            archive = f"CONJScan-{CONJSCAN_VERSION}.tar.gz",
         log:
             LOGS + "/mobilome_conjscan_models.log"
         shell:
@@ -658,11 +684,15 @@ if MOBILOME_RUN:
               echo "NOTE: these models are licensed CC BY-NC-SA 4.0 (Institut Pasteur/CNRS) - academic / non-commercial use only. They are downloaded here at your request and are never redistributed by BacFlux."
             }} > {log}
 
+            python -I -c 'import sys, urllib.request; urllib.request.urlretrieve(sys.argv[1], sys.argv[2])' \
+              {params.url:q} {output.models}/{params.archive} >> {log} 2>&1
+
             if command -v msf_data >/dev/null 2>&1; then
-                msf_data install --target {output.models} 'CONJScan=={params.version}' >> {log} 2>&1
+                msf_data install --target {output.models} {output.models}/{params.archive} >> {log} 2>&1
             else
-                macsydata install --target {output.models} 'CONJScan=={params.version}' >> {log} 2>&1
+                macsydata install --target {output.models} {output.models}/{params.archive} >> {log} 2>&1
             fi
+            rm -f {output.models}/{params.archive}
 
             # Provenance, for the same reason every other database rule writes one:
             # this package is versioned upstream but not dated, and its profiles decide
@@ -670,6 +700,7 @@ if MOBILOME_RUN:
             {{
               echo "CONJScan model package"
               echo "requested version : {params.version}"
+              echo "downloaded from   : {params.url}"
               echo "installed         : $(grep -h '^vers' {output.models}/CONJScan/metadata.yml 2>/dev/null | head -1)"
               echo "fetched           : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               echo "licence           : CC BY-NC-SA 4.0 (Institut Pasteur / CNRS), academic and non-commercial use only"
@@ -778,8 +809,8 @@ if MOBILOME_RUN:
         #           samples — plus PROVENANCE.txt.
         # Consumed by: icescan.
         #
-        # Why not `msf_data install` as conjscan_models does: ICEscan is not
-        # published in the macsy-models registry that command reads. It is
+        # Why not a release archive from GitHub, as conjscan_models does: ICEscan
+        # is not published in the macsy-models organisation there. It is
         # distributed inside ICEfinder2's database bundle, so it has to be
         # downloaded and unpacked by hand.
         #

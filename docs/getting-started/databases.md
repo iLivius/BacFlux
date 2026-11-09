@@ -264,8 +264,8 @@ but built, by the next run that screens a sample; `download_all` does not build 
 
 The optional mobilome module fetches up to five more data sets — the CONJscan models
 whenever the module runs, and ICEscan, TnCentral, ICEberg and ISOSDB only when you
-configure a source for each. Each has its own `dir:` key for a copy you already hold,
-and each writes a `PROVENANCE.txt` recording what actually arrived. See
+configure a source for each. Those four each have a `dir:` key for a copy you already
+hold, and all five write a `PROVENANCE.txt` recording what actually arrived. See
 [Optional layers](../mobilome/optional-layers.md).
 
 ## Practical notes

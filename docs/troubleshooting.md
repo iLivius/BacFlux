@@ -324,33 +324,29 @@ and [Plasmids](analysis/plasmids.md#before-you-conclude-a-plasmid-is-absent).
 
 !!! warning "Symptom"
 
-    The first run with `mobilome.run: true` fails at rule `conjscan_models`:
+    The first run with `mobilome.run: true` fails at rule `conjscan_models`, and its
+    log, `logs/mobilome_conjscan_models.log`, ends in a network error such as
+    `urllib.error.URLError` or `HTTP Error 404`.
 
-    ```text
-    You reach the maximum number of request per hour to github.
-    Please wait before to try again.
-    ```
+**Cause.** The CONJscan models are not shipped with BacFlux. Rule `conjscan_models`
+downloads the archive of the pinned release, CONJScan 2.1.0, from github.com and
+installs it with `msf_data install`. It runs on the computer that runs Snakemake,
+which therefore has to reach github.com.
 
-**Cause.** The CONJscan models are not shipped with BacFlux; they are fetched at
-your request by `msf_data install` (`macsydata install` on older MacSyFinder),
-which reads `https://api.github.com` over an **unauthenticated** connection and
-turns the HTTP 403 you get for exceeding the hourly allowance into that message
-(class `RemoteModelIndex` in `macsylib/model_package.py`: its `base_url`, and its
-`_url_json` method). GitHub counts the allowance per IP
-address, so a shared machine or an institutional gateway can use it up without you
-making a single request yourself.
+**Fix.** Check that this computer can reach `https://github.com`, through your site's
+proxy if it has one (the `https_proxy` setting is honoured), then relaunch. On a
+cluster, the [preparation](reference/running.md#cluster-preparation) fetches it with
+every other download before the jobs start. The rule fails rather than leaving an
+empty models directory behind, so nothing downstream runs on a model set that was
+never installed. The models land in `08.mobilome/conjscan_models/`, are shared by
+every sample, and are never fetched again for that output directory once they are
+there.
 
-**Fix.** Wait, then relaunch. The rule fails rather than leaving an empty models
-directory behind, so nothing downstream runs on a model set that was never
-installed. The models land in `08.mobilome/conjscan_models/`, are shared by every
-sample, and are never re-fetched for that output directory once they are there.
-
-This is the only download the module always makes; the naming layers are opt-in,
-and they come from ordinary web servers rather than GitHub. Their rules check what
-came back, because a redirect to an HTML error page arrives with a 200 and would
-otherwise be indexed as an empty database that silently names nothing — so each one
-stops with an error and prints the first bytes it received. Turning those layers on is
-covered in
+This is the only download the module always makes; the naming layers are opt-in.
+Their rules check what came back, because a redirect to an HTML error page arrives
+with a 200 and would otherwise be indexed as an empty database that silently names
+nothing — so each one stops with an error and prints the first bytes it received.
+Turning those layers on is covered in
 [Optional layers](mobilome/optional-layers.md#what-the-download-rules-do-besides-downloading).
 
 ## A tool runs inside the workflow but not by hand

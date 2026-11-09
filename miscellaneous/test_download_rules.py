@@ -48,7 +48,8 @@ from test_python_environments import REPO_ROOT, RULES_DIR, conda_path, read_rule
 # The rules that download without running wget or curl themselves, by name:
 #   secondary_metabolites_db  download-antismash-databases, a command of antiSMASH
 #   virsorter2_db             `virsorter setup`, which runs wget itself
-#   conjscan_models           msf_data (MacSyFinder's model installer)
+#   conjscan_models           the environment's Python, which downloads the CONJScan
+#                             release archive that msf_data then installs
 #   check_medaka_model        medaka_model_check.py, which makes Medaka store the
 #                             weights of the model it uses
 #   structure_annotation_db   `baktfold install`, which fetches Baktfold's database

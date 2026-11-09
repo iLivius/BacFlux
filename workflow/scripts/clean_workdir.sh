@@ -369,16 +369,10 @@ case "$WORKFLOW" in
       # the workflow fetches them at the user's request rather than shipping
       # them.
       #
-      # conjscan_models is the one worth pausing over, because it is the only
-      # entry here with no local-copy escape hatch in the config. Rule
-      # conjscan_models (shared/80_mobilome.smk) always installs the CONJScan
-      # package with `macsydata`/`msf_data install`, which pulls it from the
-      # macsy-models organisation through the GitHub API — 60 requests per hour
-      # for an unauthenticated client, counted PER HOST and shared with
-      # everything else running on that machine. Delete this and the next
-      # mobilome run has to fetch it again; a host that has already run several
-      # mobilome jobs can exhaust the hourly budget and fail at the fetch.
-      # Consider keeping this directory if another run is due soon.
+      # conjscan_models is the only entry here with no local-copy setting in
+      # the config. Delete it and the next mobilome run downloads it again: the
+      # archive of the pinned CONJScan release, about 3 MB from github.com (rule
+      # conjscan_models in shared/80_mobilome.smk).
       #
       # The other four can all be re-supplied from a copy you already hold,
       # without a download: mobilome.icescan.dir, mobilome.tncentral.dir,
