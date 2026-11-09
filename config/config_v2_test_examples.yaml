@@ -52,7 +52,7 @@ directories:
 links:
   phix_link: https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
   dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
-  card_link: https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2
+  card_link: https://card.mcmaster.ca/download/0/broadstreet-v4.0.2.tar.bz2
   checkv_link: https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz
 resources:
   threads: 8
@@ -119,7 +119,7 @@ directories:
 links:
   phix_link: https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
   dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
-  card_link: https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2
+  card_link: https://card.mcmaster.ca/download/0/broadstreet-v4.0.2.tar.bz2
   checkv_link: https://zenodo.org/records/21510554/files/checkv-db-v1.5.tar.gz
 resources:
   threads: 8

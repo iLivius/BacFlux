@@ -7,7 +7,7 @@ measurement of antimicrobial susceptibility.
 
 | Analysis | Input | Database | Reporting criterion | Modes |
 |---|---|---|---|---|
-| **ABRicate** | the finished contigs | eight curated sets, one run each | ≥80% identity over ≥70% of the reference gene | all four |
+| **ABRicate** | the finished contigs | four curated databases, one run each | ≥80% identity over ≥70% of the reference gene | all four |
 | **BBMap → CARD** | the trimmed read pairs | CARD protein homolog model | ≥70% of the reference gene's **length** covered by reads | `illumina`, `hybrid` |
 | **AMRFinderPlus** | Bakta's proteins + the contigs | NCBI's AMRFinderPlus database | AMRFinderPlus's own per-gene curated cutoffs | all four, *optional* |
 
@@ -19,9 +19,9 @@ output lands in `08.mobilome` rather than `05.amr` — see
 **Why three.** Assembly collapses repeats, so a gene present in several copies —
 or one sitting on a repeat-rich mobile element that broke the assembly — can be
 under-represented or missing in the contigs while sitting plainly in the reads.
-Mapping side-steps the assembly entirely. ABRicate gives breadth across eight
-independently curated gene sets and is the analysis carrying the EFSA reporting
-thresholds. AMRFinderPlus gives each call a coordinate, a method label and a
+Mapping side-steps the assembly entirely. ABRicate gives breadth across three
+independently curated resistance databases, plus one of virulence factors, and is
+the analysis carrying the EFSA reporting thresholds. AMRFinderPlus gives each call a coordinate, a method label and a
 drug class, which is what the mobility analysis needs to intersect AMR genes with
 mobile elements, and it is the only analysis that can report resistance-conferring
 **point mutations**.
@@ -35,6 +35,7 @@ None of the three replaces another, and their counts are not meant to agree.
     | **CARD** | Comprehensive Antibiotic Resistance Database |
     | **EFSA** | European Food Safety Authority |
     | **GTDB** | Genome Taxonomy Database, the reference taxonomy GTDB-Tk classifies against |
+    | **VFDB** | Virulence Factor Database |
 
 ## ABRicate on the contigs
 
@@ -45,17 +46,33 @@ resistance or virulence database and reports every hit clearing the cutoffs. It
 consumes nothing but the finished assembly, so it behaves identically in all four
 modes, including [`contigs`](../modes/contigs.md).
 
-The same contigs are screened against each database separately and the eight
+The same contigs are screened against each database separately and the four
 tables are kept side by side rather than merged:
 
-```
-argannot  card  ecoh  ecoli_vf  megares  ncbi  resfinder  vfdb
-```
+| Database | What it holds |
+|---|---|
+| `card` | CARD's resistance genes, its protein homolog model |
+| `ncbi` | the resistance genes of NCBI's Reference Gene Catalog, the database AMRFinderPlus uses |
+| `resfinder` | ResFinder's acquired resistance genes ([Zankari et al. 2012](https://doi.org/10.1093/jac/dks261)) |
+| `vfdb` | VFDB's core set: virulence factors verified by experiment ([Zhou et al. 2025](https://doi.org/10.1093/nar/gkae968)) |
+
+All four are maintained and curated. ABRicate ships its own copy of each, and the
+date it gives for that copy is written to `05.amr/abricate/abricate_databases.tsv`.
+ABRicate also ships databases BacFlux does not run: ARG-ANNOT and the two *E. coli*
+sets, EcOH and E. coli VF, have not been updated since 2019 or earlier, and MEGARes
+is compiled largely from the three resistance databases above, for sorting reads
+from metagenomes.
+
+VFDB collects the virulence factors of pathogens. Many of them, such as flagella,
+pili, adhesins and iron uptake systems, are also carried by harmless bacteria,
+which need them to live in their niche
+([Hill 2012](https://doi.org/10.1128/JB.00980-12)). A VFDB hit is therefore not
+evidence that a strain is a pathogen.
 
 Different databases cover different gene sets, and merging them would hide which
-resource made a call. `abricate --summary` then collapses one sample's eight
+resource made a call. `abricate --summary` then collapses one sample's four
 tables into a presence/absence matrix, gene by database — the readable overview of
-the whole screen for that isolate. Its column order follows the database order
+the whole screen for that isolate. Its columns follow the order of the table
 above.
 
 ```bash
@@ -85,7 +102,7 @@ blanket 80/70 across all three would fight that curation.
 ## CARD read mapping
 
 *Rules `download_amr_db` (or `download_amr_db_local`), `map_amr_db`,
-`card_mapping_report`. BBMap v39.33, tested against CARD v4.0.1.*
+`card_mapping_report`. BBMap v39.33, tested against CARD v4.0.2.*
 
 Short-read modes only — `illumina` and `hybrid`. The gate is a capability flag,
 "does this mode produce short reads", not a mode name, so `nanopore` and
@@ -392,8 +409,9 @@ distribution analysis plus phenotypic testing.
 
 Where the three analyses do line up with the guidance: EFSA (2024a) requires the AMR
 search to run against at least two maintained, curated databases at ≥80% identity and
-≥70% length coverage. BacFlux queries eight ABRicate resources covering AMR, virulence
-and serotyping; these are not eight independent AMR databases. CARD mapping is added
+≥70% length coverage, and asks for virulence genes to be screened against up-to-date
+databases. Through ABRicate, BacFlux queries three maintained, curated AMR databases
+(CARD, NCBI and ResFinder) and VFDB for virulence genes. CARD mapping is added
 when short reads are available, and AMRFinderPlus when the mobilome module is enabled.
 The 80%/70% thresholds apply to ABRicate; the other analyses use their stated criteria.
 These query counts alone do not establish compliance with a guidance document.
@@ -405,7 +423,7 @@ For what happens to an AMR call once the mobilome module has it, see
 
 | Path under `output_dir` | Modes |
 |---|---|
-| `05.amr/abricate/{sample}/{db}.tsv` (×8) | all four |
+| `05.amr/abricate/{sample}/{db}.tsv` (×4) | all four |
 | `05.amr/abricate/{sample}/AMR_summary.txt` | all four |
 | `05.amr/abricate/abricate_databases.tsv` (ABRicate's version and the date of its copy of each database) | all four |
 | `05.amr/mapping/{sample}/{sample}_CARD_report.tsv` | `illumina`, `hybrid` |
@@ -416,9 +434,9 @@ For what happens to an AMR call once the mobilome module has it, see
 | `08.mobilome/{sample}/{sample}_amrfinder_organism_audit.tsv` | all four, `mobilome.run: true` |
 | `10.workbooks/{sample}_amr.xlsx` | all four |
 
-The workbook gathers the CARD, ResFinder and ARG-ANNOT hits of each gene into one row,
-with its plasmid, ICE/IME and phage context; see
-[Per-strain workbooks](workbooks.md#the-amr-workbook).
+The workbook gathers the CARD, NCBI and ResFinder hits of each resistance gene into one
+row, and VFDB's hits into one row per virulence gene, each with its plasmid, ICE/IME and
+phage context; see [Per-strain workbooks](workbooks.md#the-amr-workbook).
 
 ## References
 
@@ -445,6 +463,14 @@ with its plasmid, ICE/IME and phage context; see
   <https://doi.org/10.1093/nar/gkac920>
 - Feldgarden, M. *et al.* (2021). AMRFinderPlus and the Reference Gene Catalog.
   *Scientific Reports* 11:12728. <https://doi.org/10.1038/s41598-021-91456-0>
+- Zankari, E. *et al.* (2012). Identification of acquired antimicrobial resistance
+  genes. *Journal of Antimicrobial Chemotherapy* 67(11):2640–2644.
+  <https://doi.org/10.1093/jac/dks261>
+- Zhou, S. *et al.* (2025). VFDB 2025: an integrated resource for exploring
+  anti-virulence compounds. *Nucleic Acids Research* 53(D1):D871–D877.
+  <https://doi.org/10.1093/nar/gkae968>
+- Hill, C. (2012). Virulence or niche factors: what's in a name? *Journal of
+  Bacteriology* 194(21):5725–5727. <https://doi.org/10.1128/JB.00980-12>
 - Seemann, T. ABRicate. <https://github.com/tseemann/abricate>
 - Bushnell, B. BBMap. <https://sourceforge.net/projects/bbmap/>
 

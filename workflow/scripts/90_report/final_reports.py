@@ -8,9 +8,11 @@ that answers, for every antimicrobial-resistance (AMR) gene in the genome:
 which gene it is, how close the match is, and whether it could move to another
 bacterium. That last question depends on where the gene sits: on a plasmid,
 inside an integrative and conjugative or mobilisable element (ICE or IME), or
-inside a phage or prophage. With the trait profile on (traits.run), a second
-workbook lists the strain's predicted plant-beneficial and bioremediation
-traits, with the genes, caveats, suggested assays and references behind each.
+inside a phage or prophage. The same workbook lists the strain's virulence
+genes, found in VFDB, with the same three answers. With the trait profile on
+(traits.run), a second workbook lists the strain's predicted plant-beneficial
+and bioremediation traits, with the genes, caveats, suggested assays and
+references behind each.
 
 Both workbooks are a view of results BacFlux has already produced. This
 script makes no new gene call. It reads the tables of earlier stages, groups
@@ -92,16 +94,44 @@ MISSING_VALUES = {"", "NA", "N/A", "."}
 
 # ── The AMR databases ────────────────────────────────────────────────────────
 
-# The three ABRicate databases the AMR workbook reports, each with the name
-# ABRicate writes in its own DATABASE column. BacFlux runs ABRicate against more
-# databases (rule amr_contigs in shared/50_amr.smk); these three are the
-# collections of resistance genes, which EFSA's guidance on whole-genome
-# sequencing asks to search with at least two maintained databases.
-ABRICATE_DATABASES = (
+# The four ABRicate databases BacFlux runs (DATABASES in 00_common.smk, rule
+# amr_contigs in shared/50_amr.smk), each with the name ABRicate writes in its own
+# DATABASE column.
+# Resistance genes come from three maintained, curated collections, since EFSA's
+# guidance on whole-genome sequencing asks for at least two: CARD; NCBI, the
+# Reference Gene Catalog AMRFinderPlus uses, of which ABRicate's copy holds the
+# resistance genes; and ResFinder, a collection of acquired resistance genes.
+# Their hits of one gene are grouped into one row of AMR_loci.
+RESISTANCE_DATABASES = (
     ("CARD", "card"),
+    ("NCBI", "ncbi"),
     ("ResFinder", "resfinder"),
-    ("ARG-ANNOT", "argannot"),
 )
+# Virulence genes come from VFDB's core set of experimentally verified virulence
+# factors. Its hits are grouped on their own, into Virulence_loci, so a virulence
+# gene never joins a resistance gene's row.
+VIRULENCE_DATABASES = (
+    ("VFDB", "vfdb"),
+)
+ABRICATE_DATABASES = RESISTANCE_DATABASES + VIRULENCE_DATABASES
+
+# VFDB describes each reference gene with its virulence factor and that
+# factor's category, each followed by VFDB's ID, and then the organism the
+# reference sequence came from, as in
+#   (fimH) type 1 fimbrial adhesin precursor [Type I fimbriae (VF0566) -
+#   Adherence (VFC0001)] [Klebsiella pneumoniae subsp. pneumoniae NTUH-K2044]
+# ABRicate copies this text into its PRODUCT column. The factor, the category
+# and the organism are read out into columns of their own, so the sheet can be
+# sorted and filtered by them (vfdb_fields() below).
+# VFDB_FACTOR finds "[factor (VF...) - category (VFC...)]": its four pieces are
+# the factor's name, its VF number, the category's name and its VFC number.
+# [^\[\]]+ means "any text without square brackets", so a match never runs
+# from one bracketed block into the next.
+# VFDB_ORGANISM takes the last bracketed block, the one closing the text, when it
+# follows another block.
+VFDB_FACTOR = re.compile(r"\[([^\[\]]+) \((VF\d+)\) - ([^\[\]]+) \((VFC\d+)\)\]")
+VFDB_ORGANISM = re.compile(r"\]\s*\[([^\[\]]+)\]\s*$")
+
 ABRICATE_COLUMNS = (
     "SEQUENCE", "START", "END", "STRAND", "GENE", "COVERAGE", "COVERAGE_MAP",
     "GAPS", "%COVERAGE", "%IDENTITY", "DATABASE", "ACCESSION", "PRODUCT",
@@ -118,9 +148,8 @@ SAME_GENE_FRACTION = 0.80
 
 # The AMRFinderPlus rows matched to the database loci. AMR is a resistance gene;
 # STRESS covers biocide and metal resistance, such as the quaternary-ammonium
-# efflux gene qacEdelta1, which CARD, ResFinder and ARG-ANNOT list as resistance
-# genes too. Point mutations are left out although their element type is AMR:
-# their method (amrfinder_method POINTP, POINTX, ...) says AMRFinderPlus found a
+# efflux gene qacEdelta1, which CARD lists as a resistance gene. Point mutations
+# are left out although their element type is AMR: their method (amrfinder_method POINTP, POINTX, ...) says AMRFinderPlus found a
 # mutation in a gene every strain of the species carries, such as gyrA, and
 # their coordinates are the whole gene's, so a database hit on that gene would
 # otherwise take the mutation's name and tier. VIRULENCE rows and point
@@ -421,7 +450,7 @@ def counted_answers(rows, column):
 def read_abricate(path, database, database_word, output_root):
     """Read one ABRicate result table into a list of hits.
 
-    Takes in: 05.amr/abricate/{sample}/{card,resfinder,argannot}.tsv, from rule
+    Takes in: 05.amr/abricate/{sample}/{card,ncbi,resfinder,vfdb}.tsv, from rule
               amr_contigs (shared/50_amr.smk), which runs ABRicate on the final
               contigs at 80 % identity and 70 % coverage of the reference.
     Gives back: one dict per row, with the coordinates as numbers and every
@@ -466,10 +495,14 @@ def read_abricate(path, database, database_word, output_root):
     return hits
 
 
-def group_hits_into_loci(hits, sample):
+def group_hits_into_loci(hits, sample, databases):
     """Group the database hits of one gene into one locus.
 
-    Takes in: the hits of all three databases (read_abricate).
+    Takes in: the hits of one group of databases (read_abricate): those of the
+              three resistance databases for AMR_loci, or VFDB's for
+              Virulence_loci; and that group, RESISTANCE_DATABASES or
+              VIRULENCE_DATABASES, whose order is the order of the names in
+              the "databases" column.
     Gives back: one dict per locus, sorted by contig and position, each with
               its hits under "hits"; every hit also gets its locus_id.
 
@@ -512,7 +545,7 @@ def group_hits_into_loci(hits, sample):
             home["hits"].append(hit)
         loci.extend(contig_loci)
 
-    database_order = [name for name, _word in ABRICATE_DATABASES]
+    database_order = [name for name, _word in databases]
     for locus in loci:
         # The ID is built from the anchor's coordinates, so it moves if a new
         # database version changes the longest hit.
@@ -525,6 +558,27 @@ def group_hits_into_loci(hits, sample):
     return loci
 
 
+def vfdb_fields(product):
+    """Read the virulence factor, its category and the source organism out of
+    VFDB's description of a gene (see VFDB_FACTOR above).
+
+    Takes in: the PRODUCT text of one VFDB hit.
+    Gives back: (factor, category, organism), each "NA" when the text does not
+              hold it. The factor and the category keep VFDB's IDs, as in
+              "Type I fimbriae (VF0566)" and "Adherence (VFC0001)", so they can
+              be looked up on VFDB's website.
+    """
+    factor = category = organism = "NA"
+    factor_match = VFDB_FACTOR.search(product)
+    if factor_match:
+        factor = f"{factor_match.group(1)} ({factor_match.group(2)})"
+        category = f"{factor_match.group(3)} ({factor_match.group(4)})"
+    organism_match = VFDB_ORGANISM.search(product)
+    if organism_match:
+        organism = organism_match.group(1)
+    return factor, category, organism
+
+
 def read_abricate_databases(path):
     """Read ABRicate's version and its database copies -> {database word: row}.
 
@@ -532,7 +586,7 @@ def read_abricate_databases(path):
               abricate_databases (shared/50_amr.smk): `abricate --list` (DATABASE,
               SEQUENCES, DBTYPE, DATE) with ABRicate's version as a last column.
     Gives back: one row per database, keyed by the name ABRicate uses (card,
-              resfinder, argannot, ...). DATE is the date ABRicate gives for its
+              ncbi, resfinder, vfdb, ...). DATE is the date ABRicate gives for its
               copy of the database, the closest thing to a database version it
               records. A result is reported with the database it came from and
               that database's version or date, so the workbook shows both.
@@ -609,7 +663,7 @@ def plasmid_answer(contig, replicon_calls, crashed):
                     under Platon's 1 kb minimum.
     """
     if contig not in replicon_calls:
-        raise ValueError(f"contig {contig!r} has a gene but no replicon call; the AMR "
+        raise ValueError(f"contig {contig!r} has a gene but no replicon call; the ABRicate "
                          "tables and the assembly do not belong together")
     call = replicon_calls[contig]
     replicon = call["replicon"].strip().lower()
@@ -1108,33 +1162,9 @@ RUN_QC_COLUMNS = [
 
 # ── The AMR workbook ─────────────────────────────────────────────────────────
 
-AMR_LOCUS_COLUMNS = [
-    ("sample", "BacFlux sample name, from the input file name"),
-    ("gtdb_taxon", "lowest rank GTDB-Tk assigned to the genome; the full lineage is on Summary"),
-    ("locus_id", "sample|contig:start-end of the longest database hit of the gene; it changes "
-                 "when those coordinates change, for example with a new database version"),
-    ("contig", "the contig carrying the gene"),
-    ("start", "first base of the longest database hit"),
-    ("end", "last base of the longest database hit"),
-    ("strand", "strand of the longest database hit, + or -"),
-    ("genes", "gene names given by the databases, longest hit first; databases often name "
-              "one gene differently"),
-    ("databases", "which of CARD, ResFinder and ARG-ANNOT found the gene"),
-    ("in_resfinder", "yes when ResFinder found the gene. ResFinder collects acquired "
-                     "resistance genes; a gene found only by CARD or ARG-ANNOT can be one "
-                     "every strain of the species carries, such as an efflux pump, a porin "
-                     "or a regulator"),
-    ("database_hits", "how many database hits were grouped into this locus (a hit joins the "
-                      "longest one when at least 80 % of it lies inside); each is a row on "
-                      "Database_hits"),
-    ("min_pct_identity", "lowest percent identity to the reference sequence among those hits"),
-    ("max_pct_identity", "highest percent identity among those hits"),
-    ("min_pct_coverage", "lowest percent of the reference length covered among those hits"),
-    ("max_pct_coverage", "highest percent of the reference length covered among those hits"),
-    ("products", "product descriptions given by the databases"),
-    ("resistance", "drug classes the databases attach to the gene (ABRicate's RESISTANCE column)"),
-    ("reference_accessions", "GenBank accessions, with coordinates, of the reference sequences "
-                             "the hits were made to; CARD's ARO numbers are not in ABRicate's output"),
+# The context columns: the three questions, with the evidence behind each. The
+# same for a resistance gene (AMR_loci) and a virulence gene (Virulence_loci).
+CONTEXT_COLUMNS = [
     ("replicon", "chromosome, plasmid or unknown: the replicon call for the contig, as the "
                  "mobilome module makes it (platon_replicons.py)"),
     ("plasmid", "is the gene on a plasmid? yes: the contig is called plasmid (by Platon, "
@@ -1163,6 +1193,37 @@ AMR_LOCUS_COLUMNS = [
               "overlaps no region"),
     ("phage_regions", "the virus caller's region(s) the answer rests on; see Viral_regions"),
     ("phage_evidence", "why, with the contig bases CheckV calls viral"),
+]
+
+AMR_LOCUS_COLUMNS = [
+    ("sample", "BacFlux sample name, from the input file name"),
+    ("gtdb_taxon", "lowest rank GTDB-Tk assigned to the genome; the full lineage is on Summary"),
+    ("locus_id", "sample|contig:start-end of the longest database hit of the gene; it changes "
+                 "when those coordinates change, for example with a new database version"),
+    ("contig", "the contig carrying the gene"),
+    ("start", "first base of the longest database hit"),
+    ("end", "last base of the longest database hit"),
+    ("strand", "strand of the longest database hit, + or -"),
+    ("genes", "gene names given by the databases, longest hit first; databases often name "
+              "one gene differently"),
+    ("databases", "which of CARD, NCBI and ResFinder found the gene"),
+    ("in_resfinder", "yes when ResFinder found the gene. ResFinder collects acquired "
+                     "resistance genes; a gene found only by CARD or NCBI can be one "
+                     "every strain of the species carries, such as a chromosomal "
+                     "cephalosporinase, an efflux pump, a porin or a regulator"),
+    ("database_hits", "how many database hits were grouped into this locus (a hit joins the "
+                      "longest one when at least 80 % of it lies inside); each is a row on "
+                      "Database_hits"),
+    ("min_pct_identity", "lowest percent identity to the reference sequence among those hits"),
+    ("max_pct_identity", "highest percent identity among those hits"),
+    ("min_pct_coverage", "lowest percent of the reference length covered among those hits"),
+    ("max_pct_coverage", "highest percent of the reference length covered among those hits"),
+    ("products", "product descriptions given by the databases"),
+    ("resistance", "drug classes the databases attach to the gene (ABRicate's RESISTANCE column)"),
+    ("reference_accessions", "accessions of the reference sequences the hits were made to: "
+                             "GenBank with coordinates for CARD, RefSeq for NCBI, GenBank or "
+                             "RefSeq for ResFinder; CARD's ARO numbers are not in ABRicate's output"),
+] + CONTEXT_COLUMNS + [
     ("amrfinderplus_genes", "AMRFinderPlus gene symbol(s) at the same position, from the "
                             "mobilome module (AMR and STRESS genes only)"),
     ("amrfinderplus_class", "AMRFinderPlus drug class"),
@@ -1176,10 +1237,41 @@ AMR_LOCUS_COLUMNS = [
     ("mobility_confidence", "the mobilome module's confidence in the tier: high, medium or low"),
 ]
 
+# The virulence genes: VFDB's hits of one gene grouped into one row, as for the
+# resistance genes, with the same context columns. VFDB is the only database
+# here, so there is no column saying which databases found the gene.
+VIRULENCE_LOCUS_COLUMNS = [
+    ("sample", "BacFlux sample name, from the input file name"),
+    ("gtdb_taxon", "lowest rank GTDB-Tk assigned to the genome; the full lineage is on Summary"),
+    ("locus_id", "sample|contig:start-end of the longest VFDB hit of the gene"),
+    ("contig", "the contig carrying the gene"),
+    ("start", "first base of the longest VFDB hit"),
+    ("end", "last base of the longest VFDB hit"),
+    ("strand", "strand of the longest VFDB hit, + or -"),
+    ("genes", "gene names given by VFDB, longest hit first"),
+    ("virulence_factors", "the virulence factor the gene belongs to, with VFDB's ID (VF...)"),
+    ("vf_categories", "VFDB's category of that factor, with its ID (VFC...), for example "
+                      "Adherence, Motility or Nutritional/Metabolic factor"),
+    ("reference_organisms", "the organism VFDB's reference sequence came from; VFDB collects "
+                            "the virulence factors of pathogens, and many of them, such as "
+                            "flagella, pili and iron uptake systems, are also found in "
+                            "harmless bacteria"),
+    ("database_hits", "how many VFDB hits were grouped into this locus; each is a row on "
+                      "Database_hits"),
+    ("min_pct_identity", "lowest percent identity to the reference sequence among those hits"),
+    ("max_pct_identity", "highest percent identity among those hits"),
+    ("min_pct_coverage", "lowest percent of the reference length covered among those hits"),
+    ("max_pct_coverage", "highest percent of the reference length covered among those hits"),
+    ("products", "VFDB's description of the reference gene"),
+    ("reference_accessions", "protein accessions, mostly RefSeq, of the reference sequences "
+                             "the hits were made to"),
+] + CONTEXT_COLUMNS
+
 DATABASE_HIT_COLUMNS = [
     ("hit_id", "database and row number of the hit in ABRicate's table"),
-    ("locus_id", "the AMR_loci row the hit was grouped into"),
-    ("database", "CARD, ResFinder or ARG-ANNOT"),
+    ("locus_id", "the row the hit was grouped into: on AMR_loci for CARD, NCBI and "
+                 "ResFinder, on Virulence_loci for VFDB"),
+    ("database", "CARD, NCBI, ResFinder or VFDB"),
     ("contig", "the contig of the hit"),
     ("start", "first base of the hit on the contig"),
     ("end", "last base of the hit on the contig"),
@@ -1190,9 +1282,10 @@ DATABASE_HIT_COLUMNS = [
     ("coverage", "bases of the reference covered, and its length (ABRicate's COVERAGE)"),
     ("coverage_map", "ABRicate's picture of the covered part of the reference"),
     ("gaps", "gap openings / gap bases in the alignment (ABRicate's GAPS), kept as text"),
-    ("reference_accession", "GenBank accession, with coordinates, of the reference sequence"),
+    ("reference_accession", "accession of the reference sequence: GenBank with coordinates "
+                            "for CARD, RefSeq for NCBI, mostly RefSeq protein for VFDB"),
     ("product", "the database's product description"),
-    ("resistance", "the drug classes the database attaches to the gene"),
+    ("resistance", "the drug classes the database attaches to the gene; empty for VFDB"),
     ("source_file", "the ABRicate table the row was read from"),
     ("source_line", "the line of that table"),
 ]
@@ -1235,17 +1328,39 @@ VIRAL_REGION_COLUMNS = [
 ]
 
 
+def context_columns(locus, replicon_calls, crashed, elements, mobilome_ran, regions,
+                    caller_name):
+    """The three answers for one locus, with the evidence behind each.
+
+    Takes in: a locus from group_hits_into_loci(), resistance or virulence gene
+              alike, and the context sources build_amr_workbook() read once:
+              the replicon calls, whether Platon failed, the mobilome module's
+              elements, the virus regions and the caller's name.
+    Gives back: the values of CONTEXT_COLUMNS, from plasmid_answer(),
+              ice_ime_answer() and phage_answer().
+    """
+    row = plasmid_answer(locus["contig"], replicon_calls, crashed)
+    answer, names, reason = ice_ime_answer(locus["contig"], locus["start"], locus["end"],
+                                           elements, mobilome_ran)
+    row.update({"ice_ime": answer, "ice_ime_elements": names, "ice_ime_evidence": reason})
+    answer, names, reason = phage_answer(locus["contig"], [(locus["start"], locus["end"])],
+                                         regions, caller_name)
+    row.update({"phage": answer, "phage_regions": names, "phage_evidence": reason})
+    return row
+
+
 def build_amr_workbook(args):
     """Read every input of the AMR workbook and return its sheets.
 
     The steps, in order:
       1. which strain and genome: the QC genome table and GTDB-Tk;
-      2. the database hits of CARD, ResFinder and ARG-ANNOT, grouped into loci;
-      3. the context of each locus: plasmid, ICE/IME, phage, and the mobilome
-         module's mobility tier;
-      4. the sheets: Summary, AMR_loci, Database_hits, ICE_IME_elements,
-         Viral_regions, Mobility_evidence, Mobility_audit, Run_QC and
-         Data_dictionary.
+      2. the database hits: those of CARD, NCBI and ResFinder grouped into
+         resistance-gene loci, VFDB's into virulence-gene loci;
+      3. the context of each locus: plasmid, ICE/IME, phage, and, for the
+         resistance genes, the mobilome module's mobility tier;
+      4. the sheets: Summary, AMR_loci, Virulence_loci, Database_hits,
+         ICE_IME_elements, Viral_regions, Mobility_evidence, Mobility_audit,
+         Run_QC and Data_dictionary.
     """
     out_root = args.output_root
     mobilome_ran = args.ice_table is not None
@@ -1254,12 +1369,19 @@ def build_amr_workbook(args):
     primary = read_primary_assembly(args.qc_genomes)
     taxonomy = read_taxonomy(args.taxonomy_dir, primary["bin_id"])
 
-    # 2. The database hits, then the loci.
-    hits = []
-    tables = {"CARD": args.card, "ResFinder": args.resfinder, "ARG-ANNOT": args.argannot}
-    for database, database_word in ABRICATE_DATABASES:
-        hits.extend(read_abricate(tables[database], database, database_word, out_root))
-    loci = group_hits_into_loci(hits, args.sample)
+    # 2. The database hits, then the loci: resistance genes and virulence genes
+    #    are grouped apart, each from its own databases.
+    tables = {"CARD": args.card, "NCBI": args.ncbi, "ResFinder": args.resfinder,
+              "VFDB": args.vfdb}
+    resistance_hits = []
+    for database, database_word in RESISTANCE_DATABASES:
+        resistance_hits.extend(read_abricate(tables[database], database, database_word, out_root))
+    virulence_hits = []
+    for database, database_word in VIRULENCE_DATABASES:
+        virulence_hits.extend(read_abricate(tables[database], database, database_word, out_root))
+    hits = resistance_hits + virulence_hits
+    loci = group_hits_into_loci(resistance_hits, args.sample, RESISTANCE_DATABASES)
+    virulence_loci = group_hits_into_loci(virulence_hits, args.sample, VIRULENCE_DATABASES)
     listing = read_abricate_databases(args.abricate_databases)
 
     # 3. The context of each locus. Each source is read once, here.
@@ -1298,18 +1420,45 @@ def build_amr_workbook(args):
             "resistance": joined(hit["resistance"] for hit in hits_here),
             "reference_accessions": joined(hit["reference_accession"] for hit in hits_here),
         }
-        row.update(plasmid_answer(locus["contig"], replicon_calls, crashed))
-        answer, names, reason = ice_ime_answer(locus["contig"], locus["start"], locus["end"],
-                                               elements, mobilome_ran)
-        row.update({"ice_ime": answer, "ice_ime_elements": names, "ice_ime_evidence": reason})
-        answer, names, reason = phage_answer(locus["contig"], [(locus["start"], locus["end"])],
-                                             regions, caller_name)
-        row.update({"phage": answer, "phage_regions": names, "phage_evidence": reason})
+        row.update(context_columns(locus, replicon_calls, crashed, elements, mobilome_ran,
+                                   regions, caller_name))
         mobility, matched = mobility_columns(locus, mobility_rows, mobilome_ran)
         row.update(mobility)
         for mobility_row in matched:
             loci_of_mobility_line[mobility_row["__line__"]].append(locus["locus_id"])
         locus_rows.append(row)
+
+    # The virulence genes: the same identity and context columns, plus the
+    # virulence factor, its category and the source organism from VFDB's text.
+    # No mobility tier: the mobilome module rates resistance genes only.
+    virulence_rows = []
+    for locus in virulence_loci:
+        hits_here = locus["hits"]
+        factor_names, categories, organisms = [], [], []
+        for hit in hits_here:
+            factor, category, organism = vfdb_fields(hit["product"])
+            factor_names.append(factor)
+            categories.append(category)
+            organisms.append(organism)
+        row = {
+            "sample": args.sample, "gtdb_taxon": taxonomy["lowest_taxon"],
+            "locus_id": locus["locus_id"], "contig": locus["contig"],
+            "start": locus["start"], "end": locus["end"], "strand": locus["strand"],
+            "genes": joined(hit["gene"] for hit in hits_here),
+            "virulence_factors": joined(factor_names),
+            "vf_categories": joined(categories),
+            "reference_organisms": joined(organisms),
+            "database_hits": len(hits_here),
+            "min_pct_identity": min(hit["pct_identity"] for hit in hits_here),
+            "max_pct_identity": max(hit["pct_identity"] for hit in hits_here),
+            "min_pct_coverage": min(hit["pct_coverage"] for hit in hits_here),
+            "max_pct_coverage": max(hit["pct_coverage"] for hit in hits_here),
+            "products": joined(hit["product"] for hit in hits_here),
+            "reference_accessions": joined(hit["reference_accession"] for hit in hits_here),
+        }
+        row.update(context_columns(locus, replicon_calls, crashed, elements, mobilome_ran,
+                                   regions, caller_name))
+        virulence_rows.append(row)
 
     # 4. The sheets.
     hit_rows = sorted(hits, key=lambda hit: (hit["contig"], hit["start"], hit["end"], hit["hit_id"]))
@@ -1369,22 +1518,39 @@ def build_amr_workbook(args):
         {"item": "Database hits", "value": len(hits),
          "note": f"{hit_counts}; one row each on Database_hits"},
         {"item": "AMR loci", "value": len(loci),
-         "note": "the hits of one gene grouped into one row of AMR_loci"},
+         "note": "the CARD, NCBI and ResFinder hits of one gene grouped into one row of "
+                 "AMR_loci"},
         {"item": "Found by ResFinder",
          "value": sum(1 for row in locus_rows if row["in_resfinder"] == YES),
-         "note": "loci ResFinder found; ResFinder collects acquired resistance genes, "
-                 "while CARD and ARG-ANNOT also list genes the species carries anyway"},
+         "note": "AMR loci ResFinder found; ResFinder collects acquired resistance genes, "
+                 "while CARD and NCBI also list genes the species carries anyway"},
         {"item": "Databases",
          "value": f"ABRicate {abricate_version}",
          "note": "; ".join(database_note(name, word, listing)
                            for name, word in ABRICATE_DATABASES)
                  + "; the date is the one ABRicate gives for its copy of each database"},
-        {"item": "On a plasmid", "value": counted_answers(locus_rows, "plasmid"),
-         "note": "loci by answer in the plasmid column"},
-        {"item": "Inside an ICE or IME", "value": counted_answers(locus_rows, "ice_ime"),
-         "note": "loci by answer in the ice_ime column"},
-        {"item": "Inside a phage region", "value": counted_answers(locus_rows, "phage"),
-         "note": "loci by answer in the phage column"},
+        {"item": "AMR loci on a plasmid", "value": counted_answers(locus_rows, "plasmid"),
+         "note": "AMR loci by answer in the plasmid column"},
+        {"item": "AMR loci inside an ICE or IME",
+         "value": counted_answers(locus_rows, "ice_ime"),
+         "note": "AMR loci by answer in the ice_ime column"},
+        {"item": "AMR loci inside a phage region",
+         "value": counted_answers(locus_rows, "phage"),
+         "note": "AMR loci by answer in the phage column"},
+        {"item": "Virulence loci", "value": len(virulence_loci),
+         "note": "the VFDB hits of one gene grouped into one row of Virulence_loci. VFDB "
+                 "collects the virulence factors of pathogens; many, such as flagella, pili "
+                 "and iron uptake systems, are also found in harmless bacteria, so a hit "
+                 "does not make the strain a pathogen"},
+        {"item": "Virulence loci on a plasmid",
+         "value": counted_answers(virulence_rows, "plasmid"),
+         "note": "virulence loci by answer in the plasmid column"},
+        {"item": "Virulence loci inside an ICE or IME",
+         "value": counted_answers(virulence_rows, "ice_ime"),
+         "note": "virulence loci by answer in the ice_ime column"},
+        {"item": "Virulence loci inside a phage region",
+         "value": counted_answers(virulence_rows, "phage"),
+         "note": "virulence loci by answer in the phage column"},
         {"item": "Mobilome module", "value": "run" if mobilome_ran else "not run",
          "note": ("ICE/IME answers and mobility tiers come from it" if mobilome_ran else
                   "mobilome.run was false, so the ICE/IME and mobility-tier columns read "
@@ -1456,6 +1622,8 @@ def build_amr_workbook(args):
         make_sheet("Summary", SUMMARY_COLUMNS, summary_rows, wrap=("note",)),
         make_sheet("AMR_loci", AMR_LOCUS_COLUMNS, locus_rows,
                    wrap=("products", "plasmid_evidence", "ice_ime_evidence", "phage_evidence")),
+        make_sheet("Virulence_loci", VIRULENCE_LOCUS_COLUMNS, virulence_rows,
+                   wrap=("products", "plasmid_evidence", "ice_ime_evidence", "phage_evidence")),
         make_sheet("Database_hits", DATABASE_HIT_COLUMNS, hit_rows, wrap=("product",)),
     ]
     if mobilome_ran:
@@ -1479,7 +1647,8 @@ def build_amr_workbook(args):
         not_run))
     sheets.append(make_sheet("Run_QC", RUN_QC_COLUMNS, run_qc_rows, wrap=("detail",)))
     sheets.append(dictionary_sheet(sheets, ANSWER_NOTE))
-    return sheets, {"database hits": len(hits), "loci": len(loci)}
+    return sheets, {"database hits": len(hits), "AMR loci": len(loci),
+                    "virulence loci": len(virulence_loci)}
 
 
 # ── The traits workbook ──────────────────────────────────────────────────────
@@ -1850,8 +2019,9 @@ def make_parser():
     amr = commands.add_parser("amr", help="the AMR workbook")
     add_common(amr)
     amr.add_argument("--card", required=True, help="ABRicate's CARD table.")
+    amr.add_argument("--ncbi", required=True, help="ABRicate's NCBI table.")
     amr.add_argument("--resfinder", required=True, help="ABRicate's ResFinder table.")
-    amr.add_argument("--argannot", required=True, help="ABRicate's ARG-ANNOT table.")
+    amr.add_argument("--vfdb", required=True, help="ABRicate's VFDB table.")
     amr.add_argument("--abricate-databases", required=True,
                      help="05.amr/abricate/abricate_databases.tsv: ABRicate's version and "
                           "the date of its copy of each database.")

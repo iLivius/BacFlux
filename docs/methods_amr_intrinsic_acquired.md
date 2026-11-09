@@ -153,10 +153,10 @@ in EFSA (2025) §3.2.1.
 EFSA (2024a) requires the AMR search to run against at least two maintained, curated
 databases at ≥80% identity and ≥70% length coverage. BacFlux applies those cutoffs,
 fixed in the rule, to ABRicate only; AMRFinderPlus, which runs only when the mobilome
-module is enabled, keeps its curated per-gene cutoffs. ABRicate's eight databases
-(`argannot`, `card`, `ecoh`, `ecoli_vf`, `megares`, `ncbi`, `resfinder`, `vfdb`)
-include virulence and *E. coli* serotyping collections and overlap in content, so they
-are not eight independent AMR resources.
+module is enabled, keeps its curated per-gene cutoffs. Of ABRicate's four databases,
+three hold resistance genes (`card`, `ncbi`, `resfinder`) and one virulence factors
+(`vfdb`); the three resistance databases are maintained and curated, and overlap in
+content.
 
 The CARD read-mapping analysis runs in Illumina and hybrid modes. It provides evidence
 from reads that may be missing from the assembly, but remains subject to coverage,

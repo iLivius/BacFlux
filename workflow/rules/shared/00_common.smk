@@ -1366,7 +1366,17 @@ CARD_DB_DIR  = DIR_AMR + "/card_db"
 # ABRicate is run once per database in this list; AMR_summary reads the same
 # list. Defined ONCE here (v1 hard-coded it in both rules, in all four repos)
 # and both rules are driven by expand(..., db=DATABASES).
-DATABASES = ["argannot", "card", "ecoh", "ecoli_vf", "megares", "ncbi", "resfinder", "vfdb"]
+# Four of the databases ABRicate ships, each maintained and curated:
+#   card, ncbi, resfinder : antimicrobial-resistance genes (CARD; NCBI's
+#                           Reference Gene Catalog, the one AMRFinderPlus uses;
+#                           ResFinder's acquired resistance genes);
+#   vfdb                  : virulence factors (VFDB's core set of verified ones).
+# Three resistance databases meet EFSA's guidance on whole-genome sequencing, which
+# asks for at least two maintained, curated ones. ABRicate's other databases are
+# left out: ARG-ANNOT and the E. coli sets have not been updated since 2016-2019,
+# and MEGARes is compiled largely from CARD, ResFinder, NCBI and ARG-ANNOT and is
+# built for sorting reads from metagenomes, so it repeats what the three run here find.
+DATABASES = ["card", "ncbi", "resfinder", "vfdb"]
 DATABASE_PATTERN = "|".join(DATABASES)
 # ABRicate's version and the date of its copy of each database, written once per
 # run by rule abricate_databases (shared/50_amr.smk) and shown in the AMR workbook,

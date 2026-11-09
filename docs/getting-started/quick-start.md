@@ -90,7 +90,7 @@ directories:
 
 links:
   phix_link:  https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/819/615/GCF_000819615.1_ViralProj14015/GCF_000819615.1_ViralProj14015_genomic.fna.gz
-  card_link:  https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2
+  card_link:  https://card.mcmaster.ca/download/0/broadstreet-v4.0.2.tar.bz2
   dbcan_link: https://zenodo.org/records/18622157/files/dbcan_db_v5.1.2.tar.gz
 
 resources:
@@ -159,21 +159,23 @@ too.
 Compare the discovered sample list with the intended input. A mismatch can indicate a
 naming-pattern problem, a missing input file or an incorrect directory. Below the
 header, Snakemake lists the jobs. A single isolate through the default Illumina
-pipeline, into an empty output directory, plans **42 jobs**:
+pipeline, into an empty output directory, plans **40 jobs**, listed in the order they
+can run:
 
 ```text
 Job stats:
 job                                count
 -------------------------------  -------
-AMR_summary                            1
-all                                    1
-amr_contigs                            8
-annotation                             1
+abricate_databases                     1
+cazyme_db_download                     1
+checkv_db                              1
 …
-trim_adapters                          1
-viral_quality                          1
-virsorter2_db                          1
-total                                 42
+amr_contigs                            4
+…
+amr_workbook                           1
+multiqc                                1
+all                                    1
+total                                 40
 ```
 
 The only count above one is `amr_contigs`: ABRicate runs once per database.
@@ -267,7 +269,7 @@ After a successful single-sample run, with the mobilome module off (the default)
 │   ├── antismash/isolate1/               # plus antismash/databases/, fetched once
 │   └── dbcan/isolate1/                   # plus dbcan/dbcan_db_v5.1.2/, fetched once
 ├── 05.amr/
-│   ├── abricate/isolate1/                # eight databases, one TSV each, plus AMR_summary.txt
+│   ├── abricate/isolate1/                # four databases, one TSV each, plus AMR_summary.txt
 │   └── mapping/isolate1/                 # the read-based CARD leg: covstats, AMR_legend, CARD_report
 ├── 06.plasmids/isolate1/platon/
 ├── 07.phages/

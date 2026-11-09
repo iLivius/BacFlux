@@ -21,7 +21,7 @@
 # amr_contigs           : one ABRicate run per (sample, database), at the EFSA
 #                         reporting thresholds. Fanned out over DATABASES by
 #                         rule all, not by an expand() in this file.
-# AMR_summary           : abricate --summary over one sample's eight tables.
+# AMR_summary           : abricate --summary over one sample's four tables.
 # download_amr_db       : fetch and unpack CARD from links.card_link.
 # download_amr_db_local : symlink an already-extracted CARD directory instead.
 #                         Mutually exclusive with download_amr_db.
@@ -32,7 +32,7 @@
 #
 # Data flow:
 #
-#   contigs_final.fasta ─► amr_contigs (once per database) ─► {db}.tsv  (×8)
+#   contigs_final.fasta ─► amr_contigs (once per database) ─► {db}.tsv  (×4)
 #                                                                  │
 #                                                    AMR_summary ◄──┘
 #                                                        └─► AMR_summary.txt
@@ -52,7 +52,7 @@
 # LOGS, DATABASES, DATABASE_PATTERN, and — for the CARD leg — CARDDB, CARD_LINK,
 # CARD_TARBALL, CARD_DB_DIR, CARD_MIN_IDENTITY, CARD_MIN_COVERED,
 # CARD_REPORT_SCRIPT, TRIM_R1, TRIM_R2, RAM, capped_cpus, HAS_SHORT_READS. The
-# eight-database list lives ONCE in 00_common and drives (a) the per-db fan-out in
+# four-database list lives ONCE in 00_common and drives (a) the per-db fan-out in
 # rule all, (b) the {db} wildcard constraint, and (c) the summary input — one
 # list, one source of truth.
 #
@@ -68,8 +68,9 @@
 # ABRicate BLASTs the finished contigs against one curated resistance / virulence
 # database and reports every hit clearing the identity and coverage cutoffs.
 # Different databases cover different gene sets (CARD, ResFinder, NCBI, VFDB, …),
-# so the SAME contigs are screened against each one separately and the eight
-# tables are kept side by side rather than merged.
+# so the SAME contigs are screened against each one separately and the four
+# tables are kept side by side rather than merged. Why these four, and not the
+# other databases ABRicate ships, is explained beside DATABASES in 00_common.smk.
 #
 # minid 80 / mincov 70 are the EFSA reporting thresholds — a hit must show ≥80%
 # identity over ≥70% of the reference gene's length (see README, AMR section).
@@ -79,12 +80,13 @@
 #
 # Takes in: contigs = FINAL_CONTIGS, the finished decontaminated assembly.
 # Produces: 05.amr/abricate/{sample}/{db}.tsv — one hit table per (sample, db).
-# Consumed by: AMR_summary below, which collates a sample's eight tables; and the
-#              card, resfinder and argannot tables by rule amr_workbook
-#              (shared/90_report.smk), which groups their hits into one row per gene.
+# Consumed by: AMR_summary below, which collates a sample's four tables; and rule
+#              amr_workbook (shared/90_report.smk), which groups the hits of card,
+#              ncbi and resfinder into one row per resistance gene, and those of
+#              vfdb into one row per virulence gene.
 #
 # The rule declares ONE templated output and contains NO expand(). The fan-out
-# over the eight databases lives in _downstream_targets() in 00_common.smk, which
+# over the four databases lives in _downstream_targets() in 00_common.smk, which
 # asks rule all for one {db}.tsv per (sample × database); Snakemake then
 # instantiates this rule once per pair, and params.db hands each instance its own
 # database name. In v1 that expand() sat in the Snakefile's own rule all.
@@ -96,7 +98,7 @@ rule amr_contigs:
     output:
         amr_tab = DIR_AMR + "/abricate/{sample}/{db}.tsv",
     wildcard_constraints:
-        # Restrict {db} to the eight names in DATABASES. Snakemake's default
+        # Restrict {db} to the four names in DATABASES. Snakemake's default
         # wildcard pattern is `.+`, which matches slashes too, so without this
         # both {sample} and {db} are free to split a path under abricate/ in more
         # than one way.
@@ -122,12 +124,12 @@ rule amr_contigs:
         """
 
 
-# abricate --summary turns one sample's eight per-database hit tables into a
+# abricate --summary turns one sample's four per-database hit tables into a
 # single presence/absence matrix (gene × database) — the readable overview of the
 # whole AMR / virulence screen for that isolate, and a terminal product.
 #
 # The doubled brace in expand(... "{{sample}}" ...) keeps `sample` a wildcard while
-# expand fills in only the `db` list, so the input is exactly this sample's eight
+# expand fills in only the `db` list, so the input is exactly this sample's four
 # tables, in DATABASES order. `abricate --summary` takes them as a plain
 # positional list and its column order follows the input-file order — reordering
 # DATABASES in 00_common.smk therefore reorders this file's columns.
@@ -136,7 +138,7 @@ rule amr_contigs:
 # Produces: 05.amr/abricate/{sample}/AMR_summary.txt.
 # Consumed by: the user.
 #
-# One database list: v1 hard-coded all eight database filenames TWICE (as eight
+# One database list: v1 hard-coded its eight database filenames TWICE (as eight
 # named input: keys AND again in the shell). Here input: is driven by the shared
 # DATABASES list and the shell passes {input} positionally, so adding or removing
 # a database in 00_common.DATABASES now propagates by itself to rule all, the
@@ -173,7 +175,7 @@ rule AMR_summary:
 #       for its copy), joined into one table with the version as a last column.
 # Produces: 05.amr/abricate/abricate_databases.tsv (ABRICATE_DATABASES_TSV).
 # Consumed by: rule amr_workbook (shared/90_report.smk), which shows the version
-#              and the dates of CARD, ResFinder and ARG-ANNOT; and the user.
+#              and the dates of CARD, NCBI, ResFinder and VFDB; and the user.
 rule abricate_databases:
     output:
         listing = ABRICATE_DATABASES_TSV,

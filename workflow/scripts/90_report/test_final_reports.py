@@ -6,8 +6,9 @@ not_assessed. Each answer has its own rule, and each rule is tested here state
 by state, with the evidence source that drives it: Platon and geNomad for the
 plasmid, the mobilome module's ICE table for ICE/IME, VirSorter2 or geNomad
 with CheckV's viral and host parts for the phage. The grouping of database hits
-into loci, the copying of values (the minus strand, GAPS as text, AMRFinderPlus
-STRESS rows) and the paths shown in the workbook are tested too.
+into loci, the virulence genes from VFDB, the copying of values (the minus
+strand, GAPS as text, AMRFinderPlus STRESS rows) and the paths shown in the
+workbook are tested too.
 
 Everything is invented and written into pytest's tmp_path with the columns the
 tools write; the sample is SAMPLE1. Writing the .xlsx file itself needs
@@ -43,12 +44,19 @@ ABRICATE_HEADER = ["#FILE", "SEQUENCE", "START", "END", "STRAND", "GENE", "COVER
                    "ACCESSION", "PRODUCT", "RESISTANCE"]
 
 
-def abricate_row(contig, start, end, gene, database, strand="+", gaps="0/0"):
+def abricate_row(contig, start, end, gene, database, strand="+", gaps="0/0", product=None,
+                 resistance="Aminoglycoside"):
     return {"#FILE": "contigs_final.fasta", "SEQUENCE": contig, "START": start, "END": end,
             "STRAND": strand, "GENE": gene, "COVERAGE": f"1-{end - start + 1}/{end - start + 1}",
             "COVERAGE_MAP": "===============", "GAPS": gaps, "%COVERAGE": "100.00",
             "%IDENTITY": "99.50", "DATABASE": database, "ACCESSION": "AB000001.1:1-900",
-            "PRODUCT": f"{gene} product", "RESISTANCE": "Aminoglycoside"}
+            "PRODUCT": product or f"{gene} product", "RESISTANCE": resistance}
+
+
+# VFDB's description of a gene, as ABRicate copies it into PRODUCT.
+AEROBACTIN_PRODUCT = ("(iutA) ferric aerobactin receptor IutA [Aerobactin (VF0565) - "
+                      "Nutritional/Metabolic factor (VFC0272)] [Klebsiella pneumoniae "
+                      "subsp. pneumoniae NTUH-K2044]")
 
 
 def hit(contig, start, end, database="CARD", gene="geneX", strand="+", number=1):
@@ -80,19 +88,19 @@ def test_hits_of_one_gene_become_one_locus_anchored_on_the_longest():
     with the coordinates of the longest hit and the databases in a fixed order."""
     hits = [hit("contig_1", 1010, 1800, "ResFinder", "aadA2", number=1),
             hit("contig_1", 1000, 1810, "CARD", "ANT(3'')-Ia", number=1),
-            hit("contig_1", 1005, 1805, "ARG-ANNOT", "(AGly)aadA2", number=1)]
-    loci = fr.group_hits_into_loci(hits, "SAMPLE1")
+            hit("contig_1", 1005, 1805, "NCBI", "aadA2", number=1)]
+    loci = fr.group_hits_into_loci(hits, "SAMPLE1", fr.RESISTANCE_DATABASES)
     assert len(loci) == 1
     assert (loci[0]["start"], loci[0]["end"]) == (1000, 1810)
     assert loci[0]["locus_id"] == "SAMPLE1|contig_1:1000-1810"
-    assert loci[0]["databases"] == "CARD; ResFinder; ARG-ANNOT"
+    assert loci[0]["databases"] == "CARD; NCBI; ResFinder"
     assert loci[0]["hits"][0]["database"] == "CARD"      # the anchor comes first
     assert all(h["locus_id"] == loci[0]["locus_id"] for h in hits)
 
 
 def test_neighbouring_genes_stay_apart():
     hits = [hit("contig_1", 1000, 2000, number=1), hit("contig_1", 1990, 3000, number=2)]
-    assert len(fr.group_hits_into_loci(hits, "SAMPLE1")) == 2
+    assert len(fr.group_hits_into_loci(hits, "SAMPLE1", fr.RESISTANCE_DATABASES)) == 2
 
 
 def test_a_short_hit_cannot_chain_two_genes_together():
@@ -100,14 +108,14 @@ def test_a_short_hit_cannot_chain_two_genes_together():
     two genes stay two loci. Grouping every overlapping pair would chain them."""
     hits = [hit("contig_1", 1000, 2000, number=1), hit("contig_1", 1800, 2800, number=2),
             hit("contig_1", 1850, 1950, "ResFinder", number=1)]
-    loci = fr.group_hits_into_loci(hits, "SAMPLE1")
+    loci = fr.group_hits_into_loci(hits, "SAMPLE1", fr.RESISTANCE_DATABASES)
     assert len(loci) == 2
     assert sorted(len(locus["hits"]) for locus in loci) == [1, 2]
 
 
 def test_hits_on_different_contigs_are_never_grouped():
     hits = [hit("contig_1", 1000, 2000, number=1), hit("contig_2", 1000, 2000, number=2)]
-    assert len(fr.group_hits_into_loci(hits, "SAMPLE1")) == 2
+    assert len(fr.group_hits_into_loci(hits, "SAMPLE1", fr.RESISTANCE_DATABASES)) == 2
 
 
 def test_abricate_values_are_copied_as_written(tmp_path):
@@ -118,6 +126,15 @@ def test_abricate_values_are_copied_as_written(tmp_path):
     assert hits[0]["strand"] == "-"
     assert hits[0]["gaps"] == "6/4"
     assert hits[0]["source_file"] == "card.tsv"
+
+
+def test_vfdb_text_gives_the_factor_its_category_and_the_organism():
+    factor, category, organism = fr.vfdb_fields(AEROBACTIN_PRODUCT)
+    assert factor == "Aerobactin (VF0565)"
+    assert category == "Nutritional/Metabolic factor (VFC0272)"
+    assert organism == "Klebsiella pneumoniae subsp. pneumoniae NTUH-K2044"
+    # A description without VFDB's brackets gives NA, never a wrong guess.
+    assert fr.vfdb_fields("hypothetical protein") == ("NA", "NA", "NA")
 
 
 def test_line_numbers_count_every_line_of_the_file(tmp_path):
@@ -537,9 +554,11 @@ def write_fasta(path, lengths):
 
 def make_output_folder(tmp_path, mobilome=True):
     """A BacFlux output folder for SAMPLE1: a 300 kb chromosome and a 60 kb
-    plasmid (both short enough for Platon), three ABRicate tables, one VirSorter2
-    region with CheckV parts, and, with the mobilome, one ICE and two
-    AMRFinderPlus rows. Returns the command line of the amr command."""
+    plasmid (both short enough for Platon), the four ABRicate tables, one
+    VirSorter2 region with CheckV parts, and, with the mobilome, one ICE and two
+    AMRFinderPlus rows. One VFDB hit has the coordinates of a CARD hit, to show
+    that a virulence gene never joins a resistance gene's row. Returns the
+    command line of the amr command."""
     out = tmp_path / "out"
     write_fasta(out / "02.assembly/SAMPLE1/contigs_final.fasta",
                 {"chromosome": 300000, "plasmid": 60000})
@@ -559,11 +578,16 @@ def make_output_folder(tmp_path, mobilome=True):
         abricate_row("plasmid", 5000, 5800, "aadA2", "card", gaps="6/4")])
     write_tsv(abricate / "resfinder.tsv", ABRICATE_HEADER, [
         abricate_row("plasmid", 5010, 5790, "aadA2_1", "resfinder")])
-    write_tsv(abricate / "argannot.tsv", ABRICATE_HEADER, [])
+    write_tsv(abricate / "ncbi.tsv", ABRICATE_HEADER, [
+        abricate_row("plasmid", 5000, 5790, "aadA2", "ncbi")])
+    write_tsv(abricate / "vfdb.tsv", ABRICATE_HEADER, [
+        abricate_row("plasmid", 10000, 11000, "iutA", "vfdb", product=AEROBACTIN_PRODUCT,
+                     resistance=""),
+        abricate_row("chromosome", 20000, 20800, "vfGene", "vfdb", resistance="")])
     write_tsv(out / "05.amr/abricate/abricate_databases.tsv",
               ["DATABASE", "SEQUENCES", "DBTYPE", "DATE", "ABRICATE_VERSION"],
               [{"DATABASE": name, "SEQUENCES": 1000, "DBTYPE": "nucl", "DATE": "2026-Apr-3",
-                "ABRICATE_VERSION": "1.4.0"} for name in ("card", "resfinder", "argannot")])
+                "ABRICATE_VERSION": "1.4.0"} for name in ("card", "ncbi", "resfinder", "vfdb")])
 
     platon = out / "06.plasmids/SAMPLE1/platon"
     platon.mkdir(parents=True)
@@ -589,8 +613,8 @@ def make_output_folder(tmp_path, mobilome=True):
             "--qc-genomes", str(out / "02.assembly/SAMPLE1/eval/SAMPLE1_qc_genomes.tsv"),
             "--taxonomy-dir", str(out / "03.taxonomy/SAMPLE1"),
             "--contigs", str(out / "02.assembly/SAMPLE1/contigs_final.fasta"),
-            "--card", str(abricate / "card.tsv"), "--resfinder", str(abricate / "resfinder.tsv"),
-            "--argannot", str(abricate / "argannot.tsv"),
+            "--card", str(abricate / "card.tsv"), "--ncbi", str(abricate / "ncbi.tsv"),
+            "--resfinder", str(abricate / "resfinder.tsv"), "--vfdb", str(abricate / "vfdb.tsv"),
             "--abricate-databases", str(out / "05.amr/abricate/abricate_databases.tsv"),
             "--platon-dir", str(platon), "--platon-prefix", "contigs_final",
             "--phage-caller", "virsorter2",
@@ -644,7 +668,7 @@ def sheet_rows(sheets, name):
 def test_the_amr_workbook_answers_every_question_for_every_locus(tmp_path):
     args = fr.make_parser().parse_args(make_output_folder(tmp_path))
     sheets, counts = fr.build_amr_workbook(args)
-    assert counts == {"database hits": 4, "loci": 3}
+    assert counts == {"database hits": 7, "AMR loci": 3, "virulence loci": 2}
     loci = {row["genes"].split("; ")[0]: row for row in sheet_rows(sheets, "AMR_loci")}
     assert set(loci) == {"chromGene", "phageGene", "aadA2"}
 
@@ -660,7 +684,7 @@ def test_the_amr_workbook_answers_every_question_for_every_locus(tmp_path):
 
     plasmid = loci["aadA2"]
     assert (plasmid["plasmid"], plasmid["plasmid_mobility"]) == ("yes", "conjugative")
-    assert plasmid["databases"] == "CARD; ResFinder"
+    assert plasmid["databases"] == "CARD; NCBI; ResFinder"
     assert plasmid["mobility_tier"] == 6
 
     # ResFinder, the database of acquired genes, found only aadA2.
@@ -674,6 +698,23 @@ def test_the_amr_workbook_answers_every_question_for_every_locus(tmp_path):
     hits = sheet_rows(sheets, "Database_hits")
     assert {h["gaps"] for h in hits} == {"0/0", "6/4"}
     assert "-" in {h["strand"] for h in hits}
+
+    # The virulence genes: grouped from VFDB alone, with the same three answers.
+    virulence = {row["genes"]: row for row in sheet_rows(sheets, "Virulence_loci")}
+    assert set(virulence) == {"iutA", "vfGene"}
+    aerobactin = virulence["iutA"]
+    assert (aerobactin["plasmid"], aerobactin["ice_ime"], aerobactin["phage"]) == \
+        ("yes", "no", "no")
+    assert aerobactin["virulence_factors"] == "Aerobactin (VF0565)"
+    assert aerobactin["vf_categories"] == "Nutritional/Metabolic factor (VFC0272)"
+    # At the position of the CARD hit chromGene, inside the ICE, but on its own row.
+    assert virulence["vfGene"]["ice_ime"] == "yes"
+    assert loci["chromGene"]["databases"] == "CARD"
+    assert loci["chromGene"]["database_hits"] == 1
+    vfdb_hits = [h for h in hits if h["database"] == "VFDB"]
+    assert {h["locus_id"] for h in vfdb_hits} == {row["locus_id"] for row in virulence.values()}
+    assert summary["Virulence loci"]["value"] == 2
+    assert "VFDB, dated 2026-Apr-3" in summary["Databases"]["note"]
 
     # The point mutation has no database locus, and is kept without one.
     mobility = sheet_rows(sheets, "Mobility_evidence")

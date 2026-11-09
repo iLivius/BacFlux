@@ -506,10 +506,10 @@ if TRAITS_RUN:
 # ── amr_workbook and traits_workbook — one Excel workbook per strain ──
 # Takes in: the results of earlier stages for one sample, listed in each rule's
 #           input block below.
-# Does:     final_reports.py (scripts/90_report/) groups the AMR database hits of
-#           one gene into one row and adds each gene's context by comparing
-#           coordinates: is it on a plasmid, inside an ICE or IME, inside a phage
-#           region? It makes no new gene call. Each answer is yes, no, uncertain
+# Does:     final_reports.py (scripts/90_report/) groups the database hits of
+#           one gene into one row, resistance genes and virulence genes apart, and
+#           adds each gene's context by comparing coordinates: is it on a plasmid,
+#           inside an ICE or IME, inside a phage region? It makes no new gene call. Each answer is yes, no, uncertain
 #           or not_assessed; the rules behind them are in that script and in
 #           docs/analysis/workbooks.md.
 # Produces: 10.workbooks/{sample}_amr.xlsx in every run (rule amr_workbook), and
@@ -570,11 +570,13 @@ rule amr_workbook:
         qc_genomes = QC_GENOME_TABLE,
         taxonomy_dir = GTDBTK_DIR,
         contigs = FINAL_CONTIGS,
-        # The three ABRicate tables of rule amr_contigs (shared/50_amr.smk), and
-        # ABRicate's version and database dates (rule abricate_databases there).
+        # The four ABRicate tables of rule amr_contigs (shared/50_amr.smk): three
+        # of resistance genes and VFDB's virulence genes; and ABRicate's version
+        # and database dates (rule abricate_databases there).
         card = DIR_AMR + "/abricate/{sample}/card.tsv",
+        ncbi = DIR_AMR + "/abricate/{sample}/ncbi.tsv",
         resfinder = DIR_AMR + "/abricate/{sample}/resfinder.tsv",
-        argannot = DIR_AMR + "/abricate/{sample}/argannot.tsv",
+        vfdb = DIR_AMR + "/abricate/{sample}/vfdb.tsv",
         abricate_databases = ABRICATE_DATABASES_TSV,
         platon_dir = PLATON_DIR,
         viral_dir = WORKBOOK_VIRAL_DIR,
@@ -610,8 +612,9 @@ rule amr_workbook:
           --taxonomy-dir {input.taxonomy_dir:q} \
           --contigs {input.contigs:q} \
           --card {input.card:q} \
+          --ncbi {input.ncbi:q} \
           --resfinder {input.resfinder:q} \
-          --argannot {input.argannot:q} \
+          --vfdb {input.vfdb:q} \
           --abricate-databases {input.abricate_databases:q} \
           --platon-dir {input.platon_dir:q} \
           --platon-prefix {params.platon_prefix:q} \

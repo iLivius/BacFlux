@@ -45,13 +45,13 @@ A full run leaves several thousand files. These are the ones that carry the resu
 | `03.taxonomy/{sample}/classify/gtdbtk.*.summary.tsv` | GTDB-Tk classification, reference matches and warnings. | all |
 | `04.annotation/bakta/{sample}/{sample}.tsv` | The gene calls, with products. | all |
 | `04.annotation/traits/{sample}/{sample}_trait_profile.tsv` | Which plant-growth, biocontrol, stress and degradation traits the genome's genes support, with the genes behind each call. | all, opt-in |
-| `05.amr/abricate/{sample}/AMR_summary.txt` | AMR and virulence hits on the assembly, across eight databases. | all |
+| `05.amr/abricate/{sample}/AMR_summary.txt` | AMR and virulence hits on the assembly, across four databases. | all |
 | `05.amr/mapping/{sample}/{sample}_CARD_report.tsv` | AMR determinants found in the *reads*, classified by what kind of CARD entry each is. | `[illumina, hybrid]` |
 | `06.plasmids/{sample}/platon/verified_plasmids.txt` | Contigs predicted as plasmids, with supplementary BLAST annotations. | all |
 | `07.phages/checkv/{sample}/quality_summary.tsv` | Predicted prophages and how complete each one is. | all |
 | `08.mobilome/{sample}/{sample}_amr_mobility.tsv` | For each AMR gene: the mobile-element context and a mobility tier. | all, opt-in |
 | `09.report/multiqc_report.html` | Read QC, assembly QC, completeness and taxonomy for the whole batch on one page, and the trait calls when the trait profile is on. | all |
-| `10.workbooks/{sample}_amr.xlsx` | The strain's resistance genes from CARD, ResFinder and ARG-ANNOT, one row per gene, each with its plasmid, ICE/IME and phage context. | all |
+| `10.workbooks/{sample}_amr.xlsx` | The strain's resistance genes from CARD, NCBI and ResFinder and its virulence genes from VFDB, one row per gene, each with its plasmid, ICE/IME and phage context. | all |
 | `10.workbooks/{sample}_traits.xlsx` | The strain's trait calls with their genes, caveats, suggested assays and references. | all, opt-in |
 
 !!! warning "One output directory, one batch"
@@ -101,7 +101,7 @@ output_dir/
 |   |-- baktfold/databases/                      when baktfold.run or traits.run is true
 |   `-- traits/{sample}/      + traits/databases/  only when traits.run: true
 |-- 05.amr/
-|   |-- abricate/{sample}/                       eight databases + a summary
+|   |-- abricate/{sample}/                       four databases + a summary
 |   `-- mapping/{sample}/  + card_db/            [illumina, hybrid]
 |-- 06.plasmids/{sample}/platon/
 |-- 07.phages/
@@ -265,8 +265,8 @@ criteria, so disagreement should be investigated rather than treated as an error
 
 ### `abricate/{sample}/`
 
-One TSV per database — `argannot`, `card`, `ecoh`, `ecoli_vf`, `megares`, `ncbi`,
-`resfinder`, `vfdb` — plus `AMR_summary.txt`, which collates a sample's eight tables.
+One TSV per database — `card`, `ncbi` and `resfinder` for resistance genes, `vfdb` for
+virulence genes — plus `AMR_summary.txt`, which collates a sample's four tables.
 This analysis carries the EFSA thresholds: a hit needs ≥80% identity and ≥70% gene-length
 coverage. Beside the per-sample folders, `abricate/abricate_databases.tsv` gives ABRicate's
 version and, for each database, the number of sequences and the date ABRicate lists for its
@@ -407,7 +407,7 @@ outside it.
 
 | File | Contents |
 |---|---|
-| `{sample}_amr.xlsx` | Every run. The resistance genes ABRicate found in CARD, ResFinder and ARG-ANNOT, one row per gene, each answering yes, no, uncertain or not_assessed to three questions: on a plasmid, inside an ICE or IME, inside a phage region? Further sheets keep every database hit, the mobile elements and virus regions the answers rest on, the mobilome module's tables when it ran, the inputs and a data dictionary. |
+| `{sample}_amr.xlsx` | Every run. The resistance genes ABRicate found in CARD, NCBI and ResFinder, and the virulence genes it found in VFDB, one row per gene, each answering yes, no, uncertain or not_assessed to three questions: on a plasmid, inside an ICE or IME, inside a phage region? Further sheets keep every database hit, the mobile elements and virus regions the answers rest on, the mobilome module's tables when it ran, the inputs and a data dictionary. |
 | `{sample}_traits.xlsx` | Only with `traits.run: true`. Every trait of the catalogue with its call, genes, caveat, suggested assay and references, and the plasmid and phage context of every gene behind the calls. |
 
 Without the mobilome module, the ICE/IME and mobility-tier columns read `not_assessed`,

@@ -1,13 +1,13 @@
 # Per-strain workbooks
 
 BacFlux writes one Excel workbook per strain with the antimicrobial-resistance (AMR)
-genes found in its genome and their genomic context and, with the
+and virulence genes found in its genome and their genomic context and, with the
 [trait profile](traits.md) on, a second one with the strain's predicted traits. Both
 land in `10.workbooks/`:
 
 | Workbook | Written | What it holds |
 |---|---|---|
-| `{sample}_amr.xlsx` | in every run | the resistance genes ABRicate found in CARD, ResFinder and ARG-ANNOT, one row per gene, each with three answers: is it on a plasmid, inside an ICE or IME, inside a phage region? |
+| `{sample}_amr.xlsx` | in every run | the resistance genes ABRicate found in CARD, NCBI and ResFinder, and the virulence genes it found in VFDB, one row per gene, each with three answers: is it on a plasmid, inside an ICE or IME, inside a phage region? |
 | `{sample}_traits.xlsx` | with `traits.run: true` | every trait of the catalogue with its call, the genes behind it, its caveat, a suggested laboratory assay and its references |
 
 *Rules `amr_workbook` and `traits_workbook`, both running
@@ -62,7 +62,8 @@ answer is given below, and in the `Data_dictionary` sheet of every workbook.
 |---|---|---|
 | `Summary` | item | the counts of the sheets below, and the GTDB-Tk classification |
 | `AMR_loci` | resistance gene | all the sources below |
-| `Database_hits` | ABRicate hit | `05.amr/abricate/{sample}/{card,resfinder,argannot}.tsv` |
+| `Virulence_loci` | virulence gene | the VFDB hits and the context sources below |
+| `Database_hits` | ABRicate hit | `05.amr/abricate/{sample}/{card,ncbi,resfinder,vfdb}.tsv` |
 | `ICE_IME_elements` | mobile element | `08.mobilome/{sample}/{sample}_ice_candidates.tsv`, or its `_named` copy when ICEberg naming is on |
 | `Viral_regions` | virus or prophage region | the virus caller's region table, and CheckV's `quality_summary.tsv` and `contamination.tsv` |
 | `Mobility_evidence` | AMRFinderPlus gene | `08.mobilome/{sample}/{sample}_amr_mobility.tsv`, copied unchanged |
@@ -74,8 +75,9 @@ Without the mobilome module, the three mobilome sheets hold a single line saying
 
 ### One gene, one row
 
-The three databases often give one gene different names (`aadA2`, `ANT(3'')-Ia`,
-`(AGly)aadA2`), so hits are grouped by their position, never by name. The longest hit
+The three resistance databases often give one gene different names
+(`catII_from_Escherichia_coli_K-12`, `catA2`, `catA2_1`), so hits are grouped by their
+position, never by name. The longest hit
 of a gene defines the locus, and a shorter hit joins it when at least 80 % of the
 shorter hit lies inside it. Hits are taken longest first and compared with these
 longest hits only, so a short hit lying where two genes overlap cannot chain the two
@@ -84,14 +86,17 @@ coordinates of the longest hit, as in `SAMPLE1|contig_3:3176892-3177704`; a data
 version that changes those coordinates changes the ID. Every hit stays on
 `Database_hits`, with its identity, coverage and the line of the table it came from.
 
-`reference_accessions` holds the GenBank accessions of the database's reference
-sequences, with their coordinates. CARD's ARO numbers are not in ABRicate's output.
+`reference_accessions` holds the accessions of the databases' reference sequences:
+GenBank with coordinates for CARD, RefSeq for NCBI. CARD's ARO numbers are not in
+ABRicate's output.
 
 `in_resfinder` says whether ResFinder found the gene. ResFinder collects acquired
 resistance genes ([Zankari et al. 2012](https://doi.org/10.1093/jac/dks261)), while CARD
-and ARG-ANNOT also list genes a species carries anyway, such as efflux pumps, porins and
-their regulators; a gene found only by CARD or ARG-ANNOT is therefore worth a look
-before it is read as acquired. The `Summary` sheet counts the loci ResFinder found, and
+and NCBI also list genes a species carries anyway: both list the chromosomal AmpC
+cephalosporinase of *Pseudomonas aeruginosa*, and CARD also its multidrug efflux pumps
+and their regulators ([Lister et al. 2009](https://doi.org/10.1128/CMR.00040-09)). A
+gene found only by CARD or NCBI is therefore worth a look before it is read as
+acquired. The `Summary` sheet counts the loci ResFinder found, and
 gives ABRicate's version and the date ABRicate lists for its copy of each database
 (also on `Run_QC`, from `05.amr/abricate/abricate_databases.tsv`), so each result is
 reported with the database it came from.
@@ -168,15 +173,29 @@ matched to the database loci by position: same contig, and at least 80 % of the
 shorter gene inside the longer one. Resistance genes (`AMR`) and biocide and metal
 resistance genes (`STRESS`) are matched; the quaternary-ammonium efflux gene
 `qacEdelta1`, for instance, is a `STRESS` gene for AMRFinderPlus and a resistance gene
-for the databases. Point mutations are not matched: AMRFinderPlus reports one with the
+for CARD. Point mutations are not matched: AMRFinderPlus reports one with the
 coordinates of the whole gene it lies in, which a database hit on that gene would
 otherwise take for its own. When several rows match one locus, the highest tier is
 shown. The tiers are explained under [the mobility ladder](../mobilome/mobility-ladder.md).
 
+### Virulence genes
+
+`Virulence_loci` lists the genes ABRicate found in VFDB. Its hits are grouped by
+position as above, apart from the resistance genes, so a virulence gene never joins a
+resistance gene's row. Each row has the same plasmid, ICE/IME and phage answers, by the
+same rules. `virulence_factors` and `vf_categories` give the virulence factor the gene
+belongs to and VFDB's category for it, such as Adherence, Motility or
+Nutritional/Metabolic factor, each with VFDB's ID; `reference_organisms` names the
+organism VFDB's reference sequence came from. No mobility tier is given: the mobilome
+module rates resistance genes only.
+
+VFDB collects the virulence factors of pathogens. Many of them, such as flagella, pili
+and iron uptake systems, are also carried by harmless bacteria
+([Hill 2012](https://doi.org/10.1128/JB.00980-12)), so a hit says that the gene is
+there, not that the strain is a pathogen.
+
 ### What the AMR workbook leaves out
 
-- The other five ABRicate databases (EcoH, E. coli VF, MEGARes, NCBI and VFDB): their
-  tables stay in `05.amr/abricate/{sample}/`.
 - The reads mapped to CARD in the short-read modes: see `05.amr/mapping/`.
 - AMRFinderPlus's point mutations (for example in `gyrA`), virulence genes, and any
   other AMRFinderPlus gene no database hit matches. With the mobilome module on, they

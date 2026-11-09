@@ -90,7 +90,7 @@ Re-check the table when you change the GTDB release.
 
     ABRicate and the CARD read screen keep running exactly as before. The three
     analyses are complementary: the CARD read screen detects genes the assembly
-    collapsed or broke, ABRicate screens eight databases, and AMRFinderPlus supplies
+    collapsed or broke, ABRicate screens four databases, and AMRFinderPlus supplies
     the structured gene and mutation output this module uses.
     See [Antimicrobial resistance](../analysis/amr.md).
 

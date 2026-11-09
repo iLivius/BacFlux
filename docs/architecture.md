@@ -120,7 +120,7 @@ flowchart LR
     R([trimmed reads])
     F([contigs_final.fasta])
 
-    A[ABRicate on the contigs<br/>8 databases, EFSA 80% and 70%]
+    A[ABRicate on the contigs<br/>4 databases, EFSA 80% and 70%]
     B[BBMap, reads against CARD<br/>at least 70% of the gene covered]
     P[AMRFinderPlus on the proteins<br/>curated cutoffs, one per gene]
 

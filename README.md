@@ -91,7 +91,7 @@ assembly fragmentation and available read types still affect the results.
   03.taxonomy      GTDB-Tk against GTDB R232
   04.annotation    Bakta · eggNOG · antiSMASH · dbCAN
                    Baktfold* · EcoFoldDB trait profile*
-  05.amr           ABRicate over eight databases · reads mapped to CARD †
+  05.amr           ABRicate over four databases · reads mapped to CARD †
   06.plasmids      Platon, with a supplementary BLAST line beside each call
   07.phages        VirSorter2 (or geNomad*) → CheckV
   08.mobilome      AMRFinderPlus · ISEScan · CONJscan → a mobility tier per AMR gene *
@@ -124,7 +124,8 @@ to test whether the strain expresses it. See
 [trait profile](https://iLivius.github.io/BacFlux/analysis/traits/).
 
 **The per-strain workbooks** (`10.workbooks`) gather, for each strain, the resistance
-genes found in CARD, ResFinder and ARG-ANNOT, one row per gene, each with three answers:
+genes found in CARD, NCBI and ResFinder and the virulence genes found in VFDB, one row
+per gene, each with three answers:
 is it on a plasmid, inside an ICE or IME, inside a phage region? Each answer is `yes`,
 `no`, `uncertain` or `not_assessed`, so an analysis that did not run never reads as a
 negative result. With the trait profile on, a second workbook lists the trait calls with
