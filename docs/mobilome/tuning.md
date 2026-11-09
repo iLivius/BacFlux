@@ -634,7 +634,7 @@ megaplasmids run to 1–2 Mb; between the two the module says `unknown` and lets
 confidence cap reflect that. Above it, a geNomad plasmid call is weighed against the
 length rather than taken: such a contig is called chromosomal with the disagreement
 flagged, since a replicon that large is usually a secondary chromosome (see
-[Plasmids](../analysis/plasmids.md#what-the-mobility-ladder-takes-from-here)).
+[Plasmids](../analysis/plasmids.md#what-platon-classifies-and-how-bacflux-reads-it)).
 
 ## The two directions
 

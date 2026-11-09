@@ -115,7 +115,7 @@ called a plasmid, `both`, `conflict`, and `platon` for every other call, includi
 contig Platon skipped whose call comes from its length (`plasmid_evidence` then says
 so). Platon skips every contig of 500 kb or more and every contig under 1 kb, and such a
 contig is decided by geNomad's call or by its length, as explained under
-[Plasmids](plasmids.md#what-the-mobility-ladder-takes-from-here). A plasmid is not
+[Plasmids](plasmids.md#what-platon-classifies-and-how-bacflux-reads-it). A plasmid is not
 transferable by being a plasmid: `plasmid_mobility` gives Platon's reading of its
 conjugation and mobilisation genes.
 

@@ -95,22 +95,56 @@ The lookup is by contig ID, so the wrong table would report every plasmid as
 "not verified by BLAST search" — silently, with no error. That is the reason it is resolved
 centrally rather than per rule.
 
-!!! warning "An almost-empty Platon directory is a normal result, not a failure"
+### What Platon classifies, and how BacFlux reads it
 
-    Platon classifies only contigs of 1,000 bp up to 499,999 bp (`MIN_CONTIG_LENGTH` and
-    `MAX_CONTIG_LENGTH` in Platon's own source). When no contig of the genome is in that
-    range, as on a closed genome without small plasmids, Platon stops early and writes no
-    table and no FASTA: on a complete Nanopore or hybrid assembly this is the usual case.
+Platon classifies only contigs of 1,000 to 499,999 bp (`MIN_CONTIG_LENGTH` and
+`MAX_CONTIG_LENGTH` in its source). Any other contig is skipped: never scored, and absent
+from `contigs_final.tsv`. What reaches the two FASTA files depends on the rest of the
+genome:
 
-    When at least one contig is in range, Platon writes its chromosome FASTA from every
-    contig it did not call a plasmid, so the contigs it skipped land there too, although it
-    never classified them: a 1.1 Mb megaplasmid can sit in that file, and so can every
-    contig under 1 kb of a draft assembly. BacFlux reads the chromosome FASTA as a
-    chromosome call only for contigs in Platon's range, and decides the others from
-    geNomad's call or their length (see
-    [What the mobility ladder takes from here](#what-the-mobility-ladder-takes-from-here)).
+| Contigs in Platon's range | `contigs_final.plasmid.fasta` | `contigs_final.chromosome.fasta` |
+|---|---|---|
+| none | not written | not written |
+| at least one | the contigs called plasmid | every other contig, **the skipped ones included** |
 
-    A real Platon crash looks different: the rule traps the exit status and writes one line,
+The chromosome FASTA is therefore a chromosome call only for a contig in Platon's range.
+A megaplasmid of 500 kb or more, or a contig under 1 kb of a draft assembly, sits in that
+file without Platon having looked at it. Read as a call, it would turn every resistance gene
+on such a contig into a chromosomal, intrinsic candidate — the error that hides mobility.
+
+BacFlux reads both files against the contig lengths of `contigs_final.fasta`, in the
+concordance table and in the mobilome module's replicon table alike. A contig outside
+Platon's range counts as not classified by Platon (`not_called` in the concordance), and
+geNomad's call or its length decides:
+
+| Contig Platon skipped | geNomad | `replicon` | `replicon_call_source` |
+|---|---|---|---|
+| 2 Mb or more | no plasmid call, or not run | `chromosome` | `platon` |
+| 2 Mb or more | plasmid | `chromosome`, flagged | `conflict` |
+| 500 kb to 2 Mb | no plasmid call, or not run | `unknown` | `platon` |
+| under 1 kb | no plasmid call, or not run | `unknown` | `platon` |
+| under 2 Mb | plasmid | `plasmid` | `genomad` |
+
+- **2 Mb** is the megaplasmid ceiling: no realistic plasmid reaches it, so a longer contig
+  is called chromosomal from its length, and its evidence text says the call is inferred.
+- **500 kb to 2 Mb** stays `unknown`, because megaplasmids of that size exist; under 1 kb,
+  the length says nothing either way.
+- **A geNomad plasmid call** decides a skipped contig under 2 Mb, so a plasmid Platon
+  never looked at is not reported as chromosomal.
+- **At 2 Mb or more**, a geNomad plasmid call is weighed against the length. A replicon
+  that large beside the main chromosome is usually a secondary chromosome, or chromid: it
+  carries core genes but replicates and partitions like a plasmid, which is why geNomad
+  can score it as one ([Harrison et al. 2010](https://doi.org/10.1016/j.tim.2009.12.010)).
+  The contig is called chromosomal and flagged `conflict`, which caps the confidence of
+  every mobility tier on it, as when Platon calls a contig chromosomal and geNomad a
+  plasmid.
+
+!!! warning "An empty Platon directory is a normal result, not a failure"
+
+    On a complete Nanopore or hybrid assembly without small plasmids, every replicon is
+    500 kb or more, so Platon writes nothing, and the lengths decide as above. A real Platon
+    crash looks
+    different: the rule traps the exit status and writes one line,
     `{sample}: Platon exited with status N; see the log.`, into `verified_plasmids.txt`
     instead of killing the sample. That line is the only reliable signal that Platon failed,
     and both downstream readers key on it.
@@ -127,10 +161,9 @@ is licensed by Berkeley Lab for academic / non-commercial use; the terms of ever
 are listed under [Licensing](../about/licensing.md).
 
 The rule joins four files into one table: Platon's per-contig table, Platon's chromosome
-FASTA, `verified_plasmids.txt`, and geNomad's plasmid summary from stage 07. It also reads
-the contig lengths from `contigs_final.fasta`, so that a contig Platon skipped for its size
-(500 kb or more, or under 1 kb) counts as `not_called` even when it sits in Platon's
-chromosome FASTA. One
+FASTA, `verified_plasmids.txt`, and geNomad's plasmid summary from stage 07, with the
+contig lengths of `contigs_final.fasta`, so that a contig Platon skipped counts as
+`not_called` ([above](#what-platon-classifies-and-how-bacflux-reads-it)). One
 row per plasmid **candidate** — the union of the two tools' plasmid calls. Contigs both
 tools agree are chromosome are left out.
 
@@ -195,22 +228,9 @@ itself, from its own `# Conjugation`, `# Mobilization` and `# OriT` counts.
 | neither | `non-mobilisable` | — |
 
 Conjugation is tested first because a relaxase is part of a conjugative system, not an
-alternative to one. Contigs Platon skipped for their size, whether or not they appear in its
-chromosome FASTA, are decided as follows:
-
-| Contig Platon skipped | geNomad | `replicon` | `replicon_call_source` |
-|---|---|---|---|
-| any length | no plasmid call (or not run) | `chromosome` at **2 Mb and above**; `unknown` from 500 kb to 2 Mb, because megaplasmids of that size exist, and under 1 kb | `platon` |
-| under 2 Mb | plasmid | `plasmid` | `genomad` |
-| 2 Mb and above | plasmid | `chromosome`, flagged | `conflict` |
-
-The second row keeps a plasmid that Platon missed or skipped from silently becoming
-"chromosomal, intrinsic candidate". The third covers secondary chromosomes, or chromids:
-replicons that carry core genes but replicate and partition like a plasmid, which is why
-geNomad can score them as one ([Harrison et al. 2010](https://doi.org/10.1016/j.tim.2009.12.010)).
-The 3.36 Mb second chromosome of *Paraburkholderia xenovorans* LB400 is an example. Such a
-contig is called chromosomal from its length, and the disagreement caps the confidence of
-every tier on it, as for a contig Platon calls chromosomal and geNomad a plasmid.
+alternative to one. A contig Platon skipped gets its replicon from geNomad's call and its
+length, as set out under
+[What Platon classifies, and how BacFlux reads it](#what-platon-classifies-and-how-bacflux-reads-it).
 
 ## Before you conclude a plasmid is absent
 
