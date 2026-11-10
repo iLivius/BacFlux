@@ -187,7 +187,28 @@ references:
     start: i884
     end: i890
     doi: 10.1093/bioinformatics/bty560
-    notes: "fastp."
+    notes: "fastp; also cited for fastplong, as fastplong's README asks."
+
+  - type: article
+    title: "Ultrafast one-pass FASTQ data preprocessing, quality control, and deduplication using fastp"
+    authors:
+      - family-names: Chen
+        given-names: Shifu
+    year: 2023
+    journal: iMeta
+    volume: 2
+    issue: 2
+    start: e107
+    doi: 10.1002/imt2.107
+    notes: "fastp; cited for fastplong, as fastplong's README asks."
+
+  - type: software
+    title: "fastplong: ultrafast preprocessing and quality control for long reads"
+    authors:
+      - name: OpenGene
+    repository-code: "https://github.com/OpenGene/fastplong"
+    version: 0.7.1
+    notes: "ONT adapter and barcode trimming. No publication of its own: cite the two fastp papers."
 
   - type: article
     title: "NanoPack: visualizing and processing long-read sequencing data"

@@ -326,7 +326,7 @@ whole batch stopping. Fix the one sample, then resume with `--rerun-incomplete`.
 |---|---|---|
 | `.snakemake/conda/` in the launch directory, or the `--conda-prefix` folder | the per-rule environments, and the Medaka model weights stored inside the medaka one | rebuilt from scratch, needs network |
 | `.snakemake/` metadata | what is up to date, and the lock | the next run recomputes more than it needs to |
-| under `output_dir` | the databases the workflow fetches and keeps — the PhiX genome and its Bowtie2 index, CARD, antiSMASH, dbCAN, CheckV, the phage caller's own database, and the optional Baktfold, EcoFoldDB and mobilome databases | re-downloaded or rebuilt; for PhiX and CARD, see below |
+| under `output_dir` | the databases the workflow fetches and keeps — the PhiX genome and its Bowtie2 index, CARD, antiSMASH, dbCAN, CheckV, UniVec's Illumina adapters, the phage caller's own database, and the optional Baktfold, EcoFoldDB and mobilome databases | re-downloaded or rebuilt; for PhiX and CARD, see below |
 | `output_dir/logs/` | one log per rule and sample (`LOGS` in `00_common.smk`) | nothing recomputes; you lose the record |
 
 The PhiX index and CARD are kept for a reason beyond saving a download. Snakemake
@@ -441,6 +441,7 @@ What `download_all` fetches, according to the configuration:
 | VirSorter2 database | `virsorter2_db` | `phage.caller: virsorter2`, unless `directories.vs2_db` names your copy | `07.phages/vs2_db/` |
 | geNomad database | `genomad_db` | `phage.caller: genomad`, unless `directories.genomad_db` names your copy | `07.phages/genomad_db/` |
 | CheckV database | `checkv_db` | unless `directories.checkv_db` names your copy | `07.phages/checkv_db/` |
+| UniVec's Illumina adapter records | `univec_illumina` | always (the adapter screen runs in every mode) | `02.assembly/adapter_lists/` |
 | Baktfold database and the ProstT5 model | `structure_annotation_db` | `baktfold.run` or `traits.run`, unless `directories.baktfold_db` names your copy | `04.annotation/baktfold/databases/` |
 | EcoFoldDB | `trait_db` | `traits.run`, unless `directories.ecofolddb_db` names your copy | `04.annotation/traits/databases/` |
 | CONJScan models | `conjscan_models` | `mobilome.run` | `08.mobilome/conjscan_models/` |

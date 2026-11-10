@@ -80,8 +80,10 @@ output_dir/
 |   |-- {sample}/
 |   |   |-- illumina/                            [illumina, hybrid]
 |   |   `-- ont/                                 [nanopore, hybrid]
+|   |       `-- adapters/                        adapter scan and trimming, unless ont_adapter: off
 |   `-- phix/                                    [illumina, hybrid]  genome + index
 |-- 02.assembly/
+|   |-- adapter_lists/                           UniVec's Illumina adapters, for the adapter screen
 |   `-- {sample}/
 |       |-- contigs_final.fasta                  <- the delivered genome
 |       |-- contigs_filt.fasta                   [illumina, hybrid, contigs]
@@ -91,7 +93,7 @@ output_dir/
 |       |-- {sample}_replicons.tsv  + _audit     [nanopore, hybrid]
 |       |-- {sample}_medaka_model.txt            [nanopore, hybrid]
 |       |-- contaminants/                        BLAST + BlobTools + the audit
-|       `-- eval/                                QUAST, CheckM, Qualimap
+|       `-- eval/                                QUAST, CheckM, Qualimap, adapter screen
 |-- 03.taxonomy/{sample}/                        GTDB-Tk
 |-- 04.annotation/
 |   |-- bakta/{sample}/   eggnog/{sample}/
@@ -127,8 +129,12 @@ Absent entirely in `contigs` mode, which has no reads to QC.
 | `{sample}/illumina/{sample}_sel_R{1,2}.fastq` | `map_sel_contigs` | `[hybrid]` The Illumina pairs that mapped as proper pairs to the decontaminated Illumina assembly. Polypolish uses these reads for correction. Filtlong also uses them when `parameters.hybrid.short_read_guidance: true`; that guidance is disabled by default. Kept, not temporary — deleting them would force the whole short-read half to re-run. |
 | `{sample}/ont/{sample}_filt.fastq` | `filter_long_reads` | The Oxford Nanopore reads Filtlong kept — what Flye assembled and what Medaka polished with. |
 | `{sample}/ont/raw_qc/`, `{sample}/ont/filt_qc/` | `raw_long_read_qc`, `filtered_long_read_qc` | NanoPlot read-length and quality profiles, before and after filtering: `{sample}_NanoPlot-report.html`, one interactive HTML file per plot, and `{sample}_NanoStats.txt`. Read side by side: the difference is what the filter did. The plots are HTML only, with no PNG copies, because NanoPlot needs a Chrome browser on the machine to draw static images. |
+| `{sample}/ont/adapters/{sample}_adapter_scan.tsv`, `_adapter_choice.tsv`, `_fastplong_options.txt`, `_adapter_sequence.fasta` | `find_ont_adapter` | What the Oxford Nanopore reads still carry and what is trimmed: reads with the adapter, with a barcode block and no adapter core, and with the Mu end, per 10,000 reads; the decision with the barcodes found and the second barcode; the options and sequences fastplong is given. Absent with `ont_adapter: off`. See [ONT adapter trimming](../methods_ont_adapters.md). |
+| `{sample}/ont/adapters/{sample}_fastplong.json`, `.html` | `trim_ont_adapters` | fastplong's own report: reads and bases in and out, reads trimmed, chimeric reads split. Not read by MultiQC, whose fastp module would take it for a fastp run. |
+| `{sample}/ont/adapters/{sample}_adapter_check.tsv` | `check_ont_trimming` | Among the reads Filtlong kept, how many still start with the adapter, or with the end of the trimmed sequence. |
 
-The trimmed Illumina pairs (`{sample}_trim_R{1,2}.fastq`) are temporary and are gone
+The trimmed Illumina pairs (`{sample}_trim_R{1,2}.fastq`) and the trimmed Oxford
+Nanopore reads (`{sample}/ont/{sample}_trimmed.fastq.gz`) are temporary and are gone
 when the run finishes. `01.reads/phix/` is kept: the PhiX genome, `phix.fna.gz`,
 fetched once, and the six Bowtie2 index files built from it, `phix.*.bt2`, about
 8 MB, built once. The index is kept so that a sample added to the output folder later
@@ -203,11 +209,17 @@ plasmid, on [Decontamination](../analysis/decontamination.md).
 | `quast/` | QUAST assembly metrics — contig count, N50, largest contig, total length, GC. |
 | `checkm/{sample}_checkm_stats.tsv` | CheckM completeness and contamination. `lineage.ms` beside it is CheckM's own marker-set file. |
 | `qualimap/` | Coverage depth and evenness of the reads on the assembly. Absent in `contigs` mode, where the only alignment is the contigs against themselves and a report on it would say nothing. |
+| `adapter_screen/{sample}_adapter_loci.tsv` | The adapter screen of the delivered genome: one row per locus of adapter or barcode sequence, with its contig, topology, position, the adapters that matched (best hit first) and `counted` and `reason` columns. A header line alone when nothing was found. |
+| `adapter_screen/{sample}_adapter_screen_mqc.tsv` | The sample's row of the Adapters table of the MultiQC report. |
+| `adapter_screen/{sample}_adapter_blast.tsv`, `_adapter_query.fasta` | Every BLAST hit, also those that do not pass the screen's rules, and every adapter searched for. |
 
 In `hybrid`, QUAST, CheckM and GTDB-Tk each run over **two** genomes per sample —
 `{sample}_illumina` and `{sample}_ont` — so one report holds both and the comparison
 is the point. The staging directory `eval/genomes/` that carries them there is
-temporary. See [Assembly QC](../analysis/assembly-qc.md).
+temporary. The adapter screen searches the delivered genome only. Its Illumina adapter
+list, the Illumina records of NCBI UniVec, sits once per output folder in
+`02.assembly/adapter_lists/univec_illumina.fasta`, with `PROVENANCE.txt` beside it. See
+[Assembly QC](../analysis/assembly-qc.md).
 
 ### Front-end working directories
 
@@ -444,6 +456,8 @@ not a failure.
 | Gone by the end | Why it existed |
 |---|---|
 | `01.reads/{sample}/illumina/{sample}.{1,2}.fastq` and `{sample}_trim_R{1,2}.fastq` | The PhiX-free pairs and then the fastp-trimmed pairs. The trimmed ones survive until the last rule that reads them is done: the assembler, the coverage alignment, the CARD analysis, and in `hybrid` the mapping that picks the Illumina pairs to keep. |
+| `01.reads/{sample}/ont/{sample}_trimmed.fastq.gz` | The Oxford Nanopore reads after fastplong; Filtlong reads them and keeps the selection in `{sample}_filt.fastq`. |
+| `02.assembly/{sample}/eval/adapter_screen/{sample}_search_contigs.fasta` | The delivered genome with each circular contig extended by its first 200 bp, for the adapter screen's BLAST search. |
 | `02.assembly/{sample}/contaminants/{sample}_map.bam`, the BlobTools JSON and coverage file | Intermediates of the screen; the BlobTools *table* is kept. |
 | `02.assembly/{sample}/eval/genomes/` | Staging copies of the assemblies under their bin ids, for QUAST, CheckM and GTDB-Tk. |
 | `02.assembly/{sample}/polypolish/` contents | Alignments and the pre-correction draft. |

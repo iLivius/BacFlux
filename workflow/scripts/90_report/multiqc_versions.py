@@ -17,7 +17,8 @@ It reads files only: it never runs a tool or builds an environment.
 
 Takes in (from rule multiqc in shared/90_report.smk): the folder of the
 environment files, the BacFlux output folder, the sample names, and which
-kinds of tools the run used (--short-reads, --long-reads, --traits).
+kinds of tools the run used (--short-reads, --long-reads, --ont-trimming,
+--traits).
 Gives back: 09.report/multiqc_versions.yaml, a MultiQC configuration file with a
 software_versions entry, which rule multiqc hands to MultiQC with a second
 --config.
@@ -42,10 +43,14 @@ SHARED_TOOLS = (
     ("CheckM", "checkm", "checkm-genome"),
     ("GTDB-Tk", "gtdbtk", "gtdbtk"),
     ("Bakta", "bakta", "bakta"),
+    # The adapter screen of the finished genome (Adapters table, every mode). Its
+    # BLAST table records no version, so the pin is shown.
+    ("BLAST+", "blast", "blast"),
 )
 
 # How each tool writes its version into its own output, as a regular expression
-# whose group is the version number. fastp is read from its JSON report instead.
+# whose group is the version number. fastp and fastplong are read from their JSON
+# reports instead.
 VERSION_PATTERNS = {
     "QUAST": r"^Version:\s*([^\s]+)",
     "GTDB-Tk": r"\bGTDB-Tk v([^\s]+)",
@@ -102,6 +107,8 @@ def version_sources(root, sample, tool):
         return [root / "04.annotation" / "bakta" / sample / f"{sample}.log"]
     if tool == "fastp":
         return list((root / "01.reads" / sample / "illumina").glob("*.json"))
+    if tool == "fastplong":
+        return list((root / "01.reads" / sample / "ont" / "adapters").glob("*_fastplong.json"))
     if tool == "NanoPlot":
         return list((root / "01.reads" / sample / "ont").rglob("*NanoPlot*.log"))
     if tool == "QualiMap":
@@ -122,9 +129,9 @@ def observed_versions(root, samples, tool):
         for path in version_sources(root, sample, tool):
             if not path.is_file():
                 continue
-            if tool == "fastp":
+            if tool in {"fastp", "fastplong"}:
                 data = json.loads(path.read_text(encoding="utf-8"))
-                version = data.get("summary", {}).get("fastp_version")
+                version = data.get("summary", {}).get(f"{tool}_version")
                 if version:
                     versions.add(str(version))
                 continue
@@ -137,11 +144,13 @@ def observed_versions(root, samples, tool):
     return sorted(versions)
 
 
-def collect_versions(env_dir, root, samples, short_reads=False, long_reads=False, traits=False):
+def collect_versions(env_dir, root, samples, short_reads=False, long_reads=False, traits=False,
+                     ont_trimming=False):
     """Decide the version(s) to show for every tool of this run's report.
 
     Takes in: the environment folder, the output folder, the samples, and which
-              kinds of tools the run used.
+              kinds of tools the run used (ont_trimming: fastplong trimmed the ONT
+              reads, which the Adapters table reports).
     Gives back: {tool: [version, ...]}, each from the tool's own output when it
               recorded one, otherwise the pin labelled "(workflow pin)".
     """
@@ -152,6 +161,8 @@ def collect_versions(env_dir, root, samples, short_reads=False, long_reads=False
         tools.append(("NanoPlot", "nanoplot", "nanoplot"))
     if short_reads or long_reads:
         tools.append(("QualiMap", "qualimap", "qualimap"))
+    if ont_trimming:
+        tools.append(("fastplong", "fastplong", "fastplong"))
     if traits:
         # The trait profile's structure search: Baktfold's environment brings
         # Foldseek, and Baktfold runs ProstT5 to give each protein its 3Di
@@ -179,8 +190,9 @@ def versions_yaml(versions):
 
     MultiQC groups the Software Versions table by report section, so each tool
     goes under the section that shows its results: NanoPlot under NanoStat (the
-    MultiQC module that reads NanoPlot's statistics), the structure tools under
-    Trait profile, and QualiMap's version under the name BamQC, the key MultiQC's
+    MultiQC module that reads NanoPlot's statistics), BLAST+ and fastplong under
+    Adapters, the structure tools under Trait profile, and QualiMap's version under
+    the name BamQC, the key MultiQC's
     own QualiMap module uses, so the table gets one column for it, not two.
     Every value is written as a quoted string (JSON strings are valid YAML), so
     a version such as 1.10 is not read back as the number 1.1.
@@ -189,6 +201,8 @@ def versions_yaml(versions):
     for tool, values in versions.items():
         if tool == "NanoPlot":
             group = "NanoStat"
+        elif tool in {"BLAST+", "fastplong"}:
+            group = "Adapters"
         elif tool in {"Baktfold", "Foldseek"}:
             group = "Trait profile"
         else:
@@ -212,11 +226,14 @@ def main(argv=None):
     parser.add_argument("--samples", nargs="+", required=True, help="The samples in the report.")
     parser.add_argument("--short-reads", action="store_true", help="The run used Illumina reads.")
     parser.add_argument("--long-reads", action="store_true", help="The run used ONT reads.")
+    parser.add_argument("--ont-trimming", action="store_true",
+                        help="fastplong trimmed the ONT adapters and barcodes.")
     parser.add_argument("--traits", action="store_true", help="The trait profile ran.")
     parser.add_argument("--out", required=True, help="The YAML file to write.")
     args = parser.parse_args(argv)
     versions = collect_versions(args.env_dir, args.output_root, args.samples,
-                                args.short_reads, args.long_reads, args.traits)
+                                args.short_reads, args.long_reads, args.traits,
+                                args.ont_trimming)
     path = Path(args.out)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(versions_yaml(versions), encoding="utf-8")

@@ -1,0 +1,21 @@
+# fastplong 0.7.1, for rule trim_ont_adapters (shared/05_ont_adapters.smk). The exact
+# package builds are fixed by fastplong.linux-64.pin.txt next to this file; Snakemake
+# creates the environment from that list. It holds fastplong and nothing else.
+#
+# What it is for. fastplong (OpenGene, MIT licence; by the author of fastp) removes the
+# Oxford Nanopore sequencing adapter, and the barcode block that follows it in barcoded
+# libraries, from the ends of ONT reads before Filtlong and Flye see them, and splits a
+# read where it finds that sequence in the middle (two molecules joined into one read).
+# BacFlux always tells fastplong which sequence to remove, worked out from the reads by
+# rule find_ont_adapter; fastplong's own guess of the adapter is never used, because it
+# looks only at the first reads of a file (docs/methods_ont_adapters.md).
+#
+# The list was made on 2026-11-09 (conda 26.9.4) with
+#   conda create -p <env> --override-channels -c conda-forge -c bioconda fastplong=0.7.1
+# and then conda list -p <env> --explicit wrote the list.
+name: fastplong
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - fastplong=0.7.1

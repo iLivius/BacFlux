@@ -60,7 +60,7 @@ config file, `mode`, decides which of four front ends runs:
 | `mode:` | Input | Front end |
 |---|---|---|
 | `illumina` | Illumina paired-end reads | PhiX removal, `fastp`, `SPAdes` |
-| `nanopore` | Long reads from Oxford Nanopore Technologies (ONT) | `NanoPlot`, `Filtlong`, `Flye`, `dnaapler`, `Medaka`\* |
+| `nanopore` | Long reads from Oxford Nanopore Technologies (ONT) | `NanoPlot`, adapter and barcode trimming (`fastplong`), `Filtlong`, `Flye`, `dnaapler`, `Medaka`\* |
 | `hybrid` | Illumina and ONT reads from the same isolate | both front ends above, then the ONT assembly corrected with the short reads by `Polypolish`, and a `Snippy` comparison of the two assemblies |
 | `contigs` | A finished assembly (FASTA) | contig filtering only — no assembler |
 
@@ -79,7 +79,8 @@ assembly fragmentation and available read types still affect the results.
                    │ illumina │ nanopore │  hybrid  │ contigs  │
                    └────┬─────┴────┬─────┴────┬─────┴────┬─────┘
   01.reads         bowtie2 PhiX  NanoPlot    both legs   —
-                   fastp         Filtlong
+                   fastp         fastplong
+                                 Filtlong
   02.assembly      SPAdes        Flye        Flye, Medaka*,   contig filter,
                                  dnaapler    Polypolish,      header-aware
                                  Medaka*     Snippy
@@ -99,8 +100,9 @@ assembly fragmentation and available read types still affect the results.
   10.workbooks     one Excel workbook per strain: AMR genes and their context,
                    and the trait calls *
 
-  Decontamination (BLAST + BlobTools) and assembly QC (QUAST, CheckM, Qualimap) are
-  shared code as well; both sit inside 02.assembly, where each front end needs them.
+  Decontamination (BLAST + BlobTools) and assembly QC (QUAST, CheckM, Qualimap, and a
+  BLAST screen for leftover sequencing adapters) are shared code as well; both sit
+  inside 02.assembly, where each front end needs them.
 
   * optional, set in the config          † modes that have short reads
 ```

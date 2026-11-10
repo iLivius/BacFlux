@@ -39,12 +39,13 @@ flowchart TD
     subgraph LA["ONT reads"]
         direction TB
         OR([ONT reads])
+        TRM[find_ont_adapter<br/>trim_ont_adapters<br/>adapter and barcode, fastplong]
         FL[filter_long_reads<br/>Filtlong, NanoPlot QC;<br/>SEL reads if guided]
         ASM[ont_assembly<br/>Flye]
         FIX[fix_start<br/>dnaapler]
         MED[long_read_consensus<br/>Medaka]
         POL[short_read_correction<br/>Polypolish]
-        OR --> FL --> ASM --> FIX --> MED --> POL
+        OR --> TRM --> FL --> ASM --> FIX --> MED --> POL
         FIX -.->|Medaka off| POL
     end
     SELR --> POL
@@ -59,6 +60,14 @@ assembly. Reads mapping to its retained contigs are used by Polypolish and, when
 `parameters.hybrid.short_read_guidance: true`, by Filtlong, which then waits for
 the screen; guidance is disabled by default. The final assembly receives a separate
 screen that reports decisions and removes no sequence.
+
+Before Filtlong, the ONT reads lose their sequencing adapter and barcode, as in
+`nanopore` mode: `find_ont_adapter` works out what is still on the reads and fastplong
+removes it (`parameters.hybrid.ont_adapter`: `detect` by default, `off`, or the sequence
+to trim; see [ONT adapter trimming and the adapter screen](../methods_ont_adapters.md)).
+With short-read guidance on, Filtlong's `--trim` would cut adapter at the read ends too,
+but `--split 1000` breaks a read only at an unsupported stretch of 1 kb or more, so a
+chimeric read joined by a 100 bp adapter passes; fastplong splits it.
 
 !!! abstract "Terms used on this page"
 
@@ -97,7 +106,8 @@ Whether it also filters the long reads is a setting, `parameters.hybrid.short_re
     This is independent of the Filtlong settings below. Both can delete a plasmid, for
     different reasons, and both are worth ruling out.
 
-The Filtlong flags differ from `nanopore` mode on purpose:
+Filtlong reads the trimmed ONT reads (the raw ones with `ont_adapter: off`). Its flags
+differ from `nanopore` mode on purpose:
 
 | Flag | From | Default | Why it differs here |
 |---|---|---|---|

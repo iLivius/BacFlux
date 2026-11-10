@@ -33,9 +33,21 @@ class Links(HTMLParser):
 def test_only_methods_represented_by_the_mode_are_selected(short_reads, long_reads, extra):
     methods, trait_methods = citations.references_for_run(short_reads, long_reads)
     assert {reference.tool for reference in methods} == {
-        "MultiQC", "QUAST", "CheckM", "GTDB-Tk", "GTDB", "Bakta",
+        "MultiQC", "QUAST", "CheckM", "GTDB-Tk", "GTDB", "Bakta", "BLAST+",
     } | extra
     assert trait_methods == []
+
+
+@pytest.mark.parametrize("short_reads", [False, True])
+def test_ont_trimming_adds_the_two_fastp_papers_once(short_reads):
+    # fastplong has no paper of its own; its README asks for both fastp papers. In
+    # hybrid mode the 2018 one is already there for fastp itself, and is not repeated.
+    methods, _ = citations.references_for_run(short_reads=short_reads, long_reads=True,
+                                              ont_trimming=True)
+    tools = [reference.tool for reference in methods]
+    assert tools.count("fastp") == 1
+    assert "fastplong (cite fastp)" in tools
+    assert citations.FASTPLONG_REFERENCE.doi == "10.1002/imt2.107"
 
 
 def test_traits_add_the_four_structural_method_references_and_explain_rule_sources():
@@ -61,7 +73,9 @@ def test_visible_links_are_unique_without_relabelling_native_tool_citations():
     links = Links()
     links.feed(content)
     dois = [url.removeprefix("https://doi.org/") for url in links.targets]
-    assert len(dois) == len(set(dois)) == 14
+    # 15: the seven shared references (MultiQC, QUAST, CheckM, GTDB-Tk, GTDB, Bakta,
+    # BLAST+), fastp, NanoPack, the two QualiMap papers and the four trait methods.
+    assert len(dois) == len(set(dois)) == 15
     assert all(re.fullmatch(r"10\.\d{4,9}/\S+", doi) for doi in dois)
 
 

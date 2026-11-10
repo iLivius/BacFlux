@@ -194,6 +194,7 @@ required key is reported by Python as a `KeyError` naming it.
     | a switch: `mobilome.run`, `mobilome.icescan.run`, `discard_no_hit`, `eggnog.dbmem`, `short_read_guidance`, `medaka_model_fallback_auto`, `require_trna_boundary_for_high` | takes it as meant |
     | `medaka_model` | `false` skips Medaka, `true` infers the model |
     | `parameters.decontamination.mode` or `long_read_mode` | `off` counts as `off`; `on`, `yes` or `true` names no policy, and the run stops |
+    | `ont_adapter` | `off` counts as `off`; `on`, `yes` or `true` names neither `detect` nor a sequence, and the run stops |
     | any other key that takes a word: `mode`, `phage.caller`, `parameters.nt_version`, `spades_kmers`, `auto_vote`, `flye_input_mode` | stops, saying how YAML read the value and listing the words it accepts |
     | any key that takes a number: the three `resources`, `min_length`, `keep_percent`, `length_weight`, `max_gene_gap`, and the mobilome thresholds such as `coverage_profile` and `min_identity` | stops, saying how YAML read the value and what number the key takes. A number has no off: write the value itself, e.g. `keep_percent: 100`, which rejects no read by percentage |
     | a block written as one value, e.g. `decontamination: off` or `mobilome: on` | stops. Decontamination is switched off with `mode: off` inside its block and the mobilome module with `run: false` inside its block; phage calling has no off switch |
@@ -386,6 +387,8 @@ links:
   genomad_md5:  "67244b528bb8bed464d1ca147136d33e"
   ecofolddb_link: "https://zenodo.org/records/16908168/files/EcoFoldDB_v2.0.tar.gz"
   ecofolddb_md5:  "be3144a4993f5816a8b772db964d1f3e"
+  univec_link:   "https://ftp.ncbi.nlm.nih.gov/pub/UniVec/archive/10.1/UniVec"
+  univec_sha256: "687d8aa872d4ee215c9e0b3b004d0ee709fb243436d36d159a3f0ac5c25b5e36"
 ```
 
 | Key | Required in | Default | Notes |
@@ -398,6 +401,8 @@ links:
 | `genomad_md5` | with `genomad_link` | the MD5 of the default archive | Zenodo publishes an MD5 rather than the `.sha256` sidecar the other mirrors carry, so it is configured rather than derived. **Change it whenever you change the link.** A mismatch stops rule `genomad_db` before the archive is extracted; an empty value downloads without verification and says so in `logs/genomad_db.log`. |
 | `ecofolddb_link` | *optional*, `traits.run: true` | EcoFoldDB v2.0 on Zenodo | Must be the `.tar.gz` archive of the Zenodo record: the copy in the authors' GitHub repository names some entries differently from the names the trait rules use. Nothing is downloaded when `directories.ecofolddb_db` is set, but a link that is set must still be a `.tar.gz`; with neither set, a run with `traits.run: true` stops before any job starts. |
 | `ecofolddb_md5` | with `ecofolddb_link` | the MD5 of the default archive | As for geNomad, Zenodo publishes an MD5. **Change it whenever you change the link.** A mismatch stops rule `trait_db` before the archive is extracted; an empty value downloads without verification and says so in `logs/trait_db.log`. |
+| `univec_link` | *optional*, all modes | UniVec build 10.1 in NCBI's archive | NCBI UniVec, from which rule `univec_illumina` keeps the Illumina adapter records for the [adapter screen](../analysis/assembly-qc.md#adapter-screen-blast). Illumina's sequences are copyrighted, so they are downloaded into the run rather than shipped. The archive copy of a build does not change, unlike the current UniVec. Empty or missing takes the default. |
+| `univec_sha256` | with `univec_link` | the SHA-256 of build 10.1 | NCBI publishes no checksum for UniVec, so the default was computed from the file. **Change it whenever you change the link.** A mismatch stops rule `univec_illumina`, keeps the file as `.failed` and gives its checksum; a value that is not 64 hexadecimal characters stops the run before any job starts. |
 
 The CheckV and geNomad mirrors exist for one reason: both databases are served
 from `portal.nersc.gov` ([NERSC](https://www.nersc.gov/)), which is unreachable
@@ -689,10 +694,12 @@ by which a real plasmid is lost are on
     flye_input_mode: auto      # auto | nano-raw | nano-hq
     medaka_model: auto
     medaka_model_fallback_auto: false
+    ont_adapter: detect        # detect | off | the sequence to trim
   hybrid:                      # read only when mode == hybrid
     flye_input_mode: auto
     medaka_model: auto
     medaka_model_fallback_auto: false
+    ont_adapter: detect
     short_read_guidance: false # hybrid only: optional Illumina guidance for Filtlong
 ```
 
@@ -703,6 +710,7 @@ The block is namespaced per mode: a run reads only the block named after itself.
 | `flye_input_mode` | Which read model Flye assembles under | `auto` | `auto` gives `--nano-hq` unless an explicit *fast* Medaka model is named. |
 | `medaka_model` | Which Medaka consensus model polishes the assembly | `auto` | `auto`/`true`/empty infer it from the FASTQ headers; `false` skips Medaka entirely *(set `false` to skip this optional step)*; anything else is taken as a model name. |
 | `medaka_model_fallback_auto` | What to do when an explicit model is invalid | `false` | `false` stops with model suggestions. `true` attempts automatic inference. |
+| `ont_adapter` | Whether, and how, the ONT sequencing adapter and barcode are trimmed from the reads before Filtlong (fastplong) | `detect` | `detect` (also empty) works the sequence out from the reads, or copies reads that are already trimmed unchanged; `off` (also an unquoted `off`) gives Filtlong the raw reads; a sequence of 20 to 200 bases of A, C, G and T is trimmed as written. A short tandem repeat is refused. With trimming on, an output folder made before v2.2.0 assembles again. See [ONT adapter trimming and the adapter screen](../methods_ont_adapters.md). |
 | `short_read_guidance` | Hybrid only: use selected Illumina pairs to guide Filtlong, enabling trimming and splitting | `false` | With `false`, Filtlong uses long-read length/quality filtering and the target-base cap, and nothing screens the long reads before Flye; the second screen of the final assembly only reports. With `true`, no `--target_bases` cap is passed, and reads without support from the decontaminated Illumina reads are trimmed, split or discarded. Polypolish uses the selected Illumina reads in either case. |
 
 !!! warning "The two keys are coupled, and it changes the assembly"
@@ -1086,6 +1094,8 @@ the benchmark afterwards.
 | 80% identity, 70% coverage | `rule amr_contigs`, `50_amr.smk` | ABRicate's EFSA reporting thresholds. Kept on that analysis only — a blanket cutoff would fight AMRFinderPlus's curated per-gene ones. |
 | four databases | `DATABASES`, `00_common.smk` | Which ABRicate databases run: card, ncbi and resfinder for resistance genes, vfdb for virulence genes. |
 | `--target_bases 500000000` | `rule filter_long_reads`, `nanopore/10_reads.smk` and `hybrid/30_ont_reads.smk` (`FILTLONG_TARGET_BASES`, `00_common.smk`) | The nanopore mode's total-output cap. Hybrid mode also applies the cap when `short_read_guidance: false`. With guidance enabled it uses the selected Illumina reads, `--trim` and `--split 1000` instead; `--length_weight` is passed in hybrid mode. |
+| 1 % of the reads, 10 reads; 10 % of the barcoded reads; up to 3 mismatches in a 24 bp barcode; 50 bp | `MIN_READ_SHARE`, `MIN_BARCODE_READS`, `SECOND_BLOCK_SHARE`, `MAX_BARCODE_MISMATCHES`, `MIN_SPLIT_LENGTH`, `find_ont_adapter.py` | ONT adapter trimming: below 1 % of the reads an adapter or barcode counts as absent; a barcode is trimmed from 1 % (and 10 reads); two barcodes above 10 % of the barcoded reads give the several-samples NOTE; a sequence shorter than 50 bp is trimmed at the read ends only. See [ONT adapter trimming](../methods_ont_adapters.md#how-the-sequence-is-found). |
+| 90 % identity; 20 bp within 100 bp of a linear contig end, 28 bp inside | `MIN_IDENTITY`, `MIN_END_LENGTH`, `END_DISTANCE`, `MIN_INTERNAL_LENGTH`, `adapter_screen.py` | The adapter screen of the finished genome. 100 bp is the distance within which NCBI's FCS-adaptor trims adaptor to the sequence end; 28 bp is a whole ONT adapter. |
 | coverage ≥ 2×, length ≥ 500 bp | `FASTA_SEL_CMD`, `00_common.smk` | The contig filter, read out of the SPAdes header. Always applied in `illumina` and `hybrid`; in `contigs` mode only when the first header looks like SPAdes' own (it carries `length_…` or `cov_…`), since inventing a filter for an assembly from anywhere else would silently delete real sequence. |
 | 80% of the reference | `EXACT_NAME_REFERENCE_COVERAGE`, `name_ice_elements.py` | Below it, an ICEberg name is suffixed `-like`. Distinct from `iceberg.min_overlap_fraction`, which is measured against our candidate. |
 | 4,000 amino acids | `TRAITS_MAX_PROTEIN_LENGTH`, `00_common.smk` | The longest protein the trait profile searches by structure. Each longer one is listed in the gene table as `not_searched_too_long`, and can still count by its name. EcoFoldDB's published method (Ghaly et al. 2025). |

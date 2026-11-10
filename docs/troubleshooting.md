@@ -349,6 +349,93 @@ nothing — so each one stops with an error and prints the first bytes it receiv
 Turning those layers on is covered in
 [Optional layers](mobilome/optional-layers.md#what-the-download-rules-do-besides-downloading).
 
+## ONT adapter trimming and the adapter screen
+
+The method behind these messages is on
+[ONT adapter trimming and the adapter screen](methods_ont_adapters.md).
+
+### Several barcodes in one read file
+
+!!! warning "Symptom"
+
+    `[BacFlux] NOTE find_ont_adapter <sample>: the reads carry 2 barcodes in at least 10% of
+    the reads …` on the console, and in `logs/find_ont_adapter_<sample>.log`.
+
+**Cause.** Two or more ONT barcodes each sit on at least 10 % of the barcoded reads of one
+sample file. Bleed-through from neighbouring samples of a flow cell stays far below that, so
+the file probably holds the reads of several samples: a mislabelled file, or files merged by
+mistake. Every barcode that reaches 1 % of the reads is trimmed, and the run goes on.
+
+**Fix.** Demultiplex the reads, or take the right file, and run each sample on its own. The
+barcodes and their shares are in `01.reads/{sample}/ont/adapters/{sample}_adapter_choice.tsv`
+and in the Adapters table of the MultiQC report.
+
+### Adapter left in the reads after trimming
+
+!!! warning "Symptom"
+
+    `[BacFlux] NOTE check_ont_trimming <sample>: more than 1% of the reads kept after trimming
+    still start with …`
+
+**Cause.** After fastplong and Filtlong, more than 1 % of the reads Flye assembles still
+start with the ONT adapter core, or with the end of the sequence that was trimmed. The
+adapter in these reads may differ from the one BacFlux searched for, or carry more
+basecalling errors than fastplong allows (a quarter of the bases).
+
+**Fix.** Look at the Adapters table, or at
+`02.assembly/{sample}/eval/adapter_screen/{sample}_adapter_loci.tsv`, to see whether any of
+it reached the assembly. If it did, write the sequence the reads carry into
+`parameters.<mode>.ont_adapter` and run again: the adapter followed by the barcode block, as
+`01.reads/{sample}/ont/adapters/{sample}_adapter_choice.tsv` shows it.
+
+### Adapter at a contig end
+
+!!! warning "Symptom"
+
+    The Adapters table of the MultiQC report gives a number above 0 under *Contig ends with
+    adapter*.
+
+**Cause.** Adapter or barcode sequence lies within 100 bp of the end of a linear contig.
+Reads that kept it ended there: trimming was off, the assembly came from elsewhere
+(`contigs` mode), or the reads carried it in fewer than 1 % of them, below the line at which
+BacFlux trims.
+
+**Fix.** The locus table gives the contig, the coordinates and the adapter. Before a GenBank
+submission, trim it from the contig end, or run NCBI's FCS-adaptor, which does so. A match
+*inside* a contig is listed for a look rather than as a defect; one made of the phage Mu end
+alone (reason `mu_end_inside_contig`) is not counted, because a Mu prophage carries the same
+50 bp.
+
+### UniVec does not match its checksum
+
+!!! warning "Symptom"
+
+    Rule `univec_illumina` fails with `[BacFlux] univec_illumina: the file downloaded from …
+    has the checksum …, not the one in links.univec_sha256, so it was NOT used`.
+
+**Cause.** The file downloaded from `links.univec_link` has a different SHA-256 checksum from
+`links.univec_sha256`. NCBI replaces the current UniVec from time to time; the default link
+points at build 10.1 in NCBI's archive, which does not change.
+
+**Fix.** Use the default link, or, if you changed the link on purpose, put the checksum of the
+new file into `links.univec_sha256`: the message gives it, and the file is kept as
+`02.assembly/adapter_lists/univec_illumina.fasta.download.failed` for you to check first.
+
+### An existing long-read output folder assembles again
+
+!!! warning "Symptom"
+
+    A run of BacFlux v2.2.0 on an output folder made by an earlier version plans Filtlong,
+    Flye and every later step again for each long-read sample.
+
+**Cause.** With `ont_adapter: detect` or a sequence, Filtlong reads the trimmed reads, a new
+file, so Snakemake runs Filtlong and everything after it again, even when nothing was
+trimmed. In `hybrid` mode the Illumina steps run again too, because their trimmed reads are
+temporary files the later steps need.
+
+**Fix.** Set `parameters.<mode>.ont_adapter: off` to keep the existing assembly. The adapter
+screen still runs on it.
+
 ## A tool runs inside the workflow but not by hand
 
 A few tools — QUAST and ISEScan among them — start with `#!/usr/bin/env python`,

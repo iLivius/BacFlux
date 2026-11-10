@@ -6,8 +6,10 @@
 #   hybrid   → Illumina + ONT, ONT-first         (rules/hybrid/*.smk)
 #   contigs  → pre-assembled genomes             (rules/contigs/*.smk)
 # Everything downstream of assembly is shared — one copy of each rule in
-# rules/shared/*.smk, used by all four modes: decontamination → assembly QC →
-# taxonomy → annotation → AMR → plasmids → phages → (mobilome) → report.
+# rules/shared/*.smk, used by all four modes: decontamination → assembly QC
+# (with the adapter screen) → taxonomy → annotation → AMR → plasmids → phages →
+# (mobilome) → report. The long-read modes also share their ONT adapter trimming
+# (rules/shared/05_ont_adapters.smk).
 # Parentheses mark the one optional stage — the mobilome module runs only when
 # config.mobilome.run is true (see rules/shared/80_mobilome.smk).
 #
@@ -110,15 +112,16 @@ include: "rules/shared/00_common.smk"
 for _smk in sorted(glob.glob(os.path.join(workflow.basedir, "rules", MODE, "*.smk"))):
     include: _smk
 
-# 3) Shared downstream modules (10_decontam … 80_mobilome) in numeric order.
+# 3) Shared modules (05_ont_adapters … 80_mobilome) in numeric order.
 #    Globbed (not hard-coded) so the skeleton parses before these files exist.
 #    00_common is already included above; 90_report is included last (step 4) so
 #    it sees every upstream rule's outputs — both are skipped here.
-#    Two files in rules/shared/ are long-read-only despite living here:
-#    12_medaka_check and 15_replicons. They sit in shared/ because nanopore and
-#    hybrid would otherwise hold byte-identical copies of them, and each wraps its
-#    rules in a HAS_LONG_READS gate, so including them unconditionally defines
-#    nothing at all in illumina and contigs mode.
+#    Three files in rules/shared/ are long-read-only despite living here:
+#    05_ont_adapters, 12_medaka_check and 15_replicons. They sit in shared/
+#    because nanopore and hybrid would otherwise hold byte-identical copies of
+#    them, and each wraps its rules in a gate (ONT_ADAPTER_TRIM, or
+#    HAS_LONG_READS), so including them unconditionally defines nothing at all in
+#    illumina and contigs mode.
 for _smk in sorted(glob.glob(os.path.join(workflow.basedir, "rules", "shared", "*.smk"))):
     if os.path.basename(_smk) in ("00_common.smk", "90_report.smk"):
         continue

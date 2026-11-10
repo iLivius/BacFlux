@@ -1,10 +1,12 @@
-# Stage 20 assembly QC: three questions about the finished genome, one tool each.
+# Stage 20 assembly QC: four questions about the finished genome, one tool each.
 #   QUAST    — is the ASSEMBLY any good? Contig count, N50, total length, GC.
 #   CheckM   — is the GENOME complete, and is it one organism? Single-copy marker
 #              genes, reported as completeness % and contamination %.
 #   Qualimap — did the READS map back sensibly? Depth, evenness, insert size.
-# The first two need a genome; the third needs the BAM shared/10_decontam.smk
-# already made for BlobTools.
+#   BLAST    — does the GENOME still carry sequencing adapters or barcodes? The
+#              adapter screen, at the end of this file.
+# QUAST, CheckM and the adapter screen need a genome; Qualimap needs the BAM
+# shared/10_decontam.smk already made for BlobTools.
 #
 # stage_qc_genomes               : copies this sample's 1-or-2 assemblies into
 #                                  one temporary directory under controlled
@@ -14,9 +16,18 @@
 # completeness_and_contamination : CheckM lineage_wf then qa, same directory.
 # map_evaluation                 : Qualimap on the decontamination BAM. Only in
 #                                  modes that have reads — see its banner below.
+# univec_illumina                : once per run, downloads NCBI's UniVec and keeps
+#                                  its Illumina adapter records.
+# adapter_search_input           : the files the adapter search reads: every
+#                                  adapter in one FASTA, and the genome with its
+#                                  circular contigs extended across their start.
+# blast_adapters                 : BLAST of those adapters against the genome.
+# screen_adapters                : the hits turned into adapter loci, with a
+#                                  reason for each, and the sample's row of the
+#                                  Adapters table of the MultiQC report.
 #
 # GTDB-Tk reads the same staged directory from shared/30_taxonomy.smk, and all
-# four results end up in MultiQC (shared/90_report.smk).
+# five results end up in MultiQC (shared/90_report.smk).
 #
 # The hybrid complication, and why stage_qc_genomes exists. Three modes deliver
 # one genome per sample; hybrid delivers the ONT+Polypolish genome AND keeps the
@@ -40,7 +51,11 @@
 # Everything referenced here is defined once in 00_common.smk and never re-derived:
 # qc_genome_fastas, qc_stage_commands, qc_genome_table_text, QC_GENOMES_DIR,
 # QC_GENOME_TABLE, QUAST_DIR, CHECKM_DIR, CHECKM_STATS, CHECKM_LINEAGE,
-# QUALIMAP_DIR, DECONTAM_BAM, LOGS, RAM, capped_cpus, HAS_READS.
+# QUALIMAP_DIR, DECONTAM_BAM, LOGS, RAM, capped_cpus, HAS_READS; for the adapter
+# screen FINAL_CONTIGS, BAKTA_REPLICON_INPUT, UNIVEC_LINK, UNIVEC_SHA256,
+# UNIVEC_ILLUMINA, UNIVEC_PROVENANCE, ADAPTER_LIST_FILES, ADAPTER_SCREEN_TRIMMED,
+# ADAPTER_SCREEN_CHOICE, ADAPTER_SCREEN_CHECK, ADAPTER_QUERY, ADAPTER_SUBJECT,
+# ADAPTER_BLAST, ADAPTER_SCREEN, ADAPTER_SCREEN_MQC and ADAPTER_SCREEN_SCRIPT.
 #
 # conda: env paths resolve relative to THIS file (workflow/rules/shared/), so
 # "../../envs/x.yaml" climbs shared/ → rules/ → workflow/ → workflow/envs/x.yaml.
@@ -336,3 +351,247 @@ if HAS_READS:
                 echo "NOTE: Qualimap exited non-zero. This is a QC report, not an input to any other step, so the run continues; the mapping-quality report will be missing from MultiQC for this sample. Check the log above." >> {log}
               }}
             """
+
+
+# ═══════════════════════ The adapter screen (every mode) ═══════════════════════
+# Does the finished genome still carry sequencing adapters or barcodes? Left in the
+# reads, they end up in the assembly where many reads end at the same place: at the
+# ends of linear contigs. NCBI screens genome submissions for contamination, and its
+# FCS-adaptor, provided to clean genomes before submission to GenBank, trims adaptor
+# found within 100 bp of a sequence end. BacFlux trims ONT reads before
+# assembly (shared/05_ont_adapters.smk); this screen checks contigs_final.fasta in
+# every mode, including assemblies made elsewhere (contigs mode) and Illumina
+# assemblies. It reports and removes nothing. In the hybrid genome of K. pneumoniae
+# TUM24772 made without trimming, it finds the 112 bp of rapid-kit construct that end
+# the linear contig_2.
+#
+# Chain, per sample:
+#   contigs_final.fasta (+ the Bakta replicon table in nanopore/hybrid)
+#   + the adapter lists (shipped ONT, PacBio and MGI records; UniVec's Illumina
+#     records from univec_illumina; the sequences trimmed from this sample's reads)
+#     --adapter_search_input--> query FASTA (kept) + the genome with circular contigs
+#                               extended (temporary)
+#     --blast_adapters-------> the BLAST hits (kept)
+#     --screen_adapters------> the adapter loci (kept) + the sample's MultiQC row (kept)
+# The method and its thresholds are explained in the opening text of
+# scripts/20_qc/adapter_screen.py and in docs/methods_ont_adapters.md.
+#
+# Why the genome as delivered, and not Flye's draft: it is the genome every later step
+# annotates and the one a user submits, it exists in all four modes, and dnaapler
+# rotates only circular contigs, whose ends are no ends at all. A linear contig keeps
+# Flye's ends through dnaapler, Medaka and Polypolish.
+
+
+# ──────────────── The Illumina adapters (UniVec), once per run ────────────────
+# Takes in: nothing from other rules; links.univec_link (UNIVEC_LINK, by default
+#           build 10.1 in NCBI's UniVec archive) and links.univec_sha256
+#           (UNIVEC_SHA256).
+# Does:     downloads UniVec (about 1.7 MB) with wget, checks its SHA-256 checksum,
+#           keeps the records whose description names Illumina (151 in build 10.1:
+#           TruSeq, Nextera and other adapters and primers) and deletes the rest. A
+#           file that fails the check is renamed with a .failed suffix and kept, and
+#           the run stops. awk renames each kept record from UniVec's
+#           gnl|uv|NGB00747.1:1-70 to Illumina_UniVec_NGB00747.1:1-70, so that the
+#           screen's tables say at a glance that a hit is an Illumina adapter: the
+#           variable keep is set at every header line (starting with >) and every line
+#           is printed while it is true; [|] stands for a literal |, and the doubled
+#           braces are Snakemake's way of writing single braces in a shell command.
+#           grep -c ends with status 1 when it counts nothing, which the strict shell
+#           would take for a failure; "|| true" keeps the count of 0, and a NOTE then
+#           says that the screen searches the shipped lists only. When the checksum
+#           does not match, the message gives the checksum of the file received, to
+#           put into links.univec_sha256 if that file is the one meant.
+# Produces: UNIVEC_ILLUMINA, the Illumina records (FASTA), and UNIVEC_PROVENANCE, one
+#           item per line: the address, the date in UTC, the checksum and the number
+#           of records. Both in 02.assembly/adapter_lists/, kept, and shared by every
+#           sample of the output folder.
+# Consumed by: adapter_search_input, for every sample.
+#
+# Why downloaded and not shipped: UniVec notes on every Illumina record that the
+# oligonucleotide sequence is copyright Illumina, Inc. The ONT, PacBio and MGI records
+# are shipped in workflow/data/adapters/ (its README names their sources).
+#
+# Where it runs: on the computer that runs Snakemake (localrule: True), because it
+# downloads; `snakemake download_all` fetches it too. wget comes from
+# envs/download.yaml; sha256sum, awk, grep and date from the computer itself.
+rule univec_illumina:
+    localrule: True
+    output:
+        fasta = UNIVEC_ILLUMINA,
+        provenance = UNIVEC_PROVENANCE,
+    params:
+        url = UNIVEC_LINK,
+        sha256 = UNIVEC_SHA256,
+        download = UNIVEC_ILLUMINA + ".download",
+    conda:
+        "../../envs/download.yaml"
+    log:
+        LOGS + "/univec_illumina.log"
+    shell:
+        """
+        mkdir -p "$(dirname {output.fasta:q})"
+
+        echo "downloading {params.url}" > {log}
+        wget -O {params.download:q} {params.url:q} >> {log} 2>&1
+
+        echo "checking the file against links.univec_sha256 ({params.sha256})" >> {log}
+        if ! printf '%s  %s\\n' {params.sha256:q} {params.download:q} | sha256sum -c - >> {log} 2>&1; then
+            got=$(sha256sum {params.download:q} | cut -d ' ' -f 1)
+            mv {params.download:q} {params.download:q}.failed
+            echo "[BacFlux] univec_illumina: the file downloaded from {params.url} has the checksum $got, not the one in links.univec_sha256, so it was NOT used (the file is kept as {params.download}.failed; details in {log}). If this is the file you meant to use, put $got into links.univec_sha256." | tee -a {log} >&2
+            exit 1
+        fi
+
+        awk '/^>/ {{ keep = /Illumina/; if (keep) sub(/^>gnl[|]uv[|]/, ">Illumina_UniVec_") }} keep' {params.download:q} > {output.fasta:q}
+        rm {params.download:q}
+        records=$(grep -c '^>' {output.fasta:q} || true)
+        if [ "$records" = 0 ]; then
+            echo "[BacFlux] NOTE univec_illumina: no record of {params.url} names Illumina, so the adapter screen searches for the shipped adapters (ONT, PacBio, MGI) only." | tee -a {log} >&2
+        fi
+
+        echo "source_url: {params.url}" > {output.provenance:q}
+        echo "downloaded_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> {output.provenance:q}
+        echo "sha256: {params.sha256}" >> {output.provenance:q}
+        echo "illumina_records: $records" >> {output.provenance:q}
+        echo "done: $records Illumina records" >> {log}
+        """
+
+
+# ──────────────── What to search, and where (adapter_search_input) ────────────────
+# Takes in: contigs = FINAL_CONTIGS, the finished genome; replicons =
+#           BAKTA_REPLICON_INPUT, the Bakta replicon table (build_replicons,
+#           shared/15_replicons.smk) in nanopore and hybrid mode and an empty list in
+#           the other two, where the topology is not known; illumina =
+#           UNIVEC_ILLUMINA from univec_illumina; trimmed = ADAPTER_SCREEN_TRIMMED,
+#           the sequences fastplong trimmed from this sample's reads
+#           (ONT_ADAPTER_SEQUENCE, rule find_ont_adapter) when BacFlux trimmed them,
+#           otherwise an empty list. The shipped lists (ADAPTER_LIST_FILES:
+#           workflow/data/adapters/ont_chtd.fasta and univec_pacbio_mgi.fasta) go in
+#           as a param, not an input: a file in the repository gets a new modification
+#           time at every checkout, and as an input that alone would re-run every
+#           sample's screen and the MultiQC report. The cost: a change to a shipped
+#           list does not re-run the screen by itself.
+# Does:     python adapter_screen.py prepare. It joins every adapter record into one
+#           query FASTA, and writes the genome with each CIRCULAR contig extended by
+#           its own first 200 bp: a circular contig's ends are an arbitrary cut, and
+#           an adapter lying across it would otherwise be seen as two short pieces,
+#           or not at all. An empty list renders as nothing in the command, and the
+#           script reads the option without a value as "not given".
+# Produces: query = ADAPTER_QUERY (kept: screen_adapters reads it to know where the
+#           Mu end sits on each query, and it records what was searched for);
+#           subject = ADAPTER_SUBJECT, temporary, deleted after BLAST.
+# Consumed by: blast_adapters; screen_adapters (the query).
+rule adapter_search_input:
+    input:
+        contigs = FINAL_CONTIGS,
+        replicons = BAKTA_REPLICON_INPUT,
+        illumina = UNIVEC_ILLUMINA,
+        trimmed = ADAPTER_SCREEN_TRIMMED,
+    output:
+        query = ADAPTER_QUERY,
+        subject = temp(ADAPTER_SUBJECT),
+    params:
+        script = ADAPTER_SCREEN_SCRIPT,
+        lists = ADAPTER_LIST_FILES,
+    conda:
+        "../../envs/python.yaml"
+    log:
+        LOGS + "/adapter_search_input_{sample}.log"
+    shell:
+        """
+        python {params.script:q} prepare \
+          --contigs {input.contigs:q} \
+          --replicons {input.replicons:q} \
+          --lists {params.lists:q} {input.illumina:q} \
+          --trimmed {input.trimmed:q} \
+          --out-query {output.query:q} \
+          --out-subject {output.subject:q} > {log} 2>&1
+        """
+
+
+# ──────────────── The search (blast_adapters) ────────────────
+# Takes in: query and subject from adapter_search_input.
+# Does:     blastn with the adapters as queries and the genome as subject. -task
+#           blastn-short is BLAST's setting for queries shorter than 50 bp (word size
+#           7), and -evalue 1 keeps short matches, which screen_adapters then judges
+#           by length, identity and position. -subject reads the FASTA directly, so no
+#           BLAST database is built; on a bacterial genome the search takes seconds.
+#           BLAST names every contig and adapter exactly as written in the FASTA
+#           headers, which is what screen_adapters joins on.
+# Produces: hits = ADAPTER_BLAST, the hits in BLAST's tabular format, columns named
+#           in the -outfmt below. Kept: every hit, also those that do not pass the
+#           screen's rules, so the locus table can be checked against it.
+# Consumed by: screen_adapters.
+rule blast_adapters:
+    input:
+        query = ADAPTER_QUERY,
+        subject = ADAPTER_SUBJECT,
+    output:
+        hits = ADAPTER_BLAST,
+    conda:
+        "../../envs/blast.yaml"
+    log:
+        LOGS + "/blast_adapters_{sample}.log"
+    shell:
+        """
+        blastn -task blastn-short \
+          -query {input.query:q} \
+          -subject {input.subject:q} \
+          -evalue 1 \
+          -outfmt "6 qseqid sseqid pident length qstart qend sstart send evalue bitscore qlen slen" \
+          -out {output.hits:q} 2> {log}
+        """
+
+
+# ──────────────── The verdict (screen_adapters) ────────────────
+# Takes in: hits = ADAPTER_BLAST; contigs = FINAL_CONTIGS (for the contig lengths);
+#           query = ADAPTER_QUERY; replicons = BAKTA_REPLICON_INPUT (the topology, or
+#           an empty list); and, for a sample whose ONT reads BacFlux trimmed, choice
+#           and check = the files of rules find_ont_adapter and check_ont_trimming
+#           (ADAPTER_SCREEN_CHOICE, ADAPTER_SCREEN_CHECK; empty lists otherwise).
+# Does:     python adapter_screen.py report. A hit counts at 90 % identity or more,
+#           from 20 bp within 100 bp of the end of a linear contig, from 28 bp (a whole
+#           ONT adapter) inside a contig; a circular contig has no ends. Overlapping
+#           hits form one locus. A locus made only of the phage Mu end that follows
+#           every rapid barcode is listed but not counted when it lies inside a
+#           contig, because a Mu prophage holds the same 50 bp. Every locus gets a
+#           counted (yes/no) column and a reason. The script's opening text gives the
+#           reasons for every rule. Its summary line is copied from the log to the
+#           console.
+# Produces: loci = ADAPTER_SCREEN, one row per locus (a header line alone when there
+#           is none); mqc = ADAPTER_SCREEN_MQC, the sample's row of the Adapters table
+#           of the MultiQC report. Both kept.
+# Consumed by: multiqc (shared/90_report.smk) reads the MultiQC row; _downstream_targets()
+#              in 00_common.smk asks for the locus table, which nothing else reads.
+rule screen_adapters:
+    input:
+        hits = ADAPTER_BLAST,
+        contigs = FINAL_CONTIGS,
+        query = ADAPTER_QUERY,
+        replicons = BAKTA_REPLICON_INPUT,
+        choice = ADAPTER_SCREEN_CHOICE,
+        check = ADAPTER_SCREEN_CHECK,
+    output:
+        loci = ADAPTER_SCREEN,
+        mqc = ADAPTER_SCREEN_MQC,
+    params:
+        script = ADAPTER_SCREEN_SCRIPT,
+    conda:
+        "../../envs/python.yaml"
+    log:
+        LOGS + "/screen_adapters_{sample}.log"
+    shell:
+        """
+        python {params.script:q} report \
+          --blast {input.hits:q} \
+          --contigs {input.contigs:q} \
+          --replicons {input.replicons:q} \
+          --query {input.query:q} \
+          --sample {wildcards.sample:q} \
+          --read-choice {input.choice:q} \
+          --read-check {input.check:q} \
+          --out {output.loci:q} \
+          --out-mqc {output.mqc:q} > {log} 2>&1
+
+        grep -F '[BacFlux]' {log} >&2 || true
+        """

@@ -7,7 +7,7 @@ as required by the selected analyses, or can be supplied through local paths.
 | Database group | Preparation |
 |---|---|
 | Bakta, NCBI nucleotide database, eggNOG, GTDB and Platon | Download the compatible releases and set the five required `directories.*_db` paths |
-| PhiX, CARD, dbCAN, antiSMASH, CheckV, the selected phage caller's database, and those of the optional Baktfold layer and trait profile | Downloaded by the workflow when needed |
+| PhiX, CARD, dbCAN, antiSMASH, CheckV, UniVec's Illumina adapters, the selected phage caller's database, and those of the optional Baktfold layer and trait profile | Downloaded by the workflow when needed |
 | Existing local copies of CheckV, VirSorter2, antiSMASH, dbCAN, CARD, geNomad, Baktfold or EcoFoldDB | Set the corresponding optional path to skip its download |
 | Optional mobilome layers | Configure each required source; see [Optional layers](../mobilome/optional-layers.md) |
 
@@ -168,6 +168,11 @@ same output directory across runs of a project and they are downloaded once.
 | geNomad | `07.phages/genomad_db/` | `links.genomad_link` + `genomad_md5` | only when `phage.caller: genomad` |
 | Baktfold (about 22 GB, with the ProstT5 model) | `04.annotation/baktfold/databases/` | — (`baktfold install`) | only when `baktfold.run` or `traits.run` is true; the trait profile uses its ProstT5 model |
 | EcoFoldDB v2.0 (a 0.57 GB archive, about 0.8 GB unpacked) | `04.annotation/traits/databases/` | `links.ecofolddb_link` + `ecofolddb_md5` | only when `traits.run: true` |
+| NCBI UniVec build 10.1 (about 1.7 MB; only its 151 Illumina records are kept) | `02.assembly/adapter_lists/` | `links.univec_link` + `univec_sha256` | all, for the [adapter screen](../analysis/assembly-qc.md#adapter-screen-blast); both keys are optional and default to build 10.1 |
+
+The ONT, PacBio and MGI adapter sequences the screen also searches for ship with BacFlux
+in `workflow/data/adapters/`; Illumina's are downloaded because UniVec marks them as
+copyright Illumina, Inc.
 
 `phix_link` and `card_link` ship empty and are required in the two modes that have
 short reads. An unset one stops the run at parse time, naming the key.

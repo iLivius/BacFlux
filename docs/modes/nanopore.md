@@ -1,9 +1,10 @@
 # Nanopore mode
 
 Use `mode: nanopore` for Oxford Nanopore Technologies (ONT) reads. The workflow
-filters reads, assembles with Flye, reorients circular contigs and screens for
-contamination. Medaka polishing is optional. The mode-specific rules are in
-`workflow/rules/nanopore/`.
+trims the adapter and barcode from the reads, filters them, assembles with Flye,
+reorients circular contigs and screens for contamination. Medaka polishing is
+optional. The mode-specific rules are in `workflow/rules/nanopore/`; the adapter
+trimming, which `hybrid` mode shares, is in `workflow/rules/shared/05_ont_adapters.smk`.
 
 ```mermaid
 ---
@@ -17,6 +18,8 @@ config:
 flowchart TD
     RAW([ONT reads as basecalled])
     QC1[raw_long_read_qc<br/>NanoPlot, before]
+    SCAN[find_ont_adapter<br/>works out the adapter and barcode]
+    TRIM[trim_ont_adapters<br/>fastplong]
     FL[filter_long_reads<br/>Filtlong]
     QC2[filtered_long_read_qc<br/>NanoPlot, after]
     MK[check_medaka_model<br/>resolves the Medaka model<br/>before Flye starts]
@@ -28,7 +31,8 @@ flowchart TD
     OUT([contigs_final.fasta])
 
     RAW --> QC1
-    RAW --> FL --> QC2
+    RAW --> SCAN --> TRIM --> FL --> QC2
+    RAW -.->|ont_adapter: off| FL
     FL --> MK
     FL --> ASM
     MK --> ASM
@@ -48,12 +52,24 @@ seconds rather than an hour of assembly — see
     |---|---|
     | **CARD** | Comprehensive Antibiotic Resistance Database |
 
+## 0. Adapter and barcode trimming
+
+Before Filtlong, `find_ont_adapter` reads every read once and works out whether the
+sequencing adapter, and the barcode block after it, are still on the reads; fastplong
+then removes exactly that sequence (`trim_ont_adapters`). Reads that are already trimmed
+are copied unchanged. Left in, adapter and barcode end up at the ends of linear contigs.
+The setting is `parameters.nanopore.ont_adapter`: `detect` (the default), `off`, or the
+sequence to trim. How the sequence is found, what fastplong does with it and what was
+seen on public runs is on
+[ONT adapter trimming and the adapter screen](../methods_ont_adapters.md).
+
 ## 1. Read filtering { #1-read-filtering-and-why-it-is-the-biggest-lever-in-this-mode }
 
 ONT read length, quality and depth vary between datasets. Filtlong reduces the
 input according to length, quality and total bases. Filtering can reduce assembly
 cost, but may also remove reads from small plasmids. The rule
-`filter_long_reads` uses these settings:
+`filter_long_reads` reads the trimmed reads (the raw ones with `ont_adapter: off`)
+and uses these settings:
 
 | Flag | From | Default | What it does |
 |---|---|---|---|
@@ -183,6 +199,7 @@ which one it copied. That one line is the provenance of the delivered genome.
 | Path | Contents |
 |---|---|
 | `01.reads/{sample}/ont/raw_qc/`, `filt_qc/` | NanoPlot, before and after filtering |
+| `01.reads/{sample}/ont/adapters/` | the adapter scan, its decision, fastplong's reports and the check after trimming (absent with `ont_adapter: off`) |
 | `01.reads/{sample}/ont/{sample}_filt.fastq` | the reads Flye assembled and Medaka polished |
 | `02.assembly/{sample}/flye/` | `assembly.fasta`, `assembly_info.txt`, `ignore_list.txt` |
 | `02.assembly/{sample}/fix_start/` | dnaapler's output and the reorientation summary |

@@ -8,10 +8,11 @@ should cite each tool's paper. This script writes that list as a small HTML
 page that MultiQC shows as its own section, titled References. The references
 are written into the report itself, so they can be read offline, and only the
 tools this run's report shows are listed: the read-QC tools in the read modes,
-the structure-search methods with the trait profile.
+fastplong when it trimmed the ONT reads, the structure-search methods with the
+trait profile.
 
 Takes in (from rule multiqc in shared/90_report.smk): which kinds of tools the
-run used (--short-reads, --long-reads, --traits).
+run used (--short-reads, --long-reads, --ont-trimming, --traits).
 Gives back: 09.report/bacflux_references_mqc.html. MultiQC reads it as custom
 content (a page another program wrote for MultiQC to show) because its name
 ends in _mqc.html, and the comment block at its top gives the section's ID and
@@ -66,6 +67,10 @@ SHARED_REFERENCES = (
     Reference("Bakta", "Schwengers et al.", 2021,
               "Bakta: rapid and standardized annotation of bacterial genomes via alignment-free sequence identification",
               "Microbial Genomics", "10.1099/mgen.0.000685"),
+    # The adapter screen of the finished genome (the Adapters table).
+    Reference("BLAST+", "Camacho et al.", 2009,
+              "BLAST+: architecture and applications",
+              "BMC Bioinformatics", "10.1186/1471-2105-10-421"),
 )
 
 # The read-QC tools, listed only in the modes that have reads.
@@ -73,6 +78,14 @@ FASTP_REFERENCE = Reference(
     "fastp", "Chen et al.", 2018,
     "fastp: an ultra-fast all-in-one FASTQ preprocessor",
     "Bioinformatics", "10.1093/bioinformatics/bty560",
+)
+# fastplong trims the ONT adapters and barcodes when parameters.<mode>.ont_adapter is
+# not off. It has no paper of its own; its README asks for the two fastp papers, the
+# 2018 one above and this one.
+FASTPLONG_REFERENCE = Reference(
+    "fastplong (cite fastp)", "Chen", 2023,
+    "Ultrafast one-pass FASTQ data preprocessing, quality control, and deduplication using fastp",
+    "iMeta", "10.1002/imt2.107",
 )
 NANOPACK_REFERENCE = Reference(
     "NanoStat / NanoPlot", "De Coster et al.", 2018,
@@ -105,15 +118,17 @@ TRAIT_REFERENCES = (
 )
 
 
-def references_for_run(short_reads=False, long_reads=False, traits=False):
+def references_for_run(short_reads=False, long_reads=False, traits=False, ont_trimming=False):
     """Choose the papers of the tools this run's report shows.
 
     Gives back two lists: the report's tools, and the trait profile's methods
     (empty without the trait profile), which get their own heading.
     """
     methods = list(SHARED_REFERENCES)
-    if short_reads:
+    if short_reads or ont_trimming:
         methods.append(FASTP_REFERENCE)
+    if ont_trimming:
+        methods.append(FASTPLONG_REFERENCE)
     if long_reads:
         methods.append(NANOPACK_REFERENCE)
     if short_reads or long_reads:
@@ -143,14 +158,14 @@ def reference_list(references):
     return lines
 
 
-def render_references(short_reads=False, long_reads=False, traits=False):
+def render_references(short_reads=False, long_reads=False, traits=False, ont_trimming=False):
     """Write the whole page: MultiQC's header comment, then the reference lists.
 
     The header comment (between <!-- and -->) tells MultiQC the section's ID,
     title and kind. It carries no DOI, for the reason given in the module
     docstring.
     """
-    methods, trait_methods = references_for_run(short_reads, long_reads, traits)
+    methods, trait_methods = references_for_run(short_reads, long_reads, traits, ont_trimming)
     lines = [
         "<!--",
         "id: bacflux_references",
@@ -183,11 +198,13 @@ def main(argv=None):
                         help="Output custom-content HTML, normally ending in _mqc.html.")
     parser.add_argument("--short-reads", action="store_true")
     parser.add_argument("--long-reads", action="store_true")
+    parser.add_argument("--ont-trimming", action="store_true")
     parser.add_argument("--traits", action="store_true")
     args = parser.parse_args(argv)
     path = Path(args.out)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_references(args.short_reads, args.long_reads, args.traits),
+    path.write_text(render_references(args.short_reads, args.long_reads, args.traits,
+                                      args.ont_trimming),
                     encoding="utf-8")
     return 0
 

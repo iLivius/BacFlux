@@ -31,7 +31,7 @@ Four places in it matter:
 | `config/config.yaml` | The configuration template: every setting of a run, commented in place. Copy it and edit the copy — never this file. |
 | `workflow/Snakefile` | The entry point. It reads `mode` from your config and includes that mode's rule files plus the shared ones. |
 | `workflow/rules/` | The rules themselves, in `shared/` and one directory per mode (`illumina/`, `nanopore/`, `hybrid/`, `contigs/`). |
-| `workflow/envs/` | 34 conda environment specifications, one per tool stack. |
+| `workflow/envs/` | 36 conda environment specifications, one per tool stack. |
 
 A fifth directory, `.snakemake/`, appears in whatever directory you launch from:
 it holds the conda environments Snakemake builds and its own bookkeeping. It is

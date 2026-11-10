@@ -159,7 +159,7 @@ too.
 Compare the discovered sample list with the intended input. A mismatch can indicate a
 naming-pattern problem, a missing input file or an incorrect directory. Below the
 header, Snakemake lists the jobs. A single isolate through the default Illumina
-pipeline, into an empty output directory, plans **40 jobs**, listed in the order they
+pipeline, into an empty output directory, plans **44 jobs**, listed in the order they
 can run:
 
 ```text
@@ -175,7 +175,7 @@ amr_contigs                            4
 amr_workbook                           1
 multiqc                                1
 all                                    1
-total                                 40
+total                                 44
 ```
 
 The only count above one is `amr_contigs`: ABRicate runs once per database.

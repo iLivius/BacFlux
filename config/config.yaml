@@ -135,6 +135,13 @@ links:
   # link that is set must still be the address of a .tar.gz archive.
   ecofolddb_link: "https://zenodo.org/records/16908168/files/EcoFoldDB_v2.0.tar.gz"
   ecofolddb_md5:  "be3144a4993f5816a8b772db964d1f3e"   # MD5 of the file above, as published on that Zenodo record. CHANGE THIS WHENEVER YOU CHANGE ecofolddb_link — a mismatch stops the run. Empty = download without verification.
+  # NCBI UniVec — read in every mode, by the adapter screen of the finished genome,
+  # which keeps its Illumina adapter records (Illumina's sequences are copyrighted, so
+  # BacFlux downloads them rather than shipping them). Build 10.1 in NCBI's archive
+  # does not change; NCBI publishes no checksum, so the one below was computed from
+  # that file. Both keys are optional: left out or empty, they take these values.
+  univec_link:   "https://ftp.ncbi.nlm.nih.gov/pub/UniVec/archive/10.1/UniVec"
+  univec_sha256: "687d8aa872d4ee215c9e0b3b004d0ee709fb243436d36d159a3f0ac5c25b5e36"   # SHA-256 of the file above. CHANGE THIS WHENEVER YOU CHANGE univec_link — a mismatch stops the run, and the message gives the checksum of the file it got.
 
 # Compute limits — what each rule ASKS for, not what the machine sets aside.
 # On a single computer Snakemake enforces only the CPU side: `--cores N` caps every
@@ -412,6 +419,12 @@ parameters:
     flye_input_mode: auto      # Options: auto | nano-raw | nano-hq
     medaka_model: auto         # auto/TRUE/empty = infer from FASTQ headers; FALSE = skip Medaka; else an explicit model name
     medaka_model_fallback_auto: false  # if an explicit model is INVALID: false = fail with suggestions (default); true = fall back to auto-inference
+    ont_adapter: detect        # ONT adapter and barcode trimming before Filtlong (fastplong).
+                               #   detect (default; also empty): BacFlux works the adapter and
+                               #   barcode out from the reads, or copies reads that are already
+                               #   trimmed unchanged. off: no trimming, Filtlong reads the raw
+                               #   reads. Or the DNA sequence to trim (20-200 bases of A, C, G, T).
+                               #   docs/methods_ont_adapters.md
   hybrid:                      # read only when mode == hybrid
     short_read_guidance: false # [hybrid] false (default): filter the ONT reads on
                                #   length and quality only, exactly as nanopore mode.
@@ -435,6 +448,8 @@ parameters:
     flye_input_mode: auto      # Options: auto | nano-raw | nano-hq
     medaka_model: auto         # auto/TRUE/empty = infer; FALSE = skip; else an explicit model name
     medaka_model_fallback_auto: false  # if an explicit model is INVALID: false = fail with suggestions (default); true = fall back to auto-inference
+    ont_adapter: detect        # ONT adapter and barcode trimming before Filtlong: detect | off |
+                               #   a DNA sequence, as in the nanopore block above.
 
 # ── Virus / prophage caller [all modes] ──
 # Which tool finds viruses and prophages in stage 07.phages. CheckV then scores

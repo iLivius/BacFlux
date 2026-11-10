@@ -33,7 +33,7 @@ config:
 ---
 flowchart LR
     I[illumina<br/>paired short reads] --> IF[PhiX removal, fastp<br/>SPAdes assembly]
-    N[nanopore<br/>ONT long reads] --> NF[Filtlong, Flye,<br/>dnaapler, Medaka]
+    N[nanopore<br/>ONT long reads] --> NF[adapter trimming, Filtlong,<br/>Flye, dnaapler, Medaka]
     H[hybrid<br/>short and long reads] --> HF[both front ends,<br/>Polypolish, Snippy]
     C[contigs<br/>an existing assembly] --> CF[length filter only]
     IF --> DRAFT([a draft<br/>assembly])
@@ -55,7 +55,7 @@ config:
 ---
 flowchart LR
     DECON[02.assembly<br/>decontamination<br/>of the draft] --> FINAL([contigs_final.fasta])
-    FINAL --> QC[02.assembly/eval<br/>QUAST, CheckM,<br/>Qualimap]
+    FINAL --> QC[02.assembly/eval<br/>QUAST, CheckM,<br/>Qualimap, adapter screen]
     FINAL --> TAX[03.taxonomy<br/>GTDB-Tk]
     FINAL --> ANN[04.annotation<br/>Bakta, eggNOG,<br/>antiSMASH, dbCAN]
     FINAL --> AMR[05.amr<br/>ABRicate,<br/>CARD read mapping]
@@ -143,9 +143,9 @@ Read the detail on [the AMR page](analysis/amr.md).
 
 ```text
 output_dir/
-├── 01.reads/       read QC reports and the PhiX genome and index (kept);
-│                   trimmed, PhiX-free, filtlong-filtered reads   (temporary)
-├── 02.assembly/    draft and decontaminated contigs, CheckM, QUAST
+├── 01.reads/       read QC reports, the ONT adapter scan, and the PhiX genome and
+│                   index (kept); trimmed and PhiX-free reads      (temporary)
+├── 02.assembly/    draft and decontaminated contigs, CheckM, QUAST, the adapter screen
 ├── 03.taxonomy/    GTDB-Tk classification
 ├── 04.annotation/  Bakta, eggNOG, antiSMASH, dbCAN
 ├── 05.amr/         ABRicate tables, CARD read mapping

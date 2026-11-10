@@ -48,11 +48,11 @@ file, `mode`, chooses the front end; nothing else on the command line changes.
 | `mode:` | Input | Front end | Front-end rules |
 |---|---|---|--:|
 | `illumina` | Illumina paired-end reads | PhiX removal, fastp, SPAdes | 6 |
-| `nanopore` | Oxford Nanopore reads | NanoPlot, Filtlong, Flye, dnaapler, Medaka | 7 |
+| `nanopore` | Oxford Nanopore reads | NanoPlot, adapter trimming (fastplong), Filtlong, Flye, dnaapler, Medaka | 7 |
 | `hybrid` | both | both front ends, then Polypolish correction of the ONT assembly with the short reads, and a Snippy comparison of the two | 16 |
 | `contigs` | a finished assembly (FASTA) | contig filtering only | 1 |
 
-Those four front ends are 30 rules between them. The analysis they feed is 69 rules in
+Those four front ends are 30 rules between them. The analysis they feed is 76 rules in
 `workflow/rules/shared/` — 22 of them the optional mobilome module, 2 the optional
 Baktfold layer and 5 the optional trait profile — written once instead of four times,
 plus eight `_local` variants that link a database copy you already hold.

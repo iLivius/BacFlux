@@ -22,7 +22,7 @@ summarises these dependencies.
 | | `illumina` | `nanopore` | `hybrid` | `contigs` |
 |---|---|---|---|---|
 | **Input** | paired-end reads | ONT long reads | both, same isolate | a FASTA |
-| **Read QC** | PhiX removal (Bowtie2), fastp | NanoPlot, Filtlong | both | — |
+| **Read QC** | PhiX removal (Bowtie2), fastp | adapter trimming (fastplong), NanoPlot, Filtlong | both | — |
 | **Assembler** | SPAdes `--isolate` | Flye | Flye, plus SPAdes for the comparator | — |
 | **After assembly** | length and coverage filter | dnaapler, then Medaka\* | dnaapler, Medaka\*, then Polypolish | header-aware filter |
 | **Screened** | SPAdes draft | Reoriented Flye assembly | Illumina draft; Filtlong guidance is optional; a separate final-assembly screen is advisory | Supplied contigs |

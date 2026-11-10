@@ -67,8 +67,9 @@ on:
 | VirSorter2 — default virus caller | GPLv2 |
 | Platon — plasmid caller, always on | GPLv3 |
 | CheckV — grades whatever the virus caller found | LBNL BSD |
+| fastplong — trims the ONT adapter and barcode in `nanopore` and `hybrid` mode, on unless `ont_adapter: off` | MIT |
 
-Those three are the components this repository states a licence type for. Every
+Those four are the components this repository states a licence type for. Every
 other tool BacFlux invokes — on the default path or inside the mobilome module —
 is distributed under its own licence by its own authors;
 [CITATIONS.md](https://github.com/iLivius/BacFlux/blob/main/CITATIONS.md) lists
@@ -76,6 +77,22 @@ them all, and each tool's repository carries the licence itself. The databases
 every run needs — Bakta, GTDB, CARD and the rest — are fetched the same way,
 under their publishers' terms;
 [Databases](../getting-started/databases.md) says what to download and from where.
+
+## Adapter sequences
+
+The ONT read scan and the adapter screen of the finished genome need the sequences of
+the adapters they look for. `workflow/data/adapters/` holds two files, and its README names
+the source of every record:
+
+| File | What it holds | Terms |
+|---|---|---|
+| `ont_chtd.fasta` | ONT's adapter strands and its 96 native and 96 rapid barcodes with their flanks, from ONT's Chemistry Technical Document | ONT states no licence for them; they are reproduced as ONT publishes them, with the source in every record. The same barcode sequences are also distributed with Porechop (GPL v3). |
+| `univec_pacbio_mgi.fasta` | five PacBio and MGI adapter records of NCBI UniVec | a work of the US Government |
+
+Illumina's adapter sequences are not in the repository. UniVec marks every Illumina record
+as copyright Illumina, Inc., so rule `univec_illumina` downloads UniVec from NCBI on your
+computer and keeps those records in the output folder, as BacFlux does with any data it
+does not redistribute.
 
 ## Components you switch on yourself
 

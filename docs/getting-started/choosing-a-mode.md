@@ -67,7 +67,7 @@ usually simpler.
 
 | | `illumina` | `nanopore` | `hybrid` | `contigs` |
 |---|---|---|---|---|
-| Read QC | PhiX removal with Bowtie2, then fastp | NanoPlot before and after, Filtlong | both of those | none |
+| Read QC | PhiX removal with Bowtie2, then fastp | adapter and barcode trimming with fastplong, NanoPlot before and after, Filtlong | both of those | none |
 | Assembler | SPAdes `--isolate`, k chosen from read length | Flye | Flye, over the ONT reads | none |
 | After assembly | keep contigs ≥ 500 bp and ≥ 2× coverage | dnaapler reorientation, then Medaka (*optional* — `parameters.<mode>.medaka_model: false` skips it) | dnaapler and Medaka as in `nanopore`, then Polypolish correction with the Illumina reads | SPAdes-style headers: the same 500 bp / 2× filter, headers left as they are. Any other header: trimmed to its first whitespace token, nothing filtered |
 | Contamination screen | SPAdes draft; retained contigs form the final assembly | Reoriented assembly, before optional Medaka polishing | Primary filter on the Illumina draft; optional short-read guidance for Filtlong; advisory screen of the final assembly | Supplied contigs; retained contigs form the final assembly |

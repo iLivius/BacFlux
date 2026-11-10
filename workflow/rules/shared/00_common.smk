@@ -35,11 +35,13 @@
 #                          gates (mobilome, Baktfold, trait profile, eggNOG
 #                          --dbmem).
 # 6.  Decontam policy    : resolved once; the same in all four modes.
-# 7.  Database links     : CheckV, geNomad, dbCAN, CARD, PhiX, EcoFoldDB.
-# 8.  Long-read options  : Flye input mode, Medaka model, and the wiring
-#                          constants that differ between nanopore and hybrid.
+# 7.  Database links     : CheckV, geNomad, dbCAN, CARD, PhiX, EcoFoldDB, UniVec.
+# 8.  Long-read options  : Flye input mode, Medaka model, ONT adapter trimming,
+#                          and the wiring constants that differ between nanopore
+#                          and hybrid.
 # 9.  Sample discovery   : globs the ACTIVE mode's input directory only — the
-#                          other three modes' globs and exits never fire.
+#                          other three modes' globs and exits never fire — then
+#                          names the reads Filtlong starts from (FILTLONG_INPUT).
 # 9b. Wildcard constraint: pins {sample} to the discovered sample names.
 # 10. Rule-all targets   : the list `rule all` asks for.
 #
@@ -50,6 +52,7 @@
 # decontamination policy) may run unconditionally.
 
 import glob
+import importlib.util
 import os
 import re
 import sys
@@ -676,6 +679,26 @@ FINAL_REPORT_SCRIPT   = os.path.join(WORKFLOW_DIR, "scripts", "90_report", "fina
 MULTIQC_VERSIONS_SCRIPT  = os.path.join(WORKFLOW_DIR, "scripts", "90_report", "multiqc_versions.py")
 MULTIQC_CITATIONS_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "90_report", "multiqc_citations.py")
 
+# ONT adapter trimming (shared/05_ont_adapters.smk, long-read modes) and the adapter
+# screen of the finished genome (shared/20_qc.smk, every mode). find_ont_adapter.py
+# works out, from the reads, what fastplong removes, and later counts what is left;
+# section 8 also loads it to check a sequence written in parameters.<mode>.ont_adapter.
+# adapter_screen.py writes the files the screen's BLAST search reads and turns its hits
+# into adapter loci. Both are stdlib-only Python, tested outside Snakemake.
+ONT_ADAPTER_SCRIPT    = os.path.join(WORKFLOW_DIR, "scripts", "05_ont_adapters", "find_ont_adapter.py")
+ADAPTER_SCREEN_SCRIPT = os.path.join(WORKFLOW_DIR, "scripts", "20_qc", "adapter_screen.py")
+# The adapter sequences shipped with BacFlux (workflow/data/adapters/README.md names the
+# source of each): ONT's adapters and its 96 native and 96 rapid barcodes, from ONT's
+# Chemistry Technical Document, and the PacBio and MGI adapters of NCBI UniVec.
+# ONT_BARCODE_LIST, the first of them, also goes to rule find_ont_adapter, which names
+# the barcodes it finds in the reads from it. Illumina's adapters are not shipped (their
+# sequences are copyright Illumina, Inc.): rule univec_illumina downloads them.
+ONT_BARCODE_LIST   = os.path.join(WORKFLOW_DIR, "data", "adapters", "ont_chtd.fasta")
+ADAPTER_LIST_FILES = [
+    ONT_BARCODE_LIST,
+    os.path.join(WORKFLOW_DIR, "data", "adapters", "univec_pacbio_mgi.fasta"),
+]
+
 
 # ──────────────────── 3a. Resource accessors ───────────────────
 # Single source of truth for compute limits. .get with a default means a config
@@ -1130,6 +1153,24 @@ if HAS_LONG_READS:
     # NanoPlot read-QC directories, before and after filtering — MultiQC inputs.
     NANOPLOT_RAW_DIR  = DIR_READS + "/{sample}/ont/raw_qc"
     NANOPLOT_FILT_DIR = DIR_READS + "/{sample}/ont/filt_qc"
+    # ONT adapter and barcode trimming (shared/05_ont_adapters.smk), unless
+    # parameters.<mode>.ont_adapter is off (section 8). Rule find_ont_adapter reads the
+    # raw reads and writes the first four files; rule trim_ont_adapters writes the
+    # trimmed reads (temporary; Filtlong reads them, see FILTLONG_INPUT after sample
+    # discovery in section 9) and fastplong's two reports; rule check_ont_trimming
+    # counts what is left in the
+    # reads Filtlong kept. Everything but the trimmed reads sits in adapters/, a folder
+    # MultiQC is never pointed at: its fastp module would read fastplong's JSON as a
+    # fastp run.
+    ONT_ADAPTER_DIR       = DIR_READS + "/{sample}/ont/adapters"
+    ONT_ADAPTER_SCAN      = ONT_ADAPTER_DIR + "/{sample}_adapter_scan.tsv"        # reads with adapter or barcode, per 10,000 reads
+    ONT_ADAPTER_CHOICE    = ONT_ADAPTER_DIR + "/{sample}_adapter_choice.tsv"      # the decision and the numbers behind it
+    ONT_FASTPLONG_OPTIONS = ONT_ADAPTER_DIR + "/{sample}_fastplong_options.txt"   # one line: -s <sequence> ..., or -A
+    ONT_ADAPTER_SEQUENCE  = ONT_ADAPTER_DIR + "/{sample}_adapter_sequence.fasta"  # what is trimmed, both orientations; may be empty
+    FASTPLONG_JSON        = ONT_ADAPTER_DIR + "/{sample}_fastplong.json"          # fastplong's numbers
+    FASTPLONG_HTML        = ONT_ADAPTER_DIR + "/{sample}_fastplong.html"          # the same, as a page for people
+    ONT_ADAPTER_CHECK     = ONT_ADAPTER_DIR + "/{sample}_adapter_check.tsv"       # reads still carrying adapter or barcode
+    TRIMMED_LONG          = DIR_READS + "/{sample}/ont/{sample}_trimmed.fastq.gz" # fastplong output (temporary)
 
 # ── Front-end working paths (front-end contract) ──
 # Every file each mode's front end creates on the way from raw input to
@@ -1259,6 +1300,23 @@ CHECKM_STATS     = CHECKM_DIR + "/{sample}_checkm_stats.tsv"
 CHECKM_LINEAGE   = CHECKM_DIR + "/lineage.ms"                                 # name chosen by CheckM itself
 QUALIMAP_DIR     = DIR_ASSEMBLY + "/{sample}/eval/qualimap"
 GTDBTK_DIR       = DIR_TAXONOMY + "/{sample}"
+
+# The adapter screen of the finished genome (shared/20_qc.smk), in every mode. Rule
+# univec_illumina fetches the Illumina adapter records of NCBI's UniVec ONCE per output
+# folder into 02.assembly/adapter_lists/ (kept, shared by every sample, like the PhiX
+# genome in 01.reads/phix/). Per sample, rule adapter_search_input writes the adapters
+# searched for (ADAPTER_QUERY, kept) and the genome with its circular contigs extended
+# across their start (ADAPTER_SUBJECT, temporary); rule blast_adapters writes BLAST's
+# hits; rule screen_adapters writes the adapter loci, with a reason for each, and the
+# sample's row of the MultiQC Adapters table.
+UNIVEC_ILLUMINA    = DIR_ASSEMBLY + "/adapter_lists/univec_illumina.fasta"   # UniVec's Illumina records
+UNIVEC_PROVENANCE  = DIR_ASSEMBLY + "/adapter_lists/PROVENANCE.txt"          # address, date, checksum, record count
+ADAPTER_SCREEN_DIR = DIR_ASSEMBLY + "/{sample}/eval/adapter_screen"
+ADAPTER_QUERY      = ADAPTER_SCREEN_DIR + "/{sample}_adapter_query.fasta"     # every adapter searched for
+ADAPTER_SUBJECT    = ADAPTER_SCREEN_DIR + "/{sample}_search_contigs.fasta"    # the genome as searched (temporary)
+ADAPTER_BLAST      = ADAPTER_SCREEN_DIR + "/{sample}_adapter_blast.tsv"       # every BLAST hit
+ADAPTER_SCREEN     = ADAPTER_SCREEN_DIR + "/{sample}_adapter_loci.tsv"        # the loci, counted or not, with reasons
+ADAPTER_SCREEN_MQC = ADAPTER_SCREEN_DIR + "/{sample}_adapter_screen_mqc.tsv"  # one row for the MultiQC Adapters table
 
 # ── Which genomes get QC'd and classified, and what each one is called ──
 # Three of the four modes deliver ONE genome per sample. Hybrid delivers the
@@ -2484,6 +2542,27 @@ if HAS_SHORT_READS and not PHIX_LINK:
         "requires 'links.phix_link' to be set in the config."
     )
 
+# UniVec, for the adapter screen of the finished genome: rule univec_illumina
+# (shared/20_qc.smk) downloads it and keeps its Illumina adapter records. Read in
+# every mode, because the screen runs in all four. Both keys are optional: a config
+# without them, such as one written for an earlier BacFlux, gets UniVec build 10.1
+# from NCBI's archive and that file's checksum. The archive copy of a build does not
+# change, which is why the default points at it rather than at the current UniVec,
+# which NCBI replaces from time to time. NCBI publishes no checksum for UniVec, so the
+# default below was computed from the file itself with sha256sum. Change both keys
+# together: a file that does not match the checksum stops the run, and the message
+# gives the checksum to put in.
+UNIVEC_DEFAULT_LINK = "https://ftp.ncbi.nlm.nih.gov/pub/UniVec/archive/10.1/UniVec"
+UNIVEC_DEFAULT_SHA256 = "687d8aa872d4ee215c9e0b3b004d0ee709fb243436d36d159a3f0ac5c25b5e36"
+UNIVEC_LINK = str(_links.get("univec_link") or "").strip() or UNIVEC_DEFAULT_LINK
+UNIVEC_SHA256 = str(_links.get("univec_sha256") or "").strip().lower() or UNIVEC_DEFAULT_SHA256
+if not re.fullmatch(r"[0-9a-f]{64}", UNIVEC_SHA256):
+    sys.exit(
+        "[BacFlux] links.univec_sha256 must be the SHA-256 checksum of the file at "
+        "links.univec_link: 64 hexadecimal characters (got: "
+        f"{_links.get('univec_sha256')!r})."
+    )
+
 
 # ───────── 8. Long-read assembly and polishing options ─────────
 # Flye and Medaka only exist in the long-read modes, so their parameter
@@ -2565,6 +2644,81 @@ if HAS_LONG_READS:
         FLYE_INPUT_MODE = FLYE_MODE_MAP[FLYE_MODE_KEY]
         print(f"Flye input mode overridden via config with value: '{FLYE_INPUT_MODE}'.")
 
+    # ── ONT adapter and barcode trimming (shared/05_ont_adapters.smk) ──
+    # parameters.<mode>.ont_adapter decides whether, and how, the sequencing adapter
+    # and the barcode block that follows it are trimmed from the ONT reads before
+    # Filtlong (docs/methods_ont_adapters.md):
+    #   detect (the default; also a blank or missing key): rule find_ont_adapter works
+    #             the sequence out from the reads, or decides there is nothing to
+    #             trim, and the reads are then copied unchanged.
+    #   off:      no trimming; Filtlong reads the raw reads. An unquoted off, no or
+    #             false (YAML's boolean false) means off too.
+    #   a DNA sequence of 20 to 200 bases of A, C, G and T: trimmed as written.
+    # An unquoted on, yes or true names none of these and stops the run (section 0),
+    # as it does for parameters.decontamination.mode. A sequence that is a short unit
+    # repeated end to end (a homopolymer, a microsatellite) is refused: trimming it
+    # would cut genome from the read ends. The two checks of a sequence come from
+    # find_ont_adapter.py itself, loaded here as a module (importlib finds the file by
+    # its path, makes an empty module from it and runs the file's code into it), so
+    # that this start-up check and the rule apply the same rules. Python would cache the
+    # loaded file as bytecode in a __pycache__ folder beside it, inside the repository;
+    # sys.dont_write_bytecode switches that off for the load and is then put back.
+    _ont_adapter_raw = _lr_params.get("ont_adapter")
+    if _ont_adapter_raw is False:
+        _ont_adapter_raw = "off"
+    _stop_on_yaml_bool(
+        f"parameters.{MODE}.ont_adapter", _ont_adapter_raw,
+        "detect, off, or the DNA sequence to trim",
+    )
+    _ont_adapter_word = "" if _ont_adapter_raw is None else str(_ont_adapter_raw).strip()
+    if _ont_adapter_word == "" or _ont_adapter_word.lower() == "detect":
+        ONT_ADAPTER_SETTING = "detect"
+    elif _ont_adapter_word.lower() == "off":
+        ONT_ADAPTER_SETTING = "off"
+    else:
+        _ont_bytecode_setting = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
+        _ont_spec = importlib.util.spec_from_file_location("find_ont_adapter", ONT_ADAPTER_SCRIPT)
+        _ont_module = importlib.util.module_from_spec(_ont_spec)
+        _ont_spec.loader.exec_module(_ont_module)
+        sys.dont_write_bytecode = _ont_bytecode_setting
+        _ont_sequence = _ont_module.clean_sequence(_ont_adapter_word)
+        if _ont_sequence is None or not 20 <= len(_ont_sequence) <= 200:
+            sys.exit(
+                f"[BacFlux] parameters.{MODE}.ont_adapter must be detect, off, or the DNA "
+                "sequence to trim, 20 to 200 bases of A, C, G and T (got: "
+                f"{_ont_adapter_raw!r})."
+            )
+        if _ont_module.is_tandem_repeat(_ont_sequence):
+            sys.exit(
+                f"[BacFlux] parameters.{MODE}.ont_adapter is {_ont_sequence}, a short unit "
+                "repeated end to end, not an adapter. Trimming it would cut genome from "
+                "the read ends."
+            )
+        if _ont_module.ADAPTER_CORE not in _ont_sequence:
+            print(
+                f"[BacFlux] NOTE parameters.{MODE}.ont_adapter does not contain the core of "
+                f"the ONT adapter ({_ont_module.ADAPTER_CORE}); it is trimmed as written."
+            )
+        if len(_ont_sequence) < _ont_module.MIN_SPLIT_LENGTH:
+            print(
+                f"[BacFlux] NOTE parameters.{MODE}.ont_adapter is shorter than "
+                f"{_ont_module.MIN_SPLIT_LENGTH} bp, so fastplong trims it at the read ends "
+                "only and does not split reads where it occurs in the middle (a short "
+                "sequence matches genome by chance)."
+            )
+        ONT_ADAPTER_SETTING = _ont_sequence
+    # ONT_ADAPTER_TRIM is the switch the rest of the workflow reads: true puts the
+    # three rules of shared/05_ont_adapters.smk in the DAG and makes Filtlong read the
+    # trimmed reads (FILTLONG_INPUT, defined after sample discovery in section 9).
+    ONT_ADAPTER_TRIM = ONT_ADAPTER_SETTING != "off"
+    if ONT_ADAPTER_SETTING == "detect":
+        print("ONT adapter trimming: the adapter and barcode are worked out from the reads (ont_adapter: detect).")
+    elif ONT_ADAPTER_SETTING == "off":
+        print("ONT adapter trimming: off; Filtlong reads the raw ONT reads.")
+    else:
+        print(f"ONT adapter trimming: the sequence written in parameters.{MODE}.ont_adapter ({len(ONT_ADAPTER_SETTING)} bp).")
+
     # ── The two long-read modes differ ONLY in these wiring constants ──
     # Expressing the difference here, once, is what lets the Flye / dnaapler /
     # Medaka rules be byte-identical in rules/nanopore/ and rules/hybrid/. They
@@ -2588,10 +2742,29 @@ if HAS_LONG_READS:
         # What Polypolish corrects, and therefore what becomes FINAL_CONTIGS.
         POLISH_INPUT = MEDAKA_CONSENSUS if USE_MEDAKA else DNAAPLER_FIXED
 else:
-    # Short-read-only and contigs modes never touch Flye/Medaka.
+    # Short-read-only and contigs modes never touch Flye/Medaka, and have no ONT
+    # reads to trim.
     USE_MEDAKA = None
     MEDAKA_MODEL = None
     FLYE_INPUT_MODE = None
+    ONT_ADAPTER_SETTING = "off"
+    ONT_ADAPTER_TRIM = False
+
+# The read-level files the adapter screen of the finished genome (rules
+# adapter_search_input and screen_adapters, shared/20_qc.smk) takes in when BacFlux
+# trimmed this run's ONT reads: the sequences that were trimmed (searched for in the
+# genome too, which catches a barcode no published list holds), and the scan's and the
+# check's numbers (for the MultiQC Adapters table). Lists, so that a run without
+# trimming gets empty lists: an empty input adds no DAG edge, and Snakemake writes it
+# as nothing at all in the command, which the screen script reads as "not given".
+if ONT_ADAPTER_TRIM:
+    ADAPTER_SCREEN_TRIMMED = [ONT_ADAPTER_SEQUENCE]
+    ADAPTER_SCREEN_CHOICE  = [ONT_ADAPTER_CHOICE]
+    ADAPTER_SCREEN_CHECK   = [ONT_ADAPTER_CHECK]
+else:
+    ADAPTER_SCREEN_TRIMMED = []
+    ADAPTER_SCREEN_CHOICE  = []
+    ADAPTER_SCREEN_CHECK   = []
 
 
 # ───────────────── 9. Per-mode sample discovery ────────────────
@@ -2715,6 +2888,25 @@ elif MODE == "contigs":
     CONTIGS = "{sample}." + CONTIGS_EXTN
 
 
+# ── The reads Filtlong starts from (long-read modes) ──
+# Rule filter_long_reads (nanopore/10_reads.smk and hybrid/30_ont_reads.smk) reads
+# FILTLONG_INPUT: the reads fastplong trimmed (TRIMMED_LONG, rule trim_ont_adapters
+# in shared/05_ont_adapters.smk) unless parameters.<mode>.ont_adapter is off, and then
+# the sample's raw ONT FASTQ. A parse-time constant, like FINALIZE_SOURCE in section
+# 8, so the DAG is fixed before the run starts and `snakemake -n` shows the real
+# chain. Defined here, after sample discovery, because the raw file's name pattern
+# (ONT, under NANOPORE_DIR) is only known now. The raw NanoPlot profile keeps reading
+# the raw file: it describes the reads as delivered.
+#
+# Upgrading an output folder made before v2.2.0: with trimming on, Filtlong's input is
+# a new file, so Filtlong, Flye and every later step run again for every long-read
+# sample, even when the scan finds nothing to trim (the copy fastplong then makes is
+# still a new file, and Snakemake compares file times, not contents). ont_adapter: off
+# keeps the earlier input, and with it the earlier assembly.
+if HAS_LONG_READS:
+    FILTLONG_INPUT = TRIMMED_LONG if ONT_ADAPTER_TRIM else os.path.join(NANOPORE_DIR, ONT)
+
+
 # ─────────── 9b. Global {sample} wildcard constraint ───────────
 # Pin the {sample} wildcard to the exact set of discovered sample names. Without
 # this, {sample} defaults to ".+" (matches anything, even "/"), which lets a
@@ -2779,6 +2971,13 @@ def _frontend_targets_for(mode):
         # are not orphans either, now that build_replicons reads them.)
         targets += expand(BAKTA_REPLICONS_AUDIT, sample=SAMPLES)
 
+    if ONT_ADAPTER_TRIM:
+        # The count of adapters left in the reads Filtlong kept (rule
+        # check_ont_trimming, shared/05_ont_adapters.smk). screen_adapters reads it
+        # too; it is named here so that it is always made, and checked, on its own.
+        # The scan's four files come from the job that the trimming needs anyway.
+        targets += expand(ONT_ADAPTER_CHECK, sample=SAMPLES)
+
     if IS_HYBRID:
         # ORPHAN without this line: the Snippy comparison of the ONT stages
         # against the Illumina assembly is a terminal report.
@@ -2802,6 +3001,14 @@ def _downstream_targets():
         *expand(QC_GENOME_TABLE, sample=SAMPLES),
         *expand(QUAST_DIR,       sample=SAMPLES),
         *expand(CHECKM_STATS,    sample=SAMPLES),
+        # The adapter screen's locus table (rule screen_adapters, shared/20_qc.smk),
+        # in every mode. ORPHAN without this line: MultiQC reads only the screen's
+        # one-row table, which the same job writes, so a deleted locus table would
+        # otherwise never be made again. The same holds for UniVec's PROVENANCE.txt,
+        # which no rule reads: named, a deleted one is fetched again with UniVec (a
+        # 1.7 MB download, and every sample's screen after it, seconds each).
+        *expand(ADAPTER_SCREEN,  sample=SAMPLES),
+        UNIVEC_PROVENANCE,
         # 03.taxonomy — GTDB-Tk (one output directory per sample)
         *expand(DIR_TAXONOMY + "/{sample}", sample=SAMPLES),
         # 04.annotation — Bakta, eggNOG, antiSMASH, dbCAN (shared DB + per sample)
@@ -2950,6 +3157,8 @@ def download_targets():
     # filtered. A long-read run whose jobs have no internet needs one model check
     # done with internet first, or parameters.<mode>.medaka_model: false.
     targets = []
+    # The Illumina adapter records of UniVec, for the adapter screen (every mode).
+    targets.append(UNIVEC_ILLUMINA)
     if HAS_SHORT_READS:
         targets.append(PHIX_FASTA)
         if not CARDDB:

@@ -6,18 +6,20 @@
 # longest, best subset, and NanoPlot runs on both sides of it so the choice is
 # visible in the report rather than hidden.
 #
-# Stage chain: raw {sample}_ont → filter_long_reads → FILT_LONG, with a NanoPlot
-# profile hanging off either side.
+# Stage chain: raw {sample}_ont → (adapter and barcode trimming, shared/
+# 05_ont_adapters.smk, unless parameters.nanopore.ont_adapter is off) →
+# filter_long_reads → FILT_LONG, with a NanoPlot profile hanging off either side.
 #
 # raw_long_read_qc      : NanoPlot over the raw FASTQ → NANOPLOT_RAW_DIR.
-# filter_long_reads     : filtlong length/quality selection → FILT_LONG.
+# filter_long_reads     : filtlong length/quality selection of FILTLONG_INPUT (the
+#                         trimmed reads, or the raw ones) → FILT_LONG.
 # filtered_long_read_qc : the same NanoPlot over FILT_LONG → NANOPLOT_FILT_DIR.
 #
 # There is NO PhiX step here: PhiX is an Illumina spike-in and does not exist in
 # an ONT library.
 #
 # Everything referenced here comes from 00_common.smk: NANOPORE_DIR, ONT,
-# FILT_LONG, NANOPLOT_RAW_DIR, NANOPLOT_FILT_DIR, FILTLONG_MIN_LENGTH,
+# FILTLONG_INPUT, FILT_LONG, NANOPLOT_RAW_DIR, NANOPLOT_FILT_DIR, FILTLONG_MIN_LENGTH,
 # FILTLONG_KEEP_PERCENT, LOGS, capped_cpus.
 #
 # conda: paths resolve relative to THIS file (workflow/rules/nanopore/), so
@@ -84,9 +86,12 @@ rule raw_long_read_qc:
 
 
 # ──────────────────────── Read selection (filtlong) ────────────
-# Takes in: long = os.path.join(NANOPORE_DIR, ONT), the same raw ONT FASTQ
-#           raw_long_read_qc profiled above — filtlong reads the reads, not the
-#           plots, so the two rules are independent of each other.
+# Takes in: long = FILTLONG_INPUT (00_common.smk, after sample discovery): the reads
+#           fastplong trimmed of the ONT adapter and barcode (TRIMMED_LONG, rule
+#           trim_ont_adapters in shared/05_ont_adapters.smk), or, with
+#           parameters.nanopore.ont_adapter off, the same raw ONT FASTQ
+#           raw_long_read_qc profiled above. Filtlong reads the reads, not the
+#           plots, so it is independent of the NanoPlot rules.
 # Does:     filtlong scores every raw ONT read and keeps the longest, best-scoring
 #           subset. Three knobs, and only one of them is fixed in this rule:
 #             --min_length     parameters.long_read_qc.min_length, default 1000.
@@ -128,7 +133,7 @@ rule raw_long_read_qc:
 # (v1 message: "--- Filtlong: Filter long reads. ---")
 rule filter_long_reads:
     input:
-        long = os.path.join(NANOPORE_DIR, ONT),
+        long = FILTLONG_INPUT,
     output:
         filt_long = FILT_LONG,
     params:

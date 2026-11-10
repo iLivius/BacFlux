@@ -11,7 +11,9 @@
 # Chain: DECONTAM_CONTIGS (shared/10_decontam.smk) → index_selected_contigs →
 # map_sel_contigs, which also takes TRIM_R1/TRIM_R2 (hybrid/10_reads.smk) and
 # emits SEL_R1/SEL_R2, the decontaminated read pairs. SEL_R1/SEL_R2 then feed
-# filter_long_reads (with the raw ONT FASTQ) and short_read_correction
+# filter_long_reads (with the ONT reads, FILTLONG_INPUT: trimmed of their adapter
+# and barcode by shared/05_ont_adapters.smk, or raw with
+# parameters.hybrid.ont_adapter off) and short_read_correction
 # (hybrid/50_polish.smk). filter_long_reads emits FILT_LONG →
 # filtered_long_read_qc and ont_assembly (hybrid/40_ont_assembly.smk).
 #
@@ -30,7 +32,7 @@
 # filtered_long_read_qc  : NanoPlot profile of what survived.
 #
 # Every constant used here comes from shared/00_common.smk: DECONTAM_CONTIGS,
-# DECONTAM_DIR, TRIM_R1/TRIM_R2, SEL_R1/SEL_R2, NANOPORE_DIR, ONT, FILT_LONG,
+# DECONTAM_DIR, TRIM_R1/TRIM_R2, SEL_R1/SEL_R2, FILTLONG_INPUT, FILT_LONG,
 # NANOPLOT_FILT_DIR, LOGS, CPUS, capped_cpus.
 
 
@@ -153,7 +155,10 @@ rule map_sel_contigs:
 # contaminant has no short-read support once the short reads themselves have been
 # decontaminated.
 #
-# Takes in: long   = the raw ONT FASTQ, ONT under NANOPORE_DIR, i.e.
+# Takes in: long   = FILTLONG_INPUT (00_common.smk, after sample discovery): the
+#                    ONT reads trimmed of their adapter and barcode (TRIMMED_LONG,
+#                    rule trim_ont_adapters in shared/05_ont_adapters.smk), or,
+#                    with parameters.hybrid.ont_adapter off, the raw ONT FASTQ,
 #                    {sample}_ont.fastq[.gz] in config input.nanopore_dir
 #           r1, r2 = SEL_R1 / SEL_R2, the decontaminated Illumina pairs from
 #                    map_sel_contigs above
@@ -186,7 +191,7 @@ rule map_sel_contigs:
 # (v1 message: "--- Filtlong: Filter and short-read correct long reads. ---")
 rule filter_long_reads:
     input:
-        long = os.path.join(NANOPORE_DIR, ONT),
+        long = FILTLONG_INPUT,
         # Only a dependency when the guidance is on. Unpacking a dict keeps the input
         # list valid either way, and with guidance off the ONT leg no longer waits on
         # the Illumina selection at all.

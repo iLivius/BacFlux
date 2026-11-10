@@ -96,6 +96,7 @@ parameters:
   nanopore:
     flye_input_mode: auto     # auto | nano-raw | nano-hq
     medaka_model: auto        # auto/TRUE/empty = infer; FALSE = skip; else explicit model
+    ont_adapter: detect       # detect | off | the DNA sequence to trim (adapter + barcode)
 # ═════════════════ END CONFIG: mode = nanopore ═════════════════
 
 
@@ -134,6 +135,7 @@ parameters:
   hybrid:
     flye_input_mode: auto     # auto | nano-raw | nano-hq
     medaka_model: auto        # auto/TRUE/empty = infer; FALSE = skip; else explicit model
+    ont_adapter: detect       # detect | off | the DNA sequence to trim (adapter + barcode)
 # ══════════════════ END CONFIG: mode = hybrid ══════════════════
 
 

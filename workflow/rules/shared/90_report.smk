@@ -18,6 +18,7 @@
 #   NanoPlot raw + filtered          -         y        y        -
 #   Qualimap (mapping QC)            y         y        y        -
 #   QUAST (assembly QC)              y         y        y (2)    y
+#   adapter screen (Adapters table)  y         y        y        y
 #   CheckM (staged, relabelled)      y         y        y (2)    y
 #   GTDB-Tk (staged, relabelled)     y         y        y (2)    y
 #   Bakta (annotation)               y         y        y        y
@@ -33,7 +34,7 @@
 # Everything referenced here is defined once in 00_common.smk and never
 # re-derived: OUT, DIR_REPORT, DIR_ANNOTATION, LOGS, SAMPLES, CHECKM_STATS,
 # GTDBTK_DIR, QUAST_DIR, QUALIMAP_DIR, FASTP_JSON, NANOPLOT_RAW_DIR,
-# NANOPLOT_FILT_DIR, CHECKM_RELABEL_AWK, GTDBTK_RELABEL_AWK, QC_GENOMES,
+# NANOPLOT_FILT_DIR, ADAPTER_SCREEN_MQC, CHECKM_RELABEL_AWK, GTDBTK_RELABEL_AWK, QC_GENOMES,
 # IS_HYBRID, the capability flags, MULTIQC_VERSIONS_SCRIPT and
 # MULTIQC_CITATIONS_SCRIPT; for the trait profile TRAITS_RUN, TRAIT_PROFILE,
 # TRAIT_PROVENANCE, TRAIT_RULES_TSV, TRAITS_SUMMARY, TRAITS_SUMMARY_MQC and
@@ -72,6 +73,15 @@ def multiqc_qc_inputs():
         # feed BlobTools, so a mapping-quality report on it says nothing.
         paths += expand(QUALIMAP_DIR, sample=SAMPLES)
     paths += expand(QUAST_DIR, sample=SAMPLES)
+    # The Adapters table: one row per sample from the adapter screen (rule
+    # screen_adapters, shared/20_qc.smk), with the read-level numbers of the ONT
+    # adapter trimming when BacFlux trimmed the reads. MultiQC reads each file as
+    # custom content (its name ends in _mqc.tsv); the rows of all samples merge into
+    # one table because the files share one table id, and each row keeps the sample
+    # name written in its first column, so no rename rule below is needed.
+    # fastplong's own JSON report is not listed: MultiQC 1.33 has no fastplong
+    # module, and its fastp module would read the file as a fastp run.
+    paths += expand(ADAPTER_SCREEN_MQC, sample=SAMPLES)
     paths += expand(DIR_ANNOTATION + "/bakta/{sample}", sample=SAMPLES)
     # The trait plots (traits.run, off by default), written by rule
     # traits_summary at the end of this file into one folder. MultiQC reads the
@@ -280,11 +290,13 @@ rule multiqc:
         # which version made it.
         env_dir = os.path.join(WORKFLOW_DIR, "envs"),
         # Which kinds of tools this run used, so the two scripts list only those:
-        # the read-QC tools in the read modes, and the structure-search tools of
-        # the trait profile.
+        # the read-QC tools in the read modes, fastplong when it trimmed the ONT
+        # reads (ONT_ADAPTER_TRIM), and the structure-search tools of the trait
+        # profile.
         version_flags = (
             ("--short-reads " if HAS_SHORT_READS else "")
             + ("--long-reads " if HAS_LONG_READS else "")
+            + ("--ont-trimming " if ONT_ADAPTER_TRIM else "")
             + ("--traits " if TRAITS_RUN else "")
         ),
     conda:
@@ -328,6 +340,7 @@ sample_names_replace_exact: true
 report_section_order:
   fastp: {{order: 1000}}
   nanostat: {{order: 900}}
+  bacflux_adapters: {{order: 850}}
   quast: {{order: 800}}
   qualimap: {{order: 700}}
   checkm: {{order: 600}}

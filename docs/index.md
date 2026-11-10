@@ -53,7 +53,7 @@ it with x or Esc.
 |                          | `illumina` | `nanopore` | `hybrid` | `contigs` |
 |--------------------------|------------|------------|----------|-----------|
 | **Input**                | Illumina paired-end reads | long reads from Oxford Nanopore Technologies (ONT) | Illumina and ONT reads from the same isolate | a finished assembly (FASTA) |
-| **Read QC**              | PhiX removal (`bowtie2`), then `fastp` | `NanoPlot` before and after `Filtlong` | both of the above | none |
+| **Read QC**              | PhiX removal (`bowtie2`), then `fastp` | adapter and barcode trimming (`fastplong`), `NanoPlot` before and after `Filtlong` | both of the above | none |
 | **Assembly**             | `SPAdes` | `Flye`, reoriented by `dnaapler`, polished by `Medaka`\* | `Flye` as in `nanopore`, then corrected with the short reads by `Polypolish`; a `SPAdes` draft is kept as the comparator | no assembler |
 | **Contig filter**        | ≥500 bp and ≥2× coverage, read off SPAdes' own headers | none | the same cutoffs, on the SPAdes draft only | the same cutoffs when the headers are SPAdes-style; otherwise headers are trimmed and nothing is removed |
 | **Delivered genome**     | the screened SPAdes contigs | the polished Flye assembly | the Polypolish-corrected ONT assembly | the screened input contigs |

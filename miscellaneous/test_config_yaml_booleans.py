@@ -31,6 +31,13 @@ as the template ships them, they add no job; switched on with stub databases,
 they plan their jobs; and their database settings stop a run only when the layer
 is on.
 
+ONT adapter trimming gets tests of its own too: with ont_adapter: detect, as the
+template ships it, the three trimming rules are planned in nanopore and hybrid
+mode and Filtlong reads the trimmed reads; a bare off means off and Filtlong reads
+the raw reads; a bare on, a tandem repeat or a word that is not a setting stops the
+run; and the adapter screen of the finished genome is planned in every mode, with
+UniVec fetched by download_all.
+
 Snakemake is looked for next to the Python running the tests, then on PATH; the
 tests are skipped when it is not found. Each dry run takes about a second.
 Run with:
@@ -441,6 +448,94 @@ class TestConfigYamlBooleans(unittest.TestCase):
         )
         self.assertEqual(status, 0, output[-3000:])
         self.assertIn("Medaka disabled via config", output)
+
+    # ── ONT adapter trimming (long-read modes) and the adapter screen (every mode) ──
+    # -p prints each planned job's shell command; " ".join(output.split()) puts each
+    # command on one line, so a check does not depend on where Snakemake breaks it.
+    # The texts checked are whole options or file names: "fastp" alone would also be
+    # found inside "fastplong", and "--trim" inside "--trimming_extension".
+
+    TRIMMING_RULES = ("find_ont_adapter", "trim_ont_adapters", "check_ont_trimming")
+    SCREEN_RULES = ("univec_illumina", "adapter_search_input", "blast_adapters", "screen_adapters")
+
+    def test_ont_adapter_detect_trims_the_reads_before_filtlong(self):
+        # The template ships ont_adapter: detect in both long-read blocks: the three
+        # trimming rules are planned, Filtlong reads the trimmed reads, and fastplong
+        # runs with its own filters and its 10 bp extension switched off.
+        for mode in ("nanopore", "hybrid"):
+            with self.subTest(mode=mode):
+                status, output = self.dry_run({"mode": mode}, extra_args=["-p"])
+                self.assertEqual(status, 0, output[-3000:])
+                for rule_name in self.TRIMMING_RULES + self.SCREEN_RULES:
+                    self.assertIn(f"rule {rule_name}:", output)
+                flat = " ".join(output.split())
+                self.assertIn("SAMPLE1_trimmed.fastq.gz > ", flat)
+                self.assertIn("-Q -L --trimming_extension 0", flat)
+                self.assertIn("--setting detect", flat)
+                self.assertIn("ONT adapter trimming: the adapter and barcode are worked out", output)
+
+    def test_ont_adapter_bare_off_means_off(self):
+        # An unquoted off reaches BacFlux as false, and means off: no trimming rule,
+        # and Filtlong reads the raw reads, exactly as before trimming existed. The
+        # adapter screen still runs.
+        status, output = self.dry_run(
+            {"mode": "nanopore", "parameters.nanopore.ont_adapter": BARE_WORD_SLOT}, "off",
+            extra_args=["-p"],
+        )
+        self.assertEqual(status, 0, output[-3000:])
+        self.assertIn("ONT adapter trimming: off", output)
+        for rule_name in self.TRIMMING_RULES:
+            self.assertNotIn(f"rule {rule_name}:", output)
+        for rule_name in self.SCREEN_RULES:
+            self.assertIn(f"rule {rule_name}:", output)
+        flat = " ".join(output.split())
+        self.assertIn("SAMPLE1_ont.fastq.gz > ", flat)
+        self.assertNotIn("_trimmed.fastq.gz", flat)
+
+    def test_ont_adapter_on_stops(self):
+        # An unquoted on names none of detect, off or a sequence.
+        self.assert_stops({"mode": "nanopore", "parameters.nanopore.ont_adapter": BARE_WORD_SLOT},
+                          "on", "[BacFlux] parameters.nanopore.ont_adapter is an unquoted on",
+                          "detect, off, or the DNA sequence to trim")
+
+    def test_ont_adapter_sequence_checks(self):
+        # A short tandem repeat would cut genome from the read ends; a word that is not
+        # a setting is not a sequence either. A valid sequence reaches the scan as
+        # written, with a NOTE when it is too short for fastplong to split reads on.
+        self.assert_stops({"mode": "hybrid", "parameters.hybrid.ont_adapter": "TTAGGGTTAGGGTTAGGGTTAGGG"},
+                          None, "[BacFlux] parameters.hybrid.ont_adapter is TTAGGGTTAGGGTTAGGGTTAGGG",
+                          "a short unit repeated end to end")
+        self.assert_stops({"mode": "nanopore", "parameters.nanopore.ont_adapter": "auto"}, None,
+                          "[BacFlux] parameters.nanopore.ont_adapter must be detect, off, or the DNA "
+                          "sequence to trim")
+        status, output = self.dry_run(
+            {"mode": "nanopore", "parameters.nanopore.ont_adapter": "cctgtacttcgttcagttacgtattgct"},
+            extra_args=["-p"],
+        )
+        self.assertEqual(status, 0, output[-3000:])
+        self.assertIn("--setting CCTGTACTTCGTTCAGTTACGTATTGCT", " ".join(output.split()))
+        self.assertIn("NOTE parameters.nanopore.ont_adapter is shorter than 50 bp", output)
+
+    def test_adapter_screen_runs_in_illumina_mode(self):
+        # The screen runs in every mode; the template config is an illumina run, which
+        # has no ONT reads, so no trimming rule is planned.
+        status, output = self.dry_run({}, extra_args=["-p"])
+        self.assertEqual(status, 0, output[-3000:])
+        for rule_name in self.SCREEN_RULES:
+            self.assertIn(f"rule {rule_name}:", output)
+        for rule_name in self.TRIMMING_RULES:
+            self.assertNotIn(f"rule {rule_name}:", output)
+        self.assertIn("blastn -task blastn-short", " ".join(output.split()))
+
+    def test_univec_checksum_that_is_not_a_checksum_stops(self):
+        self.assert_stops({"links.univec_sha256": "not-a-checksum"}, None,
+                          "[BacFlux] links.univec_sha256 must be the SHA-256 checksum")
+
+    def test_download_all_fetches_univec(self):
+        status, output = self.dry_run({}, targets=["download_all"])
+        self.assertEqual(status, 0, output[-3000:])
+        self.assertIn("rule univec_illumina:", output)
+        self.assertNotIn("rule screen_adapters:", output)
 
     # ── The opt-in Baktfold layer ──
 

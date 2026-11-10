@@ -8,10 +8,11 @@ estimates and read-mapping statistics:
 | How contiguous is the **assembly**? | QUAST 5.3.0 | contig count, N50, largest contig, total length, GC |
 | What are the marker-based completeness and contamination estimates? | CheckM 1.2.5 | completeness %, contamination %, from lineage-specific single-copy markers |
 | How do the **reads** map to the assessed assembly? | Qualimap 2.3 | mean depth, evenness, GC bias, mapping rate, insert size |
+| Does the **genome** still carry sequencing adapters or barcodes? | BLAST+ 2.17.0 | adapter loci at contig ends and inside contigs |
 
-The first two need a genome; the third needs the BAM that
+QUAST, CheckM and the adapter screen need a genome; Qualimap needs the BAM that
 [decontamination](decontamination.md#1-coverage-the-reads-mapped-back-onto-the-draft)
-already made for BlobTools. All four results — these three plus GTDB-Tk — end up in the
+already made for BlobTools. All five results — these four plus GTDB-Tk — end up in the
 MultiQC report in `09.report`.
 
 Everything here is in `workflow/rules/shared/20_qc.smk` and runs in all four modes,
@@ -186,6 +187,34 @@ Three places, answering different questions:
 | `eval/checkm/` and `03.taxonomy/` | one row per genome — completeness, contamination, lineage |
 | `02.assembly/{sample}/snps/SNPs_summary.txt` | Snippy variant counts for each ONT polishing stage against the decontaminated Illumina **assembly** as reference; see [Hybrid mode](../modes/hybrid.md) |
 
+## Adapter screen (BLAST)
+
+Sequencing adapters and barcodes left in the reads end up in the assembly wherever many
+reads end at the same place, which is at the ends of linear contigs. The screen searches
+the finished genome, `contigs_final.fasta`, for ONT adapters and barcodes, PacBio and MGI
+adapters, Illumina adapters (downloaded from NCBI UniVec by rule `univec_illumina`) and,
+for ONT reads BacFlux trimmed, the very sequence that was trimmed. It reports and removes
+nothing.
+
+| Rule | Does |
+|---|---|
+| `univec_illumina` | once per output folder: downloads NCBI UniVec, checks its SHA-256 checksum and keeps the 151 Illumina records |
+| `adapter_search_input` | joins every adapter into one query file, and extends each circular contig by its own first 200 bp so that an adapter across the contig's start is seen |
+| `blast_adapters` | `blastn -task blastn-short`, adapters against the genome |
+| `screen_adapters` | keeps hits of at least 90 % identity, at least 20 bp long within 100 bp of the end of a linear contig or 28 bp long inside a contig, merges them into loci, and writes the Adapters table of the MultiQC report |
+
+A circular contig has no ends, so every hit on it is judged as internal. A locus made only
+of the 50 bp that follow every ONT rapid barcode, which are the right end of phage Mu, is
+listed but not counted inside a contig, because a Mu prophage holds the same sequence. The
+method, its thresholds and its limits are explained in
+[ONT adapter trimming and the adapter screen](../methods_ont_adapters.md).
+
+!!! note "Before a GenBank submission"
+
+    The screen covers the common adapters only. NCBI provides its own adaptor screen,
+    FCS-adaptor, to clean genomes before submission; run it on the genome before you
+    submit.
+
 ## Resources
 
 | Rule | Threads | Memory |
@@ -194,6 +223,7 @@ Three places, answering different questions:
 | `genome_assembly_evaluation` | capped at 24 | modest |
 | `completeness_and_contamination` | capped at 24 | tens of GB; pplacer is the driver |
 | `map_evaluation` | capped at 24 | a Java heap of `resources.ram_gb` minus 4 GB, at most 64 GB and at least 1 GB; the 4 GB are left for what Java needs beyond its heap |
+| `adapter_search_input`, `blast_adapters`, `screen_adapters` | 1 | negligible; BLAST takes seconds on a bacterial genome |
 
 "Capped at 24" means the rule asks for `min(resources.threads, 24)`, and `--cores`
 caps what Snakemake then grants it. Qualimap's memory figure is
@@ -219,6 +249,14 @@ All under `02.assembly/{sample}/eval/`.
 | `checkm/` (tree, `lineage.ms`) | yes | `checkm qa` |
 | `qualimap/` | yes | MultiQC; absent in `contigs` mode |
 | `genomes/` | no | QUAST, CheckM, GTDB-Tk — deleted once all three are done |
+| `adapter_screen/{sample}_adapter_loci.tsv` | yes | you — one row per adapter locus, with `counted` and `reason` columns |
+| `adapter_screen/{sample}_adapter_screen_mqc.tsv` | yes | MultiQC (the Adapters table) |
+| `adapter_screen/{sample}_adapter_blast.tsv` | yes | `screen_adapters`; every BLAST hit, also those that do not pass the rules |
+| `adapter_screen/{sample}_adapter_query.fasta` | yes | `screen_adapters`; every adapter searched for |
+| `adapter_screen/{sample}_search_contigs.fasta` | no | `blast_adapters` — the genome with circular contigs extended |
+
+UniVec's Illumina records sit once per output folder in `02.assembly/adapter_lists/`, with a
+`PROVENANCE.txt` saying where and when they were downloaded.
 
 ## What to check afterwards
 
@@ -231,4 +269,7 @@ All under `02.assembly/{sample}/eval/`.
 - **Qualimap's mean depth and evenness.** A bimodal depth distribution on a
   single-isolate assembly usually means more than one organism, or a plasmid at high
   copy number.
+- **The Adapters table.** Adapter at a contig end needs trimming before a submission; a
+  match inside a contig is worth a look in the locus table, whose `reason` column says how
+  each locus was judged.
 - `09.report/multiqc_report.html` — all of the above for the whole batch on one page.

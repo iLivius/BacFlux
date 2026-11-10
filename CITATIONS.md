@@ -184,6 +184,30 @@ learning from its design:
 - **BLAST+** — Camacho C, Coulouris G, Avagyan V, Ma N, Papadopoulos J, Bealer K,
   Madden TL. (2009) *BLAST+: architecture and applications.* BMC Bioinformatics 10:421.
 
+- **fastplong** (ONT adapter and barcode trimming in `nanopore` and `hybrid` mode;
+  `parameters.<mode>.ont_adapter: off` skips it) — OpenGene.
+  <https://github.com/OpenGene/fastplong>. It has no publication of its own; its README
+  asks for the two fastp papers: Chen S. (2023) *Ultrafast one-pass FASTQ data
+  preprocessing, quality control, and deduplication using fastp.* iMeta 2:e107.
+  <https://doi.org/10.1002/imt2.107>; Chen S, Zhou Y, Chen Y, Gu J. (2018) *fastp: an
+  ultra-fast all-in-one FASTQ preprocessor.* Bioinformatics 34(17):i884–i890.
+  <https://doi.org/10.1093/bioinformatics/bty560>
+  *MIT licence.*
+
+- **Adapter sequences** (the ONT adapter scan and the adapter screen of the finished
+  genome) — Oxford Nanopore Technologies, *Chemistry Technical Document*, version
+  CHTD_500_v1_revAV_24July2026, sections 14 and 15
+  (<https://nanoporetech.com/document/chemistry-technical-document>): the adapter and the
+  96 native and 96 rapid barcodes shipped in `workflow/data/adapters/ont_chtd.fasta`.
+  National Center for Biotechnology Information, *UniVec*
+  (<https://ftp.ncbi.nlm.nih.gov/pub/UniVec/>): the PacBio and MGI records shipped in
+  `workflow/data/adapters/univec_pacbio_mgi.fasta`, and the Illumina records of build
+  10.1, which the workflow downloads.
+  *ONT states no licence for its document's sequences; they are reproduced as ONT
+  publishes them, with the source in every record. UniVec is a work of the US
+  Government; Illumina's oligonucleotide sequences are copyright Illumina, Inc., so
+  BacFlux downloads them on your computer and does not redistribute them.*
+
 - **bedtools** — Quinlan AR, Hall IM. (2010) *BEDTools: a flexible suite of
   utilities for comparing genomic features.* Bioinformatics 26(6):841–842.
 

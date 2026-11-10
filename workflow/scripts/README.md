@@ -6,9 +6,11 @@ is by sight and needs no grepping:
 
 | script directory | run by |
 |---|---|
+| `05_ont_adapters/` | `workflow/rules/shared/05_ont_adapters.smk` |
 | `10_decontam/` | `workflow/rules/shared/10_decontam.smk` |
 | `12_medaka_check/` | `workflow/rules/shared/12_medaka_check.smk` |
 | `15_replicons/` | `workflow/rules/shared/15_replicons.smk` |
+| `20_qc/` | `workflow/rules/shared/20_qc.smk` |
 | `40_annotation/` | `workflow/rules/shared/40_annotation.smk` |
 | `50_amr/` | `workflow/rules/shared/50_amr.smk` |
 | `60_plasmid/` | `workflow/rules/shared/60_plasmid.smk` |
@@ -33,6 +35,14 @@ checker reports a refused name that has vanished from a new GTDB release.
 They stay here rather than moving in with `clean_workdir.sh` because they `import
 gtdb_amrfinder_organism`, which *is* a workflow script. Splitting them off would break
 that import to gain a tidier listing, which is a bad trade.
+
+## The adapter lists live in `workflow/data/adapters/`
+
+`05_ont_adapters/find_ont_adapter.py` (which ONT adapter and barcode to trim from the
+reads) and `20_qc/adapter_screen.py` (the search of the finished genome for adapters) both
+use the adapter sequences that ship with BacFlux, so those sit in a folder of their own,
+`workflow/data/adapters/`, with a README naming the source of every record. The rules read
+them through `params`, not as inputs, so a checkout of the repository re-runs nothing.
 
 ## Two files inside `40_annotation/` are data, not scripts
 

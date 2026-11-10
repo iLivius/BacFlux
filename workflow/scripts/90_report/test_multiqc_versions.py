@@ -52,7 +52,26 @@ def test_all_recorded_versions_are_retained_and_unselected_samples_ignored(tmp_p
 ])
 def test_only_mode_relevant_tools_are_added(tmp_path, short_reads, long_reads, expected):
     values = versions.collect_versions(ENV_DIR, tmp_path, ["S1"], short_reads, long_reads)
-    assert set(values) - {"QUAST", "CheckM", "GTDB-Tk", "Bakta", "MultiQC"} == expected
+    assert set(values) - {"QUAST", "CheckM", "GTDB-Tk", "Bakta", "BLAST+", "MultiQC"} == expected
+
+
+def test_fastplong_is_read_from_its_json_and_grouped_with_blast_under_adapters(tmp_path):
+    # fastplong writes its version into its JSON report, in the adapters/ folder of
+    # the ONT reads; BLAST+ records none, so its pin is shown.
+    report = tmp_path / "01.reads" / "S1" / "ont" / "adapters" / "S1_fastplong.json"
+    report.parent.mkdir(parents=True)
+    report.write_text(json.dumps({"summary": {"fastplong_version": "0.7.1"}}))
+    output = tmp_path / "versions.yaml"
+    versions.main(["--env-dir", str(ENV_DIR), "--output-root", str(tmp_path),
+                   "--samples", "S1", "--long-reads", "--ont-trimming", "--out", str(output)])
+    group = yaml.safe_load(output.read_text())["software_versions"]["Adapters"]
+    assert group["fastplong"] == ["0.7.1"]
+    assert group["BLAST+"] == [pinned("blast", "blast")]
+
+
+def test_fastplong_is_not_listed_when_the_reads_were_not_trimmed(tmp_path):
+    values = versions.collect_versions(ENV_DIR, tmp_path, ["S1"], long_reads=True)
+    assert "fastplong" not in values
 
 
 def test_trait_tools_share_yaml_group_without_overwriting(tmp_path):
