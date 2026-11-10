@@ -65,9 +65,11 @@ jobs:
           activate-environment: ""
 
       # installation.md, section 2. -y answers conda's "Proceed?" question, which
-      # nobody is there to answer on a runner.
+      # nobody is there to answer on a runner. The version is the one the
+      # documentation installs; the oldest version BacFlux accepts (min_version in
+      # workflow/Snakefile, and the README badge) is older.
       - name: Create the launcher environment
-        run: conda create -y -n snakemake -c conda-forge -c bioconda snakemake=9.14.6
+        run: conda create -y -n snakemake -c conda-forge -c bioconda snakemake=9.27.1
 
       # installation.md, section 4: pytest is not in the launcher environment.
       - name: Add pytest
