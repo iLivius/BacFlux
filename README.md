@@ -148,8 +148,8 @@ them, start at
 git clone https://github.com/iLivius/BacFlux.git
 cd BacFlux
 
-# 2. Create the launcher environment (Snakemake 9.14.6 and nothing else)
-conda create -n snakemake -c conda-forge -c bioconda snakemake=9.14.6
+# 2. Create the launcher environment (Snakemake 9.27.1 and nothing else)
+conda create -n snakemake -c conda-forge -c bioconda snakemake=9.27.1
 conda activate snakemake
 
 # 3. Copy the shipped config and edit the copy: `mode`, the input directory for

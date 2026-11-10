@@ -19,7 +19,7 @@ cd BacFlux
 
 # 2. Launcher environment (Snakemake only; the analysis tools are installed later,
 #    per rule, by conda)
-conda create -c conda-forge -c bioconda -n snakemake snakemake=9.14.6
+conda create -c conda-forge -c bioconda -n snakemake snakemake=9.27.1
 conda activate snakemake
 
 # 3. Make your own copy of the config, then edit the copy

@@ -40,14 +40,14 @@ git-ignored, so it never ends up in a commit.
 ## 2. Create the launcher environment
 
 ```bash
-conda create -n snakemake -c conda-forge -c bioconda snakemake=9.14.6
+conda create -n snakemake -c conda-forge -c bioconda snakemake=9.27.1
 conda activate snakemake
 ```
 
-Snakemake **9.14.6 or newer**. That is the version BacFlux is tested with, and
-the Snakefile declares it as the minimum: an older Snakemake stops at once, before
-reading a single rule, with a message naming the version it needs. The pin in the
-command above gives you exactly the tested version.
+Snakemake **9.14.6 or newer**. The Snakefile declares 9.14.6 as the minimum: an
+older Snakemake stops at once, before reading a single rule, with a message naming
+the version it needs. BacFlux is tested with 9.14.6 and 9.27.1, and the command
+above installs 9.27.1.
 
 This environment only runs Snakemake, which reads the configuration, plans the run
 and starts jobs; it holds no analysis software. Snakemake builds each tool's
