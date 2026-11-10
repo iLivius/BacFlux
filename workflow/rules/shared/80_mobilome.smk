@@ -640,11 +640,10 @@ if MOBILOME_RUN:
     # deleted there once installed (msf_data unpacks it in a cache folder of its
     # own, so the two never meet). If any step fails, Snakemake deletes the whole
     # models folder, as for any failed job.
-    # The archive is deliberately not declared as a temp() output: Snakemake
-    # checks a job's code and parameters only when it holds a record for every
-    # output of the job, and a deleted temp() file has none, so a later change of
-    # CONJSCAN_VERSION would no longer fetch the new models in an existing output
-    # folder.
+    # The archive is not a declared output: the rule removes it itself once the
+    # models are installed, so the models folder is the job's only output. A later
+    # change of CONJSCAN_VERSION changes params.url, and Snakemake runs the rule
+    # again in an existing output folder.
     #
     # GOTCHA: `macsydata` is DEPRECATED in MacSyFinder 2.1.6 and prints a rename
     # warning; the current command is `msf_data`. The shell prefers msf_data and
