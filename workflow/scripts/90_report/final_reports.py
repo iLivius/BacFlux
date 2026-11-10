@@ -1209,8 +1209,10 @@ AMR_LOCUS_COLUMNS = [
     ("databases", "which of CARD, NCBI and ResFinder found the gene"),
     ("in_resfinder", "yes when ResFinder found the gene. ResFinder collects acquired "
                      "resistance genes; a gene found only by CARD or NCBI can be one "
-                     "every strain of the species carries, such as a chromosomal "
-                     "cephalosporinase, an efflux pump, a porin or a regulator"),
+                     "every strain of the species carries, such as an efflux pump, a "
+                     "porin or a regulator. A yes does not prove the gene was acquired: "
+                     "ResFinder also holds a few genes a species carries anyway, such as "
+                     "the chromosomal AmpC of Pseudomonas aeruginosa (blaPAO)"),
     ("database_hits", "how many database hits were grouped into this locus (a hit joins the "
                       "longest one when at least 80 % of it lies inside); each is a row on "
                       "Database_hits"),

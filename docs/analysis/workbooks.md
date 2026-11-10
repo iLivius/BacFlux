@@ -92,11 +92,13 @@ ABRicate's output.
 
 `in_resfinder` says whether ResFinder found the gene. ResFinder collects acquired
 resistance genes ([Zankari et al. 2012](https://doi.org/10.1093/jac/dks261)), while CARD
-and NCBI also list genes a species carries anyway: both list the chromosomal AmpC
-cephalosporinase of *Pseudomonas aeruginosa*, and CARD also its multidrug efflux pumps
-and their regulators ([Lister et al. 2009](https://doi.org/10.1128/CMR.00040-09)). A
-gene found only by CARD or NCBI is therefore worth a look before it is read as
-acquired. The `Summary` sheet counts the loci ResFinder found, and
+and NCBI also list genes a species carries anyway, such as the multidrug efflux pumps of
+*Pseudomonas aeruginosa* and their regulators in CARD
+([Lister et al. 2009](https://doi.org/10.1128/CMR.00040-09)). A gene found only by CARD
+or NCBI is therefore worth a look before it is read as acquired. A `yes` does not prove
+that the gene was acquired either: ResFinder also holds a few genes a species carries
+anyway, such as the chromosomal AmpC cephalosporinase of *P. aeruginosa*, `blaPAO` in
+ResFinder and `blaPDC` in NCBI. The `Summary` sheet counts the loci ResFinder found, and
 gives ABRicate's version and the date ABRicate lists for its copy of each database
 (also on `Run_QC`, from `05.amr/abricate/abricate_databases.tsv`), so each result is
 reported with the database it came from.
