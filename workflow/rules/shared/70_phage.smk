@@ -18,7 +18,8 @@
 #                          switches on the plasmid concordance in
 #                          shared/60_plasmid.smk.
 #   CheckV     (ALWAYS)  — neither caller reports completeness or contamination, so
-#                          CheckV 1.0.3 grades whatever the caller produced.
+#                          CheckV (version pinned in envs/checkv.yaml) grades
+#                          whatever the caller produced.
 #
 # The callers sit behind mutually exclusive `if PHAGE_CALLER == ...` guards, so only
 # one set of rules is ever defined and there is never a question about who produced

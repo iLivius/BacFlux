@@ -155,13 +155,20 @@ helpers — are plain Python and are tested without Snakemake:
 pytest workflow/scripts        # three tests skip unless BACFLUX_TEST_* variables name real GTDB files
 ```
 
-## What did not change
+## What the merge did not change
 
-The analysis steps, the thresholds and the decontamination policy came across as they
-were, and the byte comparisons above are the evidence. The merge only added: QUAST now
-runs in `nanopore` mode, which never had a QUAST rule, and in `hybrid` it evaluates the
-delivered genome as well as the Illumina draft. Neither touches an existing output. What
-moved is where the output lands, and how the run is configured.
+In the merge, the analysis steps, the thresholds and the decontamination policy came
+across as they were, and the byte comparisons above are the evidence. The merge only
+added: QUAST now runs in `nanopore` mode, which never had a QUAST rule, and in `hybrid`
+it evaluates the delivered genome as well as the Illumina draft. Neither touches an
+existing output. What moved is where the output lands, and how the run is configured.
+
+Later releases changed some long-read defaults on purpose, so a current run no longer
+reproduces its v1 predecessor byte for byte: Filtlong keeps more of the reads
+(`keep_percent` 95, `length_weight` 1, where v1 used 90 and 10); in `hybrid` mode the
+Illumina reads no longer filter the ONT reads unless
+`parameters.hybrid.short_read_guidance` is on, and the delivered genome gets a screen
+of its own; and the ONT adapter and barcode are trimmed before filtering.
 
 ## Where to go next
 

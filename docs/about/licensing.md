@@ -21,12 +21,17 @@ you are and what you are doing, and it is yours to establish with the licensor.
 [MIT](https://github.com/iLivius/BacFlux/blob/main/LICENSE), © 2024 Livio
 Antonielli. Third-party components retain their own terms.
 
-The repository contains no third-party database, model set or sequence file. It
-ships **code and URLs**. Every database a run needs is either one you already
-hold and point the config at, or one the workflow fetches for you, on your
-machine, from the publisher — the arrangement `bakta_db`, `gtdbtk_db`,
-`platon_db` and the CARD link have always had, and the one every optional
-mobilome layer uses too. See
+The repository ships **code and URLs**, and no third-party database or model set. The
+third-party data it does carry are small: the adapter and barcode sequences the
+adapter steps search for ([Adapter sequences](#adapter-sequences)) and two tables
+computed from GTDB's metadata ([Tables computed from GTDB](#tables-computed-from-gtdb)).
+Every database a run needs is either one you already hold and point the config at, or
+one the workflow fetches for you, on your machine — the arrangement `bakta_db`,
+`gtdbtk_db`, `platon_db` and the CARD link have always had, and the one every optional
+mobilome layer uses too. It fetches from the publisher, except for two default links
+that point to unmodified copies deposited on Zenodo by the BacFlux author, because the
+publishers' own servers are often unreachable: `links.checkv_link` (CheckV's database)
+and `links.dbcan_link` (the database run_dbCAN 5.1.2 downloads). See
 [Databases](../getting-started/databases.md) for what that means in practice.
 
 ## Data and code are two different problems
@@ -93,6 +98,19 @@ Illumina's adapter sequences are not in the repository. UniVec marks every Illum
 as copyright Illumina, Inc., so rule `univec_illumina` downloads UniVec from NCBI on your
 computer and keeps those records in the output folder, as BacFlux does with any data it
 does not redistribute.
+
+## Tables computed from GTDB
+
+The mobilome module chooses AMRFinderPlus's `--organism` from the GTDB species name.
+Two small tables in `workflow/scripts/80_mobilome/` hold that mapping:
+`gtdb_organism_equivalences.tsv` (26 rows: a GTDB species, the AMRFinderPlus organism
+it maps to, the matching NCBI species and the share and number of genomes that agree)
+and `gtdb_organism_genus_rules.tsv` (3 rows of genus-level counts). Both were computed by
+`generate_gtdb_organism_table.py` from the metadata table of GTDB release R232, which
+their first line names. GTDB publishes its data under the
+[Creative Commons Attribution-ShareAlike 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+licence ([downloads page](https://gtdb.ecogenomic.org/downloads)); CITATIONS.md credits
+GTDB as the source of the tables.
 
 ## Components you switch on yourself
 
@@ -177,7 +195,7 @@ three of its scripts — `bin/ice_boundary_refinement.py`,
 `bin/map_tools/icefinder_process.py` and `bin/prescan_to_fasta.py` — derive from
 ICEfinder2 and carry CC BY-NC-SA headers. None of it is copied here. What was
 taken from that pipeline is **decisions**: that ICEscan exists and is worth
-running, the Sequence Ontology terms for the mobilome GFF, the
+running, Sequence Ontology terms for element types (BacFlux's `mge_type` column), the
 `contig_id|mge_type-start:end` element ID format, the discard-with-reason file
 pattern, and the rule that a gene counts as inside an element only when at least
 0.9 of it lies within the boundaries. Those are facts and design choices, not

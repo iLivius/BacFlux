@@ -52,9 +52,10 @@ destroyed the assembly. Consequences hard-wired here:
   * ABSENCE of a flanking IS may simply mean the contig ended, so every row
     carries `dist_to_contig_end` and `is_at_contig_boundary`, and anything
     resting on a contig boundary or on a partial hit is capped at LOW confidence;
-  * IS calling is imperfect even on curated genomes (ISEScan: 8.0% "improbable or
-    not an IS" against a curated E. coli annotation, Puterová & Martínek 2021),
-    so confidence is always TIERED (high/medium/low) and never a bare call.
+  * IS calling is imperfect even on curated genomes (ISEScan, run without
+    --removeShortIS as BacFlux runs it: 17.7% "improbable or not an IS" against a
+    curated E. coli annotation, Puterová & Martínek 2021), so confidence is always
+    TIERED (high/medium/low) and never a bare call.
 
 What runs where, because older comments in this module got it wrong: BacFlux v2
 is ONE workflow with four entry points (illumina, nanopore, hybrid, contigs).

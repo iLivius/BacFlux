@@ -958,8 +958,10 @@ if MOBILOME_RUN:
                   echo "ICEscan is a fork of CONJScan by the same Institut Pasteur authors,"
                   echo "distributed inside ICEfinder2's database bundle and licensed"
                   echo "CC BY-NC-SA 4.0 - academic / non-commercial use only. BacFlux ships"
-                  echo "no models, only this URL. Cite Coluzzi et al. 2022 and Wang et al."
-                  echo "2024 (ICEfinder2)."
+                  echo "no models, only this URL. Cite the three CONJScan papers its own"
+                  echo "metadata.yml lists (Coluzzi et al. 2022, Cury et al. 2017, Abby et"
+                  echo "al. 2016) and Wang et al. 2024 (ICEberg 3.0, which presents"
+                  echo "ICEfinder 2.0); full references in CITATIONS.md."
                 }} > {output.models}/PROVENANCE.txt
 
                 echo "ICEscan ready: version $VERSION, $N_PROFILES profiles."

@@ -185,8 +185,10 @@ prediction rests on finding conjugation machinery, not on watching a transfer ha
 **3. Confidence is tiered, never a bare call.** IS calling is imperfect even on
 manually curated genomes: benchmarking four tools against a curated *E. coli*
 annotation, Puterová & Martínek (2021) put the "improbable or not an IS element"
-discovery rate between 0% and 23.7% depending on the tool, with **ISEScan — the caller
-BacFlux uses — at 8.0%** (2.2% on their larger ISbrowser set). So every row carries
+discovery rate between 0% and 23.7% depending on the tool. ISEScan, the caller BacFlux
+uses, scored 8.0% in its default setting, but BacFlux runs it without
+`--removeShortIS` so that partial copies are kept, the setting the paper calls
+ISEScan-fragments: **17.7%** (9.0% on their larger ISbrowser set). So every row carries
 `confidence` (high / medium / low), and anything resting on a contig boundary or on a
 partial hit is capped at `low`. Two predictable false calls are also removed before
 anything reads the IS table: [False IS21 calls over replication genes](#false-is21-calls-over-replication-genes)

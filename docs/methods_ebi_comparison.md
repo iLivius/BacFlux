@@ -107,7 +107,8 @@ named gene on a named replicon.
 
 A practical consequence for users: for a full
 mobilome inventory of an isolate, or for anything metagenomic, MAP is the right
-tool and BacFlux writes `{sample}_contigs.fna` and `{sample}.gbk` ready to feed it.
+tool, and BacFlux's finished genome, `02.assembly/{sample}/contigs_final.fasta`, is
+ready to feed it.
 Using MAP's `mobilome.gff.gz` output does not incorporate MAP code into BacFlux;
 output and source-data terms should be considered separately (§10).
 

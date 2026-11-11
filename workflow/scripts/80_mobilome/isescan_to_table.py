@@ -21,10 +21,12 @@ those copies. Two consequences, both of them reported rather than hidden:
 
 Hence the per-IS distance to the contig end and the at_contig_boundary flag, and
 the per-sample fraction of calls sitting at one. Published IS-calling
-false discovery is real even on curated genomes — ISEScan scored an 8.0%
-"improbable or not an IS" rate against a curated E. coli annotation and 2.2% on the
-larger ISbrowser set (Puterová & Martínek 2021, BMC Bioinformatics 22:258) — so
-nothing downstream should quote a bare IS count without these numbers beside it.
+false discovery is real even on curated genomes — run as BacFlux runs it, without
+--removeShortIS (the paper's "ISEScan-fragments"), ISEScan scored a 17.7%
+"improbable or not an IS" rate against a curated E. coli annotation and 9.0% on the
+larger ISbrowser set (8.0% and 2.2% with that flag; Puterová & Martínek 2021, BMC
+Bioinformatics 22:258) — so nothing downstream should quote a bare IS count without
+these numbers beside it.
 
 Two kinds of call are dropped because they cannot be insertions at all. The
 first is a call lying over the dnaA gene. dnaA starts chromosome replication

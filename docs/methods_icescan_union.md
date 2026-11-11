@@ -57,7 +57,8 @@ theirs (§12).
 Adding it to a workflow that already runs CONJScan does **not** give two independent
 opinions: ICEscan is a *fork of CONJScan*, by the same authors at Institut Pasteur,
 one minor version behind the release BacFlux installs. Its `metadata.yml` does not
-describe it as ICEscan at all:
+describe it as ICEscan at all (an excerpt; the file's `cite:` block lists the three
+CONJScan papers):
 
 ```yaml
 maintainer:

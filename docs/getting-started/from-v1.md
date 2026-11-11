@@ -3,12 +3,14 @@
 This page explains migration from BacFlux 1.x, FastaFlux, BacFluxL or BacFluxL+.
 For a new installation, start with [Installation](installation.md).
 
-Version 2.0.0 brings the four workflows into one repository, one mode each. The
+Version 2.0.0 brought the four workflows into one repository, one mode each. The
 analysis steps, the thresholds and the decontamination policy came across as they
 were — given the same reads, tool versions, read mode and thread count, each read-based
 mode reproduced its predecessor's assembly byte for byte
 ([Rationale](../about/rationale.md)). What changed is how a run is configured and where
-its output lands.
+its output lands. Later releases changed some long-read defaults on purpose — the
+Filtlong thresholds, the use of the Illumina reads to filter the ONT reads in `hybrid`
+mode, and ONT adapter trimming — and the Rationale page lists them.
 
 !!! abstract "Terms used on this page"
 

@@ -292,10 +292,16 @@ on its own, as it does in `illumina` and `contigs` mode, where nothing else chan
 - Camacho C, Coulouris G, Avagyan V, Ma N, Papadopoulos J, Bealer K, Madden TL (2009). BLAST+:
   architecture and applications. *BMC Bioinformatics* 10:421.
   <https://doi.org/10.1186/1471-2105-10-421>
-- NCBI UniVec. <https://ftp.ncbi.nlm.nih.gov/pub/UniVec/>
+- National Center for Biotechnology Information. The UniVec Database.
+  <https://www.ncbi.nlm.nih.gov/tools/vecscreen/univec/> (files at
+  <https://ftp.ncbi.nlm.nih.gov/pub/UniVec/>)
 - NCBI Foreign Contamination Screen (FCS), FCS-adaptor. [FCS][fcs]; the trimming rules in
   [FCS-adaptor output][fcs-output].
-- Enterobacteria phage Mu, complete genome. GenBank NC_000929.1.
+- Enterobacteria phage Mu, complete genome. NCBI RefSeq NC_000929.1, derived from GenBank
+  AF083977.1, the sequence of Morgan GJ, Hatfull GF, Casjens S, Hendrix RW (2002).
+  Bacteriophage Mu genome sequence: analysis and comparison with Mu-like prophages in
+  Haemophilus, Neisseria and Deinococcus. *Journal of Molecular Biology* 317:337–359.
+  <https://doi.org/10.1006/jmbi.2002.5437>
 
 [fcs]: https://github.com/ncbi/fcs
 [fcs-output]: https://github.com/ncbi/fcs/wiki/FCS-adaptor-output
