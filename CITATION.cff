@@ -1,5 +1,7 @@
 # Machine-readable citation metadata (Citation File Format 1.2.0).
-# GitHub and Zenodo read this file to generate a citation for BacFlux.
+# GitHub reads this file to generate a citation for BacFlux. Zenodo does not: when
+# a repository also has a .zenodo.json, as this one does, Zenodo takes the record's
+# metadata from that file and ignores this one.
 #
 # AFTER EACH RELEASE, one thing has to be filled in here, because it cannot be
 # known until Zenodo has archived the release: the VERSION DOI. Zenodo mints a
@@ -92,18 +94,25 @@ references:
 
   # ── Assembly and polishing ─────────────────────────────────────────────────
   - type: article
-    title: "SPAdes: a new genome assembly algorithm and its applications to single-cell sequencing"
+    title: "Using SPAdes de novo assembler"
     authors:
-      - family-names: Bankevich
+      - family-names: Prjibelski
+        given-names: Andrey
+      - family-names: Antipov
+        given-names: Dmitry
+      - family-names: Meleshko
+        given-names: Dmitry
+      - family-names: Lapidus
+        given-names: Alla
+      - family-names: Korobeynikov
         given-names: Anton
-    year: 2012
-    journal: "Journal of Computational Biology"
-    volume: 19
-    issue: 5
-    start: 455
-    end: 477
-    doi: 10.1089/cmb.2012.0021
-    notes: "SPAdes. Author list abbreviated; full citation in CITATIONS.md."
+    year: 2020
+    journal: "Current Protocols in Bioinformatics"
+    volume: 70
+    issue: 1
+    start: e102
+    doi: 10.1002/cpbi.102
+    notes: "SPAdes: the paper its README asks for."
 
   - type: article
     title: "Assembly of long, error-prone reads using repeat graphs"
@@ -148,6 +157,17 @@ references:
     notes: "Polypolish."
 
   - type: article
+    title: "Aligning sequence reads, clone sequences and assembly contigs with BWA-MEM"
+    authors:
+      - family-names: Li
+        given-names: Heng
+    year: 2013
+    journal: arXiv
+    start: 1303.3997v2
+    doi: 10.48550/arXiv.1303.3997
+    notes: "BWA-MEM (bwa mem), which aligns the Illumina reads for Polypolish; the paper BWA's README asks for with BWA-MEM. A preprint."
+
+  - type: article
     title: "Dnaapler: a tool to reorient circular microbial genomes"
     authors:
       - family-names: Bouras
@@ -170,6 +190,19 @@ references:
 
   # ── Read processing and mapping ────────────────────────────────────────────
   - type: article
+    title: "fastp 1.0: An ultra-fast all-round tool for FASTQ data quality control and preprocessing"
+    authors:
+      - family-names: Chen
+        given-names: Shifu
+    year: 2025
+    journal: iMeta
+    volume: 4
+    issue: 5
+    start: e70078
+    doi: 10.1002/imt2.70078
+    notes: "fastp: the paper its README asks for, describing the 1.0 series BacFlux runs."
+
+  - type: article
     title: "fastp: an ultra-fast all-in-one FASTQ preprocessor"
     authors:
       - family-names: Chen
@@ -187,7 +220,7 @@ references:
     start: i884
     end: i890
     doi: 10.1093/bioinformatics/bty560
-    notes: "fastp; also cited for fastplong, as fastplong's README asks."
+    notes: "fastp's earlier paper; fastplong's README lists it for fastplong."
 
   - type: article
     title: "Ultrafast one-pass FASTQ data preprocessing, quality control, and deduplication using fastp"
@@ -200,7 +233,7 @@ references:
     issue: 2
     start: e107
     doi: 10.1002/imt2.107
-    notes: "fastp; cited for fastplong, as fastplong's README asks."
+    notes: "fastp's earlier paper; fastplong's README lists it for fastplong."
 
   - type: software
     title: "fastplong: ultrafast preprocessing and quality control for long reads"
@@ -211,26 +244,19 @@ references:
     notes: "ONT adapter and barcode trimming. No publication of its own: cite the two fastp papers."
 
   - type: article
-    title: "NanoPack: visualizing and processing long-read sequencing data"
+    title: "NanoPack2: population-scale evaluation of long-read sequencing data"
     authors:
       - family-names: De Coster
         given-names: Wouter
-      - family-names: D'Hert
-        given-names: Svenn
-      - family-names: Schultz
-        given-names: Darrin T.
-      - family-names: Cruts
-        given-names: Marc
-      - family-names: Van Broeckhoven
-        given-names: Christine
-    year: 2018
+      - family-names: Rademakers
+        given-names: Rosa
+    year: 2023
     journal: Bioinformatics
-    volume: 34
-    issue: 15
-    start: 2666
-    end: 2669
-    doi: 10.1093/bioinformatics/bty149
-    notes: "NanoPlot."
+    volume: 39
+    issue: 5
+    start: btad311
+    doi: 10.1093/bioinformatics/btad311
+    notes: "NanoPlot: the paper its README asks for."
 
   - type: software
     title: "Filtlong: quality filtering tool for long reads"
@@ -297,26 +323,18 @@ references:
     notes: "BLAST+. Author list abbreviated; full citation in CITATIONS.md."
 
   - type: article
-    title: "BlobToolKit — interactive quality assessment of genome assemblies"
+    title: "BlobTools: Interrogation of genome assemblies"
     authors:
-      - family-names: Challis
-        given-names: Richard
-      - family-names: Richards
-        given-names: Edward
-      - family-names: Rajan
-        given-names: Jeena
-      - family-names: Cochrane
-        given-names: Guy
+      - family-names: Laetsch
+        given-names: Dominik R.
       - family-names: Blaxter
-        given-names: Mark
-    year: 2020
-    journal: "G3 Genes|Genomes|Genetics"
-    volume: 10
-    issue: 4
-    start: 1361
-    end: 1374
-    doi: 10.1534/g3.119.400908
-    notes: "BlobTools."
+        given-names: Mark L.
+    year: 2017
+    journal: F1000Research
+    volume: 6
+    start: 1287
+    doi: 10.12688/f1000research.12232.1
+    notes: "BlobTools 1.1.1, the version BacFlux runs; the paper its README asks for."
 
   - type: article
     title: "QUAST: quality assessment tool for genome assemblies"
@@ -336,7 +354,27 @@ references:
     start: 1072
     end: 1075
     doi: 10.1093/bioinformatics/btt086
-    notes: "QUAST."
+    notes: "QUAST: the paper its manual names for QUAST in general."
+
+  - type: article
+    title: "WebQUAST: online evaluation of genome assemblies"
+    authors:
+      - family-names: Mikheenko
+        given-names: Alla
+      - family-names: Saveliev
+        given-names: Vladislav
+      - family-names: Hirsch
+        given-names: Pascal
+      - family-names: Gurevich
+        given-names: Alexey
+    year: 2023
+    journal: "Nucleic Acids Research"
+    volume: 51
+    issue: W1
+    start: W601
+    end: W606
+    doi: 10.1093/nar/gkad406
+    notes: "QUAST: the paper its manual asks for with its latest version, 5.3.0, which BacFlux runs."
 
   - type: article
     title: "CheckM: assessing the quality of microbial genomes recovered from isolates, single cells, and metagenomes"
@@ -508,6 +546,24 @@ references:
     end: 5829
     doi: 10.1093/molbev/msab293
     notes: "eggNOG-mapper."
+
+  - type: article
+    title: "Sensitive protein alignments at tree-of-life scale using DIAMOND"
+    authors:
+      - family-names: Buchfink
+        given-names: Benjamin
+      - family-names: Reuter
+        given-names: Klaus
+      - family-names: Drost
+        given-names: Hajk-Georg
+    year: 2021
+    journal: "Nature Methods"
+    volume: 18
+    issue: 4
+    start: 366
+    end: 368
+    doi: 10.1038/s41592-021-01101-x
+    notes: "DIAMOND: eggNOG-mapper runs in its DIAMOND mode and asks for it to be cited; BacFlux also builds CheckV's DIAMOND index with it."
 
   - type: article
     title: "antiSMASH 8.0: extended gene cluster detection capabilities and analyses of chemistry, enzymology, and regulation"

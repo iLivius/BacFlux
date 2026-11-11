@@ -43,10 +43,12 @@ class Reference:
     note: str = ""
 
 
-# The papers of the tools every report shows. The details match
-# docs/about/citation.md, where the full author lists are; the 2012 QualiMap
-# paper below is the one MultiQC's own QualiMap module cites. GTDB is the
-# database GTDB-Tk classifies against, and is cited beside the tool.
+# The papers of the tools every report shows, as each tool's authors ask for them.
+# The details match docs/about/citation.md, where the full author lists are, and
+# CITATIONS.md; the 2012 QualiMap paper below is the one MultiQC's own QualiMap
+# module cites. QUAST asks for its general paper and, with its latest version, the
+# 2023 one; GTDB-Tk for both of its papers. GTDB is the database GTDB-Tk classifies
+# against, and is cited beside the tool with its newest paper and the 2022 one.
 SHARED_REFERENCES = (
     Reference("MultiQC", "Ewels et al.", 2016,
               "MultiQC: summarize analysis results for multiple tools and samples in a single report",
@@ -54,12 +56,22 @@ SHARED_REFERENCES = (
     Reference("QUAST", "Gurevich et al.", 2013,
               "QUAST: quality assessment tool for genome assemblies",
               "Bioinformatics", "10.1093/bioinformatics/btt086"),
+    Reference("QUAST (latest version)", "Mikheenko et al.", 2023,
+              "WebQUAST: online evaluation of genome assemblies",
+              "Nucleic Acids Research", "10.1093/nar/gkad406"),
     Reference("CheckM", "Parks et al.", 2015,
               "CheckM: assessing the quality of microbial genomes recovered from isolates, single cells, and metagenomes",
               "Genome Research", "10.1101/gr.186072.114"),
     Reference("GTDB-Tk", "Chaumeil et al.", 2022,
               "GTDB-Tk v2: memory friendly classification with the genome taxonomy database",
               "Bioinformatics", "10.1093/bioinformatics/btac672"),
+    Reference("GTDB-Tk", "Chaumeil et al.", 2020,
+              "GTDB-Tk: a toolkit to classify genomes with the Genome Taxonomy Database",
+              "Bioinformatics", "10.1093/bioinformatics/btz848"),
+    Reference("GTDB", "Parks et al.", 2026,
+              "GTDB release 10: a complete and systematic taxonomy for 715 230 bacterial and "
+              "17 245 archaeal genomes",
+              "Nucleic Acids Research", "10.1093/nar/gkaf1040"),
     Reference("GTDB", "Parks et al.", 2022,
               "GTDB: an ongoing census of bacterial and archaeal diversity through a "
               "phylogenetically consistent, rank normalized and complete genome-based taxonomy",
@@ -74,23 +86,32 @@ SHARED_REFERENCES = (
 )
 
 # The read-QC tools, listed only in the modes that have reads.
+# fastp's README asks for its 2025 paper, which describes fastp 1.0, the series
+# BacFlux runs, and lists the two earlier ones as well. The 2025 paper is listed
+# when fastp trimmed Illumina reads; the 2018 one also stands for fastplong (below).
+FASTP_1_REFERENCE = Reference(
+    "fastp 1.0", "Chen", 2025,
+    "fastp 1.0: An ultra-fast all-round tool for FASTQ data quality control and preprocessing",
+    "iMeta", "10.1002/imt2.70078",
+)
 FASTP_REFERENCE = Reference(
     "fastp", "Chen et al.", 2018,
     "fastp: an ultra-fast all-in-one FASTQ preprocessor",
     "Bioinformatics", "10.1093/bioinformatics/bty560",
 )
 # fastplong trims the ONT adapters and barcodes when parameters.<mode>.ont_adapter is
-# not off. It has no paper of its own; its README asks for the two fastp papers, the
-# 2018 one above and this one.
+# not off. It has no paper of its own; its README lists the two earlier fastp papers,
+# the 2018 one above and this one.
 FASTPLONG_REFERENCE = Reference(
     "fastplong (cite fastp)", "Chen", 2023,
     "Ultrafast one-pass FASTQ data preprocessing, quality control, and deduplication using fastp",
     "iMeta", "10.1002/imt2.107",
 )
+# NanoPlot's README asks for the NanoPack2 paper.
 NANOPACK_REFERENCE = Reference(
-    "NanoStat / NanoPlot", "De Coster et al.", 2018,
-    "NanoPack: visualizing and processing long-read sequencing data",
-    "Bioinformatics", "10.1093/bioinformatics/bty149",
+    "NanoStat / NanoPlot", "De Coster and Rademakers", 2023,
+    "NanoPack2: population-scale evaluation of long-read sequencing data",
+    "Bioinformatics", "10.1093/bioinformatics/btad311",
 )
 QUALIMAP_REFERENCES = (
     Reference("QualiMap", "García-Alcalde et al.", 2012,
@@ -125,6 +146,8 @@ def references_for_run(short_reads=False, long_reads=False, traits=False, ont_tr
     (empty without the trait profile), which get their own heading.
     """
     methods = list(SHARED_REFERENCES)
+    if short_reads:
+        methods.append(FASTP_1_REFERENCE)
     if short_reads or ont_trimming:
         methods.append(FASTP_REFERENCE)
     if ont_trimming:

@@ -26,22 +26,37 @@ class Links(HTMLParser):
 
 @pytest.mark.parametrize("short_reads,long_reads,extra", [
     (False, False, set()),
-    (True, False, {"fastp", "QualiMap", "QualiMap 2"}),
+    (True, False, {"fastp 1.0", "fastp", "QualiMap", "QualiMap 2"}),
     (False, True, {"NanoStat / NanoPlot", "QualiMap", "QualiMap 2"}),
-    (True, True, {"fastp", "NanoStat / NanoPlot", "QualiMap", "QualiMap 2"}),
+    (True, True, {"fastp 1.0", "fastp", "NanoStat / NanoPlot", "QualiMap", "QualiMap 2"}),
 ])
 def test_only_methods_represented_by_the_mode_are_selected(short_reads, long_reads, extra):
     methods, trait_methods = citations.references_for_run(short_reads, long_reads)
     assert {reference.tool for reference in methods} == {
-        "MultiQC", "QUAST", "CheckM", "GTDB-Tk", "GTDB", "Bakta", "BLAST+",
+        "MultiQC", "QUAST", "QUAST (latest version)", "CheckM", "GTDB-Tk", "GTDB",
+        "Bakta", "BLAST+",
     } | extra
     assert trait_methods == []
 
 
+def test_each_tool_gets_the_papers_its_authors_ask_for():
+    # fastp 1.0 (2025) only where fastp trimmed Illumina reads; NanoPlot's paper is
+    # NanoPack2; GTDB-Tk's two papers and GTDB's newest paper with the 2022 one.
+    short_only, _ = citations.references_for_run(short_reads=True)
+    long_only, _ = citations.references_for_run(long_reads=True, ont_trimming=True)
+    assert citations.FASTP_1_REFERENCE in short_only
+    assert citations.FASTP_1_REFERENCE not in long_only
+    assert citations.NANOPACK_REFERENCE.doi == "10.1093/bioinformatics/btad311"
+    shared_dois = {reference.doi for reference in citations.SHARED_REFERENCES}
+    assert {"10.1093/bioinformatics/btac672", "10.1093/bioinformatics/btz848",
+            "10.1093/nar/gkaf1040", "10.1093/nar/gkab776",
+            "10.1093/nar/gkad406"} <= shared_dois
+
+
 @pytest.mark.parametrize("short_reads", [False, True])
 def test_ont_trimming_adds_the_two_fastp_papers_once(short_reads):
-    # fastplong has no paper of its own; its README asks for both fastp papers. In
-    # hybrid mode the 2018 one is already there for fastp itself, and is not repeated.
+    # fastplong has no paper of its own; its README lists the two earlier fastp papers.
+    # In hybrid mode the 2018 one is already there for fastp itself, and is not repeated.
     methods, _ = citations.references_for_run(short_reads=short_reads, long_reads=True,
                                               ont_trimming=True)
     tools = [reference.tool for reference in methods]
@@ -73,9 +88,10 @@ def test_visible_links_are_unique_without_relabelling_native_tool_citations():
     links = Links()
     links.feed(content)
     dois = [url.removeprefix("https://doi.org/") for url in links.targets]
-    # 15: the seven shared references (MultiQC, QUAST, CheckM, GTDB-Tk, GTDB, Bakta,
-    # BLAST+), fastp, NanoPack, the two QualiMap papers and the four trait methods.
-    assert len(dois) == len(set(dois)) == 15
+    # 19: the ten shared references (MultiQC, QUAST twice, CheckM, GTDB-Tk twice,
+    # GTDB twice, Bakta, BLAST+), the two fastp papers, NanoPack2, the two QualiMap
+    # papers and the four trait methods.
+    assert len(dois) == len(set(dois)) == 19
     assert all(re.fullmatch(r"10\.\d{4,9}/\S+", doi) for doi in dois)
 
 
