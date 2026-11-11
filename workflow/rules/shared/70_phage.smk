@@ -406,14 +406,22 @@ if PHAGE_CALLER == "virsorter2":
     # each mode delivers, where v1 illumina used the pre-decontam
     # contigs_filt.fasta) plus the VS2 database.
     #
-    # min_score 0.5 and --keep-original-seq match the first VirSorter2 pass of the SOP
-    # linked from docs/analysis/phages.md (protocols.io, step 3): a deliberately loose
-    # cutoff, taken for maximal sensitivity — CheckV downstream is what grades the
-    # result — and the original sequence of circular and near-fully-viral contigs
-    # instead of VS2's trimmed version, so CheckV sees the real contig. Two settings
-    # differ from that pass: the five viral groups (the SOP, and VirSorter2's own
-    # default since 2.2, use dsDNAphage,ssDNA, the groups for phages), and no
-    # --min-length (the SOP sets 5000; here every contig is screened).
+    # The viral groups, min_score 0.5 and --keep-original-seq match the first
+    # VirSorter2 pass of the SOP linked from docs/analysis/phages.md (protocols.io,
+    # step 3):
+    #   - dsDNAphage,ssDNA, the groups for phages, which is also VirSorter2's own
+    #     default since 2.2. Its other three classifiers look for giant viruses, RNA
+    #     viruses and virophages, none of which can be part of a bacterial genome.
+    #     VirSorter2 scores a contig with the highest of the included classifiers'
+    #     scores, so those three could only add calls, never remove one; omitting
+    #     them is how its authors target viruses of bacteria and archaea (Guo et al.
+    #     2021, Microbiome 9:37).
+    #   - a deliberately loose cutoff, taken for maximal sensitivity — CheckV
+    #     downstream is what grades the result;
+    #   - the original sequence of circular and near-fully-viral contigs instead of
+    #     VS2's trimmed version, so CheckV sees the real contig.
+    # One setting differs from that pass: no --min-length (the SOP sets 5000 for
+    # metagenomic contigs; an isolate has few contigs, and every one is screened).
     #
     # Produces 07.phages/virsorter/{sample}/ — key file final-viral-combined.fa,
     # consumed by viral_quality.
@@ -424,7 +432,7 @@ if PHAGE_CALLER == "virsorter2":
         output:
             vs2_dir = directory(VS2_DIR),
         params:
-            viral_groups = "dsDNAphage,NCLDV,RNA,ssDNA,lavidaviridae",
+            viral_groups = "dsDNAphage,ssDNA",
             min_score = 0.5,
         conda:
             "../../envs/virsorter.yaml"

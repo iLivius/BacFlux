@@ -83,14 +83,14 @@ stage 06 a second, independent caller without a second run.
 *Rules `virsorter2_db` (or `virsorter2_db_local`) and `viral_identification_virsorter2`.*
 
 VirSorter2 scores contigs against curated viral HMM groups. BacFlux runs it with the
-settings below. Two of them match the first VirSorter2 pass of the
+settings below. Three of them match the first VirSorter2 pass of the
 [VirSorter2 SOP](https://www.protocols.io/view/viral-sequence-identification-sop-with-virsorter2-5qpvoyqebg4o/v3?step=3)
-(step 3), and two differ from it:
+(step 3), and one differs from it:
 
 | Setting | Value | Compared with the SOP's first pass |
 |---|---|---|
-| `--include-groups` | `dsDNAphage,NCLDV,RNA,ssDNA,lavidaviridae` | differs: BacFlux screens all five of VirSorter2's groups, while the SOP, and VirSorter2's own default since version 2.2, use `dsDNAphage,ssDNA`, the groups for phages |
-| `--min-length` | not set (VirSorter2's default, 0) | differs: every contig is screened, where the SOP sets 5000 |
+| `--include-groups` | `dsDNAphage,ssDNA` | the same: the groups for phages, also VirSorter2's own default since version 2.2. Its other three classifiers look for giant viruses, RNA viruses and virophages, none of which can be part of a bacterial genome; because a contig's score is the highest of the included classifiers' scores, they could only add calls, and leaving them out is how VirSorter2's authors target viruses of bacteria and archaea |
+| `--min-length` | not set (VirSorter2's default, 0) | differs: the SOP sets 5000 for metagenomic contigs; an isolate has few contigs, and every one is screened |
 | `--min-score` | `0.5` | the same: deliberately loose, for sensitivity — CheckV downstream is what grades the result |
 | `--keep-original-seq` | on | the same: keeps the original sequence of circular and near-fully-viral contigs instead of VirSorter2's trimmed version, so CheckV sees the real contig |
 
