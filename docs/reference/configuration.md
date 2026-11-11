@@ -592,9 +592,8 @@ define universal plasmid-size ranges protected by either setting.
 
 There is no spelling for "off", and a blank value takes the default, 95. A value of
 `100` rejects no read by this percentage; `--min_length`
-still applies, as does the 500 Mb `--target_bases` cap (`nanopore`, and `hybrid` with
-`short_read_guidance: false`) or, with guidance on, trimming and splitting against the
-Illumina reads. Raising either key further rarely gains anything — total
+still applies, as does the 500 Mb `--target_bases` cap (both long-read modes) and,
+with guidance on, trimming and splitting against the Illumina reads. Raising either key further rarely gains anything — total
 bases barely moved in the test (208 → 227 Mb), so what changes is *which* reads
 survive, not how many. If you raise `length_weight` you are trading small
 replicons for chromosome contiguity; say so in your methods. Full treatment:
@@ -711,7 +710,7 @@ The block is namespaced per mode: a run reads only the block named after itself.
 | `medaka_model` | Which Medaka consensus model polishes the assembly | `auto` | `auto`/`true`/empty infer it from the FASTQ headers; `false` skips Medaka entirely *(set `false` to skip this optional step)*; anything else is taken as a model name. |
 | `medaka_model_fallback_auto` | What to do when an explicit model is invalid | `false` | `false` stops with model suggestions. `true` attempts automatic inference. |
 | `ont_adapter` | Whether, and how, the ONT sequencing adapter and barcode are trimmed from the reads before Filtlong (fastplong) | `detect` | `detect` (also empty) works the sequence out from the reads, or copies reads that are already trimmed unchanged; `off` (also an unquoted `off`) gives Filtlong the raw reads; a sequence of 20 to 200 bases of A, C, G and T is trimmed as written. A short tandem repeat is refused. With trimming on, an output folder made before v2.2.0 assembles again. See [ONT adapter trimming and the adapter screen](../methods_ont_adapters.md). |
-| `short_read_guidance` | Hybrid only: use selected Illumina pairs to guide Filtlong, enabling trimming and splitting | `false` | With `false`, Filtlong uses long-read length/quality filtering and the target-base cap, and nothing screens the long reads before Flye; the second screen of the final assembly only reports. With `true`, no `--target_bases` cap is passed, and reads without support from the decontaminated Illumina reads are trimmed, split or discarded. Polypolish uses the selected Illumina reads in either case. |
+| `short_read_guidance` | Hybrid only: use selected Illumina pairs to guide Filtlong, enabling trimming and splitting | `false` | With `false`, Filtlong uses long-read length/quality filtering and the target-base cap, and nothing screens the long reads before Flye; the second screen of the final assembly only reports. With `true`, reads without support from the decontaminated Illumina reads are trimmed, split or discarded. The 500 Mb `--target_bases` cap applies in either case, and so does Polypolish's use of the selected Illumina reads. |
 
 !!! warning "The two keys are coupled, and it changes the assembly"
 
@@ -1093,7 +1092,7 @@ the benchmark afterwards.
 | `minid=0.76`, ≥70% of reference length covered | `CARD_MIN_IDENTITY` / `CARD_MIN_COVERED`, `00_common.smk` | The CARD read-mapping AMR analysis. Read identity is BBMap's default; the reference-length coverage gate limits partial matches. See below. |
 | 80% identity, 70% coverage | `rule amr_contigs`, `50_amr.smk` | ABRicate's EFSA reporting thresholds. Kept on that analysis only — a blanket cutoff would fight AMRFinderPlus's curated per-gene ones. |
 | four databases | `DATABASES`, `00_common.smk` | Which ABRicate databases run: card, ncbi and resfinder for resistance genes, vfdb for virulence genes. |
-| `--target_bases 500000000` | `rule filter_long_reads`, `nanopore/10_reads.smk` and `hybrid/30_ont_reads.smk` (`FILTLONG_TARGET_BASES`, `00_common.smk`) | The nanopore mode's total-output cap. Hybrid mode also applies the cap when `short_read_guidance: false`. With guidance enabled it uses the selected Illumina reads, `--trim` and `--split 1000` instead; `--length_weight` is passed in hybrid mode. |
+| `--target_bases 500000000` | `rule filter_long_reads`, `nanopore/10_reads.smk` (written into the rule) and `hybrid/30_ont_reads.smk` (`FILTLONG_TARGET_BASES`, `00_common.smk`) | The total-output cap of both long-read modes; hybrid mode applies it with or without `short_read_guidance`. With guidance enabled hybrid also passes the selected Illumina reads, `--trim` and `--split 1000`; `--length_weight` is passed in hybrid mode. |
 | 1 % of the reads, 10 reads; 10 % of the barcoded reads; up to 3 mismatches in a 24 bp barcode; 50 bp | `MIN_READ_SHARE`, `MIN_BARCODE_READS`, `SECOND_BLOCK_SHARE`, `MAX_BARCODE_MISMATCHES`, `MIN_SPLIT_LENGTH`, `find_ont_adapter.py` | ONT adapter trimming: below 1 % of the reads an adapter or barcode counts as absent; a barcode is trimmed from 1 % (and 10 reads); two barcodes above 10 % of the barcoded reads give the several-samples NOTE; a sequence shorter than 50 bp is trimmed at the read ends only. See [ONT adapter trimming](../methods_ont_adapters.md#how-the-sequence-is-found). |
 | 90 % identity; 20 bp within 100 bp of a linear contig end, 28 bp inside | `MIN_IDENTITY`, `MIN_END_LENGTH`, `END_DISTANCE`, `MIN_INTERNAL_LENGTH`, `adapter_screen.py` | The adapter screen of the finished genome. 100 bp is the distance within which NCBI's FCS-adaptor trims adaptor to the sequence end; 28 bp is a whole ONT adapter. |
 | coverage ≥ 2×, length ≥ 500 bp | `FASTA_SEL_CMD`, `00_common.smk` | The contig filter, read out of the SPAdes header. Always applied in `illumina` and `hybrid`; in `contigs` mode only when the first header looks like SPAdes' own (it carries `length_…` or `cov_…`), since inventing a filter for an assembly from anywhere else would silently delete real sequence. |

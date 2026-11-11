@@ -5,13 +5,13 @@
 # are pulled back out (SEL_R1/SEL_R2). Polypolish always corrects the ONT genome
 # with them (short_read_correction, hybrid/50_polish.smk). Whether they also filter
 # the ONT reads is decided by parameters.hybrid.short_read_guidance:
-#   false (the default) — filtlong keeps ONT reads on length and quality alone,
-#     under a 500 Mbp coverage cap, the value nanopore mode also uses. Nothing
-#     screens the ONT reads for contaminants.
+#   false (the default) — filtlong keeps ONT reads on length and quality alone.
+#     Nothing screens the ONT reads for contaminants.
 #   true — filtlong scores every ONT read against the decontaminated short reads:
 #     a read that does not look like the clean Illumina genome is trimmed, split or
 #     dropped, so the Illumina leg acts as the ONT leg's decontamination filter.
 #     This was v1 BacFluxL+'s design.
+# Both ways, filtlong stops at 500 Mbp of reads, the cap nanopore mode also uses.
 # Either way, the genome the ONT reads build gets a screen of its own after
 # Polypolish (map_final_contigs → screen_final_contigs, shared/10_decontam.smk):
 # a check that writes a keep or remove verdict for every contig and never changes
@@ -184,11 +184,10 @@ rule map_sel_contigs:
 #   --split 1000      (guidance on only) break a read at any unsupported stretch
 #                     of 1000 bp, which is how a chimeric ONT read gets separated.
 #                     The one number still hard-coded in this rule.
-#   --target_bases    (guidance off only) FILTLONG_TARGET_BASES, 500 Mbp, the
-#                     value nanopore mode writes into its own rule. With the
-#                     guidance on no cap is passed and nothing else limits depth,
-#                     so very deep ONT data has to be subsampled before the run
-#                     (docs/methods_reference_genome_run.md).
+#   --target_bases    FILTLONG_TARGET_BASES, 500 Mbp, the value nanopore mode
+#                     writes into its own rule, with or without the guidance:
+#                     the short reads change how a read is scored, not how many
+#                     are kept.
 #   --keep_percent    FILTLONG_KEEP_PERCENT — how much of the remaining sequence
 #                     to keep, by score. Set by
 #                     parameters.long_read_qc.keep_percent, default 95.
@@ -242,11 +241,13 @@ rule filter_long_reads:
             f"-1 {input.r1} -2 {input.r2} --trim --split 1000"
             if HYBRID_SHORT_READ_GUIDANCE else ""
         ),
-        # The coverage cap nanopore mode has always applied. With guidance off there
-        # is nothing else culling depth, and hybrid runs on 300x+ ONT data have been
-        # seen to leave Flye with no assembly at all.
-        target = ("" if HYBRID_SHORT_READ_GUIDANCE
-                  else f"--target_bases {FILTLONG_TARGET_BASES}"),
+        # The coverage cap nanopore mode also applies, passed with or without the
+        # guidance: neither keep_percent nor the short-read scoring limits depth.
+        # Without it, Flye assembled nothing from 306x-1,070x ONT data in guided
+        # runs (docs/methods_reference_genome_run.md). Filtlong's own README pairs
+        # -1/-2 with --target_bases in the same way. In an unguided run this param
+        # has the value it always had, so those runs re-run nothing.
+        target = f"--target_bases {FILTLONG_TARGET_BASES}",
     conda:
         "../../envs/filtlong.yaml"
     log:

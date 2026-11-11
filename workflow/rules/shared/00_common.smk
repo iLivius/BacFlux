@@ -1647,11 +1647,11 @@ HYBRID_SHORT_READ_GUIDANCE = _config_bool(
     ((config.get("parameters", {}) or {}).get("hybrid", {}) or {}).get("short_read_guidance"),
     False,
 )
-# The coverage cap hybrid's filter_long_reads passes when the guidance is off.
+# The coverage cap hybrid's filter_long_reads passes, with or without the guidance.
 # Nanopore mode passes the same 500 Mbp, written into its own rule
-# (nanopore/10_reads.smk). Hybrid historically passed no cap, because the short
-# reads were expected to do the culling; without guidance there is nothing to cull
-# with. With guidance on no cap is passed and nothing else limits depth
+# (nanopore/10_reads.smk). Hybrid once passed no cap with the guidance on, on the
+# idea that the short reads would do the culling; they change how a read is scored
+# but not how many are kept, and on 306x-1,070x ONT data Flye then assembled nothing
 # (docs/methods_reference_genome_run.md).
 FILTLONG_TARGET_BASES = 500000000
 

@@ -127,8 +127,8 @@ rule raw_long_read_qc:
 # read counts is in config.yaml, next to the long_read_qc block.
 #
 # Hybrid always adds --length_weight. With parameters.hybrid.short_read_guidance on,
-# it also gives filtlong the decontaminated Illumina reads (-1/-2, --trim, --split)
-# and passes no --target_bases — see hybrid/30_ont_reads.smk.
+# it also gives filtlong the decontaminated Illumina reads (-1/-2, --trim, --split);
+# it caps the output at the same 500 Mbp either way — see hybrid/30_ont_reads.smk.
 #
 # Rule NAME: v1 BacFluxL called this `filter_reads`; renamed to BacFluxL+'s
 # `filter_long_reads` for the same read-alike reason as above.

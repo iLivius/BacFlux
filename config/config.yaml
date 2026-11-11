@@ -209,8 +209,8 @@ parameters:
   #
   # Which key reaches which mode: min_length and keep_percent are handed to
   # filtlong in both long-read modes. length_weight reaches filtlong only in
-  # HYBRID mode — nanopore's filtlong call carries no --length_weight and caps
-  # its total output with --target_bases 500000000 instead, a fixed number that
+  # HYBRID mode — nanopore's filtlong call carries no --length_weight. Both modes
+  # cap their total output with --target_bases 500000000, a fixed number that
   # is not a config key (rule filter_long_reads, in rules/nanopore/10_reads.smk
   # and rules/hybrid/30_ont_reads.smk).
   #

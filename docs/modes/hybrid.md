@@ -115,7 +115,7 @@ differ from `nanopore` mode on purpose:
 | `--keep_percent` | `parameters.long_read_qc.keep_percent` | 95 | same key, same effect on small plasmids ([Nanopore mode](nanopore.md)) |
 | `--length_weight` | `parameters.long_read_qc.length_weight` | 1 | **only reaches Filtlong here.** At 10 the 1–3 kb read band is emptied whatever `keep_percent` says |
 | `--trim`, `--split 1000` | `short_read_guidance: true` only | — | cut unsupported read ends, and break a read at any unsupported 1 kb stretch — how a chimeric read is separated |
-| `--target_bases` | `short_read_guidance: false` only | 500 Mbp | the coverage cap `nanopore` mode applies; with guidance on, the short reads define what is worth keeping, so no cap is passed |
+| `--target_bases` | always | 500 Mbp | the coverage cap `nanopore` mode applies; the short reads, when guidance is on, change how a read is scored but not how many are kept, so the cap applies with guidance too |
 
 ## Two genomes, and which one is delivered
 

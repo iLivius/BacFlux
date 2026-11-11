@@ -38,14 +38,12 @@ ISEScan call, including the one or two look-alike calls described under Mobilome
 !!! note "The experiment used the published 50× ONT subsets"
 
     The full ONT sets published with these isolates reach **306×–1,070×**, far deeper
-    than routine isolate sequencing. The full-depth runs had short-read guidance on, and
-    with guidance on `hybrid` passes Filtlong no `--target_bases` cap: Flye reported
-    `Assembled 0 disjointigs` on all five genomes. The runs described here therefore use
-    the **50× subsets** published alongside the full sets, which is also the depth the
-    original benchmark assembled.
-
-    With guidance off, the default, Filtlong caps the ONT reads at 500 Mb with
-    `--target_bases`. With guidance on, subsample unusually deep ONT data before the run.
+    than routine isolate sequencing. The full-depth runs used short-read guidance with
+    no `--target_bases` cap on Filtlong, and Flye reported `Assembled 0 disjointigs` on
+    all five genomes. That is why `hybrid` caps the ONT reads at 500 Mb with
+    `--target_bases`, with or without guidance, as `nanopore` mode does. The runs
+    described here use the **50× subsets** published alongside the full sets, which is
+    also the depth the original benchmark assembled; at that depth the cap never binds.
 
 ## Short-read correction of long reads: it can help, and it can lose a replicon
 
