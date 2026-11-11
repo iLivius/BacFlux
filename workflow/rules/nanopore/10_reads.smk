@@ -92,8 +92,9 @@ rule raw_long_read_qc:
 #           parameters.nanopore.ont_adapter off, the same raw ONT FASTQ
 #           raw_long_read_qc profiled above. Filtlong reads the reads, not the
 #           plots, so it is independent of the NanoPlot rules.
-# Does:     filtlong scores every raw ONT read and keeps the longest, best-scoring
-#           subset. Three knobs, and only one of them is fixed in this rule:
+# Does:     filtlong scores every ONT read it is given and keeps the longest,
+#           best-scoring subset. Three knobs, and only one of them is fixed in
+#           this rule:
 #             --min_length     parameters.long_read_qc.min_length, default 1000.
 #                              Reads under ~1 kb bring ONT's error rate without
 #                              ONT's main benefit, which is spanning repeats.
@@ -109,8 +110,10 @@ rule raw_long_read_qc:
 # Consumed by: filtered_long_read_qc (below), check_medaka_model
 #              (shared/12_medaka_check.smk, which infers the Medaka model from
 #              these reads), ont_assembly (nanopore/20_assembly.smk),
-#              long_read_consensus (nanopore/30_polish.smk) and map_contigs
-#              (shared/10_decontam.smk, the ONT coverage track for BlobTools).
+#              long_read_consensus (nanopore/30_polish.smk), map_contigs
+#              (shared/10_decontam.smk, the ONT coverage track for BlobTools) and
+#              check_ont_trimming (shared/05_ont_adapters.smk, when the adapter
+#              is trimmed).
 #
 # GOTCHA: setting parameters.long_read_qc.length_weight has NO effect in this
 # mode. There is no --length_weight below, so filtlong uses its own default of 1.
@@ -123,9 +126,9 @@ rule raw_long_read_qc:
 # did NOT recover the plasmid: nothing we tried assembled it. The full 2x2 of
 # read counts is in config.yaml, next to the long_read_qc block.
 #
-# Hybrid's whole flag set differs (--trim --split --length_weight, and no
-# --target_bases) because there the decontaminated Illumina reads, not a coverage
-# cap, define what is worth keeping — see hybrid/30_ont_reads.smk.
+# Hybrid always adds --length_weight. With parameters.hybrid.short_read_guidance on,
+# it also gives filtlong the decontaminated Illumina reads (-1/-2, --trim, --split)
+# and passes no --target_bases — see hybrid/30_ont_reads.smk.
 #
 # Rule NAME: v1 BacFluxL called this `filter_reads`; renamed to BacFluxL+'s
 # `filter_long_reads` for the same read-alike reason as above.
@@ -163,8 +166,10 @@ rule filter_long_reads:
 #           {sample}_NanoStats.txt, with no PNG images (--no_static, see
 #           raw_long_read_qc above).
 # Consumed by: multiqc (shared/90_report.smk) only. Side by side with the raw plot
-#              it shows exactly what filtlong removed, which is the honest way to
-#              report a filter.
+#              it shows what filtlong removed, together with the read ends
+#              fastplong trimmed (the raw plot is made before trimming; with
+#              ont_adapter off, the difference is filtlong's alone), which is the
+#              honest way to report a filter.
 #
 # Same --prefix rule as raw_long_read_qc — the report regex depends on it, here on
 # its filt_qc branch.

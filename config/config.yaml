@@ -370,7 +370,7 @@ parameters:
                                #   A SECOND screen, of the genome hybrid actually
                                #   delivers. `mode:` above screens the Illumina SPAdes
                                #   draft; the delivered genome is built afterwards from
-                               #   the ONT reads (Flye, Medaka, dnaapler, Polypolish),
+                               #   the ONT reads (Flye, dnaapler, Medaka, Polypolish),
                                #   and with parameters.hybrid.short_read_guidance: false
                                #   (the default) no step removes contaminant long reads
                                #   before Flye.
@@ -427,7 +427,7 @@ parameters:
                                #   docs/methods_ont_adapters.md
   hybrid:                      # read only when mode == hybrid
     short_read_guidance: false # [hybrid] false (default): filter the ONT reads on
-                               #   length and quality only, exactly as nanopore mode.
+                               #   length and quality only, as nanopore mode does.
                                #   true: also score every long read against the
                                #   decontaminated Illumina reads (-1/-2), trimming and
                                #   splitting it where they disagree.
@@ -443,8 +443,10 @@ parameters:
                                #   docs/methods_reference_genome_run.md
                                #
                                #   With it ON the Illumina reads also screen the ONT
-                               #   leg for contaminants. With it OFF nothing does, so
-                               #   the long-read assembly is screened after Flye.
+                               #   reads for contaminants. With it OFF nothing does.
+                               #   Either way the delivered genome gets its own screen
+                               #   after Polypolish, which reports and removes nothing
+                               #   (parameters.decontamination.long_read_mode).
     flye_input_mode: auto      # Options: auto | nano-raw | nano-hq
     medaka_model: auto         # auto/TRUE/empty = infer; FALSE = skip; else an explicit model name
     medaka_model_fallback_auto: false  # if an explicit model is INVALID: false = fail with suggestions (default); true = fall back to auto-inference

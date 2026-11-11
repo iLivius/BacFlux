@@ -1073,13 +1073,14 @@ else:  # contigs
 # So both long-read modes get a second blastn over FINAL_CONTIGS (v1 BacFluxL+ did
 # exactly this inside its own plasmid_search; v2 keeps it in 10_decontam, rule
 # blast_final_contigs, so the blastn command text lives in one place).
-# Consumed by plasmid_search in shared/60_plasmid.smk.
+# Consumed by plasmid_search in shared/60_plasmid.smk and, in hybrid mode, by
+# blob_json_final (shared/10_decontam.smk), the screen of the delivered genome.
 NEEDS_FINAL_BLAST = HAS_LONG_READS
 PLASMID_BLASTOUT = (DECONTAM_DIR + "/{sample}_final_blastout") if NEEDS_FINAL_BLAST else BLASTOUT
 
 # ── Contaminant screen of the DELIVERED long-read genome (hybrid) ──
 # Hybrid screens the Illumina SPAdes draft; the genome it delivers comes from the
-# ONT side (Flye -> Medaka -> dnaapler -> Polypolish) and was never screened. That
+# ONT side (Flye -> dnaapler -> Medaka -> Polypolish) and was never screened. That
 # was defensible while filtlong scored every long read against the decontaminated
 # short reads, which removed contaminant reads before Flye ever saw them. With
 # parameters.hybrid.short_read_guidance defaulting to false, nothing does that any
@@ -1640,14 +1641,18 @@ FILTLONG_LENGTH_WEIGHT = _config_number(
 # Full three-arm measurement: docs/methods_reference_genome_run.md
 #
 # --trim and --split do nothing without a reference, so they travel with the flag.
-# When it is off, the hybrid filter is byte-identical to the nanopore one.
+# When it is off, the hybrid filter passes nanopore's flags plus --length_weight,
+# which at its default of 1 is filtlong's own default.
 HYBRID_SHORT_READ_GUIDANCE = _config_bool(
     ((config.get("parameters", {}) or {}).get("hybrid", {}) or {}).get("short_read_guidance"),
     False,
 )
-# Nanopore mode caps coverage here; hybrid historically did not, because the short
-# reads were expected to do the culling. Without guidance there is nothing to cull
-# with, so the cap applies in both modes.
+# The coverage cap hybrid's filter_long_reads passes when the guidance is off.
+# Nanopore mode passes the same 500 Mbp, written into its own rule
+# (nanopore/10_reads.smk). Hybrid historically passed no cap, because the short
+# reads were expected to do the culling; without guidance there is nothing to cull
+# with. With guidance on no cap is passed and nothing else limits depth
+# (docs/methods_reference_genome_run.md).
 FILTLONG_TARGET_BASES = 500000000
 
 
@@ -2735,9 +2740,12 @@ if HAS_LONG_READS:
         # What finalize_contigs copies to FINAL_CONTIGS.
         FINALIZE_SOURCE = MEDAKA_CONSENSUS if USE_MEDAKA else DECONTAM_CONTIGS
     else:  # hybrid
-        # The ONT leg is never decontaminated: its reads were already filtered
-        # against the decontaminated Illumina reads by filtlong. So Medaka
-        # polishes the PRE-screen reoriented assembly.
+        # No screen removes contigs from the ONT assembly: hybrid filters the
+        # Illumina draft, and the screen of the delivered genome only writes a
+        # keep or remove verdict for each contig (screen_final_contigs,
+        # shared/10_decontam.smk).
+        # So Medaka polishes the reoriented assembly directly; there is no
+        # filtered version to wait for.
         MEDAKA_INPUT = DNAAPLER_FIXED
         # What Polypolish corrects, and therefore what becomes FINAL_CONTIGS.
         POLISH_INPUT = MEDAKA_CONSENSUS if USE_MEDAKA else DNAAPLER_FIXED

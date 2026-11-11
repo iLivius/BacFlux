@@ -2,12 +2,15 @@
 # a length and coverage filter.
 #
 # In hybrid mode the Illumina assembly is NOT the deliverable. It has two jobs.
-# First, it is what the contamination screen actually screens, and the reads that
-# map back to the CLEAN version of it become the read set that filters the ONT
-# reads (hybrid/30_ont_reads.smk) — so the Illumina leg IS the ONT leg's
-# decontamination filter, and the ONT leg has no screen of its own. Second, it is
-# kept as the comparator genome: QC and taxonomy run over both the Illumina draft
-# and the delivered ONT genome, and Snippy compares them.
+# First, it is what the contamination screen filters, and the reads that map back
+# to the CLEAN version of it (hybrid/30_ont_reads.smk) are the read set Polypolish
+# corrects the ONT genome with and, with parameters.hybrid.short_read_guidance on,
+# the set filtlong scores the ONT reads against. The ONT genome itself is never
+# filtered: after Polypolish it gets a screen of its own that writes a keep or
+# remove verdict for every contig and never changes the genome
+# (screen_final_contigs, shared/10_decontam.smk).
+# Second, it is kept as the comparator genome: QC and taxonomy run over both the
+# Illumina draft and the delivered ONT genome, and Snippy compares them.
 #
 # Chain: TRIM_R1/TRIM_R2 (hybrid/10_reads.smk) → illumina_assembly →
 # SPADES_CONTIGS → filter_contigs → DRAFT_CONTIGS → the shared screen (BLAST +
@@ -24,7 +27,9 @@
 # Duplicated deliberately, for the reasons given in the header of
 # hybrid/10_reads.smk.
 #
-# illumina_assembly : SPAdes --isolate over k = 21..127.
+# illumina_assembly : SPAdes --isolate; with parameters.spades_kmers: auto (the
+#                     default) SPAdes picks the k-mer sizes from the read length
+#                     (SPADES_KMER_FLAG, shared/00_common.smk).
 # filter_contigs    : drop contigs under 500 bp or under 2x coverage, using the
 #                     length and coverage SPAdes already wrote into each header.
 #

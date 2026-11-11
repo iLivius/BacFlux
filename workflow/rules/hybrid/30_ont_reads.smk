@@ -1,21 +1,30 @@
 # The module that makes hybrid mode hybrid. Everything here is hybrid-only; none
 # of these rules exists in the illumina or nanopore front ends.
 #
-# The idea, preserved exactly from v1 BacFluxL+: the ONT leg never gets a
-# contamination screen of its own. Instead the Illumina reads that map to the
-# ALREADY DECONTAMINATED Illumina assembly are pulled back out, and those reads
-# are handed to filtlong as the reference for scoring ONT reads. An ONT read that
-# does not look like the clean Illumina genome scores badly and is dropped. So
-# the Illumina leg IS the ONT leg's decontamination filter.
+# Here the Illumina reads that map to the ALREADY DECONTAMINATED Illumina assembly
+# are pulled back out (SEL_R1/SEL_R2). Polypolish always corrects the ONT genome
+# with them (short_read_correction, hybrid/50_polish.smk). Whether they also filter
+# the ONT reads is decided by parameters.hybrid.short_read_guidance:
+#   false (the default) — filtlong keeps ONT reads on length and quality alone,
+#     under a 500 Mbp coverage cap, the value nanopore mode also uses. Nothing
+#     screens the ONT reads for contaminants.
+#   true — filtlong scores every ONT read against the decontaminated short reads:
+#     a read that does not look like the clean Illumina genome is trimmed, split or
+#     dropped, so the Illumina leg acts as the ONT leg's decontamination filter.
+#     This was v1 BacFluxL+'s design.
+# Either way, the genome the ONT reads build gets a screen of its own after
+# Polypolish (map_final_contigs → screen_final_contigs, shared/10_decontam.smk):
+# a check that writes a keep or remove verdict for every contig and never changes
+# FINAL_CONTIGS.
 #
 # Chain: DECONTAM_CONTIGS (shared/10_decontam.smk) → index_selected_contigs →
 # map_sel_contigs, which also takes TRIM_R1/TRIM_R2 (hybrid/10_reads.smk) and
 # emits SEL_R1/SEL_R2, the decontaminated read pairs. SEL_R1/SEL_R2 then feed
-# filter_long_reads (with the ONT reads, FILTLONG_INPUT: trimmed of their adapter
-# and barcode by shared/05_ont_adapters.smk, or raw with
-# parameters.hybrid.ont_adapter off) and short_read_correction
-# (hybrid/50_polish.smk). filter_long_reads emits FILT_LONG →
-# filtered_long_read_qc and ont_assembly (hybrid/40_ont_assembly.smk).
+# short_read_correction (hybrid/50_polish.smk) and, with the guidance on,
+# filter_long_reads. filter_long_reads also takes the ONT reads, FILTLONG_INPUT:
+# trimmed of their adapter and barcode by shared/05_ont_adapters.smk, or raw with
+# parameters.hybrid.ont_adapter off. It emits FILT_LONG → filtered_long_read_qc
+# and ont_assembly (hybrid/40_ont_assembly.smk).
 #
 # There are TWO Bowtie2 indexes in play and they are not the same index.
 # shared/10_decontam.smk builds one of the DRAFT assembly, at
@@ -28,7 +37,8 @@
 # map_sel_contigs        : map the trimmed pairs to it and keep only concordant
 #                          pairs — that read set is the decontaminated Illumina
 #                          data, and it is not temp().
-# filter_long_reads      : filtlong, scoring ONT reads against those short reads.
+# filter_long_reads      : filtlong, on length and quality, and against those
+#                          short reads when the guidance is on.
 # filtered_long_read_qc  : NanoPlot profile of what survived.
 #
 # Every constant used here comes from shared/00_common.smk: DECONTAM_CONTIGS,
@@ -99,8 +109,8 @@ rule index_selected_contigs:
 #            read set is a useful deliverable on its own, and if it were deleted,
 #            re-running Polypolish alone would drag SPAdes and the whole
 #            contamination screen back through the DAG to recreate it.
-# Consumed by: filter_long_reads below, and short_read_correction
-#              (hybrid/50_polish.smk).
+# Consumed by: short_read_correction (hybrid/50_polish.smk), and filter_long_reads
+#              below when parameters.hybrid.short_read_guidance is on.
 #
 # (v1 message: "--- Bowtie2: Map trimmed reads against selected contigs. ---")
 rule map_sel_contigs:
@@ -148,12 +158,15 @@ rule map_sel_contigs:
 
 
 # ──────────────────────── Long-read filtering (filtlong) ───────
-# filtlong scores every ONT read and keeps the best of them. Given -1/-2 it stops
-# scoring by quality alone and asks instead "how much of this long read is
-# supported by k-mers from the trusted short reads?" — which is simultaneously a
-# quality filter and a decontamination filter, because a long read from a
-# contaminant has no short-read support once the short reads themselves have been
-# decontaminated.
+# filtlong scores every ONT read and keeps the best of them. With
+# parameters.hybrid.short_read_guidance on, it is given the decontaminated short
+# reads (-1/-2) and judges each read's quality from k-mer matches to them instead
+# of from its Phred scores: it asks "how much of this long read is supported by
+# k-mers from the trusted short reads?" — which is then a quality filter and a
+# decontamination filter at once, because a long read
+# from a contaminant has no short-read support once the short reads themselves have
+# been decontaminated. With the guidance off (the default) it ranks the reads on
+# length and quality only, and nothing here removes contaminant reads.
 #
 # Takes in: long   = FILTLONG_INPUT (00_common.smk, after sample discovery): the
 #                    ONT reads trimmed of their adapter and barcode (TRIMMED_LONG,
@@ -161,15 +174,21 @@ rule map_sel_contigs:
 #                    with parameters.hybrid.ont_adapter off, the raw ONT FASTQ,
 #                    {sample}_ont.fastq[.gz] in config input.nanopore_dir
 #           r1, r2 = SEL_R1 / SEL_R2, the decontaminated Illumina pairs from
-#                    map_sel_contigs above
+#                    map_sel_contigs above — only with the guidance on
 # Does:     filtlong, with a flag set that differs from nanopore mode on purpose:
 #   --min_length      FILTLONG_MIN_LENGTH — drop reads too short to help
 #                     contiguity. Set by parameters.long_read_qc.min_length,
 #                     default 1000.
-#   --trim            cut low-support read ENDS rather than discard the read.
-#   --split 1000      break a read at any unsupported stretch of 1000 bp, which
-#                     is how a chimeric ONT read gets separated. The one number
-#                     still hard-coded in this rule.
+#   --trim            (guidance on only) cut low-support read ENDS rather than
+#                     discard the read.
+#   --split 1000      (guidance on only) break a read at any unsupported stretch
+#                     of 1000 bp, which is how a chimeric ONT read gets separated.
+#                     The one number still hard-coded in this rule.
+#   --target_bases    (guidance off only) FILTLONG_TARGET_BASES, 500 Mbp, the
+#                     value nanopore mode writes into its own rule. With the
+#                     guidance on no cap is passed and nothing else limits depth,
+#                     so very deep ONT data has to be subsampled before the run
+#                     (docs/methods_reference_genome_run.md).
 #   --keep_percent    FILTLONG_KEEP_PERCENT — how much of the remaining sequence
 #                     to keep, by score. Set by
 #                     parameters.long_read_qc.keep_percent, default 95.
@@ -178,15 +197,17 @@ rule map_sel_contigs:
 #                     default 1, which is filtlong's own default.
 # Produces: filt_long = FILT_LONG, the ONT reads that survived.
 # Consumed by: filtered_long_read_qc below, ont_assembly and long_read_consensus
-#              (hybrid/40_ont_assembly.smk), and check_medaka_model
-#              (shared/12_medaka_check.smk).
+#              (hybrid/40_ont_assembly.smk), check_medaka_model
+#              (shared/12_medaka_check.smk), check_ont_trimming
+#              (shared/05_ont_adapters.smk, when the adapter is trimmed) and
+#              map_final_contigs (shared/10_decontam.smk, the coverage track of
+#              the delivered genome's screen).
 #
-# Nanopore mode instead uses --target_bases (a plain coverage cap) and no short
-# reads, because it has none.
+# Nanopore mode has no short reads, so it always runs the unguided form, with
+# --target_bases, and it does not pass --length_weight.
 #
-# map_contigs in shared/10_decontam.smk also reads FILT_LONG, but only in
-# nanopore mode: in HYBRID mode that rule takes the short-read branch, so it
-# never touches this file.
+# map_contigs, also in shared/10_decontam.smk, reads FILT_LONG only in nanopore
+# mode: in HYBRID mode that rule takes the short-read branch.
 #
 # (v1 message: "--- Filtlong: Filter and short-read correct long reads. ---")
 rule filter_long_reads:
@@ -254,8 +275,10 @@ rule filter_long_reads:
 #           HTML report and {sample}_NanoStats.txt, with no PNG images
 #           (--no_static: see raw_long_read_qc in rules/nanopore/10_reads.smk).
 # Consumed by: multiqc (shared/90_report.smk). Read side by side with
-#              NANOPLOT_RAW_DIR from hybrid/10_reads.smk it shows exactly what
-#              the short-read-guided filter removed.
+#              NANOPLOT_RAW_DIR from hybrid/10_reads.smk it shows what filtlong
+#              removed, together with the read ends fastplong trimmed: the raw
+#              profile reads the reads before trimming (with ont_adapter off, the
+#              difference is filtlong's alone).
 #
 # Identical to rules/nanopore/10_reads.smk. Keep the two in step: a change to
 # the filtlong invocation here belongs there too.

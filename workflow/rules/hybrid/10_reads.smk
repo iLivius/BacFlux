@@ -1,8 +1,10 @@
 # Hybrid front end, short-read side: PhiX removal, adapter trimming, and a first
 # look at the raw ONT reads. Hybrid sequences one isolate twice — Illumina for
-# base accuracy, ONT for contiguity — and the two legs only meet in
-# hybrid/30_ont_reads.smk, where the cleaned Illumina reads become the filter that
-# scores the ONT reads.
+# base accuracy, ONT for contiguity. The two legs meet where the cleaned Illumina
+# reads are pulled out (hybrid/30_ont_reads.smk): Polypolish corrects the ONT
+# genome with them (hybrid/50_polish.smk), and with
+# parameters.hybrid.short_read_guidance on, filtlong also scores the ONT reads
+# against them.
 #
 # Illumina chain: raw {sample}_R1/R2.fastq[.gz] (config input.illumina_dir) →
 # map_phix → trim_adapters → TRIM_R1/TRIM_R2, read by illumina_assembly

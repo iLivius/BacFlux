@@ -12,11 +12,17 @@
 # them into Bakta's --replicons table; FLYE_CONTIGS, DNAAPLER_FIXED and
 # MEDAKA_CONSENSUS go to compare_hybrid_assemblies (hybrid/50_polish.smk).
 #
-# The ONT leg is never decontaminated here. Unlike nanopore mode, Medaka polishes
-# the PRE-screen reoriented assembly (DNAAPLER_FIXED), because the ONT reads were
-# already filtered against the decontaminated Illumina reads back in
-# hybrid/30_ont_reads.smk. There is no ONT-side screen to wait for, and adding
-# one would be redundant.
+# Nothing removes contigs from the ONT assembly. Hybrid mode's contamination
+# screen filters the Illumina draft (built in hybrid/20_assembly.smk, screened in
+# shared/10_decontam.smk), and the screen of the delivered genome
+# (screen_final_contigs, also in shared/10_decontam.smk) runs after Polypolish and
+# only writes a keep or remove verdict for each contig. So, unlike nanopore mode,
+# where Medaka waits for the screen to filter the reoriented Flye draft, Medaka
+# here polishes the reoriented assembly (DNAAPLER_FIXED) straight away: there is
+# no filtered ONT assembly to wait for. Whether anything removes contaminant reads
+# before Flye depends on parameters.hybrid.short_read_guidance
+# (hybrid/30_ont_reads.smk): off, the default, nothing does; on, filtlong trims,
+# splits or drops what the decontaminated short reads do not support.
 #
 # ont_assembly        : Flye, plus one awk pass over Flye's own summary table to
 #                       build the list of contigs dnaapler must not rotate.
@@ -32,8 +38,9 @@
 
 
 # ──────────────────────── Long-read assembly (Flye) ────────────
-# Takes in: filt_long = FILT_LONG, the short-read-guided filtlong output from
-#           filter_long_reads (hybrid/30_ont_reads.smk). The second input,
+# Takes in: filt_long = FILT_LONG, the filtlong output from filter_long_reads
+#           (hybrid/30_ont_reads.smk), guided by the short reads only when
+#           parameters.hybrid.short_read_guidance is on. The second input,
 #           medaka_ok, carries no data — it is a gate, explained on the input
 #           line itself.
 # Does:     Flye in {FLYE_INPUT_MODE} — either --nano-hq or --nano-raw, resolved
@@ -211,9 +218,10 @@ if USE_MEDAKA:
     #      timings ever show a reason to.
     #   2. the failure hint names parameters.hybrid.medaka_model, where nanopore
     #      names parameters.nanopore.medaka_model.
-    #   3. MEDAKA_INPUT resolves to DNAAPLER_FIXED here — the PRE-decontamination
-    #      reoriented assembly, since the ONT leg has no screen of its own (see
-    #      this file's header) — where in nanopore mode it is DECONTAM_CONTIGS.
+    #   3. MEDAKA_INPUT resolves to DNAAPLER_FIXED here — the reoriented assembly,
+    #      unfiltered, because no screen removes contigs from the ONT assembly in
+    #      hybrid mode (see this file's header) — where in nanopore mode it is
+    #      DECONTAM_CONTIGS, the draft after the screen has filtered it.
     #
     # The model NAME arrives pre-validated from check_medaka_model
     # (shared/12_medaka_check.smk), exactly as in nanopore mode. That is one

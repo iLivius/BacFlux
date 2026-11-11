@@ -21,8 +21,9 @@
 #                      per read type — see the section prose below.
 # blast_contigs      : megablast of every draft contig against NCBI nt.
 # blast_final_contigs: the same screen re-run on the DELIVERED genome. Long-read
-#                      modes only, and it exists for the plasmid check in
-#                      shared/60_plasmid.smk, not for decontamination.
+#                      modes only. It exists for the plasmid check in
+#                      shared/60_plasmid.smk; in hybrid mode the screen of the
+#                      delivered genome (blob_json_final, below) reads it too.
 # blob_json          : BlobTools joins coverage and taxonomy into one database.
 # blob_table         : collapses each contig's many BLAST hits into one call per
 #                      taxonomic rank.
@@ -391,8 +392,10 @@ if NEEDS_FINAL_BLAST:
     #           nanopore/30_polish.smk; hybrid: the ONT+Polypolish genome) — NOT
     #           the draft that blast_contigs screened.
     # Produces: PLASMID_BLASTOUT, same 15-column outfmt as blast_contigs.
-    # Consumed by: plasmid_search in shared/60_plasmid.smk, and nothing else —
-    #              BlobTools always uses the draft table.
+    # Consumed by: plasmid_search in shared/60_plasmid.smk and, in hybrid mode,
+    #              blob_json_final below, the BlobTools join of the delivered
+    #              genome's screen. The first screen's BlobTools join (blob_json)
+    #              always uses the draft table.
     rule blast_final_contigs:
         input:
             contigs = FINAL_CONTIGS,
@@ -548,11 +551,14 @@ rule blob_table:
 # scripts/10_decontam/select_contigs_by_taxonomy.py.
 #
 # In HYBRID mode this rule can cost more than a taxonomy row. Only the Illumina
-# reads mapping to the SELECTED contigs become SEL_R1/SEL_R2, and filtlong scores
-# ONT reads against those, so a contig dropped here can take its ONT reads with it
-# and vanish from the assembly entirely. Plasmids are the usual casualty, because
-# their best nt hit is often a different genus from the host. The full worked case
-# and the fixes are in the decontamination block of config/config.yaml.
+# reads mapping to the SELECTED contigs become SEL_R1/SEL_R2, the reads Polypolish
+# corrects the ONT genome with, so a replicon dropped here gets no short-read
+# correction. With parameters.hybrid.short_read_guidance on, filtlong also scores
+# the ONT reads against SEL_R1/SEL_R2, and a contig dropped here can take its ONT
+# reads with it and vanish from the assembly entirely. Plasmids are the usual
+# casualty, because their best nt hit is often a different genus from the host.
+# The full worked case and the fixes are in the decontamination block of
+# config/config.yaml.
 #
 # Takes in:
 #   bestscore = BLOB_TABLE    (the per-contig taxonomy + coverage table)
@@ -652,7 +658,7 @@ rule select_contigs:
 # ══════════════ Contaminant screen of the DELIVERED long-read genome ══════════════
 #
 # Hybrid screens the Illumina SPAdes draft (the HAS_SHORT_READS branch above). The
-# genome it delivers comes from the other side of the mode — Flye, Medaka, dnaapler,
+# genome it delivers comes from the other side of the mode — Flye, dnaapler, Medaka,
 # Polypolish — and passes through none of that.
 #
 # That was defensible for as long as filtlong scored every long read against the
