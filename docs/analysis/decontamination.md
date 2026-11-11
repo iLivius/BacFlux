@@ -541,7 +541,7 @@ remove sequence in the final assembly.
     |---|---|
     | `blast_contigs`, `blast_final_contigs` | BLAST+ 2.17.0 |
     | `map_contigs`, `index_contigs` in short-read modes | Bowtie2 2.5.5, `bowtie.yaml` |
-    | Long-read and contig self-alignment | minimap2 2.31, `minimap.yaml` |
+    | Long-read and contig self-alignment | minimap2 2.30, `minimap.yaml` |
     | `blob_json`, `blob_table` | BlobTools 1.1.1 |
     | `select_contigs` | Standard-library Python in `workflow/envs/python.yaml` |
 
