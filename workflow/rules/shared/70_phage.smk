@@ -400,11 +400,11 @@ if PHAGE_CALLER == "virsorter2":
 
 
     # ── VirSorter2 virus calling ──
-    # Identify phages and prophages on the finished genome — a faithful port of v1's
+    # Identify phages and prophages on the finished genome — a port of v1's
     # `viral_identification` (VS2 half) onto the 00_common.smk paths, with the same
-    # viral groups and the same score cutoff. Input is FINAL_CONTIGS (the genome
-    # each mode delivers, where v1 illumina used the pre-decontam
-    # contigs_filt.fasta) plus the VS2 database.
+    # score cutoff but only the two phage groups, where v1 ran all five (why: below).
+    # Input is FINAL_CONTIGS (the genome each mode delivers, where v1 illumina used
+    # the pre-decontam contigs_filt.fasta) plus the VS2 database.
     #
     # The viral groups, min_score 0.5 and --keep-original-seq match the first
     # VirSorter2 pass of the SOP linked from docs/analysis/phages.md (protocols.io,
