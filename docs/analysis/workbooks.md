@@ -189,7 +189,8 @@ same rules. `virulence_factors` and `vf_categories` give the virulence factor th
 belongs to and VFDB's category for it, such as Adherence, Motility or
 Nutritional/Metabolic factor, each with VFDB's ID; `reference_organisms` names the
 organism VFDB's reference sequence came from. No mobility tier is given: the mobilome
-module rates resistance genes only.
+module rates AMRFinderPlus's genes, and VFDB's hits are not matched to them.
+AMRFinderPlus's own virulence genes, with their tiers, are on `Mobility_evidence`.
 
 VFDB collects the virulence factors of pathogens. Many of them, such as flagella, pili
 and iron uptake systems, are also carried by harmless bacteria
@@ -199,9 +200,13 @@ there, not that the strain is a pathogen.
 ### What the AMR workbook leaves out
 
 - The reads mapped to CARD in the short-read modes: see `05.amr/mapping/`.
-- AMRFinderPlus's point mutations (for example in `gyrA`), virulence genes, and any
-  other AMRFinderPlus gene no database hit matches. With the mobilome module on, they
-  are on `Mobility_evidence`, with `locus_ids` `NA`.
+- AMRFinderPlus's point mutations (for example in `gyrA`), and every other AMRFinderPlus
+  gene no database hit matches: most of its metal and biocide resistance genes
+  (`STRESS`), its virulence genes, and now and then a resistance gene the three
+  databases miss. With the mobilome module on, they are on `Mobility_evidence`,
+  with `locus_ids` `NA`, and the `Summary` line "AMRFinderPlus genes outside AMR_loci"
+  counts them by kind, with the highest mobility tier of each kind and the genes at
+  that tier. A mercury resistance operon inside an ICE is thus seen on `Summary`.
 
 ## The traits workbook
 

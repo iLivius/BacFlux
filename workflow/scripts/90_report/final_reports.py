@@ -157,6 +157,12 @@ SAME_GENE_FRACTION = 0.80
 MATCHED_AMRFINDER_TYPES = {"AMR", "STRESS"}
 POINT_MUTATION_METHOD_PREFIX = "POINT"
 
+# The order in which the Summary sheet lists the kinds of AMRFinderPlus rows that
+# no AMR_loci row took up (see unmatched_mobility_summary). AMR is a resistance
+# gene or point mutation, STRESS a biocide or metal resistance gene, VIRULENCE a
+# virulence gene; any other kind follows in alphabetical order.
+AMRFINDER_KIND_ORDER = ("AMR", "STRESS", "VIRULENCE")
+
 
 # ── The mobile elements ──────────────────────────────────────────────────────
 
@@ -1008,6 +1014,17 @@ def ice_ime_answer(contig, start, end, elements, assessed):
 
 # ── The mobilome module's mobility tiers ─────────────────────────────────────
 
+def mobility_tier_number(row):
+    """The mobility tier of one row of the mobility table, as a number.
+
+    The tiers run from 1 (no sign of mobility) to 6 (predicted self-transmissible);
+    a cell that is not a number counts as 0, below every real tier, so it is never
+    chosen as the highest one.
+    """
+    tier = row["mobility_tier"].strip()
+    return int(tier) if tier.isdigit() else 0
+
+
 def mobility_columns(locus, mobility_rows, assessed):
     """Add the mobilome module's verdict for the gene at this locus.
 
@@ -1046,11 +1063,7 @@ def mobility_columns(locus, mobility_rows, assessed):
             "mobility_confidence": "NA",
         }, []
 
-    def tier_number(row):
-        tier = row["mobility_tier"].strip()
-        return int(tier) if tier.isdigit() else 0
-
-    best = max(matches, key=tier_number)
+    best = max(matches, key=mobility_tier_number)
     best_tier = best["mobility_tier"].strip()
     return {
         "amrfinderplus_genes": joined(row["amr_gene"] for row in matches),
@@ -1076,6 +1089,62 @@ def read_mobility_rows(path, sample):
         row["start"] = whole_number(row["amr_start"], path, "amr_start", row["__line__"])
         row["end"] = whole_number(row["amr_end"], path, "amr_end", row["__line__"])
     return header, rows
+
+
+def unmatched_mobility_summary(mobility_rows, matched_lines, assessed):
+    """Sum up, for the Summary sheet, the AMRFinderPlus rows no AMR_loci row took up.
+
+    Takes in: the rows of the mobility table (read_mobility_rows), the line
+              numbers of the rows that were matched to an AMR_loci row
+              (mobility_columns), and whether the mobilome module ran.
+    Why: AMR_loci is built from the CARD, NCBI and ResFinder hits. AMRFinderPlus
+    also reports metal and biocide resistance genes (STRESS), point mutations,
+    virulence genes, and now and then a resistance gene those databases miss.
+    The mobilome module gives each of them a mobility tier, but they appear only
+    on Mobility_evidence: without this line, a mercury resistance gene inside an
+    ICE, at tier 6, is seen only by someone who opens that sheet.
+    Gives back: (value, note) for the Summary row. The value is the number of
+    such rows; the note gives, for each kind, how many there are and the highest
+    tier among them, with its label and the genes at that tier.
+    """
+    if not assessed:
+        return NOT_ASSESSED, ("mobilome.run was false, so AMRFinderPlus and the mobility "
+                              "tiers did not run")
+    unmatched = [row for row in mobility_rows if row["__line__"] not in matched_lines]
+    if not unmatched:
+        return 0, "every AMRFinderPlus row was matched to an AMR_loci row"
+
+    # Group the rows by kind (AMR, STRESS, VIRULENCE), in the Summary's order.
+    rows_of_kind = collections.defaultdict(list)
+    for row in unmatched:
+        rows_of_kind[row["amr_element_type"].strip().upper()].append(row)
+    kinds = [kind for kind in AMRFINDER_KIND_ORDER if kind in rows_of_kind]
+    kinds += sorted(kind for kind in rows_of_kind if kind not in AMRFINDER_KIND_ORDER)
+
+    parts = []
+    for kind in kinds:
+        rows = rows_of_kind[kind]
+        highest = max(mobility_tier_number(row) for row in rows)
+        top_rows = [row for row in rows if mobility_tier_number(row) == highest]
+        count_text = f"{kind} {len(rows)}"
+        point_mutations = sum(
+            1 for row in rows
+            if row["amrfinder_method"].strip().upper().startswith(POINT_MUTATION_METHOD_PREFIX))
+        if point_mutations == 1:
+            count_text += " (1 point mutation)"
+        elif point_mutations > 1:
+            count_text += f" ({point_mutations} point mutations)"
+        # The tier as written in the table, so a cell that is not a number is
+        # shown as it is rather than as the 0 used only for sorting.
+        tier_text = top_rows[0]["mobility_tier"].strip()
+        label = top_rows[0]["mobility_tier_label"].strip()
+        genes = joined(row["amr_gene"] for row in top_rows)
+        parts.append(f"{count_text}, highest tier {tier_text} ({label}): {genes}")
+    note = ("; ".join(parts)
+            + ". These are AMRFinderPlus genes that no CARD, NCBI or ResFinder hit matches, "
+              "such as metal and biocide resistance genes (STRESS), point mutations and "
+              "virulence genes; each is a row of Mobility_evidence, with locus_ids NA")
+    return len(unmatched), note
 
 
 # ── Sheets ───────────────────────────────────────────────────────────────────
@@ -1432,7 +1501,9 @@ def build_amr_workbook(args):
 
     # The virulence genes: the same identity and context columns, plus the
     # virulence factor, its category and the source organism from VFDB's text.
-    # No mobility tier: the mobilome module rates resistance genes only.
+    # No mobility tier: the tiers belong to AMRFinderPlus's genes, and VFDB's hits
+    # are not matched to them. AMRFinderPlus's own virulence genes keep their
+    # tiers on Mobility_evidence, and the Summary counts them.
     virulence_rows = []
     for locus in virulence_loci:
         hits_here = locus["hits"]
@@ -1510,6 +1581,11 @@ def build_amr_workbook(args):
     abricate_version = "NA"
     if listing:
         abricate_version = list(listing.values())[0]["ABRICATE_VERSION"]
+    # The AMRFinderPlus rows that no AMR_loci row took up (metal and biocide
+    # genes, point mutations, virulence genes), so the Summary shows their
+    # highest mobility tier without the reader opening Mobility_evidence.
+    unmatched_value, unmatched_note = unmatched_mobility_summary(
+        mobility_rows, set(loci_of_mobility_line), mobilome_ran)
     summary_rows = [
         {"item": "Sample", "value": args.sample,
          "note": "BacFlux sample name, from the input file name"},
@@ -1539,6 +1615,9 @@ def build_amr_workbook(args):
         {"item": "AMR loci inside a phage region",
          "value": counted_answers(locus_rows, "phage"),
          "note": "AMR loci by answer in the phage column"},
+        {"item": "AMRFinderPlus genes outside AMR_loci",
+         "value": unmatched_value,
+         "note": unmatched_note},
         {"item": "Virulence loci", "value": len(virulence_loci),
          "note": "the VFDB hits of one gene grouped into one row of Virulence_loci. VFDB "
                  "collects the virulence factors of pathogens; many, such as flagella, pili "

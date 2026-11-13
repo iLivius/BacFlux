@@ -516,6 +516,28 @@ def test_without_the_mobilome_module_the_tiers_are_not_assessed():
     assert set(columns.values()) == {"not_assessed"}
 
 
+def test_the_summary_shows_amrfinderplus_rows_without_a_locus_and_their_tier():
+    """Metal resistance genes inside an ICE have no CARD, NCBI or ResFinder hit,
+    so no AMR_loci row; the Summary must still show them with their highest
+    tier, as in P. aeruginosa PARM801 (merA and merP inside an ICE, tier 6).
+    Line 2 (mexA) was matched to a locus and is left out."""
+    rows = [mobility_row("mexA", "AMR", 1000, 2000, 1, line=2),
+            mobility_row("merA", "STRESS", 5000, 6600, 6, "ice", line=3),
+            mobility_row("merP", "STRESS", 6610, 6900, 6, "ice", line=4),
+            mobility_row("arsD", "STRESS", 9000, 9300, 2, line=5),
+            mobility_row("gyrA_S83L", "AMR", 20000, 22600, 1, method="POINTX", line=6)]
+    value, note = fr.unmatched_mobility_summary(rows, {2}, True)
+    assert value == 4
+    assert note.startswith("AMR 1 (1 point mutation), highest tier 1 (tier 1): gyrA_S83L; "
+                           "STRESS 3, highest tier 6 (tier 6): merA; merP. ")
+
+
+def test_the_summary_says_when_every_amrfinderplus_row_has_a_locus_or_none_ran():
+    rows = [mobility_row("mexA", "AMR", 1000, 2000, 1, line=2)]
+    assert fr.unmatched_mobility_summary(rows, {2}, True)[0] == 0
+    assert fr.unmatched_mobility_summary([], set(), False)[0] == "not_assessed"
+
+
 # ── Copying values, paths and cells ──────────────────────────────────────────
 
 def test_plain_numbers_become_numbers_but_names_stay_text():
