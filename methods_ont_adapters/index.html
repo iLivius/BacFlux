@@ -1,0 +1,2867 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../methods_medaka_model/">
+      
+      
+        <link rel="next" href="../methods_amr_intrinsic_acquired/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>ONT adapter trimming and the adapter screen - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ont-adapter-trimming-and-the-adapter-screen" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ONT adapter trimming and the adapter screen
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4">
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5">
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6">
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/traits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trait profile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/workbooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-strain workbooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7">
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enabling the module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked="">
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ONT adapter trimming and the adapter screen
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ONT adapter trimming and the adapter screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-sequence-is-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the sequence is found
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-fastplong-does-with-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What fastplong does with it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-adapter-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The adapter screen
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#public-runs-scanned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public runs scanned
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-did-on-k-pneumoniae-tum24772" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it did on K. pneumoniae TUM24772
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-an-output-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading an output folder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9">
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11">
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-sequence-is-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the sequence is found
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-fastplong-does-with-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What fastplong does with it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-adapter-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The adapter screen
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#public-runs-scanned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public runs scanned
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-did-on-k-pneumoniae-tum24772" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it did on K. pneumoniae TUM24772
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-an-output-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading an output folder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/methods_ont_adapters.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"></path></svg>
+    </a>
+  
+  
+
+
+<h1 id="ont-adapter-trimming-and-the-adapter-screen">ONT adapter trimming and the adapter screen<a class="headerlink" href="#ont-adapter-trimming-and-the-adapter-screen" title="Permanent link">¶</a></h1>
+<p>An Oxford Nanopore (ONT) read starts with the sequencing adapter that brought the DNA molecule
+to the pore, and in a barcoded library the barcode and its flanks follow it. Left in the reads,
+both can end up in the assembly. BacFlux therefore removes them from the ONT reads before
+assembly, in <code>nanopore</code> and <code>hybrid</code> mode, and searches every finished genome for adapter
+sequence afterwards, in all four modes.</p>
+<div class="admonition tip">
+<p class="admonition-title">Practical guidance</p>
+<ul>
+<li>The default, <code>ont_adapter: detect</code>, works out from the reads whether anything is left
+  to trim. Reads that are already trimmed pass through unchanged, so leaving the default
+  on costs a few minutes and nothing else.</li>
+<li>Set <code>ont_adapter: off</code> to keep an assembly made by an earlier BacFlux unchanged: with
+  trimming on, a long-read output folder made before v2.2.0 assembles again (see
+  <a href="#upgrading-an-output-folder">Upgrading an output folder</a>).</li>
+<li>Read the <strong>Adapters</strong> table of the MultiQC report: it says what was trimmed from the
+  reads, which barcodes they carried, and whether the finished genome still holds adapter.</li>
+<li>The screen covers the common adapters only. Before a GenBank submission, also run
+  NCBI's own screen, FCS-adaptor, on the genome.</li>
+</ul>
+</div>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>adapter</strong></td>
+<td>the short synthetic DNA that brings a molecule to the nanopore; the kit 14 ligation, native and rapid adapters share the top strand <code>CCTGTACTTCGTTCAGTTACGTATTGCT</code></td>
+</tr>
+<tr>
+<td><strong>barcode block</strong></td>
+<td>in a barcoded library, the barcode with its two flanks: for native barcoding <code>AAGGTTAA</code>, the 24 bp barcode and <code>CAGCACCT</code> (40 bp); for rapid barcoding <code>GCTTGGGTGTTTAACC</code>, the 24 bp barcode and a 50 bp constant sequence (90 bp)</td>
+</tr>
+<tr>
+<td><strong>Mu end</strong></td>
+<td>that 50 bp constant sequence: the right end of phage Mu, identical to the last 50 bp of the Mu genome (NC_000929.1)</td>
+</tr>
+<tr>
+<td><strong>trimmed sequence</strong></td>
+<td>what fastplong removes from the reads of one sample</td>
+</tr>
+<tr>
+<td><strong>chimeric read</strong></td>
+<td>one read that holds two molecules joined end to end, with an adapter between them</td>
+</tr>
+<tr>
+<td><strong>end hit</strong></td>
+<td>adapter sequence within 100 bp of the end of a linear contig</td>
+</tr>
+<tr>
+<td><strong>bleed-through</strong></td>
+<td>reads of one sample on a multiplexed flow cell that are assigned to another sample's barcode</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="why">Why<a class="headerlink" href="#why" title="Permanent link">¶</a></h2>
+<p>Dorado can remove adapters and barcodes when it basecalls, but reads made by older basecallers,
+or with other settings, can keep them, and a FASTQ file does not say which. In the reads, the adapter and barcode sit at the read ends. In the assembly,
+they end up wherever many reads end at the same place, which is at the ends of linear contigs.
+A circular contig has no ends, so a complete bacterial genome is rarely affected; an
+incomplete one, or a linear replicon, is.</p>
+<p>In the BacFlux hybrid assembly of <em>Klebsiella pneumoniae</em> TUM24772 made without trimming, the
+linear contig <code>contig_2</code> (16,144 bp) ended in 112 bp of library construct: part of the rapid
+adapter, the rapid flank, rapid barcode RB11 and the Mu end. The ONT reads (SRR30870266) were
+made with the Rapid Barcoding Kit SQK-RBK004, and the construct sat at the start of most of
+them. It was already at the end of Flye's contig, and it was still there after dnaapler
+(which leaves a linear contig unrotated), Medaka and Polypolish. NCBI screens genome
+submissions for contamination, and FCS-adaptor, the adaptor screen NCBI provides for genomes
+before submission to GenBank, trims adaptor found within 100 bp of a sequence end
+(<a href="https://github.com/ncbi/fcs/wiki/FCS-adaptor-output">FCS-adaptor output</a>): it would have flagged that contig end.</p>
+<p>Trimming the reads with the exact sequence also lets fastplong split chimeric reads at the
+adapter between their two molecules.</p>
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">¶</a></h2>
+<p>The key goes in the block of the mode, <code>parameters.nanopore</code> or <code>parameters.hybrid</code>:</p>
+<table>
+<thead>
+<tr>
+<th><code>ont_adapter</code></th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>detect</code> (the default; also empty or missing)</td>
+<td>BacFlux works the sequence out from the reads, or copies reads that are already trimmed unchanged</td>
+</tr>
+<tr>
+<td>a sequence of 20 to 200 bases of A, C, G and T</td>
+<td>that sequence is trimmed, as written</td>
+</tr>
+<tr>
+<td><code>off</code> (also an unquoted <code>off</code>, <code>no</code> or <code>false</code>)</td>
+<td>no trimming: Filtlong reads the raw reads</td>
+</tr>
+</tbody>
+</table>
+<p>An unquoted <code>on</code>, <code>yes</code> or <code>true</code> names none of these and stops the run. A sequence that is a
+short unit repeated end to end, such as a homopolymer or a microsatellite, is refused when the
+workflow starts, because trimming it would cut genome from the read ends. A sequence that lacks
+the adapter core, or is shorter than 50 bp, gets a NOTE. The adapter screen has no settings
+apart from where UniVec is downloaded from (<code>links.univec_link</code> and <code>links.univec_sha256</code>, see
+<a href="../reference/configuration/">Configuration</a>).</p>
+<h2 id="how-the-sequence-is-found">How the sequence is found<a class="headerlink" href="#how-the-sequence-is-found" title="Permanent link">¶</a></h2>
+<p>Rule <code>find_ont_adapter</code> reads every read of the sample once, in seconds to a minute for an
+isolate.</p>
+<ol>
+<li><strong>The adapter.</strong> The first 150 bp of every read are searched for the 20 bp core of the
+   adapter top strand, <code>TTCGTTCAGTTACGTATTGC</code>. The core must match exactly, so reads whose
+   adapter carries a basecalling error there are not counted, and the share of reads with the
+   adapter is a lower bound. Older kits use other adapters: the RBK004 rapid adapter ends in
+   <code>TTCGTTCAGTTACG</code> and then the rapid flank, without the core's last six bases, so its reads
+   are found by step 4 instead.</li>
+<li><strong>The block after the adapter.</strong> In a barcoded library most reads continue after the
+   adapter with the same barcode block; in a library without barcodes they continue into the
+   genome, which differs from read to read. BacFlux takes the longest block, up to 120 bp, that
+   at least 60 % of the reads with the adapter share.</li>
+<li><strong>ONT's published barcodes.</strong> The sequence after the adapter is compared with the 96 native
+   and 96 rapid barcodes ONT publishes in its Chemistry Technical Document; a read counts for a
+   barcode when at most 3 of the 24 barcode bases differ. The list names the barcode and sorts
+   the reads of a file that holds several barcodes. The sequence trimmed for each barcode is the
+   block found in its own reads, unless that block is shorter than the published one: with about
+   1 % basecalling errors per base, fewer than 60 % of the reads carry a whole 90 bp rapid block
+   without one, so the shared stretch ends inside the Mu end, and the published block is trimmed
+   instead. A kit or barcode the list lacks is trimmed as found.</li>
+<li><strong>Barcode blocks without the adapter core.</strong> A read without the core is searched for a whole
+   barcode block in its first 150 bp, in two ways: a native or rapid block with exact flanks,
+   and, for rapid barcodes, the start of the Mu end (<code>GTTTTCGCATTTATCG</code>) with a published rapid
+   barcode in the 24 bp in front of it. The second search exists because the first misses whole
+   runs: on R9.4.1 reads the 16 bases right after the adapter are often called wrong. In the
+   TUM24772 reads, BLAST found the RB11 block at the start of 18,284 of the 19,091 reads, but
+   its 16 bp flank was exact in 37 of them; RB11 followed by the start of the Mu end was exact
+   in 3,180.</li>
+<li>
+<p><strong>The decision.</strong></p>
+<ul>
+<li>When fewer than 1 % of the reads start with the adapter, and fewer than 1 % with a
+  barcode block, the reads count as already trimmed and pass through unchanged.</li>
+<li>When published barcodes follow the adapter, each in at least 1 % of the reads with the
+  adapter (and at least 10 reads), the adapter followed by each barcode's block is trimmed.</li>
+<li>When the adapter is followed by no published barcode, the adapter and the common block
+  after it are trimmed, or the adapter alone in a library without barcodes.</li>
+<li>When the adapter core is missing but at least 1 % of all reads start with a barcode block
+  (step 4), each such barcode is trimmed: for a published barcode its published block,
+  which fastplong matches despite basecalling errors and removes together with whatever
+  unrecognised adapter sits in front of it.</li>
+</ul>
+<p>Two or more barcodes that each hold at least 10 % of the barcoded reads get a NOTE,
+because such a file may hold several samples. A barcode below 10 % is usually bleed-through
+from a neighbouring sample on the same flow cell: it is trimmed when it reaches 1 % of the
+reads, without a note, and the second most common barcode is reported with its share either
+way. A block that is a short tandem repeat is never added. When the adapter is followed by
+several different blocks that are not published barcodes, only the part they share is
+trimmed, with a NOTE.</p>
+</li>
+</ol>
+<p>The file <code>01.reads/{sample}/ont/adapters/{sample}_adapter_scan.tsv</code> counts the reads with the
+adapter, and with a barcode block and no adapter core, in every block of 10,000 reads. A batch
+of already-trimmed reads in an otherwise untrimmed file shows up there.</p>
+<h2 id="what-fastplong-does-with-it">What fastplong does with it<a class="headerlink" href="#what-fastplong-does-with-it" title="Permanent link">¶</a></h2>
+<p>Rule <code>trim_ont_adapters</code> runs fastplong 0.7.1 with the most common sequence (<code>-s</code>) and a FASTA
+file of every sequence to trim, in both orientations (<code>-a</code>). fastplong searches the start of
+every read for the <code>-s</code> sequence and the end for its reverse complement; the <code>-a</code> sequences are
+searched at both ends as written, which is how every barcode of a file holding several is
+trimmed, and how a rapid block copied to the read end in its forward orientation is found.
+fastplong allows a quarter of the bases to differ and removes the sequence together with
+everything on the outer side of it. BacFlux adds:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--trimming_extension 0</code></td>
+<td>fastplong's default cuts 10 more bases past the sequence, which after a whole adapter and barcode are genome</td>
+</tr>
+<tr>
+<td><code>-Q -L</code></td>
+<td>fastplong's quality and length filters stay off: Filtlong, the next step, is the read filter of the workflow</td>
+</tr>
+<tr>
+<td><code>--disable_chimera_splitting</code>, when a sequence to trim is shorter than 50 bp</td>
+<td>fastplong also cuts a read where it finds the sequence in the middle (a chimeric read), with the same tolerance as at the ends, so a short sequence matches genome by chance. On public reads of the fungus <em>Botrytis cinerea</em> B05.10 (SRR40741277), the 28 bp adapter alone split 1,041 reads, 1,001 of them in error, while the 68 bp adapter and barcode split 73, all genuine joins</td>
+</tr>
+</tbody>
+</table>
+<p>The two pieces of a split read are named <code>chimera-segment-1-&lt;read&gt;</code> and
+<code>chimera-segment-2-&lt;read&gt;</code>. Read headers are otherwise kept as they are, including the
+basecaller tags the Medaka model check reads. When there is nothing to trim, fastplong runs with
+<code>-A</code> and copies the reads byte for byte. fastplong's own guess of the adapter is never used: it
+looks only at the first reads of a file, which can be a batch of already-trimmed reads, and takes
+the most common sequence at the read ends, which can be genome.</p>
+<p>Rule <code>check_ont_trimming</code> then counts, among the reads Filtlong kept (the reads Flye
+assembles), those that still start with the adapter core and those that still start with the
+end of the trimmed sequence. More than 1 % for either prints a NOTE; the run goes on. The
+second count matters for older kits, whose adapter lacks the core.</p>
+<h2 id="the-adapter-screen">The adapter screen<a class="headerlink" href="#the-adapter-screen" title="Permanent link">¶</a></h2>
+<p>Rule <code>blast_adapters</code> searches the finished genome, <code>contigs_final.fasta</code>, of every sample in
+every mode, with BLAST (<code>blastn -task blastn-short</code>) for:</p>
+<table>
+<thead>
+<tr>
+<th>Sequences</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ONT adapters, the 96 native barcodes and the 96 rapid barcodes with their flanks</td>
+<td>ONT Chemistry Technical Document (shipped with BacFlux)</td>
+</tr>
+<tr>
+<td>PacBio and MGI adapters</td>
+<td>NCBI UniVec (shipped with BacFlux)</td>
+</tr>
+<tr>
+<td>Illumina adapters and primers</td>
+<td>NCBI UniVec build 10.1, downloaded into the run, because Illumina's sequences are copyrighted</td>
+</tr>
+<tr>
+<td>the sequence trimmed from the sample's reads</td>
+<td>rule <code>find_ont_adapter</code>, when BacFlux trimmed the reads</td>
+</tr>
+</tbody>
+</table>
+<p>The genome as delivered is searched, not Flye's draft: it is the genome every later step
+annotates and the one a user submits, it exists in all four modes, and dnaapler rotates only
+circular contigs. A linear contig keeps Flye's ends through dnaapler and polishing.</p>
+<p>Rule <code>screen_adapters</code> keeps a hit when at least 90 % of its aligned bases are identical and it
+is at least 20 bp long within 100 bp of the end of a linear contig, or at least 28 bp long, a
+whole adapter, inside a contig. The end rule does not ask how much of an adapter record is
+covered, because adapter is often cut short at the very end of a contig. Overlapping hits form
+one locus. Two cases need care in bacteria:</p>
+<ul>
+<li><strong>Circular contigs have no ends.</strong> Their two ends are an arbitrary cut, so every hit on a
+  circular contig is judged by the internal rule. To see an adapter lying across that cut, the
+  search runs on a copy of each circular contig extended by its own first 200 bp. Topology comes
+  from Flye, through the Bakta replicon table of the long-read modes; in <code>illumina</code> and
+  <code>contigs</code> mode it is not known, and every contig is treated as linear.</li>
+<li><strong>The Mu end is genome in some bacteria.</strong> A genome that carries a Mu prophage holds the same
+  50 bp as the end of every rapid barcode. A locus made only of the Mu end is therefore listed
+  but not counted when it lies inside a contig, where a rapid-kit remnant would bring its
+  barcode along; at the end of a linear contig it counts.</li>
+</ul>
+<p>Each locus gets a <code>counted</code> (yes/no) and a <code>reason</code> column: <code>adapter_at_contig_end</code>,
+<code>mu_end_at_contig_end</code>, <code>adapter_inside_contig</code> or <code>mu_end_inside_contig</code>. The screen changes no
+contig.</p>
+<div class="admonition note">
+<p class="admonition-title">Before a GenBank submission</p>
+<p>The lists cover the common adapters only. NCBI provides its own adaptor screen,
+FCS-adaptor (<a href="https://github.com/ncbi/fcs">FCS</a>), distributed as a container, to clean genomes before submission
+to GenBank; run it on the genome before you submit.</p>
+</div>
+<h2 id="output">Output<a class="headerlink" href="#output" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>01.reads/{sample}/ont/adapters/{sample}_adapter_scan.tsv</code></td>
+<td>reads with the adapter, with a barcode block and no adapter core, and with the Mu end and no adapter core, per 10,000 reads</td>
+</tr>
+<tr>
+<td><code>01.reads/{sample}/ont/adapters/{sample}_adapter_choice.tsv</code></td>
+<td>the decision and the numbers behind it: reads with the adapter, the barcodes found, the second barcode, what was trimmed, any NOTE</td>
+</tr>
+<tr>
+<td><code>01.reads/{sample}/ont/adapters/{sample}_fastplong_options.txt</code>, <code>{sample}_adapter_sequence.fasta</code></td>
+<td>what fastplong was given</td>
+</tr>
+<tr>
+<td><code>01.reads/{sample}/ont/adapters/{sample}_fastplong.json</code>, <code>.html</code></td>
+<td>fastplong's own reports: reads and bases in and out, reads trimmed, reads split</td>
+</tr>
+<tr>
+<td><code>01.reads/{sample}/ont/adapters/{sample}_adapter_check.tsv</code></td>
+<td>reads still starting with the adapter, or with the end of the trimmed sequence, after Filtlong</td>
+</tr>
+<tr>
+<td><code>02.assembly/adapter_lists/univec_illumina.fasta</code>, <code>PROVENANCE.txt</code></td>
+<td>UniVec's Illumina records, and where and when they were downloaded</td>
+</tr>
+<tr>
+<td><code>02.assembly/{sample}/eval/adapter_screen/{sample}_adapter_query.fasta</code></td>
+<td>every adapter the genome was searched for</td>
+</tr>
+<tr>
+<td><code>02.assembly/{sample}/eval/adapter_screen/{sample}_adapter_blast.tsv</code></td>
+<td>every BLAST hit, including those that do not pass the rules above</td>
+</tr>
+<tr>
+<td><code>02.assembly/{sample}/eval/adapter_screen/{sample}_adapter_loci.tsv</code></td>
+<td>one row per locus, with <code>counted</code> and <code>reason</code></td>
+</tr>
+<tr>
+<td><strong>Adapters</strong> table of the MultiQC report</td>
+<td>one row per sample: the read numbers before and after trimming, the barcodes, what was trimmed, the contig ends with adapter, the loci inside contigs and a verdict</td>
+</tr>
+</tbody>
+</table>
+<p>The files in <code>01.reads/{sample}/ont/adapters/</code> exist only for ONT samples that BacFlux trimmed.</p>
+<h2 id="public-runs-scanned">Public runs scanned<a class="headerlink" href="#public-runs-scanned" title="Permanent link">¶</a></h2>
+<p>Before trimming was added, the scan of step 1 to 5 was run on eight public bacterial ONT
+runs:</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Organism</th>
+<th>Kit</th>
+<th>Reads</th>
+<th>What the scan found</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SRR30870266</td>
+<td><em>K. pneumoniae</em> TUM24772</td>
+<td>SQK-RBK004, R9.4.1</td>
+<td>19,091</td>
+<td>RB11 in front of the Mu end in 19.9 % of the reads (step 4); no adapter core</td>
+<td>trim the 90 bp RB11 block</td>
+</tr>
+<tr>
+<td>ERR16717241</td>
+<td><em>Bacillus cereus</em></td>
+<td>SQK-RBK114</td>
+<td>70,147</td>
+<td>RB10 without adapter core in 31.8 % of the reads, nearly all of them shorter than 1 kb; RB04 in 2.4 % of the barcoded reads</td>
+<td>trim the 90 bp RB10 block</td>
+</tr>
+<tr>
+<td>SRR41339580</td>
+<td><em>K. pneumoniae</em></td>
+<td>SQK-NBD114-96, basecalled live in MinKNOW 25.09</td>
+<td>56,128</td>
+<td>adapter in 0.02 %, its barcode NB23 in 0.2 %</td>
+<td>nothing to trim</td>
+</tr>
+<tr>
+<td>SRR41339581</td>
+<td><em>Escherichia coli</em></td>
+<td>as above, same flow cell</td>
+<td>88,966</td>
+<td>adapter in 0.05 %, NB22 in 0.35 %</td>
+<td>nothing to trim</td>
+</tr>
+<tr>
+<td>SRR41339582</td>
+<td><em>Citrobacter freundii</em></td>
+<td>as above, same flow cell</td>
+<td>54,032</td>
+<td>adapter in 0.04 %, NB21 in 0.3 %</td>
+<td>nothing to trim</td>
+</tr>
+<tr>
+<td>SRR41610995</td>
+<td><em>Pectobacterium punjabense</em></td>
+<td>SQK-NBD114</td>
+<td>81,463</td>
+<td>adapter in 0.87 %</td>
+<td>nothing to trim</td>
+</tr>
+<tr>
+<td>SRR41617180</td>
+<td><em>Methylobacterium ajmalii</em></td>
+<td>SQK-LSK114 with EXP-NBD114, trimmed by its submitters</td>
+<td>95,398</td>
+<td>barcode block in 0.26 %</td>
+<td>nothing to trim</td>
+</tr>
+<tr>
+<td>SRR36766647</td>
+<td><em>K. pneumoniae</em></td>
+<td>not stated</td>
+<td>103,071</td>
+<td>adapter in 0.31 %</td>
+<td>nothing to trim</td>
+</tr>
+</tbody>
+</table>
+<p>Six of the eight runs were already trimmed, the three runs basecalled live in MinKNOW among
+them. In those three runs of one flow cell, the few reads still starting with a barcode block
+carried mostly the sample's own barcode (NB23, NB22 and NB21: 120, 311 and 161 reads); no other
+barcode appeared in more than 5 reads. In the <em>B. cereus</em> run the rapid construct stayed mainly
+on short fragments: 62.7 % of the reads shorter than 1 kb start with it, against 0.1 to 0.2 %
+of the longer ones, and Filtlong drops reads shorter than 1 kb. The TUM24772 run carried it at
+the start of nearly every read, long and short alike (18,284 of 19,091 by BLAST). When the reads of TUM24772 and of
+<em>B. cereus</em> were put into one file, as a mislabelled file would be, the scan trimmed both
+barcodes and printed the several-barcodes NOTE.</p>
+<h2 id="what-it-did-on-k-pneumoniae-tum24772">What it did on <em>K. pneumoniae</em> TUM24772<a class="headerlink" href="#what-it-did-on-k-pneumoniae-tum24772" title="Permanent link">¶</a></h2>
+<p>The TUM24772 reads (SRR30870266) went through <code>nanopore</code> mode twice, with the same settings,
+once with <code>ont_adapter: detect</code> and once with <code>off</code>:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>off</code></th>
+<th><code>detect</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>reads fastplong trimmed</td>
+<td>—</td>
+<td>18,636 of 19,091, about 113 bp each: the RB11 block and the adapter in front of it</td>
+</tr>
+<tr>
+<td>chimeric reads split</td>
+<td>—</td>
+<td>13, into 25 pieces</td>
+</tr>
+<tr>
+<td>reads Flye assembled that still start with the adapter core, or with the end of the block</td>
+<td>—</td>
+<td>0, and 30 of 12,116 (0.25 %)</td>
+</tr>
+<tr>
+<td>Flye's contigs</td>
+<td>6: the same five circles, and a linear contig of 15,344 bp</td>
+<td>5, all circular: the chromosome and four plasmids</td>
+</tr>
+<tr>
+<td>contig ends with adapter</td>
+<td>1: the end of the linear contig, 88 bp of the RB11 block 24 bp from the end</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p>The linear contig of the untrimmed reads is a near-copy of part of the 23.8 kb plasmid (99.4 %
+identity over 11.6 kb), and it ends in the construct. With the reads trimmed, Flye assembles no
+such contig; its sequence lies inside the circular plasmid, whose coverage rises from 87× to
+106×, about what the linear contig held (17×). The hybrid assembly of the same untrimmed reads
+had the same kind of contig, the 16,144 bp <code>contig_2</code> described under <a href="#why">Why</a>. The <code>off</code>
+arm was run as far as Flye, and its contigs were searched with the same screen.</p>
+<h2 id="upgrading-an-output-folder">Upgrading an output folder<a class="headerlink" href="#upgrading-an-output-folder" title="Permanent link">¶</a></h2>
+<p>With trimming on, Filtlong reads a new file, the trimmed reads, so an output folder made before
+v2.2.0 runs Filtlong, Flye and every later step again for every long-read sample, even when the
+scan finds nothing to trim: the copy fastplong then makes is still a new file, and Snakemake
+compares file times, not contents. In <code>hybrid</code> mode the Illumina steps run again too, because
+their trimmed reads are temporary files that the later steps need. <code>ont_adapter: off</code> keeps
+Filtlong's earlier input, and with it the earlier assembly; the adapter screen then runs on it
+on its own, as it does in <code>illumina</code> and <code>contigs</code> mode, where nothing else changes.</p>
+<h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">¶</a></h2>
+<ul>
+<li>The barcode check sees only what is still in the reads. Reads demultiplexed and trimmed at
+  basecalling carry nothing to count, so the check then says nothing about bleed-through or a
+  mislabelled file.</li>
+<li>Below 1 % of the reads, the adapter or a barcode counts as absent, and nothing is trimmed. A
+  few untrimmed reads ending at a linear contig end could still leave adapter there; the screen
+  reports it.</li>
+<li>The screen searches for the adapters on its lists. An adapter of another platform or kit is
+  not found unless it is on them, or unless BacFlux trimmed it from the reads.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">¶</a></h2>
+<ul>
+<li>Oxford Nanopore Technologies. Chemistry Technical Document, version CHTD_500_v1_revAV_24July2026,
+  sections 14 and 15 (adapter and barcode sequences).
+  <a href="https://nanoporetech.com/document/chemistry-technical-document">https://nanoporetech.com/document/chemistry-technical-document</a></li>
+<li>Chen S (2023). Ultrafast one-pass FASTQ data preprocessing, quality control, and
+  deduplication using fastp. <em>iMeta</em> 2:e107. <a href="https://doi.org/10.1002/imt2.107">https://doi.org/10.1002/imt2.107</a></li>
+<li>Chen S, Zhou Y, Chen Y, Gu J (2018). fastp: an ultra-fast all-in-one FASTQ preprocessor.
+  <em>Bioinformatics</em> 34:i884–i890. <a href="https://doi.org/10.1093/bioinformatics/bty560">https://doi.org/10.1093/bioinformatics/bty560</a>
+  (fastplong, <a href="https://github.com/OpenGene/fastplong">https://github.com/OpenGene/fastplong</a>, asks to be cited through these two
+  papers.)</li>
+<li>Camacho C, Coulouris G, Avagyan V, Ma N, Papadopoulos J, Bealer K, Madden TL (2009). BLAST+:
+  architecture and applications. <em>BMC Bioinformatics</em> 10:421.
+  <a href="https://doi.org/10.1186/1471-2105-10-421">https://doi.org/10.1186/1471-2105-10-421</a></li>
+<li>National Center for Biotechnology Information. The UniVec Database.
+  <a href="https://www.ncbi.nlm.nih.gov/tools/vecscreen/univec/">https://www.ncbi.nlm.nih.gov/tools/vecscreen/univec/</a> (files at
+  <a href="https://ftp.ncbi.nlm.nih.gov/pub/UniVec/">https://ftp.ncbi.nlm.nih.gov/pub/UniVec/</a>)</li>
+<li>NCBI Foreign Contamination Screen (FCS), FCS-adaptor. <a href="https://github.com/ncbi/fcs">FCS</a>; the trimming rules in
+  <a href="https://github.com/ncbi/fcs/wiki/FCS-adaptor-output">FCS-adaptor output</a>.</li>
+<li>Enterobacteria phage Mu, complete genome. NCBI RefSeq NC_000929.1, derived from GenBank
+  AF083977.1, the sequence of Morgan GJ, Hatfull GF, Casjens S, Hendrix RW (2002).
+  Bacteriophage Mu genome sequence: analysis and comparison with Mu-like prophages in
+  Haemophilus, Neisseria and Deinococcus. <em>Journal of Molecular Biology</em> 317:337–359.
+  <a href="https://doi.org/10.1006/jmbi.2002.5437">https://doi.org/10.1006/jmbi.2002.5437</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden="">
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>

@@ -1,0 +1,3354 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Unified bacterial whole-genome workflow — Illumina, Nanopore, hybrid and pre-assembled contigs, through to AMR mobility">
+      
+      
+        <meta name="author" content="Livio Antonielli">
+      
+      
+      
+        <link rel="prev" href="../annotation/">
+      
+      
+        <link rel="next" href="../amr/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Trait profile - BacFlux</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#trait-profile" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BacFlux" class="md-header__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BacFlux
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Trait profile
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BacFlux" class="md-nav__button md-logo" aria-label="BacFlux" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    BacFlux
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/iLivius/BacFlux" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    iLivius/BacFlux
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/rationale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rationale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4">
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/databases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference databases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/choosing-a-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choosing a mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/from-v1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coming from v1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5">
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../modes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modes
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/illumina/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Illumina
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/nanopore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nanopore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/hybrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../modes/contigs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-assembled contigs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked="">
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis stages
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis stages
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decontamination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decontamination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../assembly-qc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assembly QC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../taxonomy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Taxonomy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trait profile
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trait profile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#how-a-gene-is-recognised" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a gene is recognised
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How a gene is recognised">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#borderline-hits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Borderline hits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-a-gene-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a gene counts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-a-trait-is-called" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a trait is called
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-two-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the output
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading the output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sample_trait_profiletsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        {sample}_trait_profile.tsv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sample_trait_profile_audittsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        {sample}_trait_profile_audit.tsv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sample_trait_genestsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        {sample}_trait_genes.tsv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#09reporttraits_summarytsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        09.report/traits_summary.tsv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sample_trait_provenancejson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        {sample}_trait_provenance.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-call-does-not-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a call does not mean
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-and-databases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost and databases
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-check-afterwards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to check afterwards
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#licensing-and-citation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licensing and citation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antimicrobial resistance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../phages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prophages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workbooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-strain workbooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7">
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../mobilome/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobilome module
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mobilome module
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/mobility-ladder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The mobility ladder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/enabling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enabling the module
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/optional-layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optional layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/draft-assemblies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Draft assemblies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/worked-example/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worked example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mobilome/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8">
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Method references
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Method references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_medaka_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Medaka polishing model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_ont_adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ONT adapter trimming and the adapter screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_amr_intrinsic_acquired/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intrinsic vs acquired AMR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_att_and_small_plasmids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    att sites and small plasmids
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_icescan_union/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CONJScan + ICEscan together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_ebi_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head-to-head vs the EBI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../methods_reference_genome_run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hybrid mode on five closed genomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9">
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/running/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running BacFlux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11">
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/licensing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licensing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation and references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#how-a-gene-is-recognised" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a gene is recognised
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How a gene is recognised">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#borderline-hits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Borderline hits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-a-gene-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a gene counts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-a-trait-is-called" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a trait is called
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-two-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The two tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the output
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading the output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sample_trait_profiletsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        {sample}_trait_profile.tsv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sample_trait_profile_audittsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        {sample}_trait_profile_audit.tsv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sample_trait_genestsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        {sample}_trait_genes.tsv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#09reporttraits_summarytsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        09.report/traits_summary.tsv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sample_trait_provenancejson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        {sample}_trait_provenance.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-call-does-not-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a call does not mean
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-and-databases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost and databases
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-check-afterwards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to check afterwards
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#licensing-and-citation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licensing and citation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/iLivius/BacFlux/edit/main/docs/analysis/traits.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"></path></svg>
+    </a>
+  
+  
+
+
+<h1 id="trait-profile">Trait profile<a class="headerlink" href="#trait-profile" title="Permanent link">¶</a></h1>
+<p>The trait profile reads each genome for traits that matter in plant-growth promotion,
+biocontrol, stress tolerance and bioremediation: nitrogen fixation, phosphate
+solubilisation, siderophores, plant hormones, osmoprotectants, the breakdown of
+aromatic compounds and the steps of denitrification. It serves the purpose BacFlux was
+developed for: the genomic characterisation of strains considered for biocontrol,
+biostimulant and biofertiliser applications. Each trait is called from a defined set of
+genes: for most traits several genes that must all be found, often side by side as in
+an operon; for a few, one marker gene.</p>
+<p>The layer is off by default; <code>traits.run: true</code> switches it on, in all modes. It writes
+to <code>04.annotation/traits/{sample}/</code>, from rules in
+<code>workflow/rules/shared/40_annotation.smk</code>, and the summary across samples comes from
+<code>workflow/rules/shared/90_report.smk</code>. It adds jobs and a section to the MultiQC
+report, and changes no other stage's result.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{sample}_trait_profile.tsv</code></td>
+<td><strong>the result</strong> — one row per trait: called, partial or not called, with the genes behind it</td>
+</tr>
+<tr>
+<td><code>{sample}_trait_profile_audit.tsv</code></td>
+<td><strong>why</strong> — one row per trait, with a fixed reason for its decision</td>
+</tr>
+<tr>
+<td><code>{sample}_trait_genes.tsv</code></td>
+<td><strong>the evidence</strong> — one row per protein and gene: what matched, and whether it counted</td>
+</tr>
+<tr>
+<td><code>{sample}_trait_provenance.json</code></td>
+<td><strong>the record</strong> — the fingerprints of the catalogue and of the three tables above, with the calling parameters</td>
+</tr>
+<tr>
+<td><code>09.report/traits_summary.tsv</code></td>
+<td>every sample's calls side by side, one column per trait</td>
+</tr>
+</tbody>
+</table>
+<p>Read them in this order: the summary, to see the batch at a glance; then a sample's
+profile; then its audit and gene table for any call you intend to quote.</p>
+<div class="admonition abstract">
+<p class="admonition-title">Terms used on this page</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>3Di</strong></td>
+<td>Foldseek's structural alphabet: one letter per residue that describes its 3D neighbourhood</td>
+</tr>
+<tr>
+<td><strong>KO</strong></td>
+<td>a KEGG Orthology number, KEGG's identifier for a gene family (<code>K02588</code>)</td>
+</tr>
+<tr>
+<td><strong>EC</strong></td>
+<td>an Enzyme Commission number, the identifier of an enzyme reaction (<code>3.5.99.7</code>)</td>
+</tr>
+<tr>
+<td><strong>e-value</strong></td>
+<td>how many hits at least this good the search expects by chance; smaller is better</td>
+</tr>
+<tr>
+<td><strong>coverage</strong></td>
+<td>the fraction of the protein (<code>qcov</code>) or of the catalogue structure (<code>tcov</code>) that the alignment spans</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="how-a-gene-is-recognised">How a gene is recognised<a class="headerlink" href="#how-a-gene-is-recognised" title="Permanent link">¶</a></h2>
+<p><em>Rules <code>trait_db</code> (or <code>trait_db_local</code>), <code>trait_structure_query</code>,
+<code>trait_structure_search</code> and <code>trait_profile</code>. Off by default; <code>traits.run: true</code>
+switches them on.</em></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>In</strong></td>
+<td><code>{sample}.faa</code> and <code>{sample}.tsv</code> from the Bakta directory; EcoFoldDB; the ProstT5 model from Baktfold's database; <code>{sample}.json</code> from antiSMASH; Baktfold's <code>{sample}.tsv</code> when <code>baktfold.run: true</code></td>
+</tr>
+<tr>
+<td><strong>Out</strong></td>
+<td><code>04.annotation/traits/{sample}/</code></td>
+</tr>
+<tr>
+<td><strong>Next</strong></td>
+<td><code>09.report/traits_summary.tsv</code>, the MultiQC report and <code>10.workbooks/{sample}_traits.xlsx</code>; user interpretation</td>
+</tr>
+</tbody>
+</table>
+<p>A gene is recognised in three ways, and one protein can carry all three.</p>
+<p><strong>Structure (S).</strong> Every protein Bakta predicted, up to 4,000 amino acids, is turned
+into 3Di by the ProstT5 protein language model, on the CPU, without predicting a full
+structure. Foldseek then searches it against EcoFoldDB v2.0 (Ghaly et al. 2025) with
+<code>-s 8</code>, as EcoFoldDB's own method does. EcoFoldDB holds 205,334 predicted structures,
+842 of which form its catalogue (<code>EcoFoldDB_descriptions.txt</code>): proteins of described
+function; the rest are other Swiss-Prot proteins. A hit is kept only when it passes
+the authors' filter:</p>
+<ul>
+<li>the protein's best hit among all 205,334 structures (lowest e-value; the first listed
+  wins a tie) is a catalogue entry;</li>
+<li>its e-value is below 1e-10;</li>
+<li>the alignment covers more than 0.8 of the protein and of the catalogue structure.</li>
+</ul>
+<p>The first condition keeps look-alikes out: an enzyme that shares a fold with a
+catalogue entry, but not its function, usually finds its best hit outside the
+catalogue. A kept hit gives <code>S</code> to every gene whose <code>ecofolddb</code> entries include that
+catalogue entry. A longer protein is not searched (<code>not_searched_too_long</code>), but its
+names are still checked.</p>
+<p><strong>Bakta name (Q).</strong> A protein matches a gene by name when Bakta's gene symbol is
+exactly one of the gene's symbols, when one of its KO or EC numbers is listed for the
+gene, or when the gene's product pattern is found in Bakta's product. A symbol that
+unrelated genes share can be set to count only together with the product pattern or a
+KO (<code>symbol_needs_product</code>).</p>
+<p><strong>Baktfold name (F).</strong> With <code>baktfold.run: true</code>, a protein that Bakta called
+"hypothetical protein" (a prefix such as <code>(pseudo)</code> aside) is tested the same way,
+with the name Baktfold gave it. Baktfold finds its names with the same ProstT5 model
+and Foldseek, so <code>S+F</code> is two structure searches agreeing, not a sequence-based name
+confirming a structure hit. See <a href="../annotation/#baktfold">Baktfold</a>.</p>
+<p><strong>antiSMASH regions</strong> are supporting evidence only
+(<a href="#how-a-trait-is-called">How a trait is called</a>).</p>
+<h3 id="borderline-hits">Borderline hits<a class="headerlink" href="#borderline-hits" title="Permanent link">¶</a></h3>
+<p>A kept structure hit is flagged borderline when it lies close to a cut-off or to a
+rival: its e-value is 1e-11 or above, within ten times the cut-off; its query or target
+coverage is 0.85 or less; or the best hit to another catalogue gene, or to a structure
+outside the catalogue, has an e-value at most ten times the best one. The flag never
+changes a decision. It marks a hit that a small change in the input, such as another
+assembly of the same strain, could push across a cut-off or hand to its rival.</p>
+<h2 id="when-a-gene-counts">When a gene counts<a class="headerlink" href="#when-a-gene-counts" title="Permanent link">¶</a></h2>
+<p>A protein counts for a gene when a name matches (<code>Q</code> or <code>F</code>), or when its kept
+structure hit (<code>S</code>) points to a gene whose <code>s_alone</code> is <code>yes</code>. Four points qualify
+this; the gene table gives each protein's reason.</p>
+<ol>
+<li><strong>A veto wins.</strong> A gene can list products that rule it out (<code>product_exclude</code>):
+   relatives acting on another substrate, unrelated genes with the same symbol, and
+   regulators, receptors or binding proteins named after a pathway. When the pattern
+   matches Bakta's or Baktfold's product, the protein does not count for that gene,
+   whatever else matched, structure included.</li>
+<li><strong>Most genes need a name.</strong> For most genes <code>s_alone</code> is <code>no</code>, so a structure hit
+   counts only when a name agrees (reason <code>structure_only_needs_name</code>). Often the
+   reason is a fold shared by enzymes of other pathways, as for ring-hydroxylating
+   (Rieske) oxygenases, non-ribosomal peptide synthetases and HAD-family phosphatases;
+   each gene's <code>notes</code> give its reason. A pathway name alone, such as "alcaligin
+   biosynthesis protein", does not count for a required gene: a cluster's regulators
+   and transporters carry it too.</li>
+<li><strong>A pseudogene never counts.</strong> Bakta writes <code>(pseudo)</code> before the product of a gene
+   it found broken, by a frameshift, an internal stop codon or a lost start codon.
+   Where its evidence would count, its row reads <code>pseudogene</code>, and a set that lacks
+   only such genes is <code>partial</code>.</li>
+<li>
+<p><strong>One protein, one gene per rule.</strong> A protein counts for two genes of one rule only
+   when one source names both, as a fused PqqC/D, DfoC or UreAB does; Bakta's product,
+   symbol, KO and EC count as one source. A fusion named after one part only shows the
+   other as missing. Otherwise the protein counts once, for the first gene that
+   applies:</p>
+<ul>
+<li>the gene of its structure hit, when a structure hit counts alone for that gene
+  (<code>s_alone</code> is <code>yes</code>);</li>
+<li>the gene of Bakta's name;</li>
+<li>the gene of Baktfold's name, last: Baktfold names a protein from its predicted
+  structure, while Bakta's name comes from sequence similarity, which usually
+  tells related enzymes apart.</li>
+</ul>
+<p>A protein whose structure hit is PcaG, the alpha chain of protocatechuate
+3,4-dioxygenase, but which Bakta names as the beta chain, counts for <code>pcaG</code> only:
+one protein cannot fill both places of the pair. The other gene's row reads
+<code>counted_for_other_gene</code>, and the protein counts for it in no rule. A pseudogene
+is ranked the same way, but both of its rows keep the reason <code>pseudogene</code>, and
+their <code>detail</code> names the gene the broken protein is taken as.</p>
+</li>
+</ol>
+<p>Bakta also marks a gene that runs off the end of its sequence: <code>(5' truncated)</code>,
+<code>(3' truncated)</code> or <code>(partial)</code>. BacFlux runs Bakta without <code>--partial</code>, so on a
+linear contig Bakta keeps only genes whose start and stop codons both lie inside it.
+These marks therefore appear only on the circular replicons of the <code>nanopore</code> and
+<code>hybrid</code> modes, most often on the replication gene, such as <em>dnaA</em>, that dnaapler put
+at the start. A circular replicon has no ends, so such a gene counts as usual, with a
+note in <code>detail</code>. Names are matched without these prefixes or <code>(pseudo)</code>, in Bakta's
+product and in Baktfold's.</p>
+<h2 id="how-a-trait-is-called">How a trait is called<a class="headerlink" href="#how-a-trait-is-called" title="Permanent link">¶</a></h2>
+<p>Each rule names one or more alternative sets of required genes: <code>+</code> joins the genes of
+one set and <code>|</code> separates the alternatives, as in <code>ureA+ureC | ureB+ureC</code>. Sets are
+tried in the order listed: the first set that meets the <code>called</code> condition gives the
+call; failing that, the first one that qualifies as partial, and is not withheld (key
+genes, below), is reported.</p>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>called</code></td>
+<td>every gene of the set counts, and the genes that must lie together do</td>
+</tr>
+<tr>
+<td><code>partial</code></td>
+<td>the set is complete but its genes are not together where the rule asks; or it is complete except for pseudogenes, which holds for a one-gene set too; or, with two or more genes, at least half of them count (rounded up)</td>
+</tr>
+<tr>
+<td><code>not called</code></td>
+<td>everything else, including a partial withheld by <code>key_genes</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Co-localisation.</strong> A rule can ask that genes lie together: <code>all</code> means the whole set,
+otherwise groups separated by <code>;</code>, such as
+<code>nahAa+nahAb+nahAc+nahAd; nahB+nahC+nahD+nahE</code>. A group holds when its genes form a
+chain on one contig, each at most <code>traits.max_gene_gap</code> positions from the previous
+one (default 10: up to nine other genes between). Positions count protein-coding genes
+in Bakta's order. A group applies only to a set that holds all its genes, so one rule
+can hold routes whose genes are arranged differently. Every contig is treated as
+linear: a chain across the start of a circular contig is not joined.</p>
+<p><strong>Key genes.</strong> A rule can name <code>key_genes</code>: the genes that set its pathway apart from
+look-alikes, such as <code>desA</code> for desferrioxamine, since an aerobactin cluster also
+matches <code>desB</code>, <code>desC</code> and <code>desD</code> but has no <code>desA</code>. A set that lacks only pseudogenes
+is always reported. Any other partial is reported only when a key gene is in the
+genome, counted or as a pseudogene; otherwise it is withheld, and if no other partial
+stands, the trait is <code>not called</code> with the reason <code>partial_withheld</code>. The idea comes
+from MetaCyc's key reactions, which tell related pathway variants apart (Karp et al.
+2011).</p>
+<p><strong>Supporting genes</strong> are reported when they count, and no set requires them. Like any
+gene, a supporting gene can keep its protein from counting for a required gene of the
+same rule (<a href="#when-a-gene-counts">When a gene counts</a>, point 4). An entry
+<code>antiSMASH:&lt;type&gt;</code>, such as <code>antiSMASH:NRP-metallophore</code>, is reported when an
+antiSMASH region of exactly that type overlaps, on the same contig, a protein counted
+for a required gene.</p>
+<h2 id="the-two-tables">The two tables<a class="headerlink" href="#the-two-tables" title="Permanent link">¶</a></h2>
+<p>The rules live in two tables beside the script that applies them, each headed by a
+one-line <code>#</code> comment that says what it is (skip it when you load a table):</p>
+<ul>
+<li><strong><code>workflow/scripts/40_annotation/trait_rules_v1.tsv</code></strong>: 49 rules, one per trait, in
+  the order of the seven groups below.</li>
+<li><strong><code>workflow/scripts/40_annotation/trait_genes_v1.tsv</code></strong>: the gene dictionary, 274
+  entries, one for each gene the rules name, saying how it is recognised.</li>
+</ul>
+<p>Each rule follows the primary papers in its <code>reference</code> column: the smallest set of
+genes that defines the pathway, its alternative routes, and which genes lie together.
+Each gene entry takes its structure evidence from EcoFoldDB's curated catalogue, its
+KO and EC numbers from KEGG and ExPASy ENZYME only where they belong to that gene
+alone, and its names from UniProt and RefSeq, written to match how Bakta names the
+protein. Vetoes cover known look-alikes, and <code>s_alone</code> is <code>yes</code> only where the fold
+belongs to that function alone; the <code>notes</code> give the reason for each entry.</p>
+<p>Editing either table makes the calls again, with the summary and the MultiQC report,
+but does not repeat the 3Di step (<a href="#cost-and-databases">Cost and databases</a>). A fresh
+clone of BacFlux does the same in an output folder made before, because it gives the
+tables new file dates. Before
+calling anything, the script checks both tables: the columns, unique <code>trait_id</code>s,
+exactly one entry for every gene a rule names and no unused entry, patterns that
+compile, <code>yes</code>/<code>no</code> values, and EcoFoldDB entries present in the catalogue. A failed
+check stops the job with a message naming the row.</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th style="text-align: right;">Rules</th>
+<th><code>trait_id</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nitrogen</td>
+<td style="text-align: right;">3</td>
+<td><code>n2_fixation</code>, <code>nodulation</code>, <code>urea_hydrolysis</code></td>
+</tr>
+<tr>
+<td>Phosphorus</td>
+<td style="text-align: right;">4</td>
+<td><code>mineral_phosphate_solubilisation</code>, <code>phytate_degradation</code>, <code>phosphate_ester_mineralisation</code>, <code>phosphonate_cp_lyase</code></td>
+</tr>
+<tr>
+<td>Iron: siderophores</td>
+<td style="text-align: right;">11</td>
+<td><code>siderophore_pyoverdine</code>, <code>siderophore_enterobactin</code>, <code>siderophore_bacillibactin</code>, <code>siderophore_desferrioxamine</code>, <code>siderophore_pyochelin</code>, <code>siderophore_achromobactin</code>, <code>siderophore_alcaligin</code>, <code>siderophore_putrebactin</code>, <code>siderophore_rhizobactin_1021</code>, <code>siderophore_mycobactin</code>, <code>siderophore_pseudomonine</code></td>
+</tr>
+<tr>
+<td>Plant hormones and signals</td>
+<td style="text-align: right;">9</td>
+<td><code>acc_deaminase</code>, <code>iaa_iam</code>, <code>iaa_ipya</code>, <code>iaa_nitrilase</code>, <code>gibberellin</code>, <code>cytokinin</code>, <code>gaba</code>, <code>putrescine</code>, <code>spermidine</code></td>
+</tr>
+<tr>
+<td>Stress tolerance</td>
+<td style="text-align: right;">3</td>
+<td><code>ectoine</code>, <code>glycine_betaine</code>, <code>trehalose</code></td>
+</tr>
+<tr>
+<td>Aromatic compounds</td>
+<td style="text-align: right;">15</td>
+<td><code>benzoate_to_catechol</code>, <code>catechol_ortho_cleavage</code>, <code>catechol_meta_cleavage</code>, <code>protocatechuate_ortho_cleavage</code>, <code>protocatechuate_meta_cleavage</code>, <code>phenol_to_catechol</code>, <code>naphthalene_upper_pathway</code>, <code>biphenyl_upper_pathway</code>, <code>toluene_monooxygenase_aerobic</code>, <code>toluene_anaerobic</code>, <code>xylene_methyl_monooxygenase</code>, <code>phenylacetate_degradation</code>, <code>phthalate_degradation</code>, <code>terephthalate_degradation</code>, <code>benzoyl_coa_anaerobic</code></td>
+</tr>
+<tr>
+<td>Nitrogen cycle (context)</td>
+<td style="text-align: right;">4</td>
+<td><code>nitrate_reduction</code>, <code>nitrite_reduction_to_no</code>, <code>no_reduction</code>, <code>n2o_reduction</code></td>
+</tr>
+</tbody>
+</table>
+<p>The rules table, <code>trait_rules_v1.tsv</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>trait_id</code>, <code>trait</code></td>
+<td>the identifier every output uses, and the trait in words</td>
+</tr>
+<tr>
+<td><code>application</code></td>
+<td>one or more of <code>biofertiliser</code>, <code>biocontrol</code>, <code>biostimulant</code>, <code>stress tolerance</code> and <code>bioremediation</code>, separated by commas; <code>context</code> marks a call that describes the strain's metabolism rather than supporting a product claim (<a href="#what-a-call-does-not-mean">What a call does not mean</a>)</td>
+</tr>
+<tr>
+<td><code>required</code></td>
+<td>the alternative gene sets</td>
+</tr>
+<tr>
+<td><code>supporting</code></td>
+<td>genes and antiSMASH region types that are reported but not required, separated by <code>|</code></td>
+</tr>
+<tr>
+<td><code>colocalised</code></td>
+<td>empty, <code>all</code>, or groups separated by <code>;</code></td>
+</tr>
+<tr>
+<td><code>key_genes</code></td>
+<td>optional: the genes that set the pathway apart from look-alikes, separated by <code>|</code> (<a href="#how-a-trait-is-called">Key genes</a>)</td>
+</tr>
+<tr>
+<td><code>caveat</code></td>
+<td>what a call does not show; copied into the profile</td>
+</tr>
+<tr>
+<td><code>assay</code></td>
+<td>the laboratory test that would confirm the trait</td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td>the primary papers behind the rule</td>
+</tr>
+</tbody>
+</table>
+<p>The gene dictionary, <code>trait_genes_v1.tsv</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gene</code>, <code>protein</code></td>
+<td>the name the rules use, and the protein in words</td>
+</tr>
+<tr>
+<td><code>ecofolddb</code></td>
+<td>the catalogue entries that give structure evidence, named by the catalogue's <code>Gene</code> and <code>Pathway/Activity</code> joined by <code>@</code>; one name covers every entry with that <code>Gene</code> and <code>Pathway/Activity</code>, such as <code>nifH@N2 fixation</code>, which covers three structures; empty for a gene recognised by name only</td>
+</tr>
+<tr>
+<td><code>ko</code>, <code>ec</code></td>
+<td>the KO and EC numbers that count as a name match</td>
+</tr>
+<tr>
+<td><code>bakta_gene</code></td>
+<td>the gene symbols that count, matched exactly</td>
+</tr>
+<tr>
+<td><code>symbol_needs_product</code></td>
+<td><code>yes</code>: a symbol counts only together with the product pattern or a KO</td>
+</tr>
+<tr>
+<td><code>product_include</code></td>
+<td>a pattern searched for in the product, ignoring case</td>
+</tr>
+<tr>
+<td><code>product_exclude</code></td>
+<td>a pattern that vetoes the protein for this gene</td>
+</tr>
+<tr>
+<td><code>s_alone</code></td>
+<td><code>yes</code>: a structure hit counts without a name</td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td>the biology behind the entry</td>
+</tr>
+</tbody>
+</table>
+<p>Lists inside a cell are separated by <code>;</code>, and the patterns are Python regular
+expressions.</p>
+<h2 id="reading-the-output">Reading the output<a class="headerlink" href="#reading-the-output" title="Permanent link">¶</a></h2>
+<p><code>NA</code> marks a missing value in all three tables.</p>
+<h3 id="sample_trait_profiletsv"><code>{sample}_trait_profile.tsv</code><a class="headerlink" href="#sample_trait_profiletsv" title="Permanent link">¶</a></h3>
+<p>One row per rule, in table order.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sample</code>, <code>trait_id</code>, <code>trait</code>, <code>application</code></td>
+<td>which genome, which trait</td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td><code>called</code>, <code>partial</code> or <code>not called</code></td>
+</tr>
+<tr>
+<td><code>genes</code></td>
+<td>the counted genes of the called or partial set, each as <code>gene:locus_tag(evidence)</code>, with several proteins of one gene separated by commas and genes by semicolons; <code>NA</code> for a trait that is not called, and for a partial in which no gene counts</td>
+</tr>
+<tr>
+<td><code>missing</code></td>
+<td>for a partial, the genes of that set that did not count, separated by a comma and a space: each by its name, or, when only broken copies were found, as <code>gene:locus_tag(pseudogene)</code>, several copies joined by a comma alone, as in <code>nifD:SAMPLE1_01234(pseudogene),SAMPLE1_01240(pseudogene), nifE</code>. A gene whose only broken copy went to another gene (<a href="#when-a-gene-counts">When a gene counts</a>, point 4) is written by its bare name. <code>NA</code> otherwise</td>
+</tr>
+<tr>
+<td><code>supporting</code></td>
+<td>the supporting genes that counted, and the antiSMASH region types found with their position</td>
+</tr>
+<tr>
+<td><code>borderline</code></td>
+<td><code>yes</code> when a protein counted for the call carries a borderline structure hit for that gene, <code>no</code> when none does; <code>NA</code> for a trait that is not called</td>
+</tr>
+<tr>
+<td><code>structure_only</code></td>
+<td>the genes of the call counted from structure alone, with no name agreeing; <code>NA</code> when there are none, and for a trait that is not called</td>
+</tr>
+<tr>
+<td><code>caveat</code></td>
+<td>what the call does not show, from the rules table</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sample_trait_profile_audittsv"><code>{sample}_trait_profile_audit.tsv</code><a class="headerlink" href="#sample_trait_profile_audittsv" title="Permanent link">¶</a></h3>
+<p>One row per rule, with the columns <code>sample</code>, <code>trait_id</code>, <code>decision</code>, <code>reason</code> and
+<code>detail</code>. <code>reason</code> is a fixed word you can filter on; <code>detail</code> names the set and the
+genes behind it. For a partial, and for a trait that is not called, <code>detail</code> also lists
+the required genes of the rule's other sets that were found only as pseudogenes. A gene
+whose broken protein went to another gene (<a href="#when-a-gene-counts">When a gene counts</a>,
+point 4) is treated as not found, unless another protein counts for it or another
+broken protein is taken as it, and is written by its name; its row in the gene table
+shows the broken protein.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cut<span class="w"> </span>-f3,4<span class="w"> </span><span class="o">{</span>sample<span class="o">}</span>_trait_profile_audit.tsv<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span><span class="p">|</span><span class="w"> </span>uniq<span class="w"> </span>-c<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-rn
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th><code>reason</code></th>
+<th><code>decision</code></th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_complete</code></td>
+<td><code>called</code></td>
+<td>one alternative set is complete, and its co-localisation holds</td>
+</tr>
+<tr>
+<td><code>set_complete_not_colocalised</code></td>
+<td><code>partial</code></td>
+<td>a set is complete, but its genes do not lie together where the rule asks</td>
+</tr>
+<tr>
+<td><code>set_complete_but_pseudogene</code></td>
+<td><code>partial</code></td>
+<td>each gene of a set counts or is found as a pseudogene, and at least one only as a pseudogene; a one-gene set too. <code>detail</code> names each such gene with its locus tag</td>
+</tr>
+<tr>
+<td><code>half_of_set_found</code></td>
+<td><code>partial</code></td>
+<td>at least half of a set of two or more genes counts</td>
+</tr>
+<tr>
+<td><code>partial_withheld</code></td>
+<td><code>not called</code></td>
+<td>a set qualifies as partial (other than one lacking only pseudogenes), but no key gene is in the genome, counted or as a pseudogene. <code>detail</code> reads <code>no key gene (desA) found (...)</code>, with the withheld partial in brackets</td>
+</tr>
+<tr>
+<td><code>too_few_genes</code></td>
+<td><code>not called</code></td>
+<td>some genes count, but fewer than half of the closest set; <code>detail</code> says which are missing</td>
+</tr>
+<tr>
+<td><code>no_gene_found</code></td>
+<td><code>not called</code></td>
+<td>no required gene counts; <code>detail</code> names any required gene found only as a pseudogene</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sample_trait_genestsv"><code>{sample}_trait_genes.tsv</code><a class="headerlink" href="#sample_trait_genestsv" title="Permanent link">¶</a></h3>
+<p>One row per protein and gene with any evidence, sorted by contig and position: the
+place to check a call.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sample</code>, <code>locus_tag</code>, <code>contig</code>, <code>start</code>, <code>stop</code>, <code>strand</code></td>
+<td>the protein, from Bakta</td>
+</tr>
+<tr>
+<td><code>cds_index</code></td>
+<td>its position in the contig's gene order, the number co-localisation is measured in</td>
+</tr>
+<tr>
+<td><code>gene</code>, <code>traits</code></td>
+<td>the gene, and the <code>trait_id</code> of each rule that uses it</td>
+</tr>
+<tr>
+<td><code>counted</code></td>
+<td><code>yes</code> or <code>no</code></td>
+</tr>
+<tr>
+<td><code>evidence</code></td>
+<td><code>S</code>, <code>Q</code> and <code>F</code> joined by <code>+</code>: structure, Bakta name, Baktfold name</td>
+</tr>
+<tr>
+<td><code>bakta_gene</code>, <code>bakta_product</code>, <code>ko</code>, <code>ec</code></td>
+<td>Bakta's annotation of the protein</td>
+</tr>
+<tr>
+<td><code>baktfold_product</code></td>
+<td>Baktfold's name for a protein Bakta called hypothetical</td>
+</tr>
+<tr>
+<td><code>ecofolddb_target</code>, <code>ecofolddb_gene</code>, <code>ecofolddb_pathway</code></td>
+<td>the best structure hit and its catalogue entry</td>
+</tr>
+<tr>
+<td><code>evalue</code>, <code>qcov</code>, <code>tcov</code></td>
+<td>that hit's e-value, as Foldseek printed it, and its two coverages</td>
+</tr>
+<tr>
+<td><code>borderline</code></td>
+<td>on a row whose evidence includes <code>S</code>: why that hit is borderline, or <code>no</code>; <code>NA</code> on other rows</td>
+</tr>
+<tr>
+<td><code>decision</code>, <code>reason</code>, <code>detail</code></td>
+<td><code>counted</code>, <code>not counted</code> or <code>not searched</code>; a fixed reason; free text</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th><code>reason</code></th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name_and_structure_agree</code></td>
+<td>a name match and a kept structure hit to one of the gene's <code>ecofolddb</code> entries; counted</td>
+</tr>
+<tr>
+<td><code>name_only</code></td>
+<td>a name match and no structure evidence for this gene, such as no hit, a failed hit or a kept hit to another entry (<code>detail</code> says which); counted</td>
+</tr>
+<tr>
+<td><code>structure_counts_alone</code></td>
+<td>a kept structure hit and no name, for a gene whose <code>s_alone</code> is <code>yes</code>; counted</td>
+</tr>
+<tr>
+<td><code>pseudogene</code></td>
+<td>evidence that would count by one of the three reasons above, on a protein Bakta marks as a pseudogene; not counted. When a different source names the protein for another gene of the same rule, <code>detail</code> says which of the two it is taken as (<a href="#when-a-gene-counts">When a gene counts</a>, point 4)</td>
+</tr>
+<tr>
+<td><code>counted_for_other_gene</code></td>
+<td>evidence that would count, on a protein that counts instead for another gene of the same rule (<a href="#when-a-gene-counts">When a gene counts</a>, point 4); not counted, and <code>detail</code> names both genes and why</td>
+</tr>
+<tr>
+<td><code>structure_only_needs_name</code></td>
+<td>a kept structure hit and no name, for a gene whose <code>s_alone</code> is <code>no</code>; not counted</td>
+</tr>
+<tr>
+<td><code>vetoed_by_name</code></td>
+<td>the product matched the gene's <code>product_exclude</code>; not counted by any evidence</td>
+</tr>
+<tr>
+<td><code>catalogue_gene_unused</code></td>
+<td>a kept structure hit to a catalogue entry that no gene of the gene dictionary uses; listed without a gene</td>
+</tr>
+<tr>
+<td><code>not_searched_too_long</code></td>
+<td>a protein longer than 4,000 amino acids, not searched by structure; listed without a gene, and its names are still checked. <code>detail</code> gives its length</td>
+</tr>
+</tbody>
+</table>
+<p>A protein that matched by name but whose best structure hit is a catalogue entry that
+failed the filter keeps its name row: the failed hit fills the structure columns, and
+<code>detail</code> says why it failed.</p>
+<h3 id="09reporttraits_summarytsv"><code>09.report/traits_summary.tsv</code><a class="headerlink" href="#09reporttraits_summarytsv" title="Permanent link">¶</a></h3>
+<p>One row per sample and one column per <code>trait_id</code>, in table order, each cell <code>called</code>,
+<code>partial</code> or <code>not called</code>.</p>
+<p>The MultiQC report shows the same calls in its Trait profile section, after Bakta,
+from the plot files in <code>09.report/traits_summary_mqc/</code>:</p>
+<ul>
+<li><strong>Call counts</strong>: for each strain, how many traits are called, partial and not called.
+  The counts help to find strains in a batch; they do not rank strains by benefit.</li>
+<li><strong>One heatmap per application label</strong>, strains in rows and traits in columns. Each
+  trait appears once, under its exact label, so <code>biofertiliser, biocontrol</code> has its own
+  panel. The axis shows each trait's <code>trait_id</code>, and the panel lists every ID with the
+  trait's name.</li>
+<li><strong>References and assays</strong>: for each trait, the papers behind its rule, a suggested
+  laboratory assay and its caveat, from the catalogue.</li>
+</ul>
+<p>Dark blue is <strong>called</strong>, light blue <strong>partial</strong> and grey <strong>not called</strong>. The heatmaps
+draw them from the numbers 2, 1 and 0, which stand for the three categories, not for a
+score of confidence or activity. A separate <strong>References</strong> section of the report lists
+the papers of the tools and of the trait methods.</p>
+<h3 id="sample_trait_provenancejson"><code>{sample}_trait_provenance.json</code><a class="headerlink" href="#sample_trait_provenancejson" title="Permanent link">¶</a></h3>
+<p>Written last by <code>trait_profile.py</code>, after the three tables. It records the SHA-256
+fingerprint (a code computed from every byte of a file) of the two catalogue tables, of
+EcoFoldDB's descriptions and of the three tables, each beside its file name, with the
+calling parameters. The MultiQC report and the traits workbook quote the catalogue's
+caveats, assays and references beside the calls, so rule <code>traits_summary</code> and rule
+<code>traits_workbook</code> compare these fingerprints with the files they read first: a catalogue
+edited after the calls were made, or an edited table, stops them, with rule
+<code>trait_profile</code> to be run again. Only contents are compared, so an output folder that has
+been moved still passes.</p>
+<h2 id="what-a-call-does-not-mean">What a call does not mean<a class="headerlink" href="#what-a-call-does-not-mean" title="Permanent link">¶</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">A call is genomic evidence, not a phenotype</p>
+<p>A call says that the genes for a trait are present. It does not show that they
+are expressed, that the proteins are active, or that the strain helps a plant.
+The <code>caveat</code> column says what each call leaves open, and the <code>assay</code> column of the
+rules table names the test that would confirm it.</p>
+</div>
+<p><strong><code>not called</code> is not the same as absent.</strong> A gene can be missed: its protein may carry
+no name the patterns recognise while the gene needs a name to count, the protein may be
+too long to be searched by structure, Bakta's gene finder may not predict a short gene
+at all, or the assembly may break the gene. A set that
+the rule wants together, split across contigs of a draft assembly, is reported as
+<code>partial</code> with the reason <code>set_complete_not_colocalised</code>, not as called. Read the audit
+before reporting a trait as missing.</p>
+<p><strong><code>partial</code> is a lead, not half a trait.</strong> Check <code>missing</code> in the profile, and the
+gene table for the proteins behind it.</p>
+<p><strong>A call can rest on a single gene.</strong> Some rules accept one marker gene as a set, such
+as <code>acdS</code> for ACC deaminase or <code>nosZ</code> for nitrous oxide reduction. When that gene is
+listed in <code>structure_only</code>, the call rests on a structure hit alone, with no name
+confirming it; only a gene whose <code>s_alone</code> is <code>yes</code>, such as <code>nosZ</code>, can count this
+way, so <code>acdS</code> always needs a name.</p>
+<p><strong>A call says nothing about safety.</strong> The genes behind a plant-beneficial trait are not
+confined to harmless bacteria: pyoverdine, a siderophore of the catalogue, is also a
+virulence factor of <em>Pseudomonas aeruginosa</em>
+(<a href="https://doi.org/10.1128/iai.64.2.518-523.1996">Meyer et al. 1996</a>). Whether a strain can
+be used rests on its taxonomy and risk group, and on its resistance and virulence genes and
+their mobility (<a href="../workbooks/#the-amr-workbook">AMR workbook</a>), not on how many traits it
+carries. The trait profile ranks nothing.</p>
+<p><strong><code>context</code> describes the strain, not a product claim.</strong> The <code>application</code> column
+gives each trait the use it points to. <code>context</code> marks a trait whose call describes
+the strain's metabolism but does not, on its own, support a biofertiliser,
+biocontrol, biostimulant or bioremediation claim. Three kinds of traits carry it:</p>
+<ul>
+<li>the four denitrification steps, <code>nitrate_reduction</code> to <code>n2o_reduction</code>, <code>context</code>
+  only: nitrate reduction is the first step both of denitrification, which loses
+  nitrogen from the soil, and of nitrate ammonification, which keeps it as ammonium;</li>
+<li><code>siderophore_mycobactin</code>, <code>context</code> only: mycobactin is the siderophore of
+  mycobacteria and their relatives, so a call says which genus you are holding
+  rather than that the strain supplies a plant with iron;</li>
+<li>the central aromatic routes, catechol and protocatechuate ring cleavage and
+  phenylacetate degradation, <code>bioremediation, context</code>: many aromatic pollutants end
+  up in them, but they are also the ordinary exit for plant phenolics in many soil
+  bacteria. A pollutant claim rests on an upstream route, such as
+  <code>naphthalene_upper_pathway</code> or <code>toluene_monooxygenase_aerobic</code>.</li>
+</ul>
+<p>The label never changes a decision.</p>
+<p><strong><code>borderline: yes</code></strong> marks a call in which a counted protein carries a structure hit
+close to a cut-off or to a rival. Check that hit in the gene table before quoting the
+call.</p>
+<h2 id="cost-and-databases">Cost and databases<a class="headerlink" href="#cost-and-databases" title="Permanent link">¶</a></h2>
+<p>The 3Di step dominates: about 1 h 50 min per genome on 16 CPU cores, and it grows with
+the number and length of the proteins. It turns every protein into a 3Di sequence,
+not only the hypothetical ones Baktfold looks at, so the trait profile and Baktfold do
+not share this step. The Foldseek search then takes about 2 minutes per genome, and
+the calls seconds.</p>
+<p>The layer needs two databases:</p>
+<ul>
+<li><strong>Baktfold's database</strong>, for the ProstT5 model inside it, even when <code>baktfold.run</code> is
+  false: about 22 GB, from <code>directories.baktfold_db</code>, or downloaded whole by
+  <code>baktfold install</code> on the first run.</li>
+<li><strong>EcoFoldDB v2.0</strong>: a 0.57 GB archive from its Zenodo record, checked against
+  <code>links.ecofolddb_md5</code> and unpacked to about 0.8 GB in
+  <code>04.annotation/traits/databases/</code>, or a copy you already hold, from
+  <code>directories.ecofolddb_db</code>.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Use the Zenodo copy of EcoFoldDB</p>
+<p>The copy of EcoFoldDB in the authors' GitHub repository names some catalogue
+entries differently from the Zenodo record, and the gene dictionary needs the
+Zenodo names. A copy given in <code>directories.ecofolddb_db</code> is checked before any job
+starts: when an entry the gene dictionary uses is missing from its
+<code>EcoFoldDB_descriptions.txt</code>, the run stops and names it.</p>
+</div>
+<p>The structure files in <code>04.annotation/traits/{sample}/structure/</code> are kept, so the 3Di
+step runs once per genome. The Foldseek hit table, about 170 MB per genome, is
+temporary: making the calls again, after a table edit for example, repeats only the
+2-minute search. Fetching EcoFoldDB again repeats the search and the calls; fetching
+or linking Baktfold's database again repeats the 3Di step too. The archive clean-up
+(<code>workflow/scripts/clean_workdir.sh</code>) removes the structure files and both databases,
+and a later run in a cleaned folder repeats the 3Di step. Switching <code>baktfold.run</code> on
+in a folder that already holds trait profiles makes the calls again, with Baktfold's
+names.</p>
+<h2 id="resources">Resources<a class="headerlink" href="#resources" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th style="text-align: right;">Threads</th>
+<th>Memory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>trait_structure_query</code></td>
+<td style="text-align: right;">capped at 24</td>
+<td>16 GB requested from a cluster scheduler, or <code>ram_gb</code> if lower</td>
+</tr>
+<tr>
+<td><code>trait_structure_search</code></td>
+<td style="text-align: right;">capped at 24</td>
+<td>none declared</td>
+</tr>
+<tr>
+<td><code>trait_profile</code></td>
+<td style="text-align: right;">1</td>
+<td>none declared</td>
+</tr>
+<tr>
+<td><code>traits_summary</code></td>
+<td style="text-align: right;">1</td>
+<td>none declared</td>
+</tr>
+</tbody>
+</table>
+<p>"Capped at 24" has the meaning given under
+<a href="../annotation/#resources">Annotation</a>. The 3Di step runs ProstT5 on the CPU; like
+Baktfold's own rule, it is held to its threads and asks no internet service for the
+model, so it runs on a compute node without internet. <code>trait_db</code> is a local rule: on a
+cluster it runs on the computer that runs Snakemake, which is the one with internet. It
+takes <code>wget</code>, <code>tar</code> and the <code>gzip</code> that <code>tar</code> calls from <code>workflow/envs/download.yaml</code>;
+<code>md5sum</code>, <code>awk</code>, <code>mkdir</code>, <code>basename</code>, <code>rm</code> and <code>ls</code> come from the computer, as part of
+every Linux base system. The 3Di and search rules run in <code>workflow/envs/baktfold.yaml</code>,
+which carries ProstT5 and Foldseek, and the two scripts in <code>workflow/envs/python.yaml</code>.</p>
+<h2 id="what-to-check-afterwards">What to check afterwards<a class="headerlink" href="#what-to-check-afterwards" title="Permanent link">¶</a></h2>
+<ul>
+<li><code>09.report/traits_summary.tsv</code>, or the trait heatmaps in
+  <code>09.report/multiqc_report.html</code>: every sample at a glance.</li>
+<li><code>{sample}_trait_profile_audit.tsv</code>: the reason behind each decision.</li>
+<li><code>10.workbooks/{sample}_traits.xlsx</code>: the calls with their genes, caveats, suggested
+  assays and references, and the plasmid and phage context of every gene, in one file
+  per strain (<a href="../workbooks/#the-traits-workbook">Per-strain workbooks</a>).</li>
+<li><code>logs/trait_db.log</code>: the download, and whether the MD5 matched. Nothing is
+  extracted when it did not. With <code>directories.ecofolddb_db</code> set,
+  <code>logs/trait_db_local.log</code> takes its place.</li>
+<li><code>logs/trait_structure_query_{sample}.log</code>, <code>logs/trait_structure_search_{sample}.log</code>
+  and <code>logs/trait_profile_{sample}.log</code>: one per sample per step;
+  <code>logs/traits_summary.log</code> for the summary. A <code>WARNING</code> in the trait_profile log
+  that the hit table holds no hits means that every trait of that sample is decided
+  from names alone, with no structure evidence.</li>
+</ul>
+<h2 id="licensing-and-citation">Licensing and citation<a class="headerlink" href="#licensing-and-citation" title="Permanent link">¶</a></h2>
+<p>The EcoFoldDB database is published on Zenodo under CC BY 4.0. The authors' own
+annotation script, on GitHub, states no licence, and BacFlux does not use it: the
+filter on this page is BacFlux's own code, written from the published method. See
+<a href="../../about/licensing/">Licensing</a>. Cite EcoFoldDB together with Baktfold, ProstT5 and
+Foldseek, which run in this layer (<a href="../../about/citation/">Citation</a>); the sources of
+each rule are in the <code>reference</code> column of the rules table.</p>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">¶</a></h2>
+<ul>
+<li>Ghaly, T. M., Rajabal, V., Russell, D., Colombi, E., &amp; Tetu, S. G. (2025).
+  EcoFoldDB: protein structure-guided functional profiling of ecologically relevant
+  microbial traits at the metagenome scale. <em>Environmental Microbiology</em>
+  27(9):e70178. <a href="https://doi.org/10.1111/1462-2920.70178">https://doi.org/10.1111/1462-2920.70178</a> — source of the database and
+  of the method this layer follows: the structure filter, the 4,000-residue limit and
+  the <code>-s 8</code> search, as in the authors' own annotation pipeline. The database:
+  EcoFoldDB v2.0, <a href="https://doi.org/10.5281/zenodo.16908168">https://doi.org/10.5281/zenodo.16908168</a>.</li>
+<li>Heinzinger, M. <em>et al.</em> (2024). Bilingual language model for protein sequence and
+  structure. <em>NAR Genomics and Bioinformatics</em> 6(4):lqae150.
+  <a href="https://doi.org/10.1093/nargab/lqae150">https://doi.org/10.1093/nargab/lqae150</a> — ProstT5, which predicts the 3Di
+  sequences.</li>
+<li>van Kempen, M. <em>et al.</em> (2024). Fast and accurate protein structure search with
+  Foldseek. <em>Nature Biotechnology</em> 42(2):243–246.
+  <a href="https://doi.org/10.1038/s41587-023-01773-0">https://doi.org/10.1038/s41587-023-01773-0</a></li>
+<li>Bouras, G. <em>et al.</em> (2026). Baktfold: sensitive protein functional annotation across
+  the microbial tree of life using structural information. <em>bioRxiv</em> (preprint).
+  <a href="https://doi.org/10.64898/2026.03.31.715528">https://doi.org/10.64898/2026.03.31.715528</a> — the tool that runs the ProstT5 step;
+  its database supplies the model.</li>
+<li>Karp, P. D., Latendresse, M., &amp; Caspi, R. (2011). The Pathway Tools pathway
+  prediction algorithm. <em>Standards in Genomic Sciences</em> 5(3):424–429.
+  <a href="https://doi.org/10.4056/sigs.1794338">https://doi.org/10.4056/sigs.1794338</a> — MetaCyc's key reactions, which tell
+  related pathway variants apart: the idea behind <code>key_genes</code>.</li>
+</ul>
+<p>The co-localisation distance, the borderline flag and each rule's key genes are
+conventions of this layer, not values taken from these sources: <code>key_genes</code> borrows
+only the idea of MetaCyc's key reactions.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden="">
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>
