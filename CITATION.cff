@@ -36,7 +36,11 @@ abstract: >-
   shared analysis spine: decontamination, assembly QC, completeness and
   contamination, taxonomic placement, functional annotation, secondary
   metabolites, CAZymes, antimicrobial resistance and virulence screening, plasmid
-  and prophage detection, and an aggregated report. An optional mobilome module
+  and prophage detection, and an aggregated report. ONT reads are trimmed of the
+  adapters and barcodes they carry before assembly, every finished genome is
+  screened for leftover adapter sequence, and each strain gets an Excel workbook
+  of its resistance and virulence genes with their genomic context. An optional
+  mobilome module
   (off by default) reports, for each AMR gene, whether it sits in a mobile
   genetic element and how transferable that element is predicted to be. Two
   further optional layers use predicted protein structure: Baktfold names
@@ -44,8 +48,8 @@ abstract: >-
   plant-growth promotion, biocontrol, stress tolerance and bioremediation from
   sets of genes. Every tool runs in its own conda environment.
 type: software
-version: 2.1.0
-date-released: 2026-10-28
+version: 2.2.0
+date-released: 2026-11-14
 license: MIT
 repository-code: "https://github.com/iLivius/BacFlux"
 url: "https://github.com/iLivius/BacFlux"
@@ -59,9 +63,6 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.11143917
     description: "Concept DOI — always resolves to the latest BacFlux release."
-  - type: doi
-    value: 10.5281/zenodo.23736124
-    description: "Version DOI — BacFlux v2.1.0."
 
 keywords:
   - bacterial genomics
